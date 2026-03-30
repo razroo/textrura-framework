@@ -281,27 +281,36 @@ const html = toSemanticHTML(tree, {
 
 // ─── Page Sections ───────────────────────────────────────────────────────────
 
+/** Wrap a child in a row with justifyContent center — reliable horizontal centering in Yoga. */
+function center(...children: UIElement[]): UIElement {
+  return box({ flexDirection: 'row', justifyContent: 'center' }, children)
+}
+
 function heroSection(): UIElement {
-  return box({ flexDirection: 'column', alignItems: 'center', paddingTop: 80, paddingBottom: 48, gap: 24 }, [
-    box({ borderColor: ACCENT, borderRadius: 12, paddingLeft: 14, paddingRight: 14, paddingTop: 4, paddingBottom: 4 }, [
-      text({ text: 'THE SINGULARITY FRONTEND FRAMEWORK', font: '500 12px Inter', lineHeight: 16, color: ACCENT }),
-    ]),
-    text({ text: 'The client is the server.', font: 'bold 44px Inter', lineHeight: 50, color: TEXT_COLOR }),
-    text({ text: 'The server is the client.', font: 'bold 44px Inter', lineHeight: 50, color: ACCENT }),
-    text({ text: 'Geometra dissolves the boundary between client and server. Human and AI interaction is native to both sides.', font: '16px Inter', lineHeight: 24, color: MUTED }),
-    box({
-      backgroundColor: CODE_BG, borderColor: BORDER, borderRadius: 8,
-      paddingTop: 12, paddingBottom: 12, paddingLeft: 20, paddingRight: 20,
-      flexDirection: 'row', alignItems: 'center', gap: 12,
-      onClick: () => {
-        navigator.clipboard.writeText('npm i @geometra/core @geometra/renderer-canvas')
-        copied.set(true)
-        setTimeout(() => copied.set(false), 1500)
-      },
-    }, [
-      text({ text: 'npm i @geometra/core @geometra/renderer-canvas', font: '14px JetBrains Mono', lineHeight: 20, color: TEXT_COLOR }),
-      text({ text: copied.value ? '\u2713 Copied' : 'Copy', font: '12px Inter', lineHeight: 16, color: copied.value ? ACCENT3 : MUTED }),
-    ]),
+  return box({ flexDirection: 'column', paddingTop: 80, paddingBottom: 48, gap: 24 }, [
+    center(
+      box({ borderColor: ACCENT, borderRadius: 12, paddingLeft: 14, paddingRight: 14, paddingTop: 4, paddingBottom: 4 }, [
+        text({ text: 'THE SINGULARITY FRONTEND FRAMEWORK', font: '500 12px Inter', lineHeight: 16, color: ACCENT }),
+      ]),
+    ),
+    center(text({ text: 'The client is the server.', font: 'bold 44px Inter', lineHeight: 50, color: TEXT_COLOR })),
+    center(text({ text: 'The server is the client.', font: 'bold 44px Inter', lineHeight: 50, color: ACCENT })),
+    center(text({ text: 'Geometra dissolves the boundary between client and server. Human and AI interaction is native to both sides.', font: '16px Inter', lineHeight: 24, color: MUTED })),
+    center(
+      box({
+        backgroundColor: CODE_BG, borderColor: BORDER, borderRadius: 8,
+        paddingTop: 12, paddingBottom: 12, paddingLeft: 20, paddingRight: 20,
+        flexDirection: 'row', gap: 12,
+        onClick: () => {
+          navigator.clipboard.writeText('npm i @geometra/core @geometra/renderer-canvas')
+          copied.set(true)
+          setTimeout(() => copied.set(false), 1500)
+        },
+      }, [
+        text({ text: 'npm i @geometra/core @geometra/renderer-canvas', font: '14px JetBrains Mono', lineHeight: 20, color: TEXT_COLOR }),
+        text({ text: copied.value ? '\u2713 Copied' : 'Copy', font: '12px Inter', lineHeight: 16, color: copied.value ? ACCENT3 : MUTED }),
+      ]),
+    ),
   ])
 }
 
@@ -315,11 +324,11 @@ function pipelineSection(): UIElement {
   }
   const arrow = () => text({ text: '\u2192', font: '18px Inter', lineHeight: 34, color: MUTED })
 
-  return box({ flexDirection: 'column', paddingBottom: 64, gap: 8, alignItems: 'center' }, [
-    box({ flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' }, [
+  return box({ flexDirection: 'column', paddingBottom: 64, gap: 8 }, [
+    box({ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }, [
       step('HTML', true), arrow(), step('CSS Parser', true), arrow(), step('DOM', true), arrow(), step('Layout', true), arrow(), step('Paint', true),
     ]),
-    box({ flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' }, [
+    box({ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }, [
       step('Tree', false), arrow(), step('Yoga WASM', false), arrow(), step('Geometry', false), arrow(), step('Pixels', false),
     ]),
   ])
@@ -351,8 +360,8 @@ function demoSection(): UIElement {
       btn('Column', direction.value === 'column', () => direction.set('column')),
     ]),
     // Demo area
-    box({ backgroundColor: SURFACE, borderColor: BORDER, borderRadius: 12, padding: 24, alignItems: 'center' }, [
-      box({ backgroundColor: '#1a1a2e', borderRadius: 8 }, [scenarioFn()]),
+    box({ backgroundColor: SURFACE, borderColor: BORDER, borderRadius: 12, padding: 24 }, [
+      center(box({ backgroundColor: '#1a1a2e', borderRadius: 8 }, [scenarioFn()])),
     ]),
     // Perf
     box({ flexDirection: 'row', gap: 8, justifyContent: 'center' }, [
