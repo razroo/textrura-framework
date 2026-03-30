@@ -172,26 +172,26 @@ function nestedLayout(): UIElement {
 
 function selectableText(): UIElement {
   return box(
-    { flexDirection: 'column', padding: 24, gap: 16, width: rootWidth.value, height: 400 },
+    { flexDirection: 'column', padding: 24, gap: 14, width: rootWidth.value, minHeight: 400 },
     [
       text({ text: 'Text Selection', font: 'bold 18px Inter', lineHeight: 24, color: '#ffffff' }),
       text({
-        text: 'Click and drag to select this text. It is rendered entirely on Canvas \u2014 no DOM text nodes exist. The selection highlight and character-level hit testing are computed from geometry.',
+        text: 'Click and drag to select this text. No DOM text nodes \u2014 just Canvas.',
         font: '14px Inter',
         lineHeight: 22,
         color: '#e2e8f0',
         selectable: true,
       }),
-      box({ backgroundColor: '#18181b', borderRadius: 8, padding: 16, flexDirection: 'column', gap: 10 }, [
+      box({ backgroundColor: '#18181b', borderRadius: 8, padding: 16, flexDirection: 'column', gap: 8 }, [
         text({
-          text: 'Geometra computes character positions using ctx.measureText() during each render pass. When you click, it hit-tests against these positions to find the exact character under your cursor.',
+          text: 'Character positions are measured with ctx.measureText() each frame. Click to hit-test the exact character.',
           font: '13px Inter',
           lineHeight: 20,
           color: '#a1a1aa',
           selectable: true,
         }),
         text({
-          text: 'Press Cmd+C (or Ctrl+C) to copy selected text to your clipboard. This works exactly like native text selection, but without a single DOM node.',
+          text: 'Press Cmd+C / Ctrl+C to copy. Works like native selection.',
           font: '13px Inter',
           lineHeight: 20,
           color: '#a1a1aa',
@@ -201,15 +201,15 @@ function selectableText(): UIElement {
       box({ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }, [
         box({ backgroundColor: '#0f3460', borderRadius: 8, padding: 14, flexGrow: 1, flexDirection: 'column', gap: 4 }, [
           text({ text: 'How it works', font: 'bold 13px Inter', lineHeight: 18, color: '#60a5fa', selectable: true }),
-          text({ text: 'Character offsets are measured with Canvas2D measureText() and cached per text node per frame.', font: '12px Inter', lineHeight: 17, color: '#93c5fd', selectable: true }),
+          text({ text: 'Canvas2D measureText() computes character offsets per text node per frame.', font: '12px Inter', lineHeight: 17, color: '#93c5fd', selectable: true }),
         ]),
         box({ backgroundColor: '#1e3a2f', borderRadius: 8, padding: 14, flexGrow: 1, flexDirection: 'column', gap: 4 }, [
           text({ text: 'Cross-node selection', font: 'bold 13px Inter', lineHeight: 18, color: '#4ade80', selectable: true }),
-          text({ text: 'Drag across multiple text elements. The selection range spans nodes in document order.', font: '12px Inter', lineHeight: 17, color: '#86efac', selectable: true }),
+          text({ text: 'Drag across multiple text elements to select across nodes.', font: '12px Inter', lineHeight: 17, color: '#86efac', selectable: true }),
         ]),
       ]),
       text({
-        text: 'Tip: the cursor changes to a text cursor (I-beam) when hovering over selectable text.',
+        text: 'Tip: cursor changes to I-beam over selectable text.',
         font: '11px Inter',
         lineHeight: 15,
         color: '#52525b',
@@ -222,7 +222,7 @@ function selectableText(): UIElement {
 function seoDemo(): UIElement {
   return box(
     {
-      flexDirection: 'column', padding: 24, gap: 16, width: rootWidth.value, height: 400,
+      flexDirection: 'column', padding: 24, gap: 16, width: rootWidth.value, minHeight: 400,
       semantic: { tag: 'main' },
     },
     [
@@ -232,7 +232,7 @@ function seoDemo(): UIElement {
         semantic: { tag: 'h1' },
       }),
       text({
-        text: 'Geometra can generate semantic HTML from the same element tree that renders to Canvas. Serve HTML to crawlers, Canvas to users.',
+        text: 'Generate semantic HTML from the same element tree that renders to Canvas. Serve HTML to crawlers, Canvas to users.',
         font: '14px Inter', lineHeight: 22, color: '#e2e8f0',
         semantic: { tag: 'p' },
       }),
@@ -246,7 +246,7 @@ function seoDemo(): UIElement {
           semantic: { tag: 'h2' },
         }),
         text({
-          text: 'Each element can carry a semantic property with tag, role, and alt hints. The toSemanticHTML() function walks the tree and produces valid HTML with proper heading hierarchy, ARIA roles, and Open Graph metadata.',
+          text: 'Elements carry semantic hints (tag, role, alt). toSemanticHTML() produces valid HTML with heading hierarchy, ARIA roles, and Open Graph metadata.',
           font: '13px Inter', lineHeight: 20, color: '#a1a1aa',
           semantic: { tag: 'p' },
         }),
