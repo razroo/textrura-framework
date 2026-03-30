@@ -8,6 +8,9 @@ A DOM-free frontend framework built on the [Textura](https://github.com/razroo/t
 
 Built for the AI Agent Era — where browsers are optional, SEO is irrelevant, and speed is everything. Agents instead of interacting with a client, interact with the server directly via JSON used for client as well. 
 
+- Dashboard: https://razroo.github.io/geometra-demo/
+- Agent Demo: https://razroo.github.io/geometra-demo/agent-demo.html
+
 ## How It Works
 
 ```
