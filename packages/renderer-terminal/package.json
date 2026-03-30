@@ -4,6 +4,13 @@
   "description": "Terminal/TUI renderer for Textura framework",
   "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/razroo/textrura-framework",
+    "directory": "packages/renderer-terminal"
+  },
+  "homepage": "https://razroo.github.io/textrura-framework",
+  "keywords": ["textura", "renderer", "terminal", "tui", "ansi", "dom-free"],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

@@ -4,6 +4,13 @@
   "description": "Server-side layout engine with WebSocket geometry streaming",
   "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/razroo/textrura-framework",
+    "directory": "packages/server"
+  },
+  "homepage": "https://razroo.github.io/textrura-framework",
+  "keywords": ["textura", "server", "websocket", "layout", "dom-free"],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

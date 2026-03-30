@@ -1,0 +1,81 @@
+name: Release to npm
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Set version from release tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Update textura dependency to npm (not file:)
+        run: |
+          cd packages/core
+          npm pkg set "dependencies.textura=^0.1.0"
+
+      - name: Set version on all packages
+        run: |
+          for dir in packages/core packages/renderer-canvas packages/renderer-terminal packages/server packages/client; do
+            cd "$dir"
+            npm version "$VERSION" --no-git-tag-version --allow-same-version
+            cd "$GITHUB_WORKSPACE"
+          done
+
+      - name: Update cross-references to release version
+        run: |
+          for dir in packages/renderer-canvas packages/renderer-terminal packages/server packages/client; do
+            cd "$dir"
+            npm pkg set "dependencies.@textura/core=^$VERSION" 2>/dev/null || true
+            cd "$GITHUB_WORKSPACE"
+          done
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build all packages (dependency order)
+        run: |
+          npm run build -w @textura/core
+          npm run build -w @textura/renderer-canvas
+          npm run build -w @textura/renderer-terminal
+          npm run build -w @textura/server
+          npm run build -w @textura/client
+
+      - name: Publish @textura/core
+        run: npm publish --provenance --access public -w @textura/core
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @textura/renderer-canvas
+        run: npm publish --provenance --access public -w @textura/renderer-canvas
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @textura/renderer-terminal
+        run: npm publish --provenance --access public -w @textura/renderer-terminal
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @textura/server
+        run: npm publish --provenance --access public -w @textura/server
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @textura/client
+        run: npm publish --provenance --access public -w @textura/client
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

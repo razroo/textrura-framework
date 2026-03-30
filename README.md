@@ -1,5 +1,7 @@
 # Textura Framework
 
+**[Live Demo](https://razroo.github.io/textrura-framework)** | **[npm](https://www.npmjs.com/org/textura)** | **[GitHub](https://github.com/razroo/textrura-framework)**
+
 A DOM-free frontend framework built on the [Textura](https://github.com/razroo/textura) layout engine. No browser layout engine. No DOM. Just computed geometry piped straight to render targets.
 
 Built for the AI Agent Era — where browsers are optional, SEO is irrelevant, and speed is everything.

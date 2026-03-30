@@ -4,6 +4,13 @@
   "description": "Thin client that receives server-computed geometry and paints via renderer",
   "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/razroo/textrura-framework",
+    "directory": "packages/client"
+  },
+  "homepage": "https://razroo.github.io/textrura-framework",
+  "keywords": ["textura", "client", "websocket", "thin-client", "dom-free"],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
