@@ -27,7 +27,7 @@ jobs:
       - name: Update textura dependency to npm (not file:)
         run: |
           cd packages/core
-          npm pkg set "dependencies.textura=^0.1.0"
+          npm pkg set "dependencies.textura=^1.1.1"
 
       - name: Install dependencies
         run: |
