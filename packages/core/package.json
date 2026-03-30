@@ -1,5 +1,5 @@
 {
-  "name": "@textura/core",
+  "name": "@geometra/core",
   "version": "0.1.0",
   "description": "DOM-free UI framework core: components, signals, reconciler",
   "license": "MIT",

@@ -1,5 +1,5 @@
 {
-  "name": "@textura/client",
+  "name": "@geometra/client",
   "version": "0.1.0",
   "description": "Thin client that receives server-computed geometry and paints via renderer",
   "license": "MIT",
@@ -25,6 +25,6 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
-    "@textura/core": "^0.1.0"
+    "@geometra/core": "^0.1.0"
   }
 }

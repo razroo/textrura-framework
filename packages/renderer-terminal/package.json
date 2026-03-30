@@ -1,5 +1,5 @@
 {
-  "name": "@textura/renderer-terminal",
+  "name": "@geometra/renderer-terminal",
   "version": "0.1.0",
   "description": "Terminal/TUI renderer for Textura framework",
   "license": "MIT",
@@ -25,7 +25,7 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
-    "@textura/core": "^0.1.0"
+    "@geometra/core": "^0.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0"

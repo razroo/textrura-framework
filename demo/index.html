@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Textura Framework — DOM-Free UI for the AI Agent Era</title>
+  <title>Geometra — DOM-Free UI for the AI Agent Era</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -276,11 +276,11 @@
   <section class="hero">
     <div class="hero-badge">DOM-Free Frontend Framework</div>
     <h1>UI without the <span>browser</span>.</h1>
-    <p>Textura Framework replaces the entire browser rendering pipeline.
+    <p>Geometra replaces the entire browser rendering pipeline.
        Flexbox layout via Yoga WASM. Computed geometry piped to Canvas, Terminal, or AI agents.
        Built for the AI Agent Era.</p>
     <div class="hero-install" id="install-cmd" title="Click to copy">
-      <code>npm i @textura/core @textura/renderer-canvas</code>
+      <code>npm i @geometra/core @geometra/renderer-canvas</code>
       <span style="font-size: 16px">&#x1f4cb;</span>
     </div>
   </section>
@@ -345,23 +345,23 @@
     <h2>Packages</h2>
     <div class="arch-grid">
       <div class="arch-card">
-        <h3>@textura/core <span class="badge badge-core">Core</span></h3>
+        <h3>@geometra/core <span class="badge badge-core">Core</span></h3>
         <p>Signals reactivity, <code>box()</code> / <code>text()</code> element constructors, hit-testing, tree reconciler, <code>createApp()</code>.</p>
       </div>
       <div class="arch-card">
-        <h3>@textura/renderer-canvas <span class="badge badge-render">Render</span></h3>
+        <h3>@geometra/renderer-canvas <span class="badge badge-render">Render</span></h3>
         <p>Canvas2D paint backend. Backgrounds, borders, rounded rects, text wrapping. Crisp HiDPI rendering.</p>
       </div>
       <div class="arch-card">
-        <h3>@textura/renderer-terminal <span class="badge badge-render">Render</span></h3>
+        <h3>@geometra/renderer-terminal <span class="badge badge-render">Render</span></h3>
         <p>ANSI terminal renderer. Box-drawing borders, 256-color mapping, character-grid output for TUI apps.</p>
       </div>
       <div class="arch-card">
-        <h3>@textura/server <span class="badge badge-net">Network</span></h3>
+        <h3>@geometra/server <span class="badge badge-net">Network</span></h3>
         <p>Server-side layout engine. Computes geometry, diffs frames, streams patches over WebSocket.</p>
       </div>
       <div class="arch-card">
-        <h3>@textura/client <span class="badge badge-net">Network</span></h3>
+        <h3>@geometra/client <span class="badge badge-net">Network</span></h3>
         <p>Thin client (~2KB). Receives pre-computed geometry from server, paints via any renderer. Zero layout cost.</p>
       </div>
     </div>
@@ -376,14 +376,14 @@
       <div class="code-tab" data-tab="server">Server</div>
     </div>
     <div class="code-block active" data-tab="basic">
-<pre><span class="kw">import</span> { box, text, createApp } <span class="kw">from</span> <span class="str">'@textura/core'</span>
-<span class="kw">import</span> { CanvasRenderer } <span class="kw">from</span> <span class="str">'@textura/renderer-canvas'</span>
+<pre><span class="kw">import</span> { box, text, createApp } <span class="kw">from</span> <span class="str">'@geometra/core'</span>
+<span class="kw">import</span> { CanvasRenderer } <span class="kw">from</span> <span class="str">'@geometra/renderer-canvas'</span>
 
 <span class="kw">const</span> renderer = <span class="kw">new</span> <span class="fn">CanvasRenderer</span>({ canvas, background: <span class="str">'#1a1a2e'</span> })
 
 <span class="kw">function</span> <span class="fn">view</span>() {
   <span class="kw">return</span> <span class="fn">box</span>({ flexDirection: <span class="str">'column'</span>, padding: <span class="num">24</span>, gap: <span class="num">16</span> }, [
-    <span class="fn">text</span>({ text: <span class="str">'Hello Textura'</span>, font: <span class="str">'bold 24px Inter'</span>, lineHeight: <span class="num">32</span>, color: <span class="str">'#fff'</span> }),
+    <span class="fn">text</span>({ text: <span class="str">'Hello Geometra'</span>, font: <span class="str">'bold 24px Inter'</span>, lineHeight: <span class="num">32</span>, color: <span class="str">'#fff'</span> }),
     <span class="fn">box</span>({ backgroundColor: <span class="str">'#e94560'</span>, padding: <span class="num">12</span>, borderRadius: <span class="num">8</span> }, [
       <span class="fn">text</span>({ text: <span class="str">'No DOM. No browser. Just pixels.'</span>, font: <span class="str">'14px Inter'</span>, lineHeight: <span class="num">20</span>, color: <span class="str">'#fff'</span> }),
     ]),
@@ -393,7 +393,7 @@
 <span class="kw">await</span> <span class="fn">createApp</span>(view, renderer, { width: <span class="num">400</span>, height: <span class="num">300</span> })</pre>
     </div>
     <div class="code-block" data-tab="reactive">
-<pre><span class="kw">import</span> { signal, box, text, createApp } <span class="kw">from</span> <span class="str">'@textura/core'</span>
+<pre><span class="kw">import</span> { signal, box, text, createApp } <span class="kw">from</span> <span class="str">'@geometra/core'</span>
 
 <span class="kw">const</span> count = <span class="fn">signal</span>(<span class="num">0</span>)
 
@@ -413,15 +413,15 @@
     </div>
     <div class="code-block" data-tab="server">
 <pre><span class="cm">// server.ts — runs in Node.js, no browser</span>
-<span class="kw">import</span> { signal, box, text } <span class="kw">from</span> <span class="str">'@textura/core/node'</span>
-<span class="kw">import</span> { createServer } <span class="kw">from</span> <span class="str">'@textura/server'</span>
+<span class="kw">import</span> { signal, box, text } <span class="kw">from</span> <span class="str">'@geometra/core/node'</span>
+<span class="kw">import</span> { createServer } <span class="kw">from</span> <span class="str">'@geometra/server'</span>
 
 <span class="kw">const</span> data = <span class="fn">signal</span>([<span class="str">'Live from the server'</span>])
 <span class="kw">const</span> server = <span class="kw">await</span> <span class="fn">createServer</span>(<span class="fn">view</span>, { port: <span class="num">3100</span> })
 
 <span class="cm">// client.ts — ~2KB, just a paint loop</span>
-<span class="kw">import</span> { CanvasRenderer } <span class="kw">from</span> <span class="str">'@textura/renderer-canvas'</span>
-<span class="kw">import</span> { createClient } <span class="kw">from</span> <span class="str">'@textura/client'</span>
+<span class="kw">import</span> { CanvasRenderer } <span class="kw">from</span> <span class="str">'@geometra/renderer-canvas'</span>
+<span class="kw">import</span> { createClient } <span class="kw">from</span> <span class="str">'@geometra/client'</span>
 
 <span class="fn">createClient</span>({
   url: <span class="str">'ws://localhost:3100'</span>,
@@ -438,7 +438,7 @@
     <p>
       <a href="https://github.com/razroo/textrura-framework">GitHub</a> &middot;
       <a href="https://www.npmjs.com/org/textura">npm</a> &middot;
-      Built on <a href="https://github.com/razroo/textura">Textura</a> layout engine
+      Built on <a href="https://github.com/razroo/textura">Geometra</a> layout engine
     </p>
   </footer>
 

@@ -1,5 +1,5 @@
-import { signal, box, text, createApp } from '@textura/core/node'
-import { TerminalRenderer } from '@textura/renderer-terminal'
+import { signal, box, text, createApp } from '@geometra/core/node'
+import { TerminalRenderer } from '@geometra/renderer-terminal'
 
 const cols = process.stdout.columns ?? 80
 const rows = process.stdout.rows ?? 24

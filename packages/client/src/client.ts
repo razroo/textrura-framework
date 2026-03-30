@@ -1,5 +1,5 @@
 import type { ComputedLayout } from 'textura'
-import type { Renderer, UIElement } from '@textura/core'
+import type { Renderer, UIElement } from '@geometra/core'
 
 interface ServerFrame {
   type: 'frame'

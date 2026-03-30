@@ -1,5 +1,5 @@
 {
-  "name": "@textura/demo-server-client",
+  "name": "@geometra/demo-server-client",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,10 +8,10 @@
     "dev": "echo 'Run: npm run server  (terminal 1)  &&  npm run client  (terminal 2)'"
   },
   "dependencies": {
-    "@textura/core": "*",
-    "@textura/server": "*",
-    "@textura/client": "*",
-    "@textura/renderer-canvas": "*"
+    "@geometra/core": "*",
+    "@geometra/server": "*",
+    "@geometra/client": "*",
+    "@geometra/renderer-canvas": "*"
   },
   "devDependencies": {
     "tsx": "^4.19.0",

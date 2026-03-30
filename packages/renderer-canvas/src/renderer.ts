@@ -1,5 +1,5 @@
 import type { ComputedLayout } from 'textura'
-import type { Renderer, UIElement, BoxElement, TextElement } from '@textura/core'
+import type { Renderer, UIElement, BoxElement, TextElement } from '@geometra/core'
 
 export interface CanvasRendererOptions {
   /** Canvas element to render into. */

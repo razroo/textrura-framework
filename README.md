@@ -1,6 +1,6 @@
-# Textura Framework
+# Geometra
 
-**[Live Demo](https://razroo.github.io/textrura-framework)** | **[npm](https://www.npmjs.com/org/textura)** | **[GitHub](https://github.com/razroo/textrura-framework)**
+**[Live Demo](https://razroo.github.io/textrura-framework)** | **[npm](https://www.npmjs.com/org/geometra)** | **[GitHub](https://github.com/razroo/textrura-framework)**
 
 A DOM-free frontend framework built on the [Textura](https://github.com/razroo/textura) layout engine. No browser layout engine. No DOM. Just computed geometry piped straight to render targets.
 
@@ -10,7 +10,7 @@ Built for the AI Agent Era — where browsers are optional, SEO is irrelevant, a
 
 ```
 Traditional:  HTML → CSS Parser → DOM → Layout → Paint → Composite
-Textura:      Declarative Tree → Yoga WASM → Computed Geometry → Render Target
+Geometra:     Declarative Tree → Yoga WASM → Computed Geometry → Render Target
 ```
 
 The framework replaces the entire browser rendering pipeline. Layout is computed via Yoga (Facebook's flexbox engine compiled to WASM). Text is measured via Pretext. The output is pure geometry — `{ x, y, width, height }` — rendered by pluggable backends: Canvas2D, Terminal, or raw geometry for AI agents.
@@ -19,19 +19,19 @@ The framework replaces the entire browser rendering pipeline. Layout is computed
 
 | Package | Description |
 |---|---|
-| `@textura/core` | Component model, signals reactivity, hit-testing, tree reconciler |
-| `@textura/renderer-canvas` | Canvas2D paint backend |
-| `@textura/renderer-terminal` | ANSI terminal/TUI paint backend |
-| `@textura/server` | Server-side layout engine with WebSocket geometry streaming |
-| `@textura/client` | Thin client that receives pre-computed geometry and paints it |
+| `@geometra/core` | Component model, signals reactivity, hit-testing, tree reconciler |
+| `@geometra/renderer-canvas` | Canvas2D paint backend |
+| `@geometra/renderer-terminal` | ANSI terminal/TUI paint backend |
+| `@geometra/server` | Server-side layout engine with WebSocket geometry streaming |
+| `@geometra/client` | Thin client that receives pre-computed geometry and paints it |
 
 ## Quick Start
 
 ### Phase 1: Local Canvas Rendering
 
 ```ts
-import { signal, box, text, createApp } from '@textura/core'
-import { CanvasRenderer } from '@textura/renderer-canvas'
+import { signal, box, text, createApp } from '@geometra/core'
+import { CanvasRenderer } from '@geometra/renderer-canvas'
 
 const count = signal(0)
 
@@ -72,8 +72,8 @@ await createApp(view, renderer, { width: 400, height: 300 })
 **Server** (Node.js/Bun — no browser needed):
 
 ```ts
-import { signal, box, text } from '@textura/core'
-import { createServer } from '@textura/server'
+import { signal, box, text } from '@geometra/core/node'
+import { createServer } from '@geometra/server'
 
 const data = signal(['Hello', 'from the server'])
 
@@ -93,8 +93,8 @@ const server = await createServer(view, { port: 3100, width: 600, height: 400 })
 **Client** (thin — just a paint loop):
 
 ```ts
-import { CanvasRenderer } from '@textura/renderer-canvas'
-import { createClient } from '@textura/client'
+import { CanvasRenderer } from '@geometra/renderer-canvas'
+import { createClient } from '@geometra/client'
 
 const canvas = document.getElementById('app') as HTMLCanvasElement
 
@@ -110,15 +110,15 @@ The client never runs a layout engine. It receives pre-computed `{ x, y, width, 
 ### Phase 3: Terminal Rendering
 
 ```ts
-import { signal, box, text, createApp } from '@textura/core'
-import { TerminalRenderer } from '@textura/renderer-terminal'
+import { signal, box, text, createApp } from '@geometra/core/node'
+import { TerminalRenderer } from '@geometra/renderer-terminal'
 
 const renderer = new TerminalRenderer()
 
 function view() {
   return box({ flexDirection: 'column', padding: 16, gap: 8 }, [
     box({ backgroundColor: '#0a0a2e', padding: 12 }, [
-      text({ text: 'TEXTURA TUI', font: 'bold 20px monospace', lineHeight: 26, color: '#e94560' }),
+      text({ text: 'GEOMETRA TUI', font: 'bold 20px monospace', lineHeight: 26, color: '#e94560' }),
     ]),
     text({ text: 'Flexbox layout in your terminal.', font: '14px monospace', lineHeight: 18, color: '#aaa' }),
   ])
@@ -129,17 +129,17 @@ await createApp(view, renderer, { width: 533, height: 320 })
 
 ## Reactivity
 
-Textura uses a minimal signals system. When a signal changes, only the affected parts of the tree re-layout and re-render.
+Geometra uses a minimal signals system. When a signal changes, only the affected parts of the tree re-layout and re-render.
 
 ```ts
-import { signal, computed, effect, batch } from '@textura/core'
+import { signal, computed, effect, batch } from '@geometra/core'
 
 const name = signal('world')
 const greeting = computed(() => `Hello, ${name.value}!`)
 
 effect(() => console.log(greeting.value))  // "Hello, world!"
 
-name.set('Textura')                         // "Hello, Textura!"
+name.set('Geometra')                        // "Hello, Geometra!"
 
 // Batch multiple updates into one flush
 batch(() => {
@@ -172,10 +172,10 @@ box({
 │                  Application                      │
 │  Components → Signals → Layout Trees              │
 ├──────────────────────────────────────────────────┤
-│              @textura/core                         │
+│              @geometra/core                        │
 │  box() / text() → toLayoutTree() → computeLayout()│
 ├──────────────────────────────────────────────────┤
-│              textura (engine)                      │
+│              textura (layout engine)               │
 │  Yoga WASM + Pretext → { x, y, width, height }   │
 ├───────────┬───────────┬───────────┬──────────────┤
 │ Canvas2D  │  Terminal  │  Server   │ Raw Geometry  │

@@ -1,5 +1,5 @@
-import { signal, box, text } from '@textura/core/node'
-import { createServer } from '@textura/server'
+import { signal, box, text } from '@geometra/core/node'
+import { createServer } from '@geometra/server'
 
 // Server-side state
 const messages = signal<string[]>([

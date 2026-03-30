@@ -1,13 +1,13 @@
 {
-  "name": "@textura/demo-terminal",
+  "name": "@geometra/demo-terminal",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "tsx app.ts"
   },
   "dependencies": {
-    "@textura/core": "*",
-    "@textura/renderer-terminal": "*"
+    "@geometra/core": "*",
+    "@geometra/renderer-terminal": "*"
   },
   "devDependencies": {
     "tsx": "^4.19.0"

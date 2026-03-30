@@ -1,13 +1,13 @@
 {
-  "name": "@textura/demo-local-canvas",
+  "name": "@geometra/demo-local-canvas",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite"
   },
   "dependencies": {
-    "@textura/core": "*",
-    "@textura/renderer-canvas": "*"
+    "@geometra/core": "*",
+    "@geometra/renderer-canvas": "*"
   },
   "devDependencies": {
     "vite": "^8.0.3"

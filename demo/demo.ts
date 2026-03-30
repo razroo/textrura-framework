@@ -1,6 +1,6 @@
-import { signal, box, text, createApp } from '@textura/core'
-import type { App, UIElement } from '@textura/core'
-import { CanvasRenderer } from '@textura/renderer-canvas'
+import { signal, box, text, createApp } from '@geometra/core'
+import type { App, UIElement } from '@geometra/core'
+import { CanvasRenderer } from '@geometra/renderer-canvas'
 
 // --- DOM refs ---
 const canvas = document.getElementById('demo-canvas') as HTMLCanvasElement
@@ -48,7 +48,7 @@ function cardGrid(): UIElement {
     { flexDirection: 'column', padding: 24, gap: 16, width: rootWidth.value, height: 400 },
     [
       box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, [
-        text({ text: 'Textura Framework', font: 'bold 18px Inter', lineHeight: 24, color: '#ffffff' }),
+        text({ text: 'Geometra', font: 'bold 18px Inter', lineHeight: 24, color: '#ffffff' }),
         text({ text: `${rootWidth.value}px · ${direction.value}`, font: '13px Inter', lineHeight: 18, color: '#71717a' }),
       ]),
       box({ flexDirection: direction.value, flexWrap: 'wrap', gap: 12, flexGrow: 1 }, cards),
@@ -236,7 +236,7 @@ btnCol.addEventListener('click', () => {
 })
 
 installCmd.addEventListener('click', () => {
-  navigator.clipboard.writeText('npm i @textura/core @textura/renderer-canvas')
+  navigator.clipboard.writeText('npm i @geometra/core @geometra/renderer-canvas')
   installCmd.querySelector('span')!.textContent = '\u2713'
   setTimeout(() => { installCmd.querySelector('span')!.textContent = '\uD83D\uDCCB' }, 1500)
 })

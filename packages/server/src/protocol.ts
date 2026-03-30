@@ -1,5 +1,5 @@
 import type { ComputedLayout } from 'textura'
-import type { UIElement } from '@textura/core'
+import type { UIElement } from '@geometra/core'
 
 /** Messages sent from server to client. */
 export type ServerMessage =

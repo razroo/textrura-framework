@@ -1,5 +1,5 @@
-import { CanvasRenderer } from '@textura/renderer-canvas'
-import { createClient } from '@textura/client'
+import { CanvasRenderer } from '@geometra/renderer-canvas'
+import { createClient } from '@geometra/client'
 
 const canvas = document.getElementById('app') as HTMLCanvasElement
 const renderer = new CanvasRenderer({ canvas, background: '#1a1a2e' })

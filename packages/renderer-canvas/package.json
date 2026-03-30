@@ -1,5 +1,5 @@
 {
-  "name": "@textura/renderer-canvas",
+  "name": "@geometra/renderer-canvas",
   "version": "0.1.0",
   "description": "Canvas2D renderer for Textura framework",
   "license": "MIT",
@@ -25,6 +25,6 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
-    "@textura/core": "^0.1.0"
+    "@geometra/core": "^0.1.0"
   }
 }

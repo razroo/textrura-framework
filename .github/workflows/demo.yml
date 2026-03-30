@@ -30,12 +30,14 @@ jobs:
           npm pkg set "dependencies.textura=^0.1.0"
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          rm -f package-lock.json
+          npm install
 
       - name: Build packages
         run: |
-          npm run build -w @textura/core
-          npm run build -w @textura/renderer-canvas
+          npm run build -w @geometra/core
+          npm run build -w @geometra/renderer-canvas
 
       - name: Build demo
         run: npx vite build --config demo/vite.config.ts
