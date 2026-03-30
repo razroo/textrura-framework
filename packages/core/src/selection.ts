@@ -50,7 +50,7 @@ export function collectTextNodes(
   const y = offsetY + layout.y
 
   if (element.kind === 'text') {
-    if (element.props.selectable) {
+    if (element.props.selectable !== false) {
       results.push({
         element,
         x,

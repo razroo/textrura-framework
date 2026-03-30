@@ -29,7 +29,7 @@ export interface TextElement {
     font: string
     lineHeight: number
     whiteSpace?: 'normal' | 'pre-wrap'
-    /** Enable text selection on this element. */
+    /** Text is selectable by default. Set to false to disable. */
     selectable?: boolean
   }
   key?: string

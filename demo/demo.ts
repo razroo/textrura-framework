@@ -145,19 +145,19 @@ function selectableText(): UIElement {
   const w = rootWidth.value
   return box({ flexDirection: 'column', padding: 24, gap: 14, width: w, minHeight: 400 }, [
     text({ text: 'Text Selection', font: 'bold 18px Inter', lineHeight: 24, color: '#ffffff' }),
-    text({ text: 'Click and drag to select. No DOM \u2014 just Canvas.', font: '14px Inter', lineHeight: 22, color: '#e2e8f0', selectable: true }),
+    text({ text: 'Click and drag to select. No DOM \u2014 just Canvas.', font: '14px Inter', lineHeight: 22, color: '#e2e8f0' }),
     box({ backgroundColor: SURFACE, borderRadius: 8, padding: 16, flexDirection: 'column', gap: 8 }, [
-      text({ text: 'Character positions measured with ctx.measureText() each frame.', font: '13px Inter', lineHeight: 20, color: MUTED, selectable: true }),
-      text({ text: 'Press Cmd+C / Ctrl+C to copy selected text.', font: '13px Inter', lineHeight: 20, color: MUTED, selectable: true }),
+      text({ text: 'Character positions measured with ctx.measureText() each frame.', font: '13px Inter', lineHeight: 20, color: MUTED }),
+      text({ text: 'Press Cmd+C / Ctrl+C to copy selected text.', font: '13px Inter', lineHeight: 20, color: MUTED }),
     ]),
     box({ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }, [
       box({ backgroundColor: '#0f3460', borderRadius: 8, padding: 14, flexGrow: 1, flexDirection: 'column', gap: 4 }, [
-        text({ text: 'How it works', font: 'bold 13px Inter', lineHeight: 18, color: '#60a5fa', selectable: true }),
-        text({ text: 'measureText() computes char offsets per node per frame.', font: '12px Inter', lineHeight: 17, color: '#93c5fd', selectable: true }),
+        text({ text: 'How it works', font: 'bold 13px Inter', lineHeight: 18, color: '#60a5fa' }),
+        text({ text: 'measureText() computes char offsets per node per frame.', font: '12px Inter', lineHeight: 17, color: '#93c5fd' }),
       ]),
       box({ backgroundColor: '#1e3a2f', borderRadius: 8, padding: 14, flexGrow: 1, flexDirection: 'column', gap: 4 }, [
-        text({ text: 'Cross-node selection', font: 'bold 13px Inter', lineHeight: 18, color: '#4ade80', selectable: true }),
-        text({ text: 'Drag across multiple text elements.', font: '12px Inter', lineHeight: 17, color: '#86efac', selectable: true }),
+        text({ text: 'Cross-node selection', font: 'bold 13px Inter', lineHeight: 18, color: '#4ade80' }),
+        text({ text: 'Drag across multiple text elements.', font: '12px Inter', lineHeight: 17, color: '#86efac' }),
       ]),
     ]),
   ])
@@ -252,7 +252,7 @@ function view() {
     text({
       text: 'Select this text on Canvas!',
       font: '18px Inter', lineHeight: 24, color: '#fff',
-      selectable: true,
+      // selectable by default — set selectable: false to disable
     }),
   ])
 }

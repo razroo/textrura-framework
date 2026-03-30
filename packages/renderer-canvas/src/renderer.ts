@@ -221,7 +221,8 @@ export class CanvasRenderer implements Renderer {
 
     // If this is a selectable text node with active selection, paint highlights
     // and render text in segments (selected vs unselected) for contrast
-    const nodeInfo = selectable && this.selection ? this.textNodes[this.textNodeIndex] : null
+    const isSelectable = selectable !== false
+    const nodeInfo = isSelectable && this.selection ? this.textNodes[this.textNodeIndex] : null
     const selRanges = nodeInfo ? this.getLineSelectionRanges(nodeInfo) : null
 
     if (selRanges) {
@@ -260,7 +261,7 @@ export class CanvasRenderer implements Renderer {
       }
     }
 
-    if (selectable) {
+    if (isSelectable) {
       this.textNodeIndex++
     }
 
