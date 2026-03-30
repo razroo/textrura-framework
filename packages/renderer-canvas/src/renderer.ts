@@ -9,7 +9,7 @@ export interface CanvasRendererOptions {
   dpr?: number
   /** Background color for the canvas. Default: '#ffffff'. */
   background?: string
-  /** Highlight color for text selection. Default: 'rgba(59, 130, 246, 0.35)'. */
+  /** Highlight color for text selection. Default: 'rgba(59, 130, 246, 0.4)'. */
   selectionColor?: string
 }
 
@@ -32,7 +32,7 @@ export class CanvasRenderer implements Renderer {
     this.canvas = options.canvas
     this.dpr = options.dpr ?? window.devicePixelRatio
     this.background = options.background ?? '#ffffff'
-    this.selectionColor = options.selectionColor ?? 'rgba(59, 130, 246, 0.35)'
+    this.selectionColor = options.selectionColor ?? 'rgba(59, 130, 246, 0.4)'
 
     const ctx = this.canvas.getContext('2d')
     if (!ctx) throw new Error('Could not get 2d context')
@@ -177,21 +177,50 @@ export class CanvasRenderer implements Renderer {
     }
 
     ctx.font = font
-    ctx.fillStyle = color ?? '#000000'
     ctx.textBaseline = 'top'
 
     const lines = this.wrapText(text, _width)
+    const textColor = color ?? '#000000'
 
-    // If this is a selectable text node, paint selection highlights
-    if (selectable && this.selection) {
-      const nodeInfo = this.textNodes[this.textNodeIndex]
-      if (nodeInfo) {
-        this.paintSelectionHighlight(nodeInfo, lines, lineHeight)
-      }
+    // If this is a selectable text node with active selection, paint highlights
+    // and render text in segments (selected vs unselected) for contrast
+    const nodeInfo = selectable && this.selection ? this.textNodes[this.textNodeIndex] : null
+    const selRanges = nodeInfo ? this.getLineSelectionRanges(nodeInfo) : null
+
+    if (selRanges) {
+      this.paintSelectionHighlight(nodeInfo!, lines, lineHeight)
     }
 
     for (let i = 0; i < lines.length; i++) {
-      ctx.fillText(lines[i]!, x, y + i * lineHeight)
+      const lineText = lines[i]!
+      const lineY = y + i * lineHeight
+      const lineSelRange = selRanges?.[i]
+
+      if (lineSelRange && lineSelRange.start < lineSelRange.end) {
+        // Draw in three segments: before, selected, after
+        const before = lineText.slice(0, lineSelRange.start)
+        const selected = lineText.slice(lineSelRange.start, lineSelRange.end)
+        const after = lineText.slice(lineSelRange.end)
+
+        let cx = x
+        if (before) {
+          ctx.fillStyle = textColor
+          ctx.fillText(before, cx, lineY)
+          cx += ctx.measureText(before).width
+        }
+        if (selected) {
+          ctx.fillStyle = '#ffffff'
+          ctx.fillText(selected, cx, lineY)
+          cx += ctx.measureText(selected).width
+        }
+        if (after) {
+          ctx.fillStyle = textColor
+          ctx.fillText(after, cx, lineY)
+        }
+      } else {
+        ctx.fillStyle = textColor
+        ctx.fillText(lineText, x, lineY)
+      }
     }
 
     if (selectable) {
@@ -199,6 +228,56 @@ export class CanvasRenderer implements Renderer {
     }
 
     if (opacity !== undefined) ctx.globalAlpha = 1
+  }
+
+  /** Get per-line character selection ranges for a text node. */
+  private getLineSelectionRanges(
+    node: TextNodeInfo,
+  ): Array<{ start: number; end: number }> | null {
+    const sel = this.selection
+    if (!sel) return null
+
+    let startNode = sel.anchorNode
+    let startOffset = sel.anchorOffset
+    let endNode = sel.focusNode
+    let endOffset = sel.focusOffset
+
+    if (startNode > endNode || (startNode === endNode && startOffset > endOffset)) {
+      ;[startNode, endNode] = [endNode, startNode]
+      ;[startOffset, endOffset] = [endOffset, startOffset]
+    }
+
+    if (node.index < startNode || node.index > endNode) return null
+
+    const ranges: Array<{ start: number; end: number }> = []
+    let globalCharOffset = 0
+
+    for (const line of node.lines) {
+      const lineStart = globalCharOffset
+      const lineEnd = globalCharOffset + line.text.length
+
+      let selStart: number
+      let selEnd: number
+
+      if (node.index === startNode && node.index === endNode) {
+        selStart = Math.max(startOffset, lineStart) - lineStart
+        selEnd = Math.min(endOffset, lineEnd) - lineStart
+      } else if (node.index === startNode) {
+        selStart = Math.max(startOffset, lineStart) - lineStart
+        selEnd = line.text.length
+      } else if (node.index === endNode) {
+        selStart = 0
+        selEnd = Math.min(endOffset, lineEnd) - lineStart
+      } else {
+        selStart = 0
+        selEnd = line.text.length
+      }
+
+      ranges.push({ start: Math.max(0, selStart), end: Math.min(line.text.length, selEnd) })
+      globalCharOffset = lineEnd
+    }
+
+    return ranges
   }
 
   /** Paint selection highlight rectangles for a text node. */
