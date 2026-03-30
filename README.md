@@ -2,9 +2,11 @@
 
 **[Live Demo](https://razroo.github.io/geometra)** | **[npm](https://www.npmjs.com/org/geometra)** | **[GitHub](https://github.com/razroo/geometra)**
 
+https://github.com/user-attachments/assets/1610d856-3c7d-4fce-be42-1c43306e6520
+
 A DOM-free frontend framework built on the [Textura](https://github.com/razroo/textura) layout engine. No browser layout engine. No DOM. Just computed geometry piped straight to render targets.
 
-Built for the AI Agent Era — where browsers are optional, SEO is irrelevant, and speed is everything.
+Built for the AI Agent Era — where browsers are optional, SEO is irrelevant, and speed is everything. Agents instead of interacting with a client, interact with the server directly via JSON used for client as well. 
 
 ## How It Works
 
