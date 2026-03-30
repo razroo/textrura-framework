@@ -11,6 +11,34 @@ export interface CanvasRendererOptions {
   background?: string
   /** Highlight color for text selection. Default: 'rgba(59, 130, 246, 0.4)'. */
   selectionColor?: string
+  /** Text color for selected text. Default: auto-computed from selectionColor for contrast. */
+  selectedTextColor?: string
+}
+
+/** Parse a CSS color string into [r, g, b] (0-255). Supports #hex and rgba(). */
+function parseColorRGB(color: string): [number, number, number] {
+  if (color.startsWith('#')) {
+    const hex = color.slice(1)
+    const full = hex.length === 3
+      ? hex[0]! + hex[0]! + hex[1]! + hex[1]! + hex[2]! + hex[2]!
+      : hex
+    return [
+      parseInt(full.slice(0, 2), 16),
+      parseInt(full.slice(2, 4), 16),
+      parseInt(full.slice(4, 6), 16),
+    ]
+  }
+  const match = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/)
+  if (match) return [parseInt(match[1]!), parseInt(match[2]!), parseInt(match[3]!)]
+  return [59, 130, 246] // fallback to default blue
+}
+
+/** Compute relative luminance (0-1) from sRGB. */
+function luminance(r: number, g: number, b: number): number {
+  const [rs, gs, bs] = [r / 255, g / 255, b / 255].map(
+    c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4),
+  )
+  return 0.2126 * rs! + 0.7152 * gs! + 0.0722 * bs!
 }
 
 export class CanvasRenderer implements Renderer {
@@ -19,6 +47,7 @@ export class CanvasRenderer implements Renderer {
   private dpr: number
   private background: string
   private selectionColor: string
+  private selectedTextColor: string
 
   /** Text nodes collected during the last render (for selection hit-testing). */
   textNodes: TextNodeInfo[] = []
@@ -33,6 +62,14 @@ export class CanvasRenderer implements Renderer {
     this.dpr = options.dpr ?? window.devicePixelRatio
     this.background = options.background ?? '#ffffff'
     this.selectionColor = options.selectionColor ?? 'rgba(59, 130, 246, 0.4)'
+
+    // Auto-compute contrasting text color: white on dark highlights, black on light
+    if (options.selectedTextColor) {
+      this.selectedTextColor = options.selectedTextColor
+    } else {
+      const [r, g, b] = parseColorRGB(this.selectionColor)
+      this.selectedTextColor = luminance(r, g, b) > 0.4 ? '#000000' : '#ffffff'
+    }
 
     const ctx = this.canvas.getContext('2d')
     if (!ctx) throw new Error('Could not get 2d context')
@@ -209,7 +246,7 @@ export class CanvasRenderer implements Renderer {
           cx += ctx.measureText(before).width
         }
         if (selected) {
-          ctx.fillStyle = '#ffffff'
+          ctx.fillStyle = this.selectedTextColor
           ctx.fillText(selected, cx, lineY)
           cx += ctx.measureText(selected).width
         }
