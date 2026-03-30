@@ -24,20 +24,10 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Update textura dependency to npm (not file:)
-        run: |
-          cd packages/core
-          npm pkg set "dependencies.textura=^1.1.1"
-
       - name: Install dependencies
         run: |
           rm -f package-lock.json
           npm install
-
-      - name: Build packages
-        run: |
-          npm run build -w @geometra/core
-          npm run build -w @geometra/renderer-canvas
 
       - name: Build demo
         run: npx vite build --config demo/vite.config.ts
