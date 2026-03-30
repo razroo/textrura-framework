@@ -405,6 +405,7 @@ export class CanvasRenderer implements Renderer {
   }
 
   private roundRect(x: number, y: number, w: number, h: number, r: number): void {
+    r = Math.min(r, w / 2, h / 2)
     const { ctx } = this
     ctx.beginPath()
     ctx.moveTo(x + r, y)
