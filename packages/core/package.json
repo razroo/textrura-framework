@@ -1,0 +1,23 @@
+{
+  "name": "@textura/core",
+  "version": "0.1.0",
+  "description": "DOM-free UI framework core: components, signals, reconciler",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "textura": "file:../../../textura"
+  }
+}

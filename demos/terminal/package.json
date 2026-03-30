@@ -1,0 +1,15 @@
+{
+  "name": "@textura/demo-terminal",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx app.ts"
+  },
+  "dependencies": {
+    "@textura/core": "*",
+    "@textura/renderer-terminal": "*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
+  }
+}

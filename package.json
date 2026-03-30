@@ -1,0 +1,17 @@
+{
+  "name": "textura-framework",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "demos/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "check": "npm run check --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "typescript": "6.0.2"
+  }
+}

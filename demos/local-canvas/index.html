@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Textura Framework — Local Canvas Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0a;
+      color: #fff;
+      font-family: system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px;
+      gap: 16px;
+    }
+    h1 { font-size: 20px; font-weight: 600; color: #888; }
+    canvas { border: 1px solid #333; border-radius: 8px; cursor: pointer; }
+    .controls { display: flex; gap: 12px; }
+    button {
+      background: #222;
+      color: #fff;
+      border: 1px solid #444;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover { background: #333; }
+  </style>
+</head>
+<body>
+  <h1>Textura Framework — Phase 1: Local Canvas</h1>
+  <canvas id="app" width="600" height="400"></canvas>
+  <div class="controls">
+    <button id="btn-add">Add Card</button>
+    <button id="btn-toggle">Toggle Layout</button>
+  </div>
+  <script type="module" src="./app.ts"></script>
+</body>
+</html>

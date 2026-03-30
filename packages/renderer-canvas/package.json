@@ -1,0 +1,23 @@
+{
+  "name": "@textura/renderer-canvas",
+  "version": "0.1.0",
+  "description": "Canvas2D renderer for Textura framework",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@textura/core": "^0.1.0"
+  }
+}

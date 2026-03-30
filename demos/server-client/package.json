@@ -1,0 +1,20 @@
+{
+  "name": "@textura/demo-server-client",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "server": "tsx server.ts",
+    "client": "vite --config vite.config.ts",
+    "dev": "echo 'Run: npm run server  (terminal 1)  &&  npm run client  (terminal 2)'"
+  },
+  "dependencies": {
+    "@textura/core": "*",
+    "@textura/server": "*",
+    "@textura/client": "*",
+    "@textura/renderer-canvas": "*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "vite": "^8.0.3"
+  }
+}
