@@ -1,4 +1,4 @@
-import { signal, box, text } from '@textura/core'
+import { signal, box, text } from '@textura/core/node'
 import { createServer } from '@textura/server'
 
 // Server-side state

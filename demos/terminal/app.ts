@@ -1,4 +1,4 @@
-import { signal, box, text, createApp } from '@textura/core'
+import { signal, box, text, createApp } from '@textura/core/node'
 import { TerminalRenderer } from '@textura/renderer-terminal'
 
 const cols = process.stdout.columns ?? 80
