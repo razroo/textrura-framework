@@ -6,10 +6,10 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/razroo/textrura-framework",
+    "url": "https://github.com/razroo/geometra",
     "directory": "packages/core"
   },
-  "homepage": "https://razroo.github.io/textrura-framework",
+  "homepage": "https://razroo.github.io/geometra",
   "keywords": ["ui", "framework", "dom-free", "canvas", "flexbox", "signals", "textura"],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

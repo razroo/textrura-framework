@@ -6,10 +6,10 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/razroo/textrura-framework",
+    "url": "https://github.com/razroo/geometra",
     "directory": "packages/server"
   },
-  "homepage": "https://razroo.github.io/textrura-framework",
+  "homepage": "https://razroo.github.io/geometra",
   "keywords": ["textura", "server", "websocket", "layout", "dom-free"],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
