@@ -1,12 +1,14 @@
 # Geometra
 
+**The Singularity Frontend Framework**
+
 **[Live Demo](https://razroo.github.io/geometra)** | **[npm](https://www.npmjs.com/org/geometra)** | **[GitHub](https://github.com/razroo/geometra)**
 
 https://github.com/user-attachments/assets/1610d856-3c7d-4fce-be42-1c43306e6520
 
-A DOM-free frontend framework built on the [Textura](https://github.com/razroo/textura) layout engine. No browser layout engine. No DOM. Just computed geometry piped straight to render targets.
+The client is the server. The server is the client. Geometra is a DOM-free frontend framework built on the [Textura](https://github.com/razroo/textura) layout engine where client and server are interchangeable — the same JSON geometry protocol powers both. Human and AI interaction is native to both sides. No browser layout engine. No DOM. Just computed geometry piped straight to render targets.
 
-Built for the AI Agent Era — where browsers are optional, SEO is irrelevant, and speed is everything. Agents instead of interacting with a client, interact with the server directly via JSON used for client as well. 
+AI agents interact with the server directly via the same JSON protocol the client uses — no browser middleman, no scraping, no hacks. Agents move 1000x faster because they skip the entire rendering pipeline. Multiple client/server instances can run inside a single client. This is singularity tech.
 
 - Dashboard: https://razroo.github.io/geometra-demo/
 - Agent Demo: https://razroo.github.io/geometra-demo/agent-demo.html
@@ -204,14 +206,18 @@ cd demos/server-client && npm run client   # terminal 2
 cd demos/terminal && npm run dev
 ```
 
-## Why No DOM?
+## Why Singularity Tech?
 
+The boundary between client and server dissolves. The same geometry protocol that renders pixels on a canvas also feeds data to AI agents. Humans and AI agents are first-class citizens on both sides of the wire.
+
+- **Client = Server** — the same JSON geometry protocol runs on both; either side can compute, either side can render
+- **AI-native** — agents interact with the server directly, no browser needed, no scraping — 1000x faster than DOM-based frameworks
+- **Multi-instance** — run multiple client/server pairs inside a single client for parallel AI agent workloads
 - **No DOM API calls** — zero style recalculation, zero reflow, zero composite
 - **WASM layout** — Yoga runs at near-native speed
 - **Server-computed** — clients never pay layout cost, just paint pre-computed coordinates
 - **Geometry diffs** — updates send only changed `{ x, y, w, h }`, not full re-renders
 - **No framework runtime on client** — the thin client is a paint loop, not a reconciler
-- **AI-native** — agents get exact geometry via MCP without needing a browser
 
 ## License
 

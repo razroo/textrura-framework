@@ -1,7 +1,7 @@
 {
   "name": "@geometra/renderer-canvas",
   "version": "0.1.0",
-  "description": "Canvas2D renderer for Textura framework",
+  "description": "Canvas2D renderer for Geometra — the singularity frontend framework",
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -10,7 +10,7 @@
     "directory": "packages/renderer-canvas"
   },
   "homepage": "https://razroo.github.io/geometra",
-  "keywords": ["textura", "renderer", "canvas", "dom-free"],
+  "keywords": ["geometra", "singularity", "renderer", "canvas", "dom-free", "ai-native"],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

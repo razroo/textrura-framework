@@ -1,7 +1,7 @@
 {
   "name": "@geometra/renderer-terminal",
   "version": "0.1.0",
-  "description": "Terminal/TUI renderer for Textura framework",
+  "description": "Terminal/TUI renderer for Geometra — the singularity frontend framework",
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -10,7 +10,7 @@
     "directory": "packages/renderer-terminal"
   },
   "homepage": "https://razroo.github.io/geometra",
-  "keywords": ["textura", "renderer", "terminal", "tui", "ansi", "dom-free"],
+  "keywords": ["geometra", "singularity", "renderer", "terminal", "tui", "ansi", "dom-free", "ai-native"],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
