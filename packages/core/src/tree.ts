@@ -4,7 +4,7 @@ import type { UIElement } from './types.js'
 /** Convert a UIElement tree into a textura LayoutNode tree for layout computation. */
 export function toLayoutTree(element: UIElement): LayoutNode {
   if (element.kind === 'text') {
-    const { backgroundColor: _bg, color: _c, borderColor: _bc, borderRadius: _br, opacity: _o, ...layoutProps } = element.props
+    const { backgroundColor: _bg, color: _c, borderColor: _bc, borderRadius: _br, opacity: _o, selectable: _s, ...layoutProps } = element.props
     return layoutProps
   }
 

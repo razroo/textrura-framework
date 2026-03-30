@@ -9,6 +9,18 @@ export interface StyleProps {
   opacity?: number
 }
 
+/** Semantic properties for SEO and accessibility. */
+export interface SemanticProps {
+  /** HTML tag to use in semantic HTML output (e.g. 'h1', 'p', 'nav', 'article'). */
+  tag?: string
+  /** ARIA role for accessibility (e.g. 'heading', 'navigation', 'button'). */
+  role?: string
+  /** Alt text for images or decorative elements. */
+  alt?: string
+  /** Aria-label for screen readers. */
+  ariaLabel?: string
+}
+
 /** A text node in the component tree. */
 export interface TextElement {
   kind: 'text'
@@ -17,8 +29,12 @@ export interface TextElement {
     font: string
     lineHeight: number
     whiteSpace?: 'normal' | 'pre-wrap'
+    /** Enable text selection on this element. */
+    selectable?: boolean
   }
   key?: string
+  /** Semantic hints for SEO/a11y. */
+  semantic?: SemanticProps
 }
 
 /** A box (container) node in the component tree. */
@@ -29,6 +45,8 @@ export interface BoxElement {
   key?: string
   /** Optional event handlers — resolved via hit-testing. */
   handlers?: EventHandlers
+  /** Semantic hints for SEO/a11y. */
+  semantic?: SemanticProps
 }
 
 /** Union of all element types. */

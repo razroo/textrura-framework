@@ -15,12 +15,21 @@ export { toLayoutTree } from './tree.js'
 // Hit testing
 export { dispatchHit } from './hit-test.js'
 
+// Text selection
+export { collectTextNodes, getSelectedText, hitTestText } from './selection.js'
+export type { TextNodeInfo, TextLineInfo, SelectionRange } from './selection.js'
+
+// SEO
+export { toSemanticHTML } from './seo.js'
+export type { SemanticHTMLOptions } from './seo.js'
+
 // Types
 export type {
   UIElement,
   BoxElement,
   TextElement,
   StyleProps,
+  SemanticProps,
   EventHandlers,
   HitEvent,
   Component,

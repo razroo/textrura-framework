@@ -1,18 +1,20 @@
 import type { FlexProps } from 'textura'
-import type { StyleProps, BoxElement, TextElement, UIElement, EventHandlers } from './types.js'
+import type { StyleProps, BoxElement, TextElement, UIElement, EventHandlers, SemanticProps } from './types.js'
 
-type BoxProps = FlexProps & StyleProps & EventHandlers & { key?: string }
+type BoxProps = FlexProps & StyleProps & EventHandlers & { key?: string; semantic?: SemanticProps }
 type TextProps = FlexProps & StyleProps & {
   text: string
   font: string
   lineHeight: number
   whiteSpace?: 'normal' | 'pre-wrap'
+  selectable?: boolean
   key?: string
+  semantic?: SemanticProps
 }
 
 /** Create a box (container) element. */
 export function box(props: BoxProps, children: UIElement[] = []): BoxElement {
-  const { onClick, onPointerDown, onPointerUp, onPointerMove, key, ...rest } = props
+  const { onClick, onPointerDown, onPointerUp, onPointerMove, key, semantic, ...rest } = props
   const handlers: EventHandlers = {}
   if (onClick) handlers.onClick = onClick
   if (onPointerDown) handlers.onPointerDown = onPointerDown
@@ -25,11 +27,12 @@ export function box(props: BoxProps, children: UIElement[] = []): BoxElement {
     children,
     key,
     handlers: Object.keys(handlers).length > 0 ? handlers : undefined,
+    semantic,
   }
 }
 
 /** Create a text leaf element. */
 export function text(props: TextProps): TextElement {
-  const { key, ...rest } = props
-  return { kind: 'text', props: rest, key }
+  const { key, semantic, ...rest } = props
+  return { kind: 'text', props: rest, key, semantic }
 }

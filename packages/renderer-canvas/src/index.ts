@@ -1,2 +1,2 @@
-export { CanvasRenderer } from './renderer.js'
+export { CanvasRenderer, enableSelection } from './renderer.js'
 export type { CanvasRendererOptions } from './renderer.js'

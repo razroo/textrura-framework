@@ -320,6 +320,8 @@
           <option value="chat">Chat Messages</option>
           <option value="dashboard">Dashboard</option>
           <option value="nested">Nested Layout</option>
+          <option value="selection">Text Selection</option>
+          <option value="seo">SEO Demo</option>
         </select>
       </div>
       <div class="control-group">
@@ -337,6 +339,14 @@
     <div class="canvas-wrap">
       <canvas id="demo-canvas"></canvas>
       <div class="perf">Layout: <span id="perf-time">-</span> | Nodes: <span id="perf-nodes">-</span></div>
+    </div>
+
+    <!-- SEO Output (shown only for SEO scenario) -->
+    <div class="seo-output-wrap" style="display: none;">
+      <h3 style="font-size: 15px; margin: 24px 0 8px; color: var(--text-muted);">Generated Semantic HTML (for crawlers)</h3>
+      <div style="background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto;">
+        <pre id="seo-output" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.6; color: var(--text-muted); white-space: pre-wrap; word-break: break-word;"></pre>
+      </div>
     </div>
   </section>
 
@@ -374,6 +384,8 @@
       <div class="code-tab active" data-tab="basic">Basic</div>
       <div class="code-tab" data-tab="reactive">Reactive</div>
       <div class="code-tab" data-tab="server">Server</div>
+      <div class="code-tab" data-tab="selection">Selection</div>
+      <div class="code-tab" data-tab="seo">SEO</div>
     </div>
     <div class="code-block active" data-tab="basic">
 <pre><span class="kw">import</span> { box, text, createApp } <span class="kw">from</span> <span class="str">'@geometra/core'</span>
@@ -430,6 +442,52 @@
 })
 <span class="cm">// Client receives { x, y, width, height } over WebSocket</span>
 <span class="cm">// No layout engine runs here. Zero compute. Just paint.</span></pre>
+    </div>
+    <div class="code-block" data-tab="selection">
+<pre><span class="kw">import</span> { box, text, createApp } <span class="kw">from</span> <span class="str">'@geometra/core'</span>
+<span class="kw">import</span> { CanvasRenderer, enableSelection } <span class="kw">from</span> <span class="str">'@geometra/renderer-canvas'</span>
+
+<span class="kw">function</span> <span class="fn">view</span>() {
+  <span class="kw">return</span> <span class="fn">box</span>({ padding: <span class="num">24</span>, gap: <span class="num">16</span> }, [
+    <span class="fn">text</span>({
+      text: <span class="str">'Select this text on Canvas!'</span>,
+      font: <span class="str">'18px Inter'</span>, lineHeight: <span class="num">24</span>, color: <span class="str">'#fff'</span>,
+      selectable: <span class="num">true</span>,  <span class="cm">// enables character-level hit testing</span>
+    }),
+  ])
+}
+
+<span class="kw">const</span> renderer = <span class="kw">new</span> <span class="fn">CanvasRenderer</span>({ canvas })
+<span class="kw">const</span> app = <span class="kw">await</span> <span class="fn">createApp</span>(view, renderer, { width: <span class="num">400</span>, height: <span class="num">200</span> })
+
+<span class="cm">// Attach selection handlers (pointerdown/move/up + Cmd+C)</span>
+<span class="fn">enableSelection</span>(canvas, renderer, () => app.<span class="fn">update</span>())
+<span class="cm">// Cursor changes to I-beam over selectable text</span>
+<span class="cm">// Drag to select, Cmd+C to copy. No DOM text nodes.</span></pre>
+    </div>
+    <div class="code-block" data-tab="seo">
+<pre><span class="kw">import</span> { box, text, toSemanticHTML } <span class="kw">from</span> <span class="str">'@geometra/core'</span>
+
+<span class="kw">const</span> tree = <span class="fn">box</span>({ padding: <span class="num">24</span>, semantic: { tag: <span class="str">'main'</span> } }, [
+  <span class="fn">text</span>({
+    text: <span class="str">'My App'</span>, font: <span class="str">'bold 28px Inter'</span>, lineHeight: <span class="num">34</span>,
+    semantic: { tag: <span class="str">'h1'</span> },
+  }),
+  <span class="fn">text</span>({
+    text: <span class="str">'DOM-free rendering for humans and AI.'</span>,
+    font: <span class="str">'16px Inter'</span>, lineHeight: <span class="num">22</span>,
+    semantic: { tag: <span class="str">'p'</span> },
+  }),
+])
+
+<span class="kw">const</span> html = <span class="fn">toSemanticHTML</span>(tree, {
+  title: <span class="str">'My App'</span>,
+  description: <span class="str">'DOM-free rendering for humans and AI.'</span>,
+  og: { title: <span class="str">'My App'</span>, type: <span class="str">'website'</span> },
+})
+
+<span class="cm">// Serve `html` to Googlebot, Canvas to real users</span>
+<span class="cm">// Same element tree powers both outputs</span></pre>
     </div>
   </section>
 
