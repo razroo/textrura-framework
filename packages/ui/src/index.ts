@@ -1,20 +1,20 @@
 import { box, text } from '@geometra/core'
 import type { UIElement, EventHandlers } from '@geometra/core'
 
-let caretMeasureCtx: CanvasRenderingContext2D | null = null
+let inputMeasureCtx: CanvasRenderingContext2D | null = null
 
-function getCaretMeasureCtx(): CanvasRenderingContext2D | null {
-  if (caretMeasureCtx) return caretMeasureCtx
+function getInputMeasureCtx(): CanvasRenderingContext2D | null {
+  if (inputMeasureCtx) return inputMeasureCtx
   if (typeof document === 'undefined') return null
   const canvas = document.createElement('canvas')
-  caretMeasureCtx = canvas.getContext('2d')
-  return caretMeasureCtx
+  inputMeasureCtx = canvas.getContext('2d')
+  return inputMeasureCtx
 }
 
 function getCaretOffsetFromLocalX(textValue: string, localX: number): number {
   if (textValue.length === 0) return 0
   const clampedX = Math.max(0, localX)
-  const ctx = getCaretMeasureCtx()
+  const ctx = getInputMeasureCtx()
   if (!ctx) {
     const approxCharWidth = 8
     return Math.max(0, Math.min(textValue.length, Math.round(clampedX / approxCharWidth)))
