@@ -235,6 +235,125 @@ describe('@geometra/ui input', () => {
     app.destroy()
   })
 
+  it('positions caret at the start of the input when value is empty and focused', async () => {
+    const renderer = new CaptureRenderer()
+
+    const app = await createApp(
+      () =>
+        box({ width: 280, height: 80 }, [
+          input('', 'Name', { focused: true, caretOffset: 0 }),
+        ]),
+      renderer,
+      { width: 280, height: 80 },
+    )
+
+    function getCaretPositions(tree: UIElement | null, layout: unknown, ox = 0, oy = 0): Array<{ x: number; y: number }> {
+      if (!tree || !layout || tree.kind !== 'box') return []
+      const node = layout as { x: number; y: number; children?: unknown[] }
+      const absX = ox + node.x
+      const absY = oy + node.y
+      const own = tree.props.backgroundColor === '#38bdf8' && tree.props.width === 1.5
+        ? [{ x: absX, y: absY }]
+        : []
+      const childrenLayouts = node.children ?? []
+      const childPositions = tree.children.flatMap((child, idx) =>
+        getCaretPositions(child, childrenLayouts[idx], absX, absY),
+      )
+      return [...own, ...childPositions]
+    }
+
+    const carets = getCaretPositions(renderer.lastTree, renderer.lastLayout)
+    expect(carets).toHaveLength(1)
+    // Caret should be at the content start (paddingLeft = 10), not after placeholder text
+    expect(carets[0]!.x).toBeLessThanOrEqual(11)
+
+    app.destroy()
+  })
+
+  it('caret x-position for empty+focused matches caret at offset 0 for non-empty+focused', async () => {
+    const renderer = new CaptureRenderer()
+
+    function getCaretPositions(tree: UIElement | null, layout: unknown, ox = 0, oy = 0): Array<{ x: number; y: number }> {
+      if (!tree || !layout || tree.kind !== 'box') return []
+      const node = layout as { x: number; y: number; children?: unknown[] }
+      const absX = ox + node.x
+      const absY = oy + node.y
+      const own = tree.props.backgroundColor === '#38bdf8' && tree.props.width === 1.5
+        ? [{ x: absX, y: absY }]
+        : []
+      const childrenLayouts = node.children ?? []
+      const childPositions = tree.children.flatMap((child, idx) =>
+        getCaretPositions(child, childrenLayouts[idx], absX, absY),
+      )
+      return [...own, ...childPositions]
+    }
+
+    // Empty input with placeholder
+    const appEmpty = await createApp(
+      () =>
+        box({ width: 280, height: 80 }, [
+          input('', 'Placeholder text here', { focused: true, caretOffset: 0 }),
+        ]),
+      renderer,
+      { width: 280, height: 80 },
+    )
+    const emptyCarets = getCaretPositions(renderer.lastTree, renderer.lastLayout)
+    expect(emptyCarets).toHaveLength(1)
+    const emptyCaretX = emptyCarets[0]!.x
+    appEmpty.destroy()
+
+    // Non-empty input with caret at start
+    const rendererNonEmpty = new CaptureRenderer()
+    const appNonEmpty = await createApp(
+      () =>
+        box({ width: 280, height: 80 }, [
+          input('Hello', 'Placeholder text here', { focused: true, caretOffset: 0 }),
+        ]),
+      rendererNonEmpty,
+      { width: 280, height: 80 },
+    )
+    const nonEmptyCarets = getCaretPositions(rendererNonEmpty.lastTree, rendererNonEmpty.lastLayout)
+    expect(nonEmptyCarets).toHaveLength(1)
+    const nonEmptyCaretX = nonEmptyCarets[0]!.x
+    appNonEmpty.destroy()
+
+    // Both should position the caret at the same x (start of content area)
+    expect(emptyCaretX).toBe(nonEmptyCaretX)
+  })
+
+  it('still renders placeholder text when value is empty', () => {
+    const el = input('', 'Search...', { focused: true })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+
+    const hasPlaceholder = el.children.some(
+      (child) => child.kind === 'text' && child.props.text === 'Search...',
+    )
+    expect(hasPlaceholder).toBe(true)
+
+    const hasCaret = el.children.some(
+      (child) => child.kind === 'box' && child.props.backgroundColor === '#38bdf8' && child.props.width === 1.5,
+    )
+    expect(hasCaret).toBe(true)
+  })
+
+  it('places caret before placeholder in children order when empty and focused', () => {
+    const el = input('', 'Name', { focused: true })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+
+    const caretIdx = el.children.findIndex(
+      (child) => child.kind === 'box' && child.props.backgroundColor === '#38bdf8' && child.props.width === 1.5,
+    )
+    const placeholderIdx = el.children.findIndex(
+      (child) => child.kind === 'text' && child.props.text === 'Name',
+    )
+    expect(caretIdx).toBeGreaterThanOrEqual(0)
+    expect(placeholderIdx).toBeGreaterThanOrEqual(0)
+    // Caret must come before placeholder in children order so it renders at the leading edge
+    expect(caretIdx).toBeLessThan(placeholderIdx)
+  })
+
   it('maps click x position to caret offset via callback', () => {
     let seenOffset = -1
     const el = input('Charlie', 'Name', {

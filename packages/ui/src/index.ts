@@ -71,6 +71,9 @@ export function input(value: string, placeholder = '', options: InputOptions = {
 
   const children: UIElement[] = []
   if (showPlaceholder) {
+    if (focused) {
+      children.push(box({ width: 1.5, minHeight: 14, backgroundColor: '#38bdf8' }, []))
+    }
     children.push(text({ text: placeholder, font: '13px Inter', lineHeight: 18, color: '#64748b' }))
   } else {
     if (displayLeft.length > 0) {
@@ -82,9 +85,6 @@ export function input(value: string, placeholder = '', options: InputOptions = {
     if (displayRight.length > 0) {
       children.push(text({ text: displayRight, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }))
     }
-  }
-  if (focused && showPlaceholder) {
-    children.push(box({ width: 1.5, minHeight: 14, backgroundColor: '#38bdf8' }, []))
   }
 
   const handleClick: EventHandlers['onClick'] = (e) => {
