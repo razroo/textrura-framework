@@ -51,9 +51,10 @@ export function extractFontFamiliesFromCSSFont(font: string): string[] {
   const trimmed = font.trim()
   const m = trimmed.match(/\b(\d+(?:\.\d+)?(?:px|em|rem))(?:\/\s*[\d.]+(?:px|em|rem)?)?\s+(.+)$/i)
   const tail = m ? m[2]! : trimmed
+  const sizeLike = /^\d+(\.\d+)?(px|em|rem)$/i
   return splitFontFamilyList(tail)
     .map(s => s.trim().replace(/^["']|["']$/g, ''))
-    .filter(f => f.length > 0 && !GENERIC_FAMILIES.has(f.toLowerCase()))
+    .filter(f => f.length > 0 && !GENERIC_FAMILIES.has(f.toLowerCase()) && !sizeLike.test(f))
 }
 
 /** Collect unique font families referenced by text nodes in a UI tree. */

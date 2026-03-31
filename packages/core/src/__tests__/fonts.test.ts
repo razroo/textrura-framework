@@ -57,6 +57,23 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('')).toEqual([])
     expect(extractFontFamiliesFromCSSFont('   ')).toEqual([])
   })
+
+  it('parses CSS-wide font-style keyword before size', () => {
+    expect(extractFontFamiliesFromCSSFont('normal 14px Inter')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('italic 14px Inter')).toEqual(['Inter'])
+  })
+
+  it('parses oblique angle before size and family', () => {
+    expect(extractFontFamiliesFromCSSFont('oblique 14deg 16px Inter')).toEqual(['Inter'])
+  })
+
+  it('treats bare family list when no size token is present', () => {
+    expect(extractFontFamiliesFromCSSFont('Inter, system-ui')).toEqual(['Inter'])
+  })
+
+  it('returns empty when shorthand has size but no family token', () => {
+    expect(extractFontFamiliesFromCSSFont('14px')).toEqual([])
+  })
 })
 
 describe('collectFontFamiliesFromTree', () => {

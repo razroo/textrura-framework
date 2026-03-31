@@ -23,6 +23,29 @@ describe('dispatchHit', () => {
     expect(fired).toBe(false)
   })
 
+  it('hit on bottom-right inclusive edge fires handler', () => {
+    let fired = false
+    const el = box({ width: 100, height: 50, onClick: () => { fired = true } })
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
+
+    const result = dispatchHit(el, layout, 'onClick', 100, 50)
+    expect(result.handled).toBe(true)
+    expect(fired).toBe(true)
+  })
+
+  it('zero-size box: only the origin corner is inside', () => {
+    let fired = false
+    const el = box({ width: 0, height: 0, onClick: () => { fired = true } })
+    const layout = { x: 10, y: 20, width: 0, height: 0, children: [] }
+
+    expect(dispatchHit(el, layout, 'onClick', 10, 20).handled).toBe(true)
+    expect(fired).toBe(true)
+
+    fired = false
+    expect(dispatchHit(el, layout, 'onClick', 11, 20).handled).toBe(false)
+    expect(fired).toBe(false)
+  })
+
   it('nested boxes: deepest handler fires first', () => {
     const log: string[] = []
     const child = box(
@@ -354,6 +377,16 @@ describe('hasInteractiveHitAtPoint', () => {
       children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
     }
     expect(hasInteractiveHitAtPoint(root, layout, 5, 5)).toBe(true)
+  })
+
+  it('detects onPointerMove without onClick', () => {
+    const inner = box({ width: 40, height: 40, onPointerMove: () => undefined })
+    const root = box({ width: 100, height: 100 }, [inner])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+    expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(true)
   })
 
   it('ignores key-only focusable handlers for hover hit-test', () => {
