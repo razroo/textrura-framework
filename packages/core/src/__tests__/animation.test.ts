@@ -86,4 +86,18 @@ describe('animation timeline', () => {
     expect(next.opacity).toBe(1)
     expect(props.state()).toBe('finished')
   })
+
+  it('stays deterministic under rapid interrupt bursts', () => {
+    const props = createPropertyTimeline({ x: 0, opacity: 0 })
+    for (let i = 0; i < 25; i++) {
+      props.to({ x: i * 10, opacity: (i % 10) / 10 }, 100, easing.linear)
+      props.step(20)
+      props.step(20)
+    }
+    const snapshot = props.step(60)
+    expect(snapshot.x).toBeGreaterThanOrEqual(0)
+    expect(snapshot.opacity).toBeGreaterThanOrEqual(0)
+    expect(snapshot.opacity).toBeLessThanOrEqual(1)
+    expect(props.state()).toBe('finished')
+  })
 })

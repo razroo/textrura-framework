@@ -69,13 +69,13 @@ Acceptance criteria:
 - [x] Status: `done` | Owner: `@codex` | Add interrupt/cancel/resume semantics that are deterministic across rapid state updates.
 - [x] Status: `done` | Owner: `@codex` | Add reduced-motion policy and explicit defaults for accessibility-sensitive behavior.
 - [x] Status: `done` | Owner: `@codex` | Add deterministic frame-step test harness for unit/integration assertions (no timing flake).
-- [ ] Status: `todo` | Owner: `@unassigned` | Provide representative demo scenarios (list reorder, dialog enter/exit, focus transition polish).
+- [x] Status: `done` | Owner: `@codex` | Provide representative demo scenarios (list reorder, dialog enter/exit, focus transition polish).
 
 Definition of done:
 
-- [ ] Animation behavior is consistent across canvas and terminal where applicable.
-- [ ] New tests are stable in CI and validated under bursty update conditions.
-- [ ] Docs define supported properties, timing functions, and interruption rules.
+- [x] Animation behavior is consistent across canvas and terminal where applicable.
+- [x] New tests are stable in CI and validated under bursty update conditions.
+- [x] Docs define supported properties, timing functions, and interruption rules.
 
 ### 1.3.0 — Additional render target proof
 
