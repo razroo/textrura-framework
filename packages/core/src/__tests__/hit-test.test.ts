@@ -146,6 +146,27 @@ describe('dispatchHit', () => {
     expect(log).toEqual(['front'])
   })
 
+  it('overlapping siblings: negative z-index still stacks below a higher sibling', () => {
+    const log: string[] = []
+    const back = box(
+      { width: 50, height: 50, zIndex: -2, onClick: () => { log.push('back') } },
+    )
+    const front = box(
+      { width: 50, height: 50, zIndex: -1, onClick: () => { log.push('front') } },
+    )
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['front'])
+  })
+
   it('nested boxes: deepest onPointerDown fires first', () => {
     const log: string[] = []
     const child = box(
@@ -205,6 +226,20 @@ describe('hitPathAtPoint', () => {
     }
     expect(hitPathAtPoint(root, layout, 5, 5)).toEqual([1])
   })
+
+  it('overlapping siblings: prefers less-negative z-index over deeper negative', () => {
+    const back = box({ width: 40, height: 40, zIndex: -5 })
+    const front = box({ width: 40, height: 40, zIndex: -1 })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+      ],
+    }
+    expect(hitPathAtPoint(root, layout, 5, 5)).toEqual([1])
+  })
 })
 
 describe('getCursorAtPoint', () => {
@@ -233,6 +268,20 @@ describe('getCursorAtPoint', () => {
   it('overlapping siblings: uses cursor from higher z-index', () => {
     const back = box({ width: 40, height: 40, zIndex: 0, cursor: 'default' })
     const front = box({ width: 40, height: 40, zIndex: 2, cursor: 'pointer' })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+      ],
+    }
+    expect(getCursorAtPoint(root, layout, 5, 5)).toBe('pointer')
+  })
+
+  it('overlapping siblings: cursor from less-negative z-index wins', () => {
+    const back = box({ width: 40, height: 40, zIndex: -3, cursor: 'default' })
+    const front = box({ width: 40, height: 40, zIndex: -1, cursor: 'pointer' })
     const root = box({ width: 100, height: 100 }, [back, front])
     const layout = {
       x: 0, y: 0, width: 100, height: 100,
