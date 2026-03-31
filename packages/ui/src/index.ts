@@ -66,18 +66,21 @@ export function input(value: string, placeholder = '', options: InputOptions = {
   const rightText = value.slice(caretOffset)
   const showPlaceholder = value.length === 0
 
+  const displayLeft = leftText.replace(/ /g, '\u00A0')
+  const displayRight = rightText.replace(/ /g, '\u00A0')
+
   const children: UIElement[] = []
   if (showPlaceholder) {
     children.push(text({ text: placeholder, font: '13px Inter', lineHeight: 18, color: '#64748b' }))
   } else {
-    if (leftText.length > 0) {
-      children.push(text({ text: leftText, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }))
+    if (displayLeft.length > 0) {
+      children.push(text({ text: displayLeft, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }))
     }
     if (focused) {
       children.push(box({ width: 1.5, minHeight: 14, backgroundColor: '#38bdf8' }, []))
     }
-    if (rightText.length > 0) {
-      children.push(text({ text: rightText, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }))
+    if (displayRight.length > 0) {
+      children.push(text({ text: displayRight, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }))
     }
   }
   if (focused && showPlaceholder) {
@@ -93,7 +96,7 @@ export function input(value: string, placeholder = '', options: InputOptions = {
     }
     const pointerX = e.localX ?? e.x
     const localX = pointerX - 10 // paddingLeft
-    const nextOffset = getCaretOffsetFromLocalX(value, localX)
+    const nextOffset = getCaretOffsetFromLocalX(value.replace(/ /g, '\u00A0'), localX)
     options.onCaretOffsetChange(nextOffset)
   }
 
@@ -101,7 +104,7 @@ export function input(value: string, placeholder = '', options: InputOptions = {
     {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
+      gap: 0,
       paddingLeft: 10,
       paddingRight: 10,
       paddingTop: 8,
