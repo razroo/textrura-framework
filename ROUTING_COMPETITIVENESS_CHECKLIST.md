@@ -23,7 +23,7 @@ Goal: deliver a Geometra routing stack that is competitive with modern data rout
 
 ## 2) Navigation APIs (must have)
 
-- [ ] Add imperative navigation API (`navigate(to, options)`).
+- [x] Add imperative navigation API (`navigate(to, options)`).
 - [ ] Add declarative link primitive with keyboard activation semantics.
 - [ ] Add active/pending route state helpers.
 - [ ] Add blockers/guards for unsaved state and transition confirmation.
