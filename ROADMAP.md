@@ -59,7 +59,7 @@ Tracking fields:
 ### 0.3.4 — Protocol and reliability hardening
 
 - [x] Status: `done` | Owner: `@codex` | Add protocol version fixtures and compatibility tests (including mismatch handling).
-- [ ] Status: `todo` | Owner: `@unassigned` | Add tests for geometry diff correctness under rapid update bursts.
+- [x] Status: `done` | Owner: `@codex` | Add tests for geometry diff correctness under rapid update bursts.
 - [ ] Status: `todo` | Owner: `@unassigned` | Validate error surfacing and recovery behavior in server/client flows.
 - [ ] Status: `todo` | Owner: `@unassigned` | Add reconnect/retry integration scenario with state resync.
 - [ ] Status: `todo` | Owner: `@unassigned` | Ensure protocol changes are explicit and backward-safe.
