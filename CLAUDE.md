@@ -3,6 +3,7 @@
 DOM-free UI framework. Replaces the browser rendering pipeline with: `Tree → Yoga WASM → Geometry → Pixels`.
 
 See **`ROADMAP.md`** for phased framework goals (a11y, text input, protocol, etc.).
+See **`FRAMEWORK_NORTH_STAR.md`** for the always-on coding priorities and quality bar.
 
 ## Architecture
 
