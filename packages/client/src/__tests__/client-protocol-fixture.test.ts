@@ -32,4 +32,34 @@ describe('client protocol fixtures', () => {
     expect(state.layout?.height).toBe(60)
     expect(renders).toBe(2)
   })
+
+  it('preserves direction metadata from server frames', () => {
+    let lastTree: UIElement | null = null
+    const renderer: Renderer = {
+      render: (_layout, tree) => {
+        lastTree = tree
+      },
+      destroy: () => undefined,
+    }
+    const state = {
+      layout: null as ComputedLayout | null,
+      tree: null as UIElement | null,
+    }
+
+    applyServerMessage(state, renderer, {
+      type: 'frame',
+      protocolVersion: 1,
+      layout: { x: 0, y: 0, width: 100, height: 40, children: [{ x: 0, y: 0, width: 100, height: 20, children: [] }] } as any,
+      tree: {
+        kind: 'box',
+        props: { width: 100, height: 40, dir: 'rtl' },
+        children: [
+          { kind: 'text', props: { text: 'مرحبا', font: '14px sans-serif', lineHeight: 18, dir: 'rtl' } },
+        ],
+      } as any,
+    })
+
+    expect((state.tree as any)?.props?.dir).toBe('rtl')
+    expect((lastTree as any)?.children?.[0]?.props?.dir).toBe('rtl')
+  })
 })
