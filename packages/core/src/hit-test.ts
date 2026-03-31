@@ -164,11 +164,10 @@ export function hasInteractiveHitAtPoint(
     const handlers = hits[i]!.handlers
     if (
       handlers.onClick ||
-      handlers.onKeyDown ||
-      handlers.onKeyUp ||
-      handlers.onCompositionStart ||
-      handlers.onCompositionUpdate ||
-      handlers.onCompositionEnd
+      handlers.onPointerDown ||
+      handlers.onPointerUp ||
+      handlers.onPointerMove ||
+      handlers.onWheel
     ) {
       return true
     }

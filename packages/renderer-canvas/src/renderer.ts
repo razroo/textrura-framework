@@ -129,11 +129,10 @@ function hasInteractiveHitAtPoint(
     const h = element.handlers
     return !!(
       h?.onClick ||
-      h?.onKeyDown ||
-      h?.onKeyUp ||
-      h?.onCompositionStart ||
-      h?.onCompositionUpdate ||
-      h?.onCompositionEnd
+      h?.onPointerDown ||
+      h?.onPointerUp ||
+      h?.onPointerMove ||
+      h?.onWheel
     )
   }
 

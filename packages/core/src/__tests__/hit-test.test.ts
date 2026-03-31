@@ -113,7 +113,7 @@ describe('getCursorAtPoint', () => {
 
 describe('hasInteractiveHitAtPoint', () => {
   it('detects interactive containers at pointer position', () => {
-    const interactive = box({ width: 120, height: 40, onKeyDown: () => undefined })
+    const interactive = box({ width: 120, height: 40, onClick: () => undefined })
     const root = box({ width: 200, height: 100 }, [interactive])
     const layout = {
       x: 0, y: 0, width: 200, height: 100,
