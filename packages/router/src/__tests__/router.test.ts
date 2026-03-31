@@ -166,4 +166,72 @@ describe('createRouter lifecycle', () => {
 
     expect(restored).toEqual([])
   })
+
+  it('loads route data with params, query, and request context', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/users/10?tab=profile'] })
+    const loaderRoutes: RouteNode[] = [
+      {
+        id: 'root',
+        path: '/',
+        children: [
+          {
+            id: 'users',
+            path: 'users/:id',
+            loader: ({ params, query, requestContext }) => ({
+              id: params.id,
+              tab: query.tab,
+              auth: (requestContext as { auth: string }).auth,
+            }),
+          },
+        ],
+      },
+    ]
+    const router = createRouter({
+      routes: loaderRoutes,
+      history,
+      requestContext: () => ({ auth: 'token-1' }),
+    })
+
+    await new Promise<void>((resolve) => {
+      const unsubscribe = router.subscribe((state) => {
+        if (state.loaderData.users) {
+          unsubscribe()
+          resolve()
+        }
+      })
+      router.start()
+    })
+
+    expect(router.getState().loaderData.users).toEqual({
+      id: '10',
+      tab: 'profile',
+      auth: 'token-1',
+    })
+  })
+
+  it('updates loader data after navigation', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/users/1?q=old'] })
+    const loaderRoutes: RouteNode[] = [
+      {
+        id: 'root',
+        path: '/',
+        children: [
+          {
+            id: 'users',
+            path: 'users/:id',
+            loader: ({ params, query }) => ({ id: params.id, q: query.q }),
+          },
+        ],
+      },
+    ]
+    const router = createRouter({ routes: loaderRoutes, history })
+    router.start()
+
+    await router.navigate('/users/2?q=new')
+
+    expect(router.getState().loaderData.users).toEqual({
+      id: '2',
+      q: 'new',
+    })
+  })
 })

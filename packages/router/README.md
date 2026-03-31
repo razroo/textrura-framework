@@ -18,6 +18,8 @@ npm install @geometra/router
 - `createMemoryHistory` -- history adapter for non-browser runtimes and tests
 - `createBrowserHistory` -- browser adapter using pushState/replaceState/popstate
 - `createRouter` -- router lifecycle (`start`, `navigate`, `subscribe`, `dispose`)
+- route `loader` support -- params/query/requestContext-aware data loading for matched routes
+- `state.loaderData` -- per-route loader results keyed by route `id`
 - `router.isActive(to)` / `router.isPending(to)` -- route state helpers for active and transition states
 - `router.addBlocker(fn)` -- guards transitions for unsaved-state and confirmation flows
 - `restoration` policy + per-navigation options -- scroll/focus restoration control on transitions

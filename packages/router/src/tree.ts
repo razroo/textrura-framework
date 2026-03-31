@@ -1,21 +1,32 @@
 import { matchPath } from './matcher.js'
+import type { ParsedQuery } from './query.js'
 import { comparePatternSpecificity } from './ranking.js'
+import type { RouterLocation } from './history.js'
 
-export type RouteNode<T = unknown> = {
+export type RouteLoaderContext<T = unknown, TRequestContext = unknown> = {
+  params: Record<string, string>
+  query: ParsedQuery
+  location: RouterLocation
+  requestContext: TRequestContext
+  route: RouteNode<T, TRequestContext>
+}
+
+export type RouteNode<T = unknown, TRequestContext = unknown> = {
   id?: string
   path?: string
-  children?: RouteNode<T>[]
+  children?: RouteNode<T, TRequestContext>[]
   render?: (context: {
     outlet: T | null
     params: Record<string, string>
     pathname: string
-    route: RouteNode<T>
+    route: RouteNode<T, TRequestContext>
   }) => T
+  loader?: (context: RouteLoaderContext<T, TRequestContext>) => unknown | Promise<unknown>
 }
 
-export type RouteBranchMatch<T = unknown> = {
+export type RouteBranchMatch<T = unknown, TRequestContext = unknown> = {
   params: Record<string, string>
-  matches: RouteNode<T>[]
+  matches: RouteNode<T, TRequestContext>[]
 }
 
 function joinPaths(base: string, next: string): string {
@@ -25,7 +36,7 @@ function joinPaths(base: string, next: string): string {
   return combined === '' ? '/' : combined
 }
 
-function branchPattern<T>(matches: RouteNode<T>[]): string {
+function branchPattern<T, TRequestContext>(matches: RouteNode<T, TRequestContext>[]): string {
   let current = '/'
   for (const route of matches) {
     if (!route.path) continue
@@ -34,17 +45,24 @@ function branchPattern<T>(matches: RouteNode<T>[]): string {
   return current
 }
 
-export function matchRouteTree<T>(routes: RouteNode<T>[], pathname: string): RouteBranchMatch<T> | null {
-  let bestMatch: RouteBranchMatch<T> | null = null
+export function matchRouteTree<T, TRequestContext>(
+  routes: RouteNode<T, TRequestContext>[],
+  pathname: string,
+): RouteBranchMatch<T, TRequestContext> | null {
+  let bestMatch: RouteBranchMatch<T, TRequestContext> | null = null
 
-  function visit(node: RouteNode<T>, inheritedPath: string, stack: RouteNode<T>[]): void {
+  function visit(
+    node: RouteNode<T, TRequestContext>,
+    inheritedPath: string,
+    stack: RouteNode<T, TRequestContext>[],
+  ): void {
     const nodePath = node.path ?? ''
     const absolutePath = nodePath === '' ? inheritedPath : joinPaths(inheritedPath, nodePath)
     const nextStack = [...stack, node]
 
     const nodeMatch = matchPath(absolutePath, pathname)
     if (nodeMatch) {
-      const candidate: RouteBranchMatch<T> = { params: nodeMatch.params, matches: nextStack }
+      const candidate: RouteBranchMatch<T, TRequestContext> = { params: nodeMatch.params, matches: nextStack }
       if (!bestMatch) {
         bestMatch = candidate
       } else {
@@ -70,7 +88,10 @@ export function matchRouteTree<T>(routes: RouteNode<T>[], pathname: string): Rou
   return bestMatch
 }
 
-export function renderMatchedOutlet<T>(branch: RouteBranchMatch<T>, pathname: string): T | null {
+export function renderMatchedOutlet<T, TRequestContext>(
+  branch: RouteBranchMatch<T, TRequestContext>,
+  pathname: string,
+): T | null {
   let outlet: T | null = null
   for (let i = branch.matches.length - 1; i >= 0; i -= 1) {
     const route = branch.matches[i]

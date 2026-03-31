@@ -7,13 +7,14 @@ import type { RouteNode } from '../tree.js'
 describe('declarative link primitive', () => {
   const routes: RouteNode[] = [{ id: 'root', path: '/', children: [{ id: 'about', path: 'about' }] }]
 
-  it('navigates on click', () => {
+  it('navigates on click', async () => {
     const history = createMemoryHistory({ initialEntries: ['/'] })
     const router = createRouter({ routes, history })
     router.start()
 
     const node = link({ to: '/about', router })
     node.handlers?.onClick?.({ x: 0, y: 0, target: {} as any })
+    await Promise.resolve()
 
     expect(router.getState().location.pathname).toBe('/about')
     expect(node.semantic?.role).toBe('link')
@@ -21,7 +22,7 @@ describe('declarative link primitive', () => {
     expect(node.props.cursor).toBe('pointer')
   })
 
-  it('navigates on Enter and Space key activation', () => {
+  it('navigates on Enter and Space key activation', async () => {
     const history = createMemoryHistory({ initialEntries: ['/'] })
     const router = createRouter({ routes, history })
     router.start()
@@ -36,9 +37,10 @@ describe('declarative link primitive', () => {
       metaKey: false,
       target: {} as any,
     })
+    await Promise.resolve()
     expect(router.getState().location.pathname).toBe('/about')
 
-    router.navigate('/', { replace: true })
+    await router.navigate('/', { replace: true })
     node.handlers?.onKeyDown?.({
       key: ' ',
       code: 'Space',
@@ -48,6 +50,7 @@ describe('declarative link primitive', () => {
       metaKey: false,
       target: {} as any,
     })
+    await Promise.resolve()
     expect(router.getState().location.pathname).toBe('/about')
   })
 
