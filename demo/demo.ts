@@ -37,6 +37,10 @@ const rootWidth = signal(600)
 const direction = signal<'row' | 'column'>('row')
 const codeTab = signal('basic')
 const copied = signal(false)
+const inputName = signal('')
+const inputEmail = signal('')
+const inputSearch = signal('')
+const activeDemoInput = signal<'name' | 'email' | 'search' | null>(null)
 let lastPerfTime = '-'
 let lastPerfNodes = '-'
 
@@ -216,6 +220,34 @@ function selectableText(): UIElement {
 
 function textInputDemo(): UIElement {
   const w = rootWidth.value
+
+  function applyInputKey(current: string, key: string): string {
+    if (key === 'Backspace') return current.slice(0, -1)
+    if (key === 'Delete') return ''
+    if (key.length === 1) return current + key
+    return current
+  }
+
+  function inputNode(
+    field: 'name' | 'email' | 'search',
+    value: string,
+    placeholder: string,
+    setValue: (next: string) => void,
+  ): UIElement {
+    return uiInput(value, placeholder, {
+      focused: activeDemoInput.value === field,
+      onClick: () => activeDemoInput.set(field),
+      onKeyDown: (e) => {
+        const next = applyInputKey(value, e.key)
+        if (next !== value) setValue(next)
+      },
+      onCompositionEnd: (e) => {
+        if (!e.data) return
+        setValue(value + e.data)
+      },
+    })
+  }
+
   return box({ flexDirection: 'column', padding: 24, gap: 14, width: w, minHeight: 380 }, [
     text({ text: 'Text Input (@geometra/ui)', font: 'bold 18px Inter', lineHeight: 24, color: '#ffffff' }),
     text({ text: 'Marketing demo now uses shared UI primitives. Advanced text-input behavior lives in demos/text-input-canvas and core tests.', font: '14px Inter', lineHeight: 22, color: '#e2e8f0' }),
@@ -228,9 +260,9 @@ function textInputDemo(): UIElement {
       flexDirection: 'column',
       gap: 10,
     }, [
-      uiInput('Name', 'Ada Lovelace'),
-      uiInput('Email', 'ada@geometra.dev'),
-      uiInput('Search components', 'button list dialog input'),
+      inputNode('name', inputName.value, 'Name', (next) => inputName.set(next)),
+      inputNode('email', inputEmail.value, 'Email', (next) => inputEmail.set(next)),
+      inputNode('search', inputSearch.value, 'Search components', (next) => inputSearch.set(next)),
     ]),
     box({ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }, [
       box({ backgroundColor: '#0f3460', borderRadius: 10, padding: 14, flexGrow: 1, flexDirection: 'column', gap: 4 }, [
@@ -492,6 +524,7 @@ function demoSection(): UIElement {
       ...names.map(s => btn(s.label, scenario.value === s.key, () => {
         scenario.set(s.key)
         renderer.selection = null
+        if (s.key !== 'input') activeDemoInput.set(null)
       })),
       box({ width: 12, height: 1 }, []),
       text({ text: 'Width', font: '600 12px Inter', lineHeight: 18, color: DIM }),

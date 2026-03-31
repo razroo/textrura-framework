@@ -17,20 +17,43 @@ export function button(label: string, onClick?: EventHandlers['onClick']): UIEle
   )
 }
 
-export function input(value: string, placeholder = ''): UIElement {
+export interface InputOptions {
+  focused?: boolean
+  onClick?: EventHandlers['onClick']
+  onKeyDown?: EventHandlers['onKeyDown']
+  onCompositionStart?: EventHandlers['onCompositionStart']
+  onCompositionUpdate?: EventHandlers['onCompositionUpdate']
+  onCompositionEnd?: EventHandlers['onCompositionEnd']
+}
+
+export function input(value: string, placeholder = '', options: InputOptions = {}): UIElement {
   const content = value.length > 0 ? value : placeholder
+  const focused = options.focused === true
   return box(
     {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
       paddingLeft: 10,
       paddingRight: 10,
       paddingTop: 8,
       paddingBottom: 8,
-      borderColor: '#334155',
+      borderColor: focused ? '#38bdf8' : '#334155',
       borderWidth: 1,
       borderRadius: 8,
+      cursor: 'text',
+      backgroundColor: focused ? '#111827' : undefined,
       semantic: { tag: 'input' },
+      onClick: options.onClick,
+      onKeyDown: options.onKeyDown,
+      onCompositionStart: options.onCompositionStart,
+      onCompositionUpdate: options.onCompositionUpdate,
+      onCompositionEnd: options.onCompositionEnd,
     },
-    [text({ text: content, font: '13px Inter', lineHeight: 18, color: value ? '#e2e8f0' : '#64748b' })],
+    [
+      text({ text: content, font: '13px Inter', lineHeight: 18, color: value ? '#e2e8f0' : '#64748b' }),
+      ...(focused ? [box({ width: 1.5, minHeight: 14, backgroundColor: '#38bdf8' }, [])] : []),
+    ],
   )
 }
 
