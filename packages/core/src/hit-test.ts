@@ -11,7 +11,8 @@ interface HitTarget {
 
 interface ZIndexCacheEntry {
   signature: string
-  desc: number[]
+  /** Child indices in paint order: ascending z-index (matches canvas + terminal renderers). */
+  asc: number[]
 }
 
 const zIndexOrderCache = new WeakMap<BoxElement, ZIndexCacheEntry>()
@@ -20,15 +21,20 @@ function zIndexOf(el: UIElement): number {
   return (el.props as Record<string, unknown>).zIndex as number | undefined ?? 0
 }
 
-function getChildrenByZDesc(boxEl: BoxElement): number[] {
+function getChildrenByZAsc(boxEl: BoxElement): number[] {
   const signature = boxEl.children.map((child, i) => `${i}:${zIndexOf(child)}`).join('|')
   const cached = zIndexOrderCache.get(boxEl)
   if (cached && cached.signature === signature) {
-    return cached.desc
+    return cached.asc
   }
-  const desc = boxEl.children.map((_, i) => i).sort((a, b) => zIndexOf(boxEl.children[b]!) - zIndexOf(boxEl.children[a]!))
-  zIndexOrderCache.set(boxEl, { signature, desc })
-  return desc
+  const asc = boxEl.children.map((_, i) => i).sort((a, b) => zIndexOf(boxEl.children[a]!) - zIndexOf(boxEl.children[b]!))
+  zIndexOrderCache.set(boxEl, { signature, asc })
+  return asc
+}
+
+/** Topmost-first sibling order for picking a single path or cursor (reverse of paint order). */
+function getChildrenByZDesc(boxEl: BoxElement): number[] {
+  return getChildrenByZAsc(boxEl).slice().reverse()
 }
 
 /** Result of routing a pointer/keyboard-style hit to handlers. */
@@ -80,7 +86,7 @@ function collectHits(
       results.push({ layout, handlers: boxEl.handlers, element: boxEl, absX, absY })
     }
 
-    for (const i of getChildrenByZDesc(boxEl)) {
+    for (const i of getChildrenByZAsc(boxEl)) {
       const childLayout = layout.children[i]
       if (childLayout) {
         collectHits(boxEl.children[i]!, childLayout, x, y, childOffsetX, childOffsetY, results)
@@ -176,7 +182,7 @@ export function hasInteractiveHitAtPoint(
 }
 
 /**
- * Child indices from root to the deepest box under (x, y), matching hit-test z-order.
+ * Child indices from root to the deepest box under (x, y). Among overlapping siblings, prefers higher z-index (topmost).
  * Returns `null` when the point misses the tree. Returns `[]` when the point hits the
  * root (or a leaf box) with no deeper box hit.
  */

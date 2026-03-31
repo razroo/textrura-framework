@@ -85,6 +85,27 @@ describe('dispatchHit', () => {
     expect(result.handled).toBe(false)
     expect(result.focusTarget?.element).toBe(el)
   })
+
+  it('overlapping siblings: higher z-index wins (matches paint order)', () => {
+    const log: string[] = []
+    const back = box(
+      { width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } },
+    )
+    const front = box(
+      { width: 50, height: 50, zIndex: 10, onClick: () => { log.push('front') } },
+    )
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['front'])
+  })
 })
 
 describe('hitPathAtPoint', () => {
@@ -111,6 +132,20 @@ describe('hitPathAtPoint', () => {
     const layout = { x: 0, y: 0, width: 50, height: 50, children: [] }
     expect(hitPathAtPoint(el, layout, 10, 10)).toEqual([])
   })
+
+  it('overlapping siblings: path prefers higher z-index child', () => {
+    const back = box({ width: 40, height: 40, zIndex: 0 })
+    const front = box({ width: 40, height: 40, zIndex: 5 })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+      ],
+    }
+    expect(hitPathAtPoint(root, layout, 5, 5)).toEqual([1])
+  })
 })
 
 describe('getCursorAtPoint', () => {
@@ -134,6 +169,20 @@ describe('getCursorAtPoint', () => {
 
     const cursor = getCursorAtPoint(el, layout, 50, 25)
     expect(cursor).toBeNull()
+  })
+
+  it('overlapping siblings: uses cursor from higher z-index', () => {
+    const back = box({ width: 40, height: 40, zIndex: 0, cursor: 'default' })
+    const front = box({ width: 40, height: 40, zIndex: 2, cursor: 'pointer' })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+      ],
+    }
+    expect(getCursorAtPoint(root, layout, 5, 5)).toBe('pointer')
   })
 })
 
