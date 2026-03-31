@@ -7,6 +7,8 @@ import {
   backspaceInput,
   deleteInput,
   moveInputCaret,
+  moveInputCaretByWord,
+  moveInputCaretToLineBoundary,
   getInputCaretGeometry,
   type TextInputState,
 } from '../text-input.js'
@@ -137,6 +139,31 @@ describe('text-input foundation', () => {
 
     const extend = moveInputCaret(right, 'right', true)
     expect(extend.selection).toEqual({ anchorNode: 1, anchorOffset: 0, focusNode: 1, focusOffset: 1 })
+  })
+
+  it('supports word-jump movement left/right', () => {
+    const base: TextInputState = {
+      nodes: ['hello, brave new world'],
+      selection: { anchorNode: 0, anchorOffset: 22, focusNode: 0, focusOffset: 22 },
+    }
+    const left = moveInputCaretByWord(base, 'left')
+    expect(left.selection.focusOffset).toBe(17)
+    const left2 = moveInputCaretByWord({ nodes: left.nodes, selection: left.selection }, 'left')
+    expect(left2.selection.focusOffset).toBe(13)
+    const right = moveInputCaretByWord(left2, 'right')
+    expect(right.selection.focusOffset).toBe(16)
+  })
+
+  it('supports line boundary movement (Home/End semantics)', () => {
+    const base: TextInputState = {
+      nodes: ['abcd', 'efghij'],
+      selection: { anchorNode: 1, anchorOffset: 3, focusNode: 1, focusOffset: 3 },
+    }
+    const home = moveInputCaretToLineBoundary(base, 'start')
+    expect(home.selection).toEqual({ anchorNode: 1, anchorOffset: 0, focusNode: 1, focusOffset: 0 })
+
+    const end = moveInputCaretToLineBoundary(home, 'end')
+    expect(end.selection).toEqual({ anchorNode: 1, anchorOffset: 6, focusNode: 1, focusOffset: 6 })
   })
 
   it('moves caret vertically with stable column intent across uneven lines', () => {

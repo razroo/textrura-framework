@@ -60,6 +60,10 @@ function clampSelection(nodes: string[], selection: SelectionRange): SelectionRa
   return { anchorNode: aNode, anchorOffset: aOffset, focusNode: fNode, focusOffset: fOffset }
 }
 
+function isWordChar(ch: string): boolean {
+  return /[A-Za-z0-9_]/.test(ch)
+}
+
 /** True when selection is a collapsed caret. */
 export function isCollapsedSelection(selection: SelectionRange): boolean {
   return (
@@ -296,6 +300,92 @@ export function moveInputCaret(
     selection: nextSelection,
     caretColumnIntent: nextColumnIntent,
   }
+}
+
+/** Move caret by whole words (Ctrl/Alt-style navigation). */
+export function moveInputCaretByWord(
+  state: TextInputState,
+  direction: 'left' | 'right',
+  extendSelection = false,
+): TextInputEditResult {
+  const nodes = state.nodes.length > 0 ? state.nodes : ['']
+  const selection = clampSelection(nodes, state.selection)
+  const collapsed = isCollapsedSelection(selection)
+
+  let nodeIndex = extendSelection ? selection.focusNode : selection.anchorNode
+  let offset = extendSelection ? selection.focusOffset : selection.anchorOffset
+
+  if (!collapsed && !extendSelection) {
+    const s = normalizeSelection(selection)
+    nodeIndex = direction === 'left' ? s.anchorNode : s.focusNode
+    offset = direction === 'left' ? s.anchorOffset : s.focusOffset
+  } else if (direction === 'left') {
+    if (offset === 0 && nodeIndex > 0) {
+      nodeIndex--
+      offset = nodes[nodeIndex]!.length
+    }
+    const line = nodes[nodeIndex]!
+    while (offset > 0 && /\s/.test(line[offset - 1]!)) offset--
+    while (offset > 0 && isWordChar(line[offset - 1]!)) offset--
+    while (offset > 0 && !isWordChar(line[offset - 1]!) && !/\s/.test(line[offset - 1]!)) offset--
+  } else {
+    const line = nodes[nodeIndex]!
+    while (offset < line.length && /\s/.test(line[offset]!)) offset++
+    while (offset < line.length && isWordChar(line[offset]!)) offset++
+    while (offset < line.length && !isWordChar(line[offset]!) && !/\s/.test(line[offset]!)) offset++
+    if (offset >= line.length && nodeIndex < nodes.length - 1) {
+      nodeIndex++
+      offset = 0
+    }
+  }
+
+  const nextSelection = extendSelection
+    ? {
+        anchorNode: selection.anchorNode,
+        anchorOffset: selection.anchorOffset,
+        focusNode: nodeIndex,
+        focusOffset: offset,
+      }
+    : {
+        anchorNode: nodeIndex,
+        anchorOffset: offset,
+        focusNode: nodeIndex,
+        focusOffset: offset,
+      }
+  return { nodes: [...nodes], selection: nextSelection }
+}
+
+/** Move caret to start/end of current line. */
+export function moveInputCaretToLineBoundary(
+  state: TextInputState,
+  boundary: 'start' | 'end',
+  extendSelection = false,
+): TextInputEditResult {
+  const nodes = state.nodes.length > 0 ? state.nodes : ['']
+  const selection = clampSelection(nodes, state.selection)
+  const collapsed = isCollapsedSelection(selection)
+  let nodeIndex = extendSelection ? selection.focusNode : selection.anchorNode
+
+  if (!collapsed && !extendSelection) {
+    const s = normalizeSelection(selection)
+    nodeIndex = boundary === 'start' ? s.anchorNode : s.focusNode
+  }
+  const offset = boundary === 'start' ? 0 : nodes[nodeIndex]!.length
+
+  const nextSelection = extendSelection
+    ? {
+        anchorNode: selection.anchorNode,
+        anchorOffset: selection.anchorOffset,
+        focusNode: nodeIndex,
+        focusOffset: offset,
+      }
+    : {
+        anchorNode: nodeIndex,
+        anchorOffset: offset,
+        focusNode: nodeIndex,
+        focusOffset: offset,
+      }
+  return { nodes: [...nodes], selection: nextSelection }
 }
 
 /**

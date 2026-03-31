@@ -7,6 +7,8 @@ import {
   backspaceInput,
   deleteInput,
   moveInputCaret,
+  moveInputCaretByWord,
+  moveInputCaretToLineBoundary,
   createTextInputHistory,
   pushTextInputHistory,
   undoTextInputHistory,
@@ -95,12 +97,30 @@ function onKeyDown(e: KeyboardHitEvent): void {
     return
   }
   if (e.key === 'ArrowLeft') {
-    setPresent(moveInputCaret(current, 'left', e.shiftKey))
+    if (e.altKey) {
+      setPresent(moveInputCaretByWord(current, 'left', e.shiftKey))
+    } else {
+      setPresent(moveInputCaret(current, 'left', e.shiftKey))
+    }
     caretColumnIntent.set(null)
     return
   }
   if (e.key === 'ArrowRight') {
-    setPresent(moveInputCaret(current, 'right', e.shiftKey))
+    if (e.altKey) {
+      setPresent(moveInputCaretByWord(current, 'right', e.shiftKey))
+    } else {
+      setPresent(moveInputCaret(current, 'right', e.shiftKey))
+    }
+    caretColumnIntent.set(null)
+    return
+  }
+  if (e.key === 'Home') {
+    setPresent(moveInputCaretToLineBoundary(current, 'start', e.shiftKey))
+    caretColumnIntent.set(null)
+    return
+  }
+  if (e.key === 'End') {
+    setPresent(moveInputCaretToLineBoundary(current, 'end', e.shiftKey))
     caretColumnIntent.set(null)
     return
   }
@@ -201,7 +221,7 @@ function view() {
     [
       text({ text: 'Text Input Playground', font: 'bold 22px Inter', lineHeight: 30, color: '#fafafa' }),
       text({
-        text: 'Click editor to focus. Type, Backspace/Delete, Enter, Shift+Arrow selection, Cmd/Ctrl+Z undo, Shift+Cmd/Ctrl+Z redo, Ctrl+Y redo.',
+        text: 'Click editor to focus. Type, Backspace/Delete, Enter, Alt+Arrow word jump, Home/End line bounds, Shift+Arrow selection, Cmd/Ctrl+Z undo, Shift+Cmd/Ctrl+Z redo, Ctrl+Y redo.',
         font: '13px Inter',
         lineHeight: 19,
         color: '#a1a1aa',

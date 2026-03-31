@@ -53,6 +53,8 @@ export {
   backspaceInput,
   deleteInput,
   moveInputCaret,
+  moveInputCaretByWord,
+  moveInputCaretToLineBoundary,
   getInputCaretGeometry,
 } from './text-input.js'
 export type { TextInputState, TextInputEditResult, CaretGeometry } from './text-input.js'

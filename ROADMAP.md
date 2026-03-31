@@ -99,7 +99,7 @@ Tracking fields:
 ### 0.4.0 — Input parity and editing completeness
 
 - [x] Status: `done` | Owner: `@codex` | Add vertical caret movement (`ArrowUp`/`ArrowDown`) for multi-line text input with stable column intent.
-- [ ] Status: `todo` | Owner: `@unassigned` | Add word-jump and line-boundary movement semantics (`Alt+Arrow`, `Home`, `End`) with tests.
+- [x] Status: `done` | Owner: `@codex` | Add word-jump and line-boundary movement semantics (`Alt+Arrow`, `Home`, `End`) with tests.
 - [ ] Status: `todo` | Owner: `@unassigned` | Implement pointer-driven text selection drag in canvas and align with text-input helpers.
 - [ ] Status: `todo` | Owner: `@unassigned` | Add copy/cut/paste integration tests for selection + edit history behavior.
 - [ ] Status: `todo` | Owner: `@unassigned` | Add IME stress scenarios (focus changes, rapid composition updates, cancellation) across canvas + terminal where applicable.
