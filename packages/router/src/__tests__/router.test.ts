@@ -529,15 +529,18 @@ describe('createRouter lifecycle', () => {
     const navPromise = router.navigate('/users/5')
     expect(router.getState().pending).toBe(true)
     expect(['navigating', 'loading']).toContain(router.getState().navigation)
+    expect(router.isPending('/users/5')).toBe(true)
 
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(router.getState().loading).toBe(true)
     expect(router.getState().navigation).toBe('loading')
+    expect(router.isPending('/users/5')).toBe(true)
 
     await navPromise
     expect(router.getState().pending).toBe(false)
     expect(router.getState().loading).toBe(false)
     expect(router.getState().navigation).toBe('idle')
+    expect(router.isPending('/users/5')).toBe(false)
   })
 
   it('exposes submitting state during action execution', async () => {

@@ -403,7 +403,7 @@ export function createRouter<T, TRequestContext = unknown>(
       return state.location.pathname === to
     },
     isPending(to: string) {
-      return state.navigation === 'navigating' && pendingTo === to
+      return state.pending && pendingTo === to
     },
     addBlocker(blocker: NavigationBlocker) {
       blockers.add(blocker)
