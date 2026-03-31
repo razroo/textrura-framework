@@ -39,7 +39,7 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
-    "textura": "^0.2.2"
+    "textura": "^1.1.2"
   },
   "optionalDependencies": {
     "@napi-rs/canvas": "^0.1.65"
