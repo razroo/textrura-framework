@@ -63,4 +63,52 @@ describe('applyServerMessage', () => {
     expect(state.layout).toBeNull()
     expect(renders.length).toBe(0)
   })
+
+  it('ignores delayed patch before first frame and recovers on frame', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+
+    applyServerMessage(state, renderer, {
+      type: 'patch',
+      patches: [{ path: [], x: 99 }],
+      protocolVersion: 1,
+    })
+    expect(state.layout).toBeNull()
+    expect(renders.length).toBe(0)
+
+    applyServerMessage(state, renderer, {
+      type: 'frame',
+      layout: layout(1, 2, 30, 40),
+      tree: tree(),
+      protocolVersion: 1,
+    })
+    expect(state.layout?.x).toBe(1)
+    expect(renders.length).toBe(1)
+  })
+
+  it('handles duplicate frames idempotently and applies duplicate patches deterministically', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+
+    const frame = {
+      type: 'frame' as const,
+      layout: layout(0, 0, 100, 50),
+      tree: tree(),
+      protocolVersion: 1,
+    }
+    applyServerMessage(state, renderer, frame)
+    applyServerMessage(state, renderer, frame)
+    expect(state.layout?.width).toBe(100)
+
+    const patch = {
+      type: 'patch' as const,
+      patches: [{ path: [], width: 120 }],
+      protocolVersion: 1,
+    }
+    applyServerMessage(state, renderer, patch)
+    applyServerMessage(state, renderer, patch)
+
+    expect(state.layout?.width).toBe(120)
+    expect(renders.length).toBe(4)
+  })
 })
