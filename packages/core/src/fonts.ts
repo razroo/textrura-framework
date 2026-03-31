@@ -49,7 +49,9 @@ function splitFontFamilyList(tail: string): string[] {
  */
 export function extractFontFamiliesFromCSSFont(font: string): string[] {
   const trimmed = font.trim()
-  const m = trimmed.match(/\b(\d+(?:\.\d+)?(?:px|em|rem))(?:\/\s*[\d.]+(?:px|em|rem)?)?\s+(.+)$/i)
+  const m = trimmed.match(
+    /\b(\d+(?:\.\d+)?(?:px|em|rem))\s*(?:\/\s*[\d.]+(?:px|em|rem)?)?\s+(.+)$/i,
+  )
   const tail = m ? m[2]! : trimmed
   const sizeLike = /^\d+(\.\d+)?(px|em|rem)$/i
   return splitFontFamilyList(tail)

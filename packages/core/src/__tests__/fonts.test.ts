@@ -19,6 +19,10 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('italic 12px/18px Georgia, serif')).toEqual(['Georgia'])
   })
 
+  it('parses numeric weight with spaced line-height before family', () => {
+    expect(extractFontFamiliesFromCSSFont('600 14px / 18px Inter, sans-serif')).toEqual(['Inter'])
+  })
+
   it('does not split on commas inside a quoted family name', () => {
     expect(extractFontFamiliesFromCSSFont('14px "Foo, Bar", sans-serif')).toEqual(['Foo, Bar'])
   })

@@ -145,6 +145,26 @@ describe('dispatchHit', () => {
     dispatchHit(root, layout, 'onClick', 10, 10)
     expect(log).toEqual(['front'])
   })
+
+  it('nested boxes: deepest onPointerDown fires first', () => {
+    const log: string[] = []
+    const child = box(
+      { width: 40, height: 40, onPointerDown: () => { log.push('child') } },
+    )
+    const parent = box(
+      { width: 100, height: 100, onPointerDown: () => { log.push('parent') } },
+      [child],
+    )
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+      ],
+    }
+
+    dispatchHit(parent, layout, 'onPointerDown', 20, 20)
+    expect(log).toEqual(['child'])
+  })
 })
 
 describe('hitPathAtPoint', () => {
@@ -361,6 +381,16 @@ describe('hasInteractiveHitAtPoint', () => {
 
   it('detects onPointerDown without onClick', () => {
     const inner = box({ width: 40, height: 40, onPointerDown: () => undefined })
+    const root = box({ width: 100, height: 100 }, [inner])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+    expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(true)
+  })
+
+  it('detects onPointerUp without onClick', () => {
+    const inner = box({ width: 40, height: 40, onPointerUp: () => undefined })
     const root = box({ width: 100, height: 100 }, [inner])
     const layout = {
       x: 0, y: 0, width: 100, height: 100,
