@@ -198,6 +198,26 @@ Geometra now exposes runtime primitives so non-DOM renderers can still provide a
 └───────────┴───────────┴───────────┴──────────────┘
 ```
 
+## Protocol (v1)
+
+Client and server exchange JSON messages over WebSocket with optional `protocolVersion`.
+
+- **Server -> Client**
+  - `frame`: `{ type: 'frame', layout, tree, protocolVersion?: 1 }`
+  - `patch`: `{ type: 'patch', patches, protocolVersion?: 1 }`
+  - `error`: `{ type: 'error', message, protocolVersion?: 1 }`
+- **Client -> Server**
+  - `event`: pointer/click hit-test events (`onClick`, `onPointerDown`, `onPointerUp`, `onPointerMove`)
+  - `key`: keyboard events (`onKeyDown`, `onKeyUp`)
+  - `composition`: IME events (`onCompositionStart`, `onCompositionUpdate`, `onCompositionEnd`)
+  - `resize`: viewport updates (`width`, `height`)
+
+Compatibility notes:
+
+- Unversioned messages are treated as protocol v1.
+- If one side receives a **newer** protocol version than it supports, it returns/raises an error instead of silently misbehaving.
+- Server layout dimensions can be updated live via `resize`, allowing true server-computed responsive layouts.
+
 ## Running the Demos
 
 ```bash
