@@ -50,8 +50,8 @@ let lastPerfTime = '-'
 let lastPerfNodes = '-'
 
 // ─── Page-Level Ambient Effects ───────────────────────────────────────────────
-const mouseX = signal(0)
-const mouseY = signal(0)
+const mouseX = signal(-9999)
+const mouseY = signal(-9999)
 const mouseGlowX = spring(mouseX, { stiffness: 40, damping: 20, mass: 1 })
 const mouseGlowY = spring(mouseY, { stiffness: 40, damping: 20, mass: 1 })
 
@@ -191,6 +191,88 @@ function btn(label: string, active: boolean, handler: () => void): UIElement {
 /** Section wrapper with consistent spacing. */
 function section(children: UIElement[], opts: { paddingBottom?: number } = {}): UIElement {
   return box({ flexDirection: 'column', paddingBottom: opts.paddingBottom ?? 80, gap: 24 }, children)
+}
+
+// ─── Per-Character Reactive Text (uniquely canvas) ────────────────────────────
+let heroMeasureCtx: CanvasRenderingContext2D | null = null
+function getHeroMeasureCtx(): CanvasRenderingContext2D | null {
+  if (heroMeasureCtx) return heroMeasureCtx
+  if (typeof document === 'undefined') return null
+  const c = document.createElement('canvas')
+  heroMeasureCtx = c.getContext('2d')
+  return heroMeasureCtx
+}
+
+function reactiveHeroText(
+  str: string,
+  font: string,
+  lineHeight: number,
+  baseRGB: [number, number, number],
+  glowRGB: [number, number, number],
+  approxY: number,
+): UIElement {
+  const maxLift = 16
+  const radius = 200
+  const mx = mouseX.value
+  const my = mouseY.value
+
+  const ctx = getHeroMeasureCtx()
+  if (!ctx) {
+    const [r, g, b] = baseRGB
+    return center(text({ text: str, font, lineHeight, color: `rgb(${r},${g},${b})` }))
+  }
+
+  ctx.font = font
+  const characters = Array.from(str)
+  const charWidths: number[] = []
+  let totalWidth = 0
+  for (const ch of characters) {
+    const w = ctx.measureText(ch).width
+    charWidths.push(w)
+    totalWidth += w
+  }
+
+  const viewportWidth = vw.value
+  const startX = (viewportWidth - totalWidth) / 2
+  let runningX = startX
+
+  const charElements: UIElement[] = []
+  for (let i = 0; i < characters.length; i++) {
+    const ch = characters[i]!
+    const w = charWidths[i]!
+    const charCx = runningX + w / 2
+    const charCy = approxY + lineHeight / 2
+    const dx = mx - charCx
+    const dy = my - charCy
+    const dist = Math.sqrt(dx * dx + dy * dy)
+    const influence = Math.max(0, 1 - dist / radius)
+    const eased = influence * influence
+
+    const lift = Math.round(maxLift * (1 - eased))
+
+    const [r1, g1, b1] = baseRGB
+    const [r2, g2, b2] = glowRGB
+    const r = Math.round(r1 + (r2 - r1) * eased)
+    const g = Math.round(g1 + (g2 - g1) * eased)
+    const b = Math.round(b1 + (b2 - b1) * eased)
+
+    charElements.push(text({
+      text: ch === ' ' ? '\u00A0' : ch,
+      font,
+      lineHeight,
+      color: `rgb(${r},${g},${b})`,
+      marginTop: lift,
+    }))
+
+    runningX += w
+  }
+
+  return box({
+    flexDirection: 'row',
+    justifyContent: 'center',
+    minHeight: lineHeight + maxLift,
+    alignItems: 'flex-start',
+  }, charElements)
 }
 
 /** Section heading. */
@@ -834,13 +916,28 @@ function heroSection(): UIElement {
       ),
     ]),
     spacer(8),
-    // Title lines
+    // Title lines — per-character mouse proximity (impossible in DOM without per-char <span> wrapping)
     box({ opacity: e1, marginTop: Math.round(s1) }, [
-      center(text({ text: 'The client is the server.', font: `bold ${titleSize}px Inter`, lineHeight: titleLine, color: TEXT_COLOR })),
+      reactiveHeroText(
+        'The client is the server.',
+        `bold ${titleSize}px Inter`, titleLine,
+        [250, 250, 250], [56, 189, 248],
+        130,
+      ),
     ]),
     box({ opacity: e2, marginTop: Math.round(s2) }, [
-      center(text({ text: 'The server is the client.', font: `bold ${titleSize}px Inter`, lineHeight: titleLine, color: ACCENT })),
+      reactiveHeroText(
+        'The server is the client.',
+        `bold ${titleSize}px Inter`, titleLine,
+        [233, 69, 96], [255, 160, 210],
+        130 + titleLine + 20,
+      ),
     ]),
+    // Callout
+    center(text({
+      text: '\u2191 Move your cursor over the title. Each character reacts independently. No DOM can do this.',
+      font: '12px Inter', lineHeight: 16, color: DIM,
+    })),
     spacer(4),
     // Subtitle
     box({ opacity: e2, marginTop: Math.round(s2) }, [
@@ -1222,7 +1319,7 @@ window.addEventListener('resize', () => {
 // ─── Mouse Tracking ──────────────────────────────────────────────────────────
 canvas.addEventListener('mousemove', (e) => {
   mouseX.set(e.clientX)
-  mouseY.set(e.clientY + (canvas.parentElement?.scrollTop ?? 0))
+  mouseY.set(e.clientY + window.scrollY)
 })
 
 // ─── Init ────────────────────────────────────────────────────────────────────
