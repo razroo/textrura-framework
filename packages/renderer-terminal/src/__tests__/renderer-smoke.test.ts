@@ -18,13 +18,19 @@ function stripAnsiSequences(input: string): string {
   let out = ''
   let i = 0
   while (i < input.length) {
-    if (input[i] === '\u001b' && input[i + 1] === '[') {
+    const current = input[i]
+    const next = input[i + 1]
+    if (current === '\u001b' && next === '[') {
       i += 2
-      while (i < input.length && !/[A-Za-z]/.test(input[i])) i++
+      while (i < input.length) {
+        const token = input[i]
+        if (token === undefined || /[A-Za-z]/.test(token)) break
+        i++
+      }
       if (i < input.length) i++
       continue
     }
-    out += input[i]
+    if (current !== undefined) out += current
     i++
   }
   return out
