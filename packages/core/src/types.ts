@@ -108,6 +108,10 @@ export interface EventHandlers {
 export interface HitEvent {
   x: number
   y: number
+  /** Pointer x relative to the hit target's local box. */
+  localX?: number
+  /** Pointer y relative to the hit target's local box. */
+  localY?: number
   target: ComputedLayout
 }
 

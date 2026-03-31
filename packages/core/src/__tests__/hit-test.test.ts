@@ -44,6 +44,30 @@ describe('dispatchHit', () => {
     expect(log).toEqual(['child'])
   })
 
+  it('provides target-local pointer coordinates to handlers', () => {
+    let localX = -1
+    let localY = -1
+    const child = box({
+      width: 40,
+      height: 30,
+      onClick: (e) => {
+        localX = e.localX ?? -1
+        localY = e.localY ?? -1
+      },
+    })
+    const parent = box({ width: 120, height: 80 }, [child])
+    const layout = {
+      x: 5, y: 10, width: 120, height: 80,
+      children: [
+        { x: 7, y: 9, width: 40, height: 30, children: [] },
+      ],
+    }
+
+    dispatchHit(parent, layout, 'onClick', 20, 30)
+    expect(localX).toBe(8)
+    expect(localY).toBe(11)
+  })
+
   it('click returns focus target for key-only focusable boxes', () => {
     const el = box({ width: 100, height: 50, onKeyDown: () => undefined })
     const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }

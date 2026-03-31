@@ -64,7 +64,8 @@ export function input(value: string, placeholder = '', options: InputOptions = {
     }
     const horizontalPadding = 20 // paddingLeft + paddingRight
     const usableWidth = Math.max(1, e.target.width - horizontalPadding)
-    const localX = Math.max(0, Math.min(usableWidth, e.x - e.target.x - 10))
+    const pointerX = e.localX ?? e.x
+    const localX = Math.max(0, Math.min(usableWidth, pointerX - 10))
     const nextOffset = Math.max(0, Math.min(value.length, Math.round((localX / usableWidth) * value.length)))
     options.onCaretOffsetChange(nextOffset)
   }

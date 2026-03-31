@@ -249,6 +249,7 @@ describe('@geometra/ui input', () => {
     el.handlers?.onClick?.({
       x: 200,
       y: 10,
+      localX: 80,
       target: { x: 100, y: 0, width: 200, height: 30, children: [] } as HitEvent['target'],
     })
 

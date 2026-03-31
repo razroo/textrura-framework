@@ -5,6 +5,8 @@ interface HitTarget {
   layout: ComputedLayout
   handlers: EventHandlers
   element: BoxElement
+  absX: number
+  absY: number
 }
 
 interface ZIndexCacheEntry {
@@ -75,7 +77,7 @@ function collectHits(
   if (element.kind === 'box') {
     const boxEl = element as BoxElement
     if (boxEl.handlers) {
-      results.push({ layout, handlers: boxEl.handlers, element: boxEl })
+      results.push({ layout, handlers: boxEl.handlers, element: boxEl, absX, absY })
     }
 
     for (const i of getChildrenByZDesc(boxEl)) {
@@ -104,7 +106,14 @@ export function dispatchHit(
     const hit = hits[i]!
     const handler = hit.handlers[eventType]
     if (handler) {
-      const event: HitEvent = { x, y, target: hit.layout, ...extra }
+      const event: HitEvent = {
+        x,
+        y,
+        localX: x - hit.absX,
+        localY: y - hit.absY,
+        target: hit.layout,
+        ...extra,
+      }
       ;(handler as (e: HitEvent) => void)(event)
       const focusable = !!(
         hit.handlers.onClick ||
