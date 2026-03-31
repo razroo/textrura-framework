@@ -6,6 +6,7 @@ import type { Signal } from './signals.js'
 interface FocusTarget {
   element: BoxElement
   layout: ComputedLayout
+  focusIndex?: number
 }
 
 /** Signal tracking the currently focused element. */
@@ -47,6 +48,16 @@ function collectFocusable(
   }
 }
 
+function sameBounds(a: ComputedLayout, b: ComputedLayout): boolean {
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height
+}
+
+function findTargetIndex(targets: FocusTarget[], current: FocusTarget): number {
+  const byIdentity = targets.findIndex(t => t.element === current.element)
+  if (byIdentity !== -1) return byIdentity
+  return targets.findIndex(t => sameBounds(t.layout, current.layout))
+}
+
 /** Move focus to the next focusable element. */
 export function focusNext(tree: UIElement, layout: ComputedLayout): void {
   const targets: FocusTarget[] = []
@@ -55,13 +66,15 @@ export function focusNext(tree: UIElement, layout: ComputedLayout): void {
 
   const current = focusedElement.peek()
   if (!current) {
-    focusedElement.set(targets[0]!)
+    focusedElement.set({ ...targets[0]!, focusIndex: 0 })
     return
   }
 
-  const idx = targets.findIndex(t => t.element === current.element)
-  const next = targets[(idx + 1) % targets.length]!
-  focusedElement.set(next)
+  const idx = current.focusIndex ?? findTargetIndex(targets, current)
+  const safeIdx = idx >= 0 ? idx : 0
+  const nextIndex = (safeIdx + 1) % targets.length
+  const next = targets[nextIndex]!
+  focusedElement.set({ ...next, focusIndex: nextIndex })
 }
 
 /** Move focus to the previous focusable element. */
@@ -72,11 +85,14 @@ export function focusPrev(tree: UIElement, layout: ComputedLayout): void {
 
   const current = focusedElement.peek()
   if (!current) {
-    focusedElement.set(targets[targets.length - 1]!)
+    const lastIndex = targets.length - 1
+    focusedElement.set({ ...targets[lastIndex]!, focusIndex: lastIndex })
     return
   }
 
-  const idx = targets.findIndex(t => t.element === current.element)
-  const prev = targets[(idx - 1 + targets.length) % targets.length]!
-  focusedElement.set(prev)
+  const idx = current.focusIndex ?? findTargetIndex(targets, current)
+  const safeIdx = idx >= 0 ? idx : 0
+  const prevIndex = (safeIdx - 1 + targets.length) % targets.length
+  const prev = targets[prevIndex]!
+  focusedElement.set({ ...prev, focusIndex: prevIndex })
 }

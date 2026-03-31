@@ -12,32 +12,22 @@ export function dispatchKeyboardEvent(
   eventType: 'onKeyDown' | 'onKeyUp',
   partialEvent: Omit<KeyboardHitEvent, 'target'>,
 ): boolean {
-  const focused = focusedElement.peek()
-  if (!focused) {
-    if (partialEvent.key === 'Tab') {
-      if (partialEvent.shiftKey) {
-        focusPrev(tree, layout)
-      } else {
-        focusNext(tree, layout)
-      }
-      return true
-    }
-    return false
-  }
-
-  const handler = focused.element.handlers?.[eventType]
-  if (handler) {
-    const event: KeyboardHitEvent = { ...partialEvent, target: focused.layout }
-    handler(event)
-    return true
-  }
-
-  if (partialEvent.key === 'Tab') {
+  if (partialEvent.key === 'Tab' && eventType === 'onKeyDown') {
     if (partialEvent.shiftKey) {
       focusPrev(tree, layout)
     } else {
       focusNext(tree, layout)
     }
+    return true
+  }
+
+  const focused = focusedElement.peek()
+  if (!focused) return false
+
+  const handler = focused.element.handlers?.[eventType]
+  if (handler) {
+    const event: KeyboardHitEvent = { ...partialEvent, target: focused.layout }
+    handler(event)
     return true
   }
 

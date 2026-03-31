@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx app.ts"
+    "dev": "tsx app.ts",
+    "dev:watch": "tsx watch app.ts",
+    "test:input": "tsx input.integration.ts"
   },
   "dependencies": {
     "@geometra/core": "*",
