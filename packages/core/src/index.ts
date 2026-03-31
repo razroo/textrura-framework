@@ -25,6 +25,7 @@ export {
 
 // Focus management
 export { focusedElement, setFocus, clearFocus, focusNext, focusPrev } from './focus.js'
+export { trapFocusStep } from './focus-trap.js'
 export { dispatchKeyboardEvent } from './keyboard.js'
 export { dispatchCompositionEvent } from './keyboard.js'
 
