@@ -15,6 +15,7 @@ const ACCENT2 = '#0ea5e9'
 const ACCENT3 = '#22c55e'
 const ACCENT4 = '#f59e0b'
 const CODE_BG = '#131320'
+const GLOW = 'rgba(233,69,96,0.18)'
 const CARD_COLORS = [ACCENT, '#0f3460', '#533483', ACCENT2, ACCENT3, ACCENT4]
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -320,6 +321,9 @@ const html = toSemanticHTML(tree, {
 // ─── Page Sections ───────────────────────────────────────────────────────────
 
 function heroSection(): UIElement {
+  const titleSize = vw.value > 980 ? 56 : vw.value > 760 ? 48 : 38
+  const titleLine = vw.value > 980 ? 64 : vw.value > 760 ? 56 : 46
+
   return box({ flexDirection: 'column', paddingTop: 96, paddingBottom: 64, gap: 20 }, [
     center(
       box({
@@ -331,8 +335,8 @@ function heroSection(): UIElement {
       ]),
     ),
     spacer(8),
-    center(text({ text: 'The client is the server.', font: 'bold 48px Inter', lineHeight: 56, color: TEXT_COLOR })),
-    center(text({ text: 'The server is the client.', font: 'bold 48px Inter', lineHeight: 56, color: ACCENT })),
+    center(text({ text: 'The client is the server.', font: `bold ${titleSize}px Inter`, lineHeight: titleLine, color: TEXT_COLOR })),
+    center(text({ text: 'The server is the client.', font: `bold ${titleSize}px Inter`, lineHeight: titleLine, color: ACCENT })),
     spacer(4),
     center(text({
       text: 'Geometra replaces the entire browser rendering pipeline. One JSON geometry protocol powers Canvas, Terminal, and AI agents.',
@@ -347,7 +351,7 @@ function heroSection(): UIElement {
         paddingTop: 14, paddingBottom: 14, paddingLeft: 24, paddingRight: 24,
         flexDirection: 'row', gap: 16,
         cursor: 'pointer',
-        boxShadow: { offsetX: 0, offsetY: 4, blur: 20, color: 'rgba(233,69,96,0.15)' },
+        boxShadow: { offsetX: 0, offsetY: 8, blur: 28, color: GLOW },
         onClick: () => {
           navigator.clipboard.writeText('npm i @geometra/core @geometra/renderer-canvas')
           copied.set(true)
@@ -356,6 +360,19 @@ function heroSection(): UIElement {
       }, [
         text({ text: '$ npm i @geometra/core @geometra/renderer-canvas', font: '14px JetBrains Mono', lineHeight: 20, color: TEXT_COLOR }),
         text({ text: copied.value ? '\u2713 Copied' : 'Copy', font: '600 12px Inter', lineHeight: 20, color: copied.value ? ACCENT3 : DIM }),
+      ]),
+    ),
+    center(
+      box({ flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }, [
+        box({ backgroundColor: 'rgba(14,165,233,0.12)', borderRadius: 999, paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4 }, [
+          text({ text: 'Yoga WASM layout', font: '600 11px Inter', lineHeight: 14, color: '#67e8f9' }),
+        ]),
+        box({ backgroundColor: 'rgba(34,197,94,0.12)', borderRadius: 999, paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4 }, [
+          text({ text: 'Pretext metrics', font: '600 11px Inter', lineHeight: 14, color: '#86efac' }),
+        ]),
+        box({ backgroundColor: 'rgba(233,69,96,0.12)', borderRadius: 999, paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4 }, [
+          text({ text: 'Canvas + Terminal + WS', font: '600 11px Inter', lineHeight: 14, color: '#fda4af' }),
+        ]),
       ]),
     ),
   ])
@@ -374,12 +391,24 @@ function pipelineSection(): UIElement {
   const arrow = () => text({ text: '\u2192', font: '20px Inter', lineHeight: 38, color: DIM })
 
   return box({ flexDirection: 'column', paddingBottom: 80, gap: 12 }, [
-    box({ flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }, [
-      step('HTML', true), arrow(), step('CSS Parser', true), arrow(), step('DOM', true), arrow(), step('Layout', true), arrow(), step('Paint', true),
-    ]),
-    box({ flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }, [
-      step('Tree', false), arrow(), step('Yoga WASM', false), arrow(), step('Geometry', false), arrow(), step('Pixels', false),
-    ]),
+    center(
+      box({
+        backgroundColor: SURFACE,
+        borderColor: BORDER,
+        borderRadius: 14,
+        padding: 14,
+        flexDirection: 'column',
+        gap: 10,
+        boxShadow: { offsetX: 0, offsetY: 6, blur: 24, color: 'rgba(0,0,0,0.35)' },
+      }, [
+        box({ flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }, [
+          step('HTML', true), arrow(), step('CSS Parser', true), arrow(), step('DOM', true), arrow(), step('Layout', true), arrow(), step('Paint', true),
+        ]),
+        box({ flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }, [
+          step('Tree', false), arrow(), step('Yoga WASM', false), arrow(), step('Geometry', false), arrow(), step('Pixels', false),
+        ]),
+      ]),
+    ),
   ])
 }
 
@@ -394,7 +423,16 @@ function demoSection(): UIElement {
   return section([
     ...heading('Live Demo', 'Interactive \u2014 everything below is rendered to Canvas, not DOM.'),
     // Controls
-    box({ flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' }, [
+    box({
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      alignItems: 'center',
+      backgroundColor: SURFACE,
+      borderColor: BORDER,
+      borderRadius: 12,
+      padding: 12,
+    }, [
       text({ text: 'Scenario', font: '600 12px Inter', lineHeight: 18, color: DIM }),
       ...names.map(s => btn(s.label, scenario.value === s.key, () => { scenario.set(s.key); renderer.selection = null })),
       box({ width: 12, height: 1 }, []),
@@ -409,11 +447,12 @@ function demoSection(): UIElement {
     ]),
     // Demo area
     box({
-      backgroundColor: SURFACE,
+      backgroundColor: '#111119',
       borderColor: BORDER,
       borderRadius: 16,
       padding: 24,
-      boxShadow: { offsetX: 0, offsetY: 8, blur: 32, color: 'rgba(0,0,0,0.4)' },
+      boxShadow: { offsetX: 0, offsetY: 10, blur: 36, color: 'rgba(0,0,0,0.45)' },
+      gradient: { type: 'linear', angle: 180, stops: [{ offset: 0, color: '#161622' }, { offset: 1, color: '#101016' }] },
     }, [
       center(box({
         backgroundColor: '#1a1a2e',
@@ -464,6 +503,7 @@ function archSection(): UIElement {
         padding: 24,
         flexDirection: 'column', gap: 10,
         minWidth: 200, flexGrow: 1, flexBasis: 0,
+        boxShadow: { offsetX: 0, offsetY: 6, blur: 20, color: 'rgba(0,0,0,0.28)' },
       }, [
         box({ flexDirection: 'row', gap: 10, alignItems: 'center' }, [
           text({ text: p.name, font: '600 14px Inter', lineHeight: 18, color: TEXT_COLOR }),
@@ -483,7 +523,13 @@ function codeSection(): UIElement {
   return section([
     ...heading('One protocol, every target', 'The same element tree powers Canvas, Terminal, and AI agents.'),
     // Tabs + code in a single card
-    box({ flexDirection: 'column', borderColor: BORDER, borderRadius: 14, overflow: 'hidden' }, [
+    box({
+      flexDirection: 'column',
+      borderColor: BORDER,
+      borderRadius: 14,
+      overflow: 'hidden',
+      boxShadow: { offsetX: 0, offsetY: 8, blur: 28, color: 'rgba(0,0,0,0.35)' },
+    }, [
       // Tab bar
       box({ flexDirection: 'row', backgroundColor: SURFACE }, tabs.map(t =>
         box({
@@ -510,6 +556,7 @@ function footerSection(): UIElement {
   return box({
     borderColor: BORDER,
     borderWidth: 1,
+    borderRadius: 12,
     paddingTop: 48, paddingBottom: 64,
     flexDirection: 'column', gap: 12,
   }, [

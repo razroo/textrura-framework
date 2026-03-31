@@ -38,6 +38,10 @@ export type { EasingFn } from './animation.js'
 export { toSemanticHTML } from './seo.js'
 export type { SemanticHTMLOptions } from './seo.js'
 
+// Runtime accessibility
+export { toAccessibilityTree } from './a11y.js'
+export type { AccessibilityNode, AccessibilityBounds } from './a11y.js'
+
 // Types
 export type {
   UIElement,

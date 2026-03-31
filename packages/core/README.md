@@ -14,6 +14,7 @@ npm install @geometra/core
 - `box`, `text`, `image` -- element constructors
 - `createApp` -- application entry point
 - `toSemanticHTML` -- SEO-friendly HTML generation
+- `toAccessibilityTree` -- runtime accessibility tree from geometry
 - `transition`, `spring` -- animation utilities
 
 ## Usage
