@@ -31,6 +31,103 @@ Routing competitiveness work is tracked in `ROUTING_COMPETITIVENESS_CHECKLIST.md
 - Animation primitives beyond current `animation.ts` helpers.
 - Non-canvas render targets (WebGPU, PDF) consuming the same geometry.
 
+## Post-1.0 execution plan (1.x)
+
+This plan prioritizes adoption-critical capabilities while preserving the core invariant:
+`Tree -> Yoga WASM -> Geometry -> Pixels`.
+
+Tracking fields:
+
+- Status: `todo` | `in_progress` | `blocked` | `done`
+- Owner: `@unassigned` by default
+
+### 1.1.0 — RTL and bidi baseline
+
+Goal: make mixed-direction text and interaction credible for production apps.
+
+Acceptance criteria:
+
+- [ ] Status: `todo` | Owner: `@unassigned` | Direction model is explicit: root and per-node `dir` (`ltr`/`rtl`/`auto`) semantics are documented and enforced consistently.
+- [ ] Status: `todo` | Owner: `@unassigned` | Caret movement semantics are correct for bidi text (left/right visual movement, home/end behavior, word jumps) with integration tests.
+- [ ] Status: `todo` | Owner: `@unassigned` | Selection range mapping and paint are stable for mixed LTR/RTL runs in canvas and terminal renderers.
+- [ ] Status: `todo` | Owner: `@unassigned` | Text measurement and geometry mapping stay parity-safe across local canvas and server/client paths.
+- [ ] Status: `todo` | Owner: `@unassigned` | Known limitations (complex scripts edge cases, terminal constraints) are explicitly documented.
+
+Definition of done:
+
+- [ ] Core/canvas/terminal test suites pass with new bidi/RTL coverage.
+- [ ] Release notes include interaction semantics changes and migration notes.
+- [ ] No measurable regressions in existing text input and hit-test perf baselines.
+
+### 1.2.0 — Animation model v2 (geometry-native)
+
+Goal: ship deterministic, declarative animations that stay renderer-agnostic.
+
+Acceptance criteria:
+
+- [ ] Status: `todo` | Owner: `@unassigned` | Add a declarative animation API for geometry-driven transitions (position/size) and paint properties (opacity/color).
+- [ ] Status: `todo` | Owner: `@unassigned` | Add interrupt/cancel/resume semantics that are deterministic across rapid state updates.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add reduced-motion policy and explicit defaults for accessibility-sensitive behavior.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add deterministic frame-step test harness for unit/integration assertions (no timing flake).
+- [ ] Status: `todo` | Owner: `@unassigned` | Provide representative demo scenarios (list reorder, dialog enter/exit, focus transition polish).
+
+Definition of done:
+
+- [ ] Animation behavior is consistent across canvas and terminal where applicable.
+- [ ] New tests are stable in CI and validated under bursty update conditions.
+- [ ] Docs define supported properties, timing functions, and interruption rules.
+
+### 1.3.0 — Additional render target proof
+
+Goal: prove one extra backend can consume shared geometry without divergence.
+
+Acceptance criteria:
+
+- [ ] Status: `todo` | Owner: `@unassigned` | Select and document target (`WebGPU` or `PDF`) with rationale and non-goals.
+- [ ] Status: `todo` | Owner: `@unassigned` | Implement MVP renderer path that consumes existing geometry output (no protocol fork).
+- [ ] Status: `todo` | Owner: `@unassigned` | Add renderer-agnostic fixture reuse to assert semantic/layout parity with existing backends.
+- [ ] Status: `todo` | Owner: `@unassigned` | Document feature support matrix and fallback behavior.
+
+Definition of done:
+
+- [ ] New backend passes fixture suite for agreed MVP surface.
+- [ ] CI includes backend smoke check.
+- [ ] API/export docs reflect support status and constraints.
+
+### 1.4.0 — Transport efficiency and scale hardening
+
+Goal: improve high-frequency server/client behavior under realistic load.
+
+Acceptance criteria:
+
+- [ ] Status: `todo` | Owner: `@unassigned` | Add optional binary frame encoding path behind explicit protocol version/capability negotiation.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add backpressure-aware batching/coalescing policy with bounded memory behavior.
+- [ ] Status: `todo` | Owner: `@unassigned` | Expose frame budget instrumentation (encode/decode/apply timings, dropped/coalesced counters).
+- [ ] Status: `todo` | Owner: `@unassigned` | Add large-app stress scenarios (rapid input + layout churn + reconnect) with deterministic pass criteria.
+
+Definition of done:
+
+- [ ] Conformance fixtures cover text and binary paths.
+- [ ] Latency/throughput results are documented against baseline scenarios.
+- [ ] Reconnect/resync correctness remains stable under chaos tests.
+
+### 1.5.0 — UI primitives and developer tooling
+
+Goal: reduce adoption friction with high-quality primitives and better introspection.
+
+Acceptance criteria:
+
+- [ ] Status: `todo` | Owner: `@unassigned` | Expand `@geometra/ui` with advanced primitives (combobox/menu/tree/data-table/command-palette/toast).
+- [ ] Status: `todo` | Owner: `@unassigned` | Add behavior contracts + interaction/a11y fixtures for each new primitive.
+- [ ] Status: `todo` | Owner: `@unassigned` | Extend dev overlay into inspector view (node tree, computed layout, hit-test path, focus chain, repaint reasons).
+- [ ] Status: `todo` | Owner: `@unassigned` | Publish integration cookbooks for common app stacks and DOM-assumption migration patterns.
+
+Definition of done:
+
+- [ ] `@geometra/ui` primitives are tested, documented, and versioned with clear stability labels.
+- [ ] Inspector tooling is usable in demos with negligible hot-path overhead when disabled.
+- [ ] Starter templates demonstrate at least two advanced primitives and inspector workflow.
+
 ## Release polish checklist
 
 Tracking fields:
