@@ -36,6 +36,10 @@ export type { TextNodeInfo, TextLineInfo, SelectionRange } from './selection.js'
 export { transition, spring, easing, animationLoop } from './animation.js'
 export type { EasingFn } from './animation.js'
 
+// Virtual scroll helpers
+export { syncVirtualWindow } from './virtual-scroll.js'
+export type { VirtualWindowState } from './virtual-scroll.js'
+
 // SEO
 export { toSemanticHTML } from './seo.js'
 export type { SemanticHTMLOptions } from './seo.js'

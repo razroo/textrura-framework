@@ -1,4 +1,4 @@
-import { signal, box, text, createApp, focusNext } from '@geometra/core'
+import { signal, box, text, createApp, focusNext, syncVirtualWindow } from '@geometra/core'
 import { CanvasRenderer } from '@geometra/renderer-canvas'
 
 const canvas = document.getElementById('app') as HTMLCanvasElement
@@ -12,13 +12,8 @@ const selected = signal(0)
 const scrollTop = signal(0)
 
 function clampScroll(index: number): void {
-  const start = scrollTop.peek()
-  const end = start + VIEWPORT_ROWS - 1
-  if (index < start) {
-    scrollTop.set(index)
-  } else if (index > end) {
-    scrollTop.set(index - VIEWPORT_ROWS + 1)
-  }
+  const next = syncVirtualWindow(items.peek().length, VIEWPORT_ROWS, index, scrollTop.peek())
+  scrollTop.set(next.start)
 }
 
 function move(delta: number): void {
