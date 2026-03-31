@@ -93,6 +93,40 @@ describe('text-input foundation', () => {
     expect(result.selection).toEqual({ anchorNode: 0, anchorOffset: 3, focusNode: 0, focusOffset: 3 })
   })
 
+  it('replaces reversed cross-node selection before backspace/delete operations', () => {
+    const reversed: TextInputState = {
+      nodes: ['abc', 'def'],
+      selection: { anchorNode: 1, anchorOffset: 1, focusNode: 0, focusOffset: 2 },
+    }
+
+    const backspaced = backspaceInput(reversed)
+    const deleted = deleteInput(reversed)
+
+    expect(backspaced.nodes).toEqual(['abef'])
+    expect(backspaced.selection).toEqual({ anchorNode: 0, anchorOffset: 2, focusNode: 0, focusOffset: 2 })
+    expect(deleted.nodes).toEqual(['abef'])
+    expect(deleted.selection).toEqual({ anchorNode: 0, anchorOffset: 2, focusNode: 0, focusOffset: 2 })
+  })
+
+  it('keeps caret stable at document edges for backspace/delete', () => {
+    const atStart: TextInputState = {
+      nodes: ['abc'],
+      selection: { anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 0 },
+    }
+    const atEnd: TextInputState = {
+      nodes: ['abc'],
+      selection: { anchorNode: 0, anchorOffset: 3, focusNode: 0, focusOffset: 3 },
+    }
+
+    const unchangedBackspace = backspaceInput(atStart)
+    const unchangedDelete = deleteInput(atEnd)
+
+    expect(unchangedBackspace.nodes).toEqual(['abc'])
+    expect(unchangedBackspace.selection).toEqual(atStart.selection)
+    expect(unchangedDelete.nodes).toEqual(['abc'])
+    expect(unchangedDelete.selection).toEqual(atEnd.selection)
+  })
+
   it('moves caret and can extend selection', () => {
     const base: TextInputState = {
       nodes: ['ab', 'cd'],
