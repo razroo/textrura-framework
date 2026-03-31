@@ -4,16 +4,8 @@ import {
   text,
   createApp,
   toSemanticHTML,
-  insertInputText,
-  backspaceInput,
-  deleteInput,
-  moveInputCaret,
-  createTextInputHistory,
-  pushTextInputHistory,
-  undoTextInputHistory,
-  redoTextInputHistory,
 } from '@geometra/core'
-import type { App, UIElement, TextInputState, TextInputHistoryState, KeyboardHitEvent } from '@geometra/core'
+import type { App, UIElement } from '@geometra/core'
 import { CanvasRenderer, enableSelection, enableAccessibilityMirror } from '@geometra/renderer-canvas'
 import {
   button as uiButton,
@@ -45,27 +37,8 @@ const rootWidth = signal(600)
 const direction = signal<'row' | 'column'>('row')
 const codeTab = signal('basic')
 const copied = signal(false)
-const inputHistory = signal<TextInputHistoryState>(createTextInputHistory({
-  nodes: ['Geometra text input prototype'],
-  selection: { anchorNode: 0, anchorOffset: 29, focusNode: 0, focusOffset: 29 },
-}))
-const inputFocused = signal(false)
-const compositionDraft = signal('')
-const compositionSelection = signal<TextInputState['selection'] | null>(null)
 let lastPerfTime = '-'
 let lastPerfNodes = '-'
-let inputMeasureCtx: CanvasRenderingContext2D | null = null
-
-function measureInputTextWidth(textValue: string): number {
-  if (!textValue) return 0
-  if (!inputMeasureCtx) {
-    const measureCanvas = document.createElement('canvas')
-    inputMeasureCtx = measureCanvas.getContext('2d')
-  }
-  if (!inputMeasureCtx) return 0
-  inputMeasureCtx.font = '14px JetBrains Mono'
-  return Math.ceil(inputMeasureCtx.measureText(textValue).width)
-}
 
 // ─── Layout Helpers ──────────────────────────────────────────────────────────
 function countNodes(el: UIElement): number {
@@ -81,35 +54,6 @@ function center(...children: UIElement[]): UIElement {
 /** Spacer element. */
 function spacer(h: number): UIElement {
   return box({ height: h }, [])
-}
-
-function currentInputState(): TextInputState {
-  return inputHistory.peek().present
-}
-
-function setInputPresent(next: TextInputState): void {
-  const h = inputHistory.peek()
-  inputHistory.set({ ...h, present: next })
-}
-
-function pushInput(next: TextInputState): void {
-  inputHistory.set(pushTextInputHistory(inputHistory.peek(), next))
-}
-
-function normalizedSelection(sel: TextInputState['selection']): { startNode: number; startOffset: number; endNode: number; endOffset: number } {
-  const anchorBeforeFocus =
-    sel.anchorNode < sel.focusNode ||
-    (sel.anchorNode === sel.focusNode && sel.anchorOffset <= sel.focusOffset)
-  return anchorBeforeFocus
-    ? { startNode: sel.anchorNode, startOffset: sel.anchorOffset, endNode: sel.focusNode, endOffset: sel.focusOffset }
-    : { startNode: sel.focusNode, startOffset: sel.focusOffset, endNode: sel.anchorNode, endOffset: sel.anchorOffset }
-}
-
-function withSelection(state: TextInputState, selection: TextInputState['selection']): TextInputState {
-  return {
-    nodes: state.nodes,
-    selection: { ...selection },
-  }
 }
 
 /** Styled button. */
@@ -270,228 +214,36 @@ function selectableText(): UIElement {
   ])
 }
 
-function handleInputKeyDown(e: KeyboardHitEvent): void {
-  const state = currentInputState()
-
-  if (e.key === 'Process') return
-
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
-    if (e.shiftKey) {
-      inputHistory.set(redoTextInputHistory(inputHistory.peek()))
-    } else {
-      inputHistory.set(undoTextInputHistory(inputHistory.peek()))
-    }
-    return
-  }
-  if (e.ctrlKey && e.key.toLowerCase() === 'y') {
-    inputHistory.set(redoTextInputHistory(inputHistory.peek()))
-    return
-  }
-
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
-    const last = state.nodes.length - 1
-    setInputPresent({
-      nodes: state.nodes,
-      selection: {
-        anchorNode: 0,
-        anchorOffset: 0,
-        focusNode: last,
-        focusOffset: state.nodes[last]?.length ?? 0,
-      },
-    })
-    return
-  }
-
-  if (e.key === 'Backspace') {
-    pushInput(backspaceInput(state))
-    return
-  }
-  if (e.key === 'Delete') {
-    pushInput(deleteInput(state))
-    return
-  }
-  if (e.key === 'ArrowLeft') {
-    setInputPresent(moveInputCaret(state, 'left', e.shiftKey))
-    return
-  }
-  if (e.key === 'ArrowRight') {
-    setInputPresent(moveInputCaret(state, 'right', e.shiftKey))
-    return
-  }
-  if (e.key === 'Enter') {
-    pushInput(insertInputText(state, '\n'))
-    return
-  }
-  if (e.key === 'Escape') {
-    inputFocused.set(false)
-    return
-  }
-
-  if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
-    pushInput(insertInputText(state, e.key))
-  }
-}
-
-function handleInputCompositionStart(): void {
-  compositionSelection.set({ ...currentInputState().selection })
-  compositionDraft.set('')
-}
-
-function handleInputCompositionUpdate(e: { data: string }): void {
-  compositionDraft.set(e.data)
-}
-
-function handleInputCompositionEnd(e: { data: string }): void {
-  compositionDraft.set('')
-  const selection = compositionSelection.peek() ?? currentInputState().selection
-  compositionSelection.set(null)
-  if (!e.data) return
-  pushInput(insertInputText(withSelection(currentInputState(), selection), e.data))
-}
-
 function textInputDemo(): UIElement {
   const w = rootWidth.value
-  const state = inputHistory.value.present
-  const undoDepth = inputHistory.value.past.length
-  const redoDepth = inputHistory.value.future.length
-  const active = inputFocused.value
-  const selected = state.selection
-  const collapsed =
-    selected.anchorNode === selected.focusNode &&
-    selected.anchorOffset === selected.focusOffset
-  const draft = compositionDraft.value
-  const compositionSel = compositionSelection.value
-  const effectiveSelection = draft && compositionSel ? compositionSel : selected
-  const norm = normalizedSelection(effectiveSelection)
-
-  const lines = state.nodes.map((rawLine, lineIndex) => {
-    const line = rawLine ?? ''
-    const hasSelection = (
-      (lineIndex > norm.startNode || (lineIndex === norm.startNode && norm.startOffset < line.length || norm.startNode !== norm.endNode)) &&
-      (lineIndex < norm.endNode || (lineIndex === norm.endNode && norm.endOffset > 0))
-    )
-    const start = lineIndex === norm.startNode ? Math.max(0, Math.min(norm.startOffset, line.length)) : 0
-    const end = lineIndex === norm.endNode ? Math.max(0, Math.min(norm.endOffset, line.length)) : line.length
-    const isCaretLine = active && collapsed && !draft && lineIndex === selected.focusNode
-    const caretOffset = isCaretLine ? Math.max(0, Math.min(selected.focusOffset, line.length)) : -1
-
-    const left = caretOffset >= 0 ? line.slice(0, caretOffset) : line.slice(0, hasSelection ? start : line.length)
-    const mid = hasSelection ? line.slice(start, end) : ''
-    const right = caretOffset >= 0 ? line.slice(caretOffset) : (hasSelection ? line.slice(end) : '')
-
-    const rowChildren: UIElement[] = []
-    if (left.length > 0) {
-      rowChildren.push(box({
-        width: measureInputTextWidth(left),
-        flexShrink: 0,
-      }, [
-        text({ text: left, font: '14px JetBrains Mono', lineHeight: 20, color: '#d1d5db' }),
-      ]))
-    }
-
-    if (isCaretLine) {
-      rowChildren.push(box({
-        width: 1.5,
-        minHeight: 18,
-        backgroundColor: '#38bdf8',
-      }, []))
-    }
-
-    if (draft && compositionSel && lineIndex === norm.startNode) {
-      rowChildren.push(box({
-        width: measureInputTextWidth(draft) + 2,
-        flexShrink: 0,
-        backgroundColor: 'rgba(56,189,248,0.18)',
-        borderRadius: 4,
-        paddingLeft: 1,
-        paddingRight: 1,
-      }, [
-        text({ text: draft, font: '14px JetBrains Mono', lineHeight: 20, color: '#67e8f9' }),
-      ]))
-    } else if (hasSelection && mid.length > 0) {
-      rowChildren.push(box({
-        width: measureInputTextWidth(mid) + 2,
-        flexShrink: 0,
-        backgroundColor: 'rgba(14,165,233,0.24)',
-        borderRadius: 4,
-        paddingLeft: 1,
-        paddingRight: 1,
-      }, [
-        text({ text: mid, font: '14px JetBrains Mono', lineHeight: 20, color: '#e0f2fe' }),
-      ]))
-    }
-
-    if (right.length > 0) {
-      rowChildren.push(box({
-        width: measureInputTextWidth(right),
-        flexShrink: 0,
-      }, [
-        text({ text: right, font: '14px JetBrains Mono', lineHeight: 20, color: '#d1d5db' }),
-      ]))
-    }
-
-    if (rowChildren.length === 0) {
-      rowChildren.push(text({ text: active && lineIndex === 0 ? '' : ' ', font: '14px JetBrains Mono', lineHeight: 20, color: '#d1d5db' }))
-    }
-
-    return box({
-      flexDirection: 'row',
-      alignItems: 'center',
-      minHeight: 20,
-      width: '100%',
-      overflow: 'hidden',
-      cursor: 'text',
-    }, rowChildren)
-  })
-
   return box({ flexDirection: 'column', padding: 24, gap: 14, width: w, minHeight: 380 }, [
-    text({ text: 'Text Input (foundation)', font: 'bold 18px Inter', lineHeight: 24, color: '#ffffff' }),
-    text({ text: 'Keyboard editing on Canvas: type, arrows, backspace/delete, enter, Cmd/Ctrl+A, Cmd/Ctrl+Z.', font: '14px Inter', lineHeight: 22, color: '#e2e8f0' }),
+    text({ text: 'Text Input (@geometra/ui)', font: 'bold 18px Inter', lineHeight: 24, color: '#ffffff' }),
+    text({ text: 'Marketing demo now uses shared UI primitives. Advanced text-input behavior lives in demos/text-input-canvas and core tests.', font: '14px Inter', lineHeight: 22, color: '#e2e8f0' }),
     box({
-      backgroundColor: active ? '#111827' : SURFACE,
-      borderColor: active ? ACCENT2 : BORDER,
-      borderWidth: 1,
+      backgroundColor: SURFACE,
+      borderColor: BORDER,
       borderRadius: 10,
       padding: 14,
-      minHeight: 100,
-      overflow: 'hidden',
-      cursor: 'text',
-      onClick: () => {
-        const endNode = state.nodes.length - 1
-        const endOffset = state.nodes[endNode]?.length ?? 0
-        inputFocused.set(true)
-        setInputPresent({
-          nodes: state.nodes,
-          selection: { anchorNode: endNode, anchorOffset: endOffset, focusNode: endNode, focusOffset: endOffset },
-        })
-      },
-      onKeyDown: handleInputKeyDown,
-      onCompositionStart: handleInputCompositionStart,
-      onCompositionUpdate: handleInputCompositionUpdate,
-      onCompositionEnd: handleInputCompositionEnd,
+      minHeight: 150,
+      flexDirection: 'column',
+      gap: 10,
     }, [
-      ...(state.nodes.length > 0
-        ? lines
-        : [text({
-            text: active ? '' : 'Click to focus and type...',
-            font: '14px JetBrains Mono',
-            lineHeight: 20,
-            color: DIM,
-            whiteSpace: 'pre-wrap',
-          })]),
+      uiInput('Name', 'Ada Lovelace'),
+      uiInput('Email', 'ada@geometra.dev'),
+      uiInput('Search components', 'button list dialog input'),
     ]),
     box({ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }, [
       box({ backgroundColor: '#0f3460', borderRadius: 10, padding: 14, flexGrow: 1, flexDirection: 'column', gap: 4 }, [
-        text({ text: 'Current nodes', font: 'bold 13px Inter', lineHeight: 18, color: '#60a5fa' }),
-        text({ text: JSON.stringify(state.nodes), font: '12px JetBrains Mono', lineHeight: 17, color: '#93c5fd' }),
+        text({ text: 'Core contract', font: 'bold 13px Inter', lineHeight: 18, color: '#60a5fa' }),
+        text({ text: 'Input behavior validated in @geometra/core tests.', font: '12px Inter', lineHeight: 17, color: '#93c5fd' }),
       ]),
       box({ backgroundColor: '#1e3a2f', borderRadius: 10, padding: 14, flexGrow: 1, flexDirection: 'column', gap: 4 }, [
-        text({ text: 'Selection', font: 'bold 13px Inter', lineHeight: 18, color: '#4ade80' }),
-        text({ text: JSON.stringify(state.selection), font: '12px JetBrains Mono', lineHeight: 17, color: '#86efac' }),
+        text({ text: 'Deep playground', font: 'bold 13px Inter', lineHeight: 18, color: '#4ade80' }),
+        text({ text: 'Use demos/text-input-canvas for IME, history, and caret movement.', font: '12px Inter', lineHeight: 17, color: '#86efac' }),
       ]),
       box({ backgroundColor: '#3b1b52', borderRadius: 10, padding: 14, flexGrow: 1, flexDirection: 'column', gap: 4 }, [
-        text({ text: 'History', font: 'bold 13px Inter', lineHeight: 18, color: '#e9d5ff' }),
-        text({ text: `undo:${undoDepth} redo:${redoDepth}`, font: '12px JetBrains Mono', lineHeight: 17, color: '#f3e8ff' }),
+        text({ text: 'Shared primitives', font: 'bold 13px Inter', lineHeight: 18, color: '#e9d5ff' }),
+        text({ text: '@geometra/ui starter components used directly here.', font: '12px Inter', lineHeight: 17, color: '#f3e8ff' }),
       ]),
     ]),
   ])
@@ -740,7 +492,6 @@ function demoSection(): UIElement {
       ...names.map(s => btn(s.label, scenario.value === s.key, () => {
         scenario.set(s.key)
         renderer.selection = null
-        if (s.key !== 'input') inputFocused.set(false)
       })),
       box({ width: 12, height: 1 }, []),
       text({ text: 'Width', font: '600 12px Inter', lineHeight: 18, color: DIM }),
@@ -968,21 +719,6 @@ function onDocumentKeyDown(e: KeyboardEvent) {
   }
 }
 
-function onDocumentCompositionStart(e: CompositionEvent) {
-  if (!app) return
-  app.dispatchComposition('onCompositionStart', { data: e.data ?? '' })
-}
-
-function onDocumentCompositionUpdate(e: CompositionEvent) {
-  if (!app) return
-  app.dispatchComposition('onCompositionUpdate', { data: e.data ?? '' })
-}
-
-function onDocumentCompositionEnd(e: CompositionEvent) {
-  if (!app) return
-  app.dispatchComposition('onCompositionEnd', { data: e.data ?? '' })
-}
-
 async function mount() {
   if (cleanupSelection) { cleanupSelection(); cleanupSelection = null }
   if (cleanupA11yMirror) { cleanupA11yMirror(); cleanupA11yMirror = null }
@@ -995,14 +731,8 @@ async function mount() {
   app = await createApp(view, renderer, { width: vw.peek(), waitForFonts: true })
 
   document.addEventListener('keydown', onDocumentKeyDown)
-  document.addEventListener('compositionstart', onDocumentCompositionStart as EventListener)
-  document.addEventListener('compositionupdate', onDocumentCompositionUpdate as EventListener)
-  document.addEventListener('compositionend', onDocumentCompositionEnd as EventListener)
   cleanupKeydown = () => {
     document.removeEventListener('keydown', onDocumentKeyDown)
-    document.removeEventListener('compositionstart', onDocumentCompositionStart as EventListener)
-    document.removeEventListener('compositionupdate', onDocumentCompositionUpdate as EventListener)
-    document.removeEventListener('compositionend', onDocumentCompositionEnd as EventListener)
   }
 
   const tree = view()
