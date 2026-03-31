@@ -40,6 +40,16 @@ function mutateLayout(node: L): L {
   }
 }
 
+function mutateLayoutWorstCase(node: L): L {
+  return {
+    x: node.x + 2,
+    y: node.y + 2,
+    width: node.width + 2,
+    height: node.height + 2,
+    children: node.children.map(mutateLayoutWorstCase),
+  }
+}
+
 describe('protocol perf smoke', () => {
   it('diffLayout handles rapid geometry bursts', () => {
     let prev = makeTree(4, 4)
@@ -53,5 +63,18 @@ describe('protocol perf smoke', () => {
     const elapsed = nowMs() - start
     expect(elapsed).toBeGreaterThan(0)
     expect(elapsed).toBeLessThanOrEqual(500)
+  })
+
+  it('handles large tree worst-case churn within smoke threshold', () => {
+    let prev = makeTree(5, 4)
+    const start = nowMs()
+    for (let i = 0; i < 12; i++) {
+      const next = mutateLayoutWorstCase(prev)
+      const patches = diffLayout(prev as any, next as any)
+      expect(patches.length).toBeGreaterThan(100)
+      prev = next
+    }
+    const elapsed = nowMs() - start
+    expect(elapsed).toBeLessThanOrEqual(900)
   })
 })
