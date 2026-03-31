@@ -90,9 +90,9 @@ Acceptance criteria:
 
 Definition of done:
 
-- [ ] New backend passes fixture suite for agreed MVP surface.
-- [ ] CI includes backend smoke check.
-- [ ] API/export docs reflect support status and constraints.
+- [x] New backend passes fixture suite for agreed MVP surface.
+- [x] CI includes backend smoke check.
+- [x] API/export docs reflect support status and constraints.
 
 ### 1.4.0 — Transport efficiency and scale hardening
 
