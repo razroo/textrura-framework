@@ -1,0 +1,276 @@
+import { describe, it, expect } from 'vitest'
+import WebSocket from 'ws'
+import { box } from '@geometra/core'
+import { createServer } from '../server.js'
+import { CLOSE_AUTH_FAILED } from '../protocol.js'
+
+function pickPort(): number {
+  return 41000 + Math.floor(Math.random() * 2000)
+}
+
+function connectAndCollect(url: string): Promise<{ messages: Array<{ type: string; message?: string; code?: number }>; ws: WebSocket; closeCode?: number }> {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(url)
+    const messages: Array<{ type: string; message?: string; code?: number }> = []
+    const timeout = setTimeout(() => reject(new Error('timed out')), 5000)
+
+    ws.on('message', (raw) => {
+      messages.push(JSON.parse(String(raw)))
+    })
+
+    ws.on('close', (code) => {
+      clearTimeout(timeout)
+      resolve({ messages, ws, closeCode: code })
+    })
+
+    ws.on('error', (err) => {
+      clearTimeout(timeout)
+      reject(err)
+    })
+  })
+}
+
+describe('server connection hooks', () => {
+  it('onConnection accepts when returning a truthy value', async () => {
+    const port = pickPort()
+    let receivedCtx: unknown = null
+    const server = await createServer(
+      () => box({ width: 40, height: 20 }, []),
+      {
+        port,
+        width: 200,
+        height: 100,
+        onConnection: () => ({ role: 'admin' }),
+        onDisconnect: (ctx) => { receivedCtx = ctx },
+      },
+    )
+
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}`)
+      const timeout = setTimeout(() => reject(new Error('timed out')), 5000)
+
+      ws.on('message', (raw) => {
+        const msg = JSON.parse(String(raw)) as { type: string }
+        if (msg.type === 'frame') {
+          clearTimeout(timeout)
+          ws.close()
+        }
+      })
+
+      ws.on('close', () => {
+        setTimeout(resolve, 100)
+      })
+
+      ws.on('error', (err) => {
+        clearTimeout(timeout)
+        reject(err)
+      })
+    }).finally(() => {
+      server.close()
+    })
+
+    expect(receivedCtx).toEqual({ role: 'admin' })
+  })
+
+  it('onConnection rejects when returning null', async () => {
+    const port = pickPort()
+    const server = await createServer(
+      () => box({ width: 40, height: 20 }, []),
+      {
+        port,
+        width: 200,
+        height: 100,
+        onConnection: () => null,
+      },
+    )
+
+    const result = await connectAndCollect(`ws://127.0.0.1:${port}`).finally(() => {
+      server.close()
+    })
+
+    expect(result.closeCode).toBe(CLOSE_AUTH_FAILED)
+    expect(result.messages.filter(m => m.type === 'frame')).toHaveLength(0)
+  })
+
+  it('onConnection rejects when throwing', async () => {
+    const port = pickPort()
+    const server = await createServer(
+      () => box({ width: 40, height: 20 }, []),
+      {
+        port,
+        width: 200,
+        height: 100,
+        onConnection: () => { throw new Error('bad token') },
+      },
+    )
+
+    const result = await connectAndCollect(`ws://127.0.0.1:${port}`).finally(() => {
+      server.close()
+    })
+
+    expect(result.closeCode).toBe(CLOSE_AUTH_FAILED)
+    expect(result.messages.filter(m => m.type === 'frame')).toHaveLength(0)
+  })
+
+  it('onConnection supports async handlers', async () => {
+    const port = pickPort()
+    const server = await createServer(
+      () => box({ width: 40, height: 20 }, []),
+      {
+        port,
+        width: 200,
+        height: 100,
+        onConnection: async () => {
+          await new Promise(r => setTimeout(r, 50))
+          return { userId: '42' }
+        },
+      },
+    )
+
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}`)
+      const timeout = setTimeout(() => reject(new Error('timed out')), 5000)
+
+      ws.on('message', (raw) => {
+        const msg = JSON.parse(String(raw)) as { type: string }
+        if (msg.type === 'frame') {
+          clearTimeout(timeout)
+          ws.close()
+          resolve()
+        }
+      })
+
+      ws.on('error', (err) => {
+        clearTimeout(timeout)
+        reject(err)
+      })
+    }).finally(() => {
+      server.close()
+    })
+  })
+})
+
+describe('server message hooks', () => {
+  it('onMessage allows events when returning true', async () => {
+    const port = pickPort()
+    let clickDispatched = false
+    const server = await createServer(
+      () => box({
+        width: 40, height: 20,
+        onClick: () => { clickDispatched = true },
+      }, []),
+      {
+        port,
+        width: 200,
+        height: 100,
+        onConnection: () => ({ role: 'operator' }),
+        onMessage: (_msg, ctx) => (ctx as { role: string }).role === 'operator',
+      },
+    )
+
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}`)
+      const timeout = setTimeout(() => reject(new Error('timed out')), 5000)
+
+      ws.on('message', (raw) => {
+        const msg = JSON.parse(String(raw)) as { type: string }
+        if (msg.type === 'frame') {
+          ws.send(JSON.stringify({
+            type: 'event', eventType: 'onClick', x: 10, y: 10,
+          }))
+          setTimeout(() => {
+            clearTimeout(timeout)
+            ws.close()
+            resolve()
+          }, 200)
+        }
+      })
+
+      ws.on('error', (err) => {
+        clearTimeout(timeout)
+        reject(err)
+      })
+    }).finally(() => {
+      server.close()
+    })
+
+    expect(clickDispatched).toBe(true)
+  })
+
+  it('onMessage rejects events when returning false', async () => {
+    const port = pickPort()
+    let clickDispatched = false
+    const server = await createServer(
+      () => box({
+        width: 40, height: 20,
+        onClick: () => { clickDispatched = true },
+      }, []),
+      {
+        port,
+        width: 200,
+        height: 100,
+        onConnection: () => ({ role: 'readonly' }),
+        onMessage: (_msg, ctx) => (ctx as { role: string }).role !== 'readonly',
+      },
+    )
+
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}`)
+      const timeout = setTimeout(() => reject(new Error('timed out')), 5000)
+      let sentEvent = false
+
+      ws.on('message', (raw) => {
+        const msg = JSON.parse(String(raw)) as { type: string; code?: number }
+        if (msg.type === 'frame' && !sentEvent) {
+          sentEvent = true
+          ws.send(JSON.stringify({
+            type: 'event', eventType: 'onClick', x: 10, y: 10,
+          }))
+        }
+        if (msg.type === 'error' && msg.code === 4003) {
+          clearTimeout(timeout)
+          ws.close()
+          resolve()
+        }
+      })
+
+      ws.on('error', (err) => {
+        clearTimeout(timeout)
+        reject(err)
+      })
+    }).finally(() => {
+      server.close()
+    })
+
+    expect(clickDispatched).toBe(false)
+  })
+
+  it('works without any hooks (backward-compatible)', async () => {
+    const port = pickPort()
+    const server = await createServer(
+      () => box({ width: 40, height: 20 }, []),
+      { port, width: 200, height: 100 },
+    )
+
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}`)
+      const timeout = setTimeout(() => reject(new Error('timed out')), 5000)
+
+      ws.on('message', (raw) => {
+        const msg = JSON.parse(String(raw)) as { type: string }
+        if (msg.type === 'frame') {
+          clearTimeout(timeout)
+          ws.close()
+          resolve()
+        }
+      })
+
+      ws.on('error', (err) => {
+        clearTimeout(timeout)
+        reject(err)
+      })
+    }).finally(() => {
+      server.close()
+    })
+  })
+})

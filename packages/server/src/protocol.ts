@@ -4,6 +4,12 @@ import type { UIElement } from '@geometra/core'
 /** Increment when the wire message shape changes in a non-backward-compatible way. */
 export const PROTOCOL_VERSION = 1
 
+/** WebSocket close code: connection rejected by onConnection hook. */
+export const CLOSE_AUTH_FAILED = 4001
+
+/** WebSocket close code: message rejected by onMessage hook. */
+export const CLOSE_FORBIDDEN = 4003
+
 /**
  * Protocol compatibility rule:
  * - undefined means legacy v1 and is accepted.
@@ -26,7 +32,7 @@ interface VersionedMessage {
 export type ServerMessage =
   | (VersionedMessage & { type: 'frame'; layout: ComputedLayout; tree: UIElement })
   | (VersionedMessage & { type: 'patch'; patches: LayoutPatch[] })
-  | (VersionedMessage & { type: 'error'; message: string })
+  | (VersionedMessage & { type: 'error'; message: string; code?: number })
 
 /** Messages sent from client to server. */
 export type ClientMessage =
