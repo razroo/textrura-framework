@@ -44,6 +44,7 @@ export interface Router<T = unknown, TRequestContext = unknown> {
   start(): void
   navigate(to: string, options?: NavigationOptions): Promise<boolean>
   submitAction(routeId: string, submission?: RouteActionSubmission): Promise<boolean>
+  revalidate(): Promise<boolean>
   subscribe(listener: RouterSubscriber<T, TRequestContext>): Unsubscribe
   dispose(): void
   getState(): RouterState<T, TRequestContext>
@@ -306,6 +307,11 @@ export function createRouter<T, TRequestContext = unknown>(
         },
       }
       emit()
+      await applyResolvedLocation(state.location, null)
+      return true
+    },
+    async revalidate() {
+      if (disposed) return false
       await applyResolvedLocation(state.location, null)
       return true
     },

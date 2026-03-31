@@ -22,6 +22,7 @@ npm install @geometra/router
 - `state.loaderData` -- per-route loader results keyed by route `id`
 - route `action` support -- write/mutation handlers with submission payloads
 - `router.submitAction(routeId, submission)` + `state.actionData` -- mutation workflow primitives
+- automatic loader revalidation after actions + explicit `router.revalidate()` support
 - `redirect()` / `response()` / `json()` -- loader/action helpers for redirects and structured results
 - loader/action contexts include `signal` for AbortController-driven cancellation
 - `router.isActive(to)` / `router.isPending(to)` -- route state helpers for active and transition states

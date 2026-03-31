@@ -280,6 +280,63 @@ describe('createRouter lifecycle', () => {
     expect(success).toBe(false)
   })
 
+  it('revalidates loaders after successful actions', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/users/1'] })
+    const records = { value: 'before' }
+    const routesWithRevalidation: RouteNode[] = [
+      {
+        id: 'root',
+        path: '/',
+        children: [
+          {
+            id: 'users',
+            path: 'users/:id',
+            loader: ({ params }) => ({ id: params.id, value: records.value }),
+            action: ({ submission }) => {
+              records.value = String((submission.data as { value?: string })?.value ?? records.value)
+              return { ok: true }
+            },
+          },
+        ],
+      },
+    ]
+    const router = createRouter({ routes: routesWithRevalidation, history })
+    router.start()
+    await router.revalidate()
+    expect(router.getState().loaderData.users).toEqual({ id: '1', value: 'before' })
+
+    await router.submitAction('users', { method: 'POST', data: { value: 'after' } })
+    expect(router.getState().loaderData.users).toEqual({ id: '1', value: 'after' })
+  })
+
+  it('supports explicit manual revalidate', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/users/1'] })
+    const store = { count: 1 }
+    const revalidateRoutes: RouteNode[] = [
+      {
+        id: 'root',
+        path: '/',
+        children: [
+          {
+            id: 'users',
+            path: 'users/:id',
+            loader: ({ params }) => ({ id: params.id, count: store.count }),
+          },
+        ],
+      },
+    ]
+    const router = createRouter({ routes: revalidateRoutes, history })
+    router.start()
+    await router.revalidate()
+    expect(router.getState().loaderData.users).toEqual({ id: '1', count: 1 })
+
+    store.count = 2
+    const ok = await router.revalidate()
+
+    expect(ok).toBe(true)
+    expect(router.getState().loaderData.users).toEqual({ id: '1', count: 2 })
+  })
+
   it('supports loader redirects via helper', async () => {
     const history = createMemoryHistory({ initialEntries: ['/users/1'] })
     const redirectRoutes: RouteNode[] = [

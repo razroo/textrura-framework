@@ -35,7 +35,7 @@ Goal: deliver a Geometra routing stack that is competitive with modern data rout
 - [x] Add route `action` support for write operations and mutation workflows.
 - [x] Add redirect and response helpers from loaders/actions.
 - [x] Add request cancellation via `AbortController` on interrupted transitions.
-- [ ] Add revalidation strategy after actions and explicit manual revalidate.
+- [x] Add revalidation strategy after actions and explicit manual revalidate.
 - [ ] Add pending/submitting/loading states for transition-aware UI.
 - [ ] Add optimistic mutation hooks with rollback behavior.
 
