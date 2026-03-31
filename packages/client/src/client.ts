@@ -1,10 +1,13 @@
 import type { ComputedLayout } from 'textura'
 import type { Renderer, UIElement } from '@geometra/core'
 
+const PROTOCOL_VERSION = 1
+
 interface ServerFrame {
   type: 'frame'
   layout: ComputedLayout
   tree: UIElement
+  protocolVersion?: number
 }
 
 interface ServerPatch {
@@ -16,9 +19,16 @@ interface ServerPatch {
     width?: number
     height?: number
   }>
+  protocolVersion?: number
 }
 
-type ServerMessage = ServerFrame | ServerPatch
+interface ServerError {
+  type: 'error'
+  message: string
+  protocolVersion?: number
+}
+
+type ServerMessage = ServerFrame | ServerPatch | ServerError
 
 export interface TexturaClientOptions {
   /** WebSocket URL to connect to. Default: 'ws://localhost:3100'. */
@@ -96,6 +106,14 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
     ws.addEventListener('message', (event) => {
       try {
         const msg = JSON.parse(String(event.data)) as ServerMessage
+        if (msg.protocolVersion && msg.protocolVersion > PROTOCOL_VERSION) {
+          onError?.(
+            new Error(
+              `Server protocol ${msg.protocolVersion} is newer than client protocol ${PROTOCOL_VERSION}`,
+            ),
+          )
+          return
+        }
         if (msg.type === 'frame') {
           state.layout = msg.layout
           state.tree = msg.tree
@@ -103,6 +121,8 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
         } else if (msg.type === 'patch' && state.layout && state.tree) {
           applyPatches(state.layout, msg.patches)
           renderer.render(state.layout, state.tree)
+        } else if (msg.type === 'error') {
+          onError?.(new Error(msg.message))
         }
       } catch (err) {
         onError?.(err)
@@ -127,7 +147,7 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
     const rect = canvas?.getBoundingClientRect()
     const x = rect ? e.clientX - rect.left : e.clientX
     const y = rect ? e.clientY - rect.top : e.clientY
-    ws.send(JSON.stringify({ type: 'event', eventType, x, y }))
+    ws.send(JSON.stringify({ type: 'event', eventType, x, y, protocolVersion: PROTOCOL_VERSION }))
   }
 
   if (canvas) {

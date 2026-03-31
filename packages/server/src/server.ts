@@ -4,7 +4,7 @@ import { init, computeLayout } from 'textura'
 import type { ComputedLayout } from 'textura'
 import { toLayoutTree, dispatchHit } from '@geometra/core'
 import type { UIElement, EventHandlers } from '@geometra/core'
-import { diffLayout } from './protocol.js'
+import { diffLayout, PROTOCOL_VERSION } from './protocol.js'
 import type { ServerMessage, ClientMessage } from './protocol.js'
 
 export interface TexturaServerOptions {
@@ -57,12 +57,12 @@ export async function createServer(
       if (patches.length === 0) return
       // If patches are more than half the tree, just send full frame
       if (patches.length > 20) {
-        msg = { type: 'frame', layout, tree: currentTree }
+        msg = { type: 'frame', layout, tree: currentTree, protocolVersion: PROTOCOL_VERSION }
       } else {
-        msg = { type: 'patch', patches }
+        msg = { type: 'patch', patches, protocolVersion: PROTOCOL_VERSION }
       }
     } else {
-      msg = { type: 'frame', layout, tree: currentTree }
+      msg = { type: 'frame', layout, tree: currentTree, protocolVersion: PROTOCOL_VERSION }
     }
 
     prevLayout = layout
@@ -79,7 +79,7 @@ export async function createServer(
         console.error('Geometra server error:', err)
       }
       // Send error to clients
-      const errorMsg: ServerMessage = { type: 'error', message: String(err) }
+      const errorMsg: ServerMessage = { type: 'error', message: String(err), protocolVersion: PROTOCOL_VERSION }
       const data = JSON.stringify(errorMsg)
       for (const client of clients) {
         if (client.readyState === client.OPEN) {
@@ -96,7 +96,12 @@ export async function createServer(
 
     // Send current state immediately
     if (prevLayout && currentTree) {
-      const msg: ServerMessage = { type: 'frame', layout: prevLayout, tree: currentTree }
+      const msg: ServerMessage = {
+        type: 'frame',
+        layout: prevLayout,
+        tree: currentTree,
+        protocolVersion: PROTOCOL_VERSION,
+      }
       ws.send(JSON.stringify(msg))
     } else {
       computeAndBroadcast()
@@ -105,6 +110,15 @@ export async function createServer(
     ws.on('message', (raw) => {
       try {
         const msg = JSON.parse(String(raw)) as ClientMessage
+        if (msg.protocolVersion && msg.protocolVersion > PROTOCOL_VERSION) {
+          const errorMsg: ServerMessage = {
+            type: 'error',
+            message: `Client protocol ${msg.protocolVersion} is newer than server protocol ${PROTOCOL_VERSION}`,
+            protocolVersion: PROTOCOL_VERSION,
+          }
+          ws.send(JSON.stringify(errorMsg))
+          return
+        }
         if (msg.type === 'event' && currentTree && prevLayout) {
           dispatchHit(
             currentTree,

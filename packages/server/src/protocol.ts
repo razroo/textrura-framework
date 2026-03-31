@@ -1,16 +1,23 @@
 import type { ComputedLayout } from 'textura'
 import type { UIElement } from '@geometra/core'
 
+/** Increment when the wire message shape changes in a non-backward-compatible way. */
+export const PROTOCOL_VERSION = 1
+
+interface VersionedMessage {
+  protocolVersion?: number
+}
+
 /** Messages sent from server to client. */
 export type ServerMessage =
-  | { type: 'frame'; layout: ComputedLayout; tree: UIElement }
-  | { type: 'patch'; patches: LayoutPatch[] }
-  | { type: 'error'; message: string }
+  | (VersionedMessage & { type: 'frame'; layout: ComputedLayout; tree: UIElement })
+  | (VersionedMessage & { type: 'patch'; patches: LayoutPatch[] })
+  | (VersionedMessage & { type: 'error'; message: string })
 
 /** Messages sent from client to server. */
 export type ClientMessage =
-  | { type: 'event'; eventType: string; x: number; y: number }
-  | { type: 'resize'; width: number; height: number }
+  | (VersionedMessage & { type: 'event'; eventType: string; x: number; y: number })
+  | (VersionedMessage & { type: 'resize'; width: number; height: number })
 
 /** A patch describing a change to a single node's geometry. */
 export interface LayoutPatch {
