@@ -25,6 +25,7 @@ npm install @geometra/router
 - automatic loader revalidation after actions + explicit `router.revalidate()` support
 - `redirect()` / `response()` / `json()` -- loader/action helpers for redirects and structured results
 - loader/action contexts include `signal` for AbortController-driven cancellation
+- router state exposes `pending` / `submitting` / `loading` flags for transition-aware UI
 - `router.isActive(to)` / `router.isPending(to)` -- route state helpers for active and transition states
 - `router.addBlocker(fn)` -- guards transitions for unsaved-state and confirmation flows
 - `restoration` policy + per-navigation options -- scroll/focus restoration control on transitions

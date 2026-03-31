@@ -451,4 +451,73 @@ describe('createRouter lifecycle', () => {
     expect(router.getState().location.pathname).toBe('/users/2')
     expect(router.getState().loaderData.users).toEqual({ id: '2' })
   })
+
+  it('exposes pending/loading states during navigation lifecycle', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/'] })
+    const routesWithDelay: RouteNode[] = [
+      {
+        id: 'root',
+        path: '/',
+        children: [
+          {
+            id: 'users',
+            path: 'users/:id',
+            loader: ({ params }) =>
+              new Promise((resolve) => setTimeout(() => resolve({ id: params.id }), 20)),
+          },
+        ],
+      },
+    ]
+    const router = createRouter({ routes: routesWithDelay, history })
+    router.start()
+
+    const navPromise = router.navigate('/users/5')
+    expect(router.getState().pending).toBe(true)
+    expect(['navigating', 'loading']).toContain(router.getState().navigation)
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(router.getState().loading).toBe(true)
+    expect(router.getState().navigation).toBe('loading')
+
+    await navPromise
+    expect(router.getState().pending).toBe(false)
+    expect(router.getState().loading).toBe(false)
+    expect(router.getState().navigation).toBe('idle')
+  })
+
+  it('exposes submitting state during action execution', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/users/1'] })
+    const control: { resolve?: () => void } = {}
+    const actionRoutes: RouteNode[] = [
+      {
+        id: 'root',
+        path: '/',
+        children: [
+          {
+            id: 'users',
+            path: 'users/:id',
+            action: () =>
+              new Promise((resolve) => {
+                control.resolve = () => resolve({ ok: true })
+              }),
+          },
+        ],
+      },
+    ]
+    const router = createRouter({ routes: actionRoutes, history })
+    router.start()
+    await router.revalidate()
+
+    const submitPromise = router.submitAction('users', { method: 'POST' })
+    await Promise.resolve()
+    expect(router.getState().submitting).toBe(true)
+    expect(router.getState().pending).toBe(true)
+    expect(router.getState().navigation).toBe('submitting')
+
+    control.resolve?.()
+    await submitPromise
+    expect(router.getState().submitting).toBe(false)
+    expect(router.getState().pending).toBe(false)
+    expect(router.getState().navigation).toBe('idle')
+  })
 })

@@ -4,7 +4,7 @@ import { parseQuery, type ParsedQuery } from './query.js'
 import type { RouteActionSubmission } from './tree.js'
 import { isRedirectResult } from './responses.js'
 
-export type RouterNavigationState = 'idle' | 'navigating'
+export type RouterNavigationState = 'idle' | 'navigating' | 'loading' | 'submitting'
 export type NavigationOptions = {
   replace?: boolean
   restoreScroll?: boolean
@@ -15,6 +15,9 @@ export type RouterState<T = unknown, TRequestContext = unknown> = {
   location: RouterLocation
   matches: RouteBranchMatch<T, TRequestContext> | null
   navigation: RouterNavigationState
+  pending: boolean
+  submitting: boolean
+  loading: boolean
   loaderData: Record<string, unknown>
   actionData: Record<string, unknown>
 }
@@ -65,6 +68,19 @@ type ResolvedState<T = unknown, TRequestContext = unknown> = {
   matches: RouteBranchMatch<T, TRequestContext> | null
   loaderData: Record<string, unknown>
   redirect: { to: string; replace: boolean } | null
+}
+
+function withNavigationState<T, TRequestContext>(
+  state: RouterState<T, TRequestContext>,
+  navigation: RouterNavigationState,
+): RouterState<T, TRequestContext> {
+  return {
+    ...state,
+    navigation,
+    pending: navigation !== 'idle',
+    submitting: navigation === 'submitting',
+    loading: navigation === 'loading',
+  }
 }
 
 function createAbortError(): Error {
@@ -141,6 +157,9 @@ export function createRouter<T, TRequestContext = unknown>(
     location: history.location,
     matches: matchRouteTree(routes, history.location.pathname),
     navigation: 'idle',
+    pending: false,
+    submitting: false,
+    loading: false,
     loaderData: {},
     actionData: {},
   }
@@ -204,8 +223,12 @@ export function createRouter<T, TRequestContext = unknown>(
       matches: resolved.matches,
       loaderData: resolved.loaderData,
       actionData: state.actionData,
-      navigation: 'idle',
+      navigation: state.navigation,
+      pending: state.pending,
+      submitting: state.submitting,
+      loading: state.loading,
     }
+    state = withNavigationState(state, 'idle')
 
     if (previousNavigation) {
       const context: NavigationRestorationContext<T, TRequestContext> = {
@@ -229,6 +252,8 @@ export function createRouter<T, TRequestContext = unknown>(
 
   const onHistoryUpdate = (): void => {
     const previous = pendingNavigation
+    state = withNavigationState(state, 'loading')
+    emit()
     void applyResolvedLocation(history.location, previous)
   }
 
@@ -253,7 +278,7 @@ export function createRouter<T, TRequestContext = unknown>(
         resolve,
       }
     })
-    state = { ...state, navigation: 'navigating' }
+    state = withNavigationState(state, 'navigating')
     emit()
     if (replace) {
       history.replace(to)
@@ -282,6 +307,8 @@ export function createRouter<T, TRequestContext = unknown>(
       const route = branch.matches.find((item) => item.id === routeId)
       if (!route?.action) return false
 
+      state = withNavigationState(state, 'submitting')
+      emit()
       const requestContext = await getRequestContext()
       const query = parseQuery(state.location.search)
       const controller = new AbortController()
