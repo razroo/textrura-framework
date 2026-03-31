@@ -101,4 +101,15 @@ describe('toLayoutTree', () => {
     expect(layout).not.toHaveProperty('boxShadow')
     expect(layout).not.toHaveProperty('gradient')
   })
+
+  it('strips dir from layout props', () => {
+    const el = box({
+      width: 100,
+      height: 100,
+      dir: 'rtl',
+    })
+    const layout = toLayoutTree(el)
+    expect(layout).toHaveProperty('width', 100)
+    expect(layout).not.toHaveProperty('dir')
+  })
 })

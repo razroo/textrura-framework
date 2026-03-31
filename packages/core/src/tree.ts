@@ -18,6 +18,8 @@ function stripStyleProps(props: Record<string, unknown>): Record<string, unknown
   delete layoutProps.boxShadow
   delete layoutProps.gradient
   delete layoutProps.selectable
+  // Direction metadata is resolved by interaction/text helpers, not Yoga.
+  delete layoutProps.dir
   // Image-only props
   delete layoutProps.src
   delete layoutProps.alt

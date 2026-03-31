@@ -46,6 +46,13 @@ const app = createApp(() =>
 - `moveInputCaret` supports range extension via `extendSelection=true`.
 - `getInputCaretGeometry` is defined for collapsed selections with measured line metrics; expanded ranges return `null`.
 
+## Direction model baseline
+
+- Elements may provide `dir: 'ltr' | 'rtl' | 'auto'` on `box()`, `text()`, and `image()` props.
+- `dir='auto'` currently inherits from parent direction (script-level auto detection is deferred).
+- Omitted `dir` inherits from parent; root fallback is `ltr`.
+- Direction metadata is kept in the declarative tree and intentionally stripped from Yoga layout props.
+
 ## Accessibility guarantees and limits
 
 - `toAccessibilityTree(tree, layout)` emits deterministic role/name/bounds/focusable nodes for geometry-rendered UIs.

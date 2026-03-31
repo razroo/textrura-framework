@@ -11,6 +11,8 @@ export type { App, AppOptions } from './app.js'
 
 // Tree conversion
 export { toLayoutTree } from './tree.js'
+export { resolveDirectionValue, resolveElementDirection } from './direction.js'
+export type { ResolvedDirection } from './direction.js'
 
 // Hit testing
 export { dispatchHit, getCursorAtPoint, hasInteractiveHitAtPoint } from './hit-test.js'
@@ -78,6 +80,8 @@ export type {
   TextElement,
   ImageElement,
   StyleProps,
+  Direction,
+  DirectionProps,
   SemanticProps,
   EventHandlers,
   HitEvent,

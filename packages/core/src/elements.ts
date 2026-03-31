@@ -1,8 +1,17 @@
 import type { FlexProps } from 'textura'
-import type { StyleProps, BoxElement, TextElement, ImageElement, UIElement, EventHandlers, SemanticProps } from './types.js'
+import type {
+  StyleProps,
+  BoxElement,
+  TextElement,
+  ImageElement,
+  UIElement,
+  EventHandlers,
+  SemanticProps,
+  DirectionProps,
+} from './types.js'
 
-type BoxProps = FlexProps & StyleProps & EventHandlers & { key?: string; semantic?: SemanticProps }
-type TextProps = FlexProps & StyleProps & {
+type BoxProps = FlexProps & StyleProps & DirectionProps & EventHandlers & { key?: string; semantic?: SemanticProps }
+type TextProps = FlexProps & StyleProps & DirectionProps & {
   text: string
   font: string
   lineHeight: number
@@ -11,7 +20,7 @@ type TextProps = FlexProps & StyleProps & {
   key?: string
   semantic?: SemanticProps
 }
-type ImageProps = FlexProps & StyleProps & {
+type ImageProps = FlexProps & StyleProps & DirectionProps & {
   src: string
   alt?: string
   objectFit?: 'fill' | 'contain' | 'cover'

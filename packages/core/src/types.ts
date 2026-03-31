@@ -1,5 +1,13 @@
 import type { FlexProps, ComputedLayout } from 'textura'
 
+/** Text direction model used by UI elements. */
+export type Direction = 'ltr' | 'rtl' | 'auto'
+
+/** Optional direction metadata carried on UI props. */
+export interface DirectionProps {
+  dir?: Direction
+}
+
 /** Style properties for visual rendering (not layout). */
 export interface StyleProps {
   backgroundColor?: string
@@ -50,7 +58,7 @@ export interface SemanticProps {
 /** A text node in the component tree. */
 export interface TextElement {
   kind: 'text'
-  props: FlexProps & StyleProps & {
+  props: FlexProps & StyleProps & DirectionProps & {
     text: string
     font: string
     lineHeight: number
@@ -66,7 +74,7 @@ export interface TextElement {
 /** A box (container) node in the component tree. */
 export interface BoxElement {
   kind: 'box'
-  props: FlexProps & StyleProps
+  props: FlexProps & StyleProps & DirectionProps
   children: UIElement[]
   key?: string
   /** Optional event handlers — resolved via hit-testing. */
@@ -78,7 +86,7 @@ export interface BoxElement {
 /** An image element in the component tree. */
 export interface ImageElement {
   kind: 'image'
-  props: FlexProps & StyleProps & {
+  props: FlexProps & StyleProps & DirectionProps & {
     src: string
     alt?: string
     objectFit?: 'fill' | 'contain' | 'cover'

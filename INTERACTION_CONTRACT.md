@@ -38,6 +38,14 @@ This document defines expected keyboard/focus behavior across renderers.
   - `Enter`: insert newline
   - `Escape`: renderer/app-defined cancel or blur behavior
 
+## Direction baseline (v1.x)
+
+- Elements may set `dir` as `ltr`, `rtl`, or `auto`.
+- `dir=auto` currently inherits the parent direction.
+- Omitted `dir` inherits from parent direction.
+- Root direction fallback is `ltr`.
+- Direction semantics are defined at the core tree level so renderers can implement consistent caret/selection behavior.
+
 ## Composition / IME
 
 - `onCompositionStart`: snapshot active selection for composition anchor.
