@@ -2,7 +2,7 @@ import { WebSocketServer } from 'ws'
 import type { WebSocket } from 'ws'
 import { init, computeLayout } from 'textura'
 import type { ComputedLayout } from 'textura'
-import { toLayoutTree, dispatchHit } from '@geometra/core'
+import { toLayoutTree, dispatchHit, dispatchKeyboardEvent } from '@geometra/core'
 import type { UIElement, EventHandlers } from '@geometra/core'
 import { diffLayout, PROTOCOL_VERSION } from './protocol.js'
 import type { ServerMessage, ClientMessage } from './protocol.js'
@@ -128,6 +128,16 @@ export async function createServer(
             msg.y,
           )
           // After event handling, signals may have changed — re-render
+          computeAndBroadcast()
+        } else if (msg.type === 'key' && currentTree && prevLayout) {
+          dispatchKeyboardEvent(currentTree, prevLayout, msg.eventType, {
+            key: msg.key,
+            code: msg.code,
+            shiftKey: msg.shiftKey,
+            ctrlKey: msg.ctrlKey,
+            metaKey: msg.metaKey,
+            altKey: msg.altKey,
+          })
           computeAndBroadcast()
         }
       } catch {

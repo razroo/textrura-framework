@@ -17,6 +17,16 @@ export type ServerMessage =
 /** Messages sent from client to server. */
 export type ClientMessage =
   | (VersionedMessage & { type: 'event'; eventType: string; x: number; y: number })
+  | (VersionedMessage & {
+      type: 'key'
+      eventType: 'onKeyDown' | 'onKeyUp'
+      key: string
+      code: string
+      shiftKey: boolean
+      ctrlKey: boolean
+      metaKey: boolean
+      altKey: boolean
+    })
   | (VersionedMessage & { type: 'resize'; width: number; height: number })
 
 /** A patch describing a change to a single node's geometry. */

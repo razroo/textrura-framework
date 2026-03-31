@@ -25,6 +25,7 @@ export {
 
 // Focus management
 export { focusedElement, setFocus, clearFocus, focusNext, focusPrev } from './focus.js'
+export { dispatchKeyboardEvent } from './keyboard.js'
 
 // Text selection
 export { collectTextNodes, getSelectedText, hitTestText } from './selection.js'

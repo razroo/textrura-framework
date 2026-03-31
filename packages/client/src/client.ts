@@ -37,6 +37,10 @@ export interface TexturaClientOptions {
   renderer: Renderer
   /** Optional canvas element for forwarding pointer events. */
   canvas?: HTMLCanvasElement
+  /** Capture keyboard on canvas/document and forward to server. Default: true when canvas provided. */
+  forwardKeyboard?: boolean
+  /** Keyboard event target. Default: canvas, else document. */
+  keyboardTarget?: HTMLElement | Document
   /** Called on WebSocket or message parsing errors. */
   onError?: (error: unknown) => void
   /** Enable automatic reconnection on disconnect. Default: true. */
@@ -83,7 +87,7 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
   let closed = false
   let retryCount = 0
   let retryTimer: ReturnType<typeof setTimeout> | null = null
-  const handlers: Array<[string, (e: MouseEvent) => void]> = []
+  const handlers: Array<[EventTarget, string, EventListener]> = []
 
   const state: TexturaClient = {
     layout: null,
@@ -150,6 +154,21 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
     ws.send(JSON.stringify({ type: 'event', eventType, x, y, protocolVersion: PROTOCOL_VERSION }))
   }
 
+  const sendKeyEvent = (eventType: 'onKeyDown' | 'onKeyUp', e: KeyboardEvent) => {
+    if (ws.readyState !== WebSocket.OPEN) return
+    ws.send(JSON.stringify({
+      type: 'key',
+      eventType,
+      key: e.key,
+      code: e.code,
+      shiftKey: e.shiftKey,
+      ctrlKey: e.ctrlKey,
+      metaKey: e.metaKey,
+      altKey: e.altKey,
+      protocolVersion: PROTOCOL_VERSION,
+    }))
+  }
+
   if (canvas) {
     const onClick = (e: MouseEvent) => sendEvent('onClick', e)
     const onPointerDown = (e: MouseEvent) => sendEvent('onPointerDown', e)
@@ -162,18 +181,32 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
     canvas.addEventListener('pointermove', onPointerMove)
 
     handlers.push(
-      ['click', onClick],
-      ['pointerdown', onPointerDown],
-      ['pointerup', onPointerUp],
-      ['pointermove', onPointerMove],
+      [canvas, 'click', onClick as EventListener],
+      [canvas, 'pointerdown', onPointerDown as EventListener],
+      [canvas, 'pointerup', onPointerUp as EventListener],
+      [canvas, 'pointermove', onPointerMove as EventListener],
+    )
+  }
+
+  const forwardKeyboard = options.forwardKeyboard ?? !!canvas
+  if (forwardKeyboard) {
+    const target = options.keyboardTarget ?? canvas ?? document
+    if (target instanceof HTMLElement && !target.hasAttribute('tabindex')) {
+      target.setAttribute('tabindex', '0')
+    }
+    const onKeyDown = (e: KeyboardEvent) => sendKeyEvent('onKeyDown', e)
+    const onKeyUp = (e: KeyboardEvent) => sendKeyEvent('onKeyUp', e)
+    target.addEventListener('keydown', onKeyDown as EventListener)
+    target.addEventListener('keyup', onKeyUp as EventListener)
+    handlers.push(
+      [target, 'keydown', onKeyDown as EventListener],
+      [target, 'keyup', onKeyUp as EventListener],
     )
   }
 
   function cleanup() {
-    if (canvas) {
-      for (const [event, handler] of handlers) {
-        canvas.removeEventListener(event, handler as EventListener)
-      }
+    for (const [target, event, handler] of handlers) {
+      target.removeEventListener(event, handler)
     }
     renderer.destroy()
   }

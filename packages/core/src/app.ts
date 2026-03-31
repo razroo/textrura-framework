@@ -1,11 +1,12 @@
 import { init, computeLayout } from 'textura'
 import type { ComputedLayout } from 'textura'
-import type { UIElement, Renderer, KeyboardHitEvent, EventHandlers } from './types.js'
+import type { UIElement, Renderer, EventHandlers, KeyboardHitEvent } from './types.js'
 import { toLayoutTree } from './tree.js'
 import { dispatchHit } from './hit-test.js'
 import { effect } from './signals.js'
-import { focusedElement, setFocus, focusNext, focusPrev } from './focus.js'
+import { focusedElement, setFocus } from './focus.js'
 import { collectFontFamiliesFromTree, waitForFonts } from './fonts.js'
+import { dispatchKeyboardEvent } from './keyboard.js'
 
 export interface AppOptions {
   /** Root width for layout computation. */
@@ -85,38 +86,8 @@ export async function createApp(
       return handled
     },
     dispatchKey(eventType, partialEvent) {
-      const focused = focusedElement.peek()
-      if (!focused) {
-        // Tab navigation even without focus
-        if (partialEvent.key === 'Tab' && app.tree && app.layout) {
-          if (partialEvent.shiftKey) {
-            focusPrev(app.tree, app.layout)
-          } else {
-            focusNext(app.tree, app.layout)
-          }
-          return true
-        }
-        return false
-      }
-
-      const handler = focused.element.handlers?.[eventType]
-      if (handler) {
-        const event: KeyboardHitEvent = { ...partialEvent, target: focused.layout }
-        handler(event)
-        return true
-      }
-
-      // Tab moves focus even if the element doesn't handle keyboard
-      if (partialEvent.key === 'Tab' && app.tree && app.layout) {
-        if (partialEvent.shiftKey) {
-          focusPrev(app.tree, app.layout)
-        } else {
-          focusNext(app.tree, app.layout)
-        }
-        return true
-      }
-
-      return false
+      if (!app.tree || !app.layout) return false
+      return dispatchKeyboardEvent(app.tree, app.layout, eventType, partialEvent)
     },
     destroy() {
       dispose()
