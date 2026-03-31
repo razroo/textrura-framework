@@ -50,7 +50,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          bun install || (rm -rf node_modules && npm install)
+          bun install || (rm -rf node_modules package-lock.json && npm install)
 
       - name: Build all packages (dependency order)
         run: |
