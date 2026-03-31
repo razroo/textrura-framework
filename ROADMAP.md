@@ -30,3 +30,61 @@ Routing competitiveness work is tracked in `ROUTING_COMPETITIVENESS_CHECKLIST.md
 - Full RTL/document direction pass through Textura props.
 - Animation primitives beyond current `animation.ts` helpers.
 - Non-canvas render targets (WebGPU, PDF) consuming the same geometry.
+
+## Release polish checklist
+
+Tracking fields:
+
+- Status: `todo` | `in_progress` | `blocked` | `done`
+- Owner: `@unassigned` by default
+
+### 0.3.2 — Text input and IME quality
+
+- [x] Status: `done` | Owner: `@codex` | Add a dedicated text-input demo covering caret, selection, insert/delete, and undo/redo.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add integration tests for composition lifecycle (`start/update/end`) and mixed key/composition flows.
+- [ ] Status: `todo` | Owner: `@unassigned` | Validate caret geometry across multiline and edge positions.
+- [ ] Status: `todo` | Owner: `@unassigned` | Verify selection replacement plus backspace/delete boundary behavior.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add regression tests for focus switching during active composition.
+- [ ] Status: `todo` | Owner: `@unassigned` | Document text-input semantics in README/API docs.
+
+### 0.3.3 — Keyboard/focus contract and a11y
+
+- [ ] Status: `todo` | Owner: `@unassigned` | Write a concise interaction spec (Tab/Shift+Tab, Enter/Escape, arrow behavior, focus order rules).
+- [ ] Status: `todo` | Owner: `@unassigned` | Align core + terminal/canvas behavior with the interaction spec.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add end-to-end focus traversal tests for multiple focusable regions.
+- [ ] Status: `todo` | Owner: `@unassigned` | Expand accessibility tree coverage for common patterns (headings, nav, lists, buttons, forms).
+- [ ] Status: `todo` | Owner: `@unassigned` | Add semantic output snapshots for representative UI trees.
+- [ ] Status: `todo` | Owner: `@unassigned` | Document accessibility guarantees and known limitations.
+
+### 0.3.4 — Protocol and reliability hardening
+
+- [ ] Status: `todo` | Owner: `@unassigned` | Add protocol version fixtures and compatibility tests (including mismatch handling).
+- [ ] Status: `todo` | Owner: `@unassigned` | Add tests for geometry diff correctness under rapid update bursts.
+- [ ] Status: `todo` | Owner: `@unassigned` | Validate error surfacing and recovery behavior in server/client flows.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add reconnect/retry integration scenario with state resync.
+- [ ] Status: `todo` | Owner: `@unassigned` | Ensure protocol changes are explicit and backward-safe.
+
+### 0.3.5 — Performance guardrails
+
+- [ ] Status: `todo` | Owner: `@unassigned` | Add microbenchmarks for hit-testing, text measurement, and geometry diffing.
+- [ ] Status: `todo` | Owner: `@unassigned` | Establish baseline metrics and acceptable regression thresholds.
+- [ ] Status: `todo` | Owner: `@unassigned` | Wire benchmark/performance checks into CI reporting.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add smoke perf test for large tree updates (worst-case UI churn).
+- [ ] Status: `todo` | Owner: `@unassigned` | Track perf notes in release checklist before each tag.
+
+### Docs and developer experience (parallel track)
+
+- [ ] Status: `todo` | Owner: `@unassigned` | Keep README/API exports aligned with shipped behavior every release.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add a testing matrix doc (unit vs integration vs renderer-specific).
+- [ ] Status: `todo` | Owner: `@unassigned` | Provide copy-paste examples for terminal input/focus wiring.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add release playbook checklist (version bump, tests, notes, verification).
+- [ ] Status: `todo` | Owner: `@unassigned` | Add known caveats section for environment-specific behavior.
+
+### Release readiness gate (every release)
+
+- [ ] Status: `todo` | Owner: `@unassigned` | Core unit tests pass.
+- [ ] Status: `todo` | Owner: `@unassigned` | Terminal integration suite passes.
+- [ ] Status: `todo` | Owner: `@unassigned` | Renderer-specific smoke checks pass.
+- [ ] Status: `todo` | Owner: `@unassigned` | Lint/build pass in CI.
+- [ ] Status: `todo` | Owner: `@unassigned` | Changelog/release notes include behavior changes plus migration notes.
+- [ ] Status: `todo` | Owner: `@unassigned` | npm published versions verified after release workflow completes.

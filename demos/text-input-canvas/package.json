@@ -1,0 +1,15 @@
+{
+  "name": "@geometra/demo-text-input-canvas",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite"
+  },
+  "dependencies": {
+    "@geometra/core": "*",
+    "@geometra/renderer-canvas": "*"
+  },
+  "devDependencies": {
+    "vite": "^8.0.3"
+  }
+}
