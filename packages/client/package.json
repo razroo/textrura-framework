@@ -1,6 +1,6 @@
 {
   "name": "@geometra/client",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Thin client that receives server-computed geometry and paints via renderer",
   "license": "MIT",
   "type": "module",
@@ -10,7 +10,13 @@
     "directory": "packages/client"
   },
   "homepage": "https://razroo.github.io/geometra",
-  "keywords": ["textura", "client", "websocket", "thin-client", "dom-free"],
+  "keywords": [
+    "textura",
+    "client",
+    "websocket",
+    "thin-client",
+    "dom-free"
+  ],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -19,7 +25,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "check": "tsc --noEmit"
