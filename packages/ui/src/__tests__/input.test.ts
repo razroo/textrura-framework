@@ -22,7 +22,9 @@ if (typeof globalThis.OffscreenCanvas === 'undefined') {
 
 class CaptureRenderer implements Renderer {
   lastTree: UIElement | null = null
+  lastLayout: unknown = null
   render(_layout: unknown, tree: UIElement): void {
+    this.lastLayout = _layout
     this.lastTree = tree
   }
   destroy(): void {
@@ -159,20 +161,32 @@ describe('@geometra/ui input', () => {
       { width: 280, height: 140 },
     )
 
-    function countCaretBoxes(tree: UIElement | null): number {
-      if (!tree) return 0
-      if (tree.kind === 'text') return 0
-      const selfCaret = tree.props.backgroundColor === '#38bdf8' && tree.props.width === 1.5 ? 1 : 0
-      return selfCaret + tree.children.reduce((sum, child) => sum + countCaretBoxes(child), 0)
+    function getCaretPositions(tree: UIElement | null, layout: unknown, ox = 0, oy = 0): Array<{ x: number; y: number }> {
+      if (!tree || !layout || tree.kind !== 'box') return []
+      const node = layout as { x: number; y: number; children?: unknown[] }
+      const absX = ox + node.x
+      const absY = oy + node.y
+      const own = tree.props.backgroundColor === '#38bdf8' && tree.props.width === 1.5
+        ? [{ x: absX, y: absY }]
+        : []
+      const childrenLayouts = node.children ?? []
+      const childPositions = tree.children.flatMap((child, idx) =>
+        getCaretPositions(child, childrenLayouts[idx], absX, absY),
+      )
+      return [...own, ...childPositions]
     }
 
-    expect(countCaretBoxes(renderer.lastTree)).toBe(0)
+    expect(getCaretPositions(renderer.lastTree, renderer.lastLayout)).toHaveLength(0)
 
     app.dispatch('onClick', 10, 10)
-    expect(countCaretBoxes(renderer.lastTree)).toBe(1)
+    const firstCaret = getCaretPositions(renderer.lastTree, renderer.lastLayout)
+    expect(firstCaret).toHaveLength(1)
 
     app.dispatch('onClick', 10, 70)
-    expect(countCaretBoxes(renderer.lastTree)).toBe(1)
+    const secondCaret = getCaretPositions(renderer.lastTree, renderer.lastLayout)
+    expect(secondCaret).toHaveLength(1)
+    // Focus moved to a different input row, so caret y-position should change.
+    expect(secondCaret[0]!.y).toBeGreaterThan(firstCaret[0]!.y)
 
     app.destroy()
   })
