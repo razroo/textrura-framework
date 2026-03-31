@@ -10,7 +10,7 @@
     "build": "bun run --workspaces build",
     "check": "bun run --workspaces --if-present check",
     "test": "vitest run",
-    "test:terminal-input": "npm run -w @geometra/demo-terminal test:input",
+    "test:terminal-input": "bun run --filter @geometra/demo-terminal test:input",
     "test:perf": "vitest run packages/core/src/__tests__/perf-smoke.test.ts packages/server/src/__tests__/protocol-perf-smoke.test.ts",
     "test:renderer-smoke": "vitest run packages/renderer-terminal/src/__tests__/renderer-smoke.test.ts",
     "release:gate": "npm run test -- packages/core/src/__tests__/keyboard.test.ts packages/core/src/__tests__/text-input.test.ts packages/core/src/__tests__/a11y.test.ts packages/core/src/__tests__/seo.test.ts && npm run test:terminal-input && npm run test:renderer-smoke && npm run test:perf",
