@@ -136,4 +136,4 @@ Tracking fields:
 - [x] Status: `done` | Owner: `@codex` | Publish `@geometra/ui` starter primitives (button/input/list/dialog) built only on core exports.
 - [x] Status: `done` | Owner: `@codex` | Add end-to-end starter templates (canvas local app, terminal app, server/client app).
 - [x] Status: `done` | Owner: `@codex` | Produce migration guide for teams moving from DOM-centric event/layout assumptions.
-- [ ] Status: `todo` | Owner: `@unassigned` | Define 1.0 release criteria and freeze policy for protocol + interaction contract.
+- [x] Status: `done` | Owner: `@codex` | Define 1.0 release criteria and freeze policy for protocol + interaction contract.
