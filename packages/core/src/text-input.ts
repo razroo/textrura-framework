@@ -436,12 +436,25 @@ export function getInputCaretGeometry(
     if (targetOffset <= lineEnd || isLastLine) {
       const local = Math.max(0, Math.min(targetOffset - traversed, line.text.length))
       let x = line.x
-      if (local > 0 && line.charOffsets.length > 0) {
-        if (local < line.charOffsets.length) {
-          x += line.charOffsets[local] ?? 0
+      if (line.charOffsets.length > 0) {
+        if (node.direction === 'rtl') {
+          const lineWidth = (line.charOffsets[line.charOffsets.length - 1] ?? 0) + (line.charWidths[line.charWidths.length - 1] ?? 0)
+          let logicalOffset = 0
+          if (local > 0) {
+            if (local < line.charOffsets.length) {
+              logicalOffset = line.charOffsets[local] ?? 0
+            } else {
+              logicalOffset = lineWidth
+            }
+          }
+          x += lineWidth - logicalOffset
         } else {
-          const lastIndex = line.charOffsets.length - 1
-          x += (line.charOffsets[lastIndex] ?? 0) + (line.charWidths[lastIndex] ?? 0)
+          if (local < line.charOffsets.length) {
+            x += line.charOffsets[local] ?? 0
+          } else {
+            const lastIndex = line.charOffsets.length - 1
+            x += (line.charOffsets[lastIndex] ?? 0) + (line.charWidths[lastIndex] ?? 0)
+          }
         }
       }
       return {

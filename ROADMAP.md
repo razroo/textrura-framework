@@ -50,7 +50,7 @@ Acceptance criteria:
 - [x] Status: `done` | Owner: `@codex` | Direction model is explicit: root and per-node `dir` (`ltr`/`rtl`/`auto`) semantics are documented and enforced consistently.
 - [x] Status: `done` | Owner: `@codex` | Caret movement semantics are correct for bidi text (left/right visual movement, home/end behavior, word jumps) with integration tests.
 - [ ] Status: `in_progress` | Owner: `@codex` | Selection range mapping and paint are stable for mixed LTR/RTL runs in canvas and terminal renderers. (canvas baseline landed; terminal parity pending)
-- [ ] Status: `todo` | Owner: `@unassigned` | Text measurement and geometry mapping stay parity-safe across local canvas and server/client paths.
+- [ ] Status: `in_progress` | Owner: `@codex` | Text measurement and geometry mapping stay parity-safe across local canvas and server/client paths. (RTL caret geometry + protocol frame preservation covered; broader parity matrix pending)
 - [x] Status: `done` | Owner: `@codex` | Known limitations (complex scripts edge cases, terminal constraints) are explicitly documented.
 
 Definition of done:

@@ -293,6 +293,37 @@ describe('text-input foundation', () => {
     expect(clampedEnd?.offset).toBe(4)
   })
 
+  it('computes caret geometry with rtl direction-aware x mapping', () => {
+    const textNodes = [
+      {
+        element: { kind: 'text', props: { text: 'abcd', font: '14px Inter', lineHeight: 18, dir: 'rtl' } },
+        direction: 'rtl',
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 18,
+        index: 0,
+        lines: [
+          { text: 'abcd', x: 10, y: 20, charOffsets: [0, 10, 20, 30], charWidths: [10, 10, 10, 10] },
+        ],
+      },
+    ] as any
+
+    const atStart = getInputCaretGeometry(textNodes, {
+      anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 0,
+    })
+    const atMiddle = getInputCaretGeometry(textNodes, {
+      anchorNode: 0, anchorOffset: 2, focusNode: 0, focusOffset: 2,
+    })
+    const atEnd = getInputCaretGeometry(textNodes, {
+      anchorNode: 0, anchorOffset: 4, focusNode: 0, focusOffset: 4,
+    })
+
+    expect(atStart?.x).toBe(50)
+    expect(atMiddle?.x).toBe(30)
+    expect(atEnd?.x).toBe(10)
+  })
+
   it('supports undo/redo history for edits', () => {
     let history = createTextInputHistory({
       nodes: ['hello'],
