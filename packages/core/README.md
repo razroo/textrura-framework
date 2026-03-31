@@ -46,6 +46,12 @@ const app = createApp(() =>
 - `moveInputCaret` supports range extension via `extendSelection=true`.
 - `getInputCaretGeometry` is defined for collapsed selections with measured line metrics; expanded ranges return `null`.
 
+## Accessibility guarantees and limits
+
+- `toAccessibilityTree(tree, layout)` emits deterministic role/name/bounds/focusable nodes for geometry-rendered UIs.
+- Semantic overrides (`semantic.tag`, `semantic.role`, `semantic.ariaLabel`, `semantic.alt`) are preserved when projecting accessibility and semantic HTML output.
+- The core package does not directly expose native accessibility APIs; renderer integrations (for example canvas mirror strategies) are responsible for host-level assistive technology bridging.
+
 ## Links
 
 - [Main repo](https://github.com/AiGeekz/geometra)

@@ -54,7 +54,7 @@ Tracking fields:
 - [x] Status: `done` | Owner: `@codex` | Add end-to-end focus traversal tests for multiple focusable regions.
 - [x] Status: `done` | Owner: `@codex` | Expand accessibility tree coverage for common patterns (headings, nav, lists, buttons, forms).
 - [x] Status: `done` | Owner: `@codex` | Add semantic output snapshots for representative UI trees.
-- [ ] Status: `todo` | Owner: `@unassigned` | Document accessibility guarantees and known limitations.
+- [x] Status: `done` | Owner: `@codex` | Document accessibility guarantees and known limitations.
 
 ### 0.3.4 — Protocol and reliability hardening
 

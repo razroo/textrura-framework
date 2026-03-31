@@ -212,6 +212,21 @@ Geometra now exposes runtime primitives so non-DOM renderers can still provide a
 - Composition flow should snapshot selection on `onCompositionStart`, update transient draft on `onCompositionUpdate`, and commit text on `onCompositionEnd`.
 - `getInputCaretGeometry` only returns non-null for collapsed selections and clamps offsets to measured text bounds.
 
+### Accessibility guarantees and current limitations
+
+Guarantees:
+
+- `toAccessibilityTree(tree, layout)` provides deterministic role/name/bounds/focusable output from the rendered geometry tree.
+- Semantic hints (`tag`, `role`, `ariaLabel`, `alt`) are preserved in a11y/SEO projections.
+- Common container patterns (main/nav/article/list/form/button/input-like) map to stable roles.
+
+Current limitations:
+
+- Accessibility output is structural and does not implement full platform accessibility APIs by itself.
+- Focus management is traversal-based and does not yet provide advanced patterns such as focus traps.
+- Keyboard behavior is currently horizontal/linear (`ArrowLeft`/`ArrowRight`) in text-input primitives; full vertical caret movement is not implemented.
+- True screen reader parity for canvas mode depends on `enableAccessibilityMirror` integration and host/browser behavior.
+
 ## Architecture
 
 ```
