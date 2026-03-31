@@ -441,19 +441,6 @@ function textInputDemo(): UIElement {
       width: '100%',
       overflow: 'hidden',
       cursor: 'text',
-      onClick: () => {
-        inputFocused.set(true)
-        const lineEnd = line.length
-        setInputPresent({
-          nodes: state.nodes,
-          selection: {
-            anchorNode: lineIndex,
-            anchorOffset: lineEnd,
-            focusNode: lineIndex,
-            focusOffset: lineEnd,
-          },
-        })
-      },
     }, rowChildren)
   })
 
