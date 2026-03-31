@@ -288,6 +288,13 @@ cd demos/text-input-canvas && npm run dev
 
 Terminal input/focus wiring snippets are in `TERMINAL_INPUT_EXAMPLES.md`.
 
+## Known caveats
+
+- Server-side text measurement in pure Node environments requires an available canvas measurement backend (for example OffscreenCanvas/polyfill paths).
+- Terminal key escape sequences can vary by terminal emulator; integration tests include normalized paths for Tab/Shift+Tab/arrows.
+- Canvas accessibility parity depends on host/browser support for hidden accessibility mirror strategies.
+- Protocol mismatches are rejected explicitly when peer version is newer; keep release notes and protocol docs in sync when changing wire shapes.
+
 Bun equivalents (faster install/startup in many environments):
 
 ```bash

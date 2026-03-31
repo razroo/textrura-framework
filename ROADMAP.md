@@ -78,7 +78,7 @@ Tracking fields:
 - [x] Status: `done` | Owner: `@codex` | Add a testing matrix doc (unit vs integration vs renderer-specific).
 - [x] Status: `done` | Owner: `@codex` | Provide copy-paste examples for terminal input/focus wiring.
 - [x] Status: `done` | Owner: `@codex` | Add release playbook checklist (version bump, tests, notes, verification).
-- [ ] Status: `todo` | Owner: `@unassigned` | Add known caveats section for environment-specific behavior.
+- [x] Status: `done` | Owner: `@codex` | Add known caveats section for environment-specific behavior.
 
 ### Release readiness gate (every release)
 
