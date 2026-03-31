@@ -10,6 +10,12 @@ import {
   getInputCaretGeometry,
   type TextInputState,
 } from '../text-input.js'
+import {
+  createTextInputHistory,
+  pushTextInputHistory,
+  undoTextInputHistory,
+  redoTextInputHistory,
+} from '../text-input-history.js'
 
 describe('text-input foundation', () => {
   it('detects collapsed selection', () => {
@@ -123,6 +129,31 @@ describe('text-input foundation', () => {
     expect(caret?.x).toBe(25)
     expect(caret?.y).toBe(30)
     expect(caret?.height).toBe(20)
+  })
+
+  it('supports undo/redo history for edits', () => {
+    let history = createTextInputHistory({
+      nodes: ['hello'],
+      selection: { anchorNode: 0, anchorOffset: 5, focusNode: 0, focusOffset: 5 },
+    })
+
+    history = pushTextInputHistory(history, {
+      nodes: ['hello!'],
+      selection: { anchorNode: 0, anchorOffset: 6, focusNode: 0, focusOffset: 6 },
+    })
+    history = pushTextInputHistory(history, {
+      nodes: ['hello!?'],
+      selection: { anchorNode: 0, anchorOffset: 7, focusNode: 0, focusOffset: 7 },
+    })
+
+    history = undoTextInputHistory(history)
+    expect(history.present.nodes).toEqual(['hello!'])
+
+    history = undoTextInputHistory(history)
+    expect(history.present.nodes).toEqual(['hello'])
+
+    history = redoTextInputHistory(history)
+    expect(history.present.nodes).toEqual(['hello!'])
   })
 })
 

@@ -17,6 +17,7 @@ npm install @geometra/core
 - `toAccessibilityTree` -- runtime accessibility tree from geometry
 - `insertInputText`, `backspaceInput`, `deleteInput` -- text-input editing primitives
 - `getInputCaretGeometry` -- caret x/y/height from measured text lines
+- `createTextInputHistory`, `undoTextInputHistory` -- undo/redo state helpers
 - `transition`, `spring` -- animation utilities
 
 ## Usage

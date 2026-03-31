@@ -56,6 +56,13 @@ export {
   getInputCaretGeometry,
 } from './text-input.js'
 export type { TextInputState, TextInputEditResult, CaretGeometry } from './text-input.js'
+export {
+  createTextInputHistory,
+  pushTextInputHistory,
+  undoTextInputHistory,
+  redoTextInputHistory,
+} from './text-input-history.js'
+export type { TextInputHistoryState } from './text-input-history.js'
 
 // Types
 export type {

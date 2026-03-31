@@ -8,8 +8,12 @@ import {
   backspaceInput,
   deleteInput,
   moveInputCaret,
+  createTextInputHistory,
+  pushTextInputHistory,
+  undoTextInputHistory,
+  redoTextInputHistory,
 } from '@geometra/core'
-import type { App, UIElement, TextInputState, KeyboardHitEvent } from '@geometra/core'
+import type { App, UIElement, TextInputState, TextInputHistoryState, KeyboardHitEvent } from '@geometra/core'
 import { CanvasRenderer, enableSelection, enableAccessibilityMirror } from '@geometra/renderer-canvas'
 
 // ─── Design Tokens ───────────────────────────────────────────────────────────
@@ -35,10 +39,10 @@ const rootWidth = signal(600)
 const direction = signal<'row' | 'column'>('row')
 const codeTab = signal('basic')
 const copied = signal(false)
-const inputState = signal<TextInputState>({
+const inputHistory = signal<TextInputHistoryState>(createTextInputHistory({
   nodes: ['Geometra text input prototype'],
   selection: { anchorNode: 0, anchorOffset: 29, focusNode: 0, focusOffset: 29 },
-})
+}))
 const inputFocused = signal(false)
 const compositionDraft = signal('')
 let lastPerfTime = '-'
@@ -58,6 +62,19 @@ function center(...children: UIElement[]): UIElement {
 /** Spacer element. */
 function spacer(h: number): UIElement {
   return box({ height: h }, [])
+}
+
+function currentInputState(): TextInputState {
+  return inputHistory.peek().present
+}
+
+function setInputPresent(next: TextInputState): void {
+  const h = inputHistory.peek()
+  inputHistory.set({ ...h, present: next })
+}
+
+function pushInput(next: TextInputState): void {
+  inputHistory.set(pushTextInputHistory(inputHistory.peek(), next))
 }
 
 /** Styled button. */
@@ -219,13 +236,26 @@ function selectableText(): UIElement {
 }
 
 function handleInputKeyDown(e: KeyboardHitEvent): void {
-  const state = inputState.peek()
+  const state = currentInputState()
 
   if (e.key === 'Process') return
 
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+    if (e.shiftKey) {
+      inputHistory.set(redoTextInputHistory(inputHistory.peek()))
+    } else {
+      inputHistory.set(undoTextInputHistory(inputHistory.peek()))
+    }
+    return
+  }
+  if (e.ctrlKey && e.key.toLowerCase() === 'y') {
+    inputHistory.set(redoTextInputHistory(inputHistory.peek()))
+    return
+  }
+
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
     const last = state.nodes.length - 1
-    inputState.set({
+    setInputPresent({
       nodes: state.nodes,
       selection: {
         anchorNode: 0,
@@ -238,23 +268,23 @@ function handleInputKeyDown(e: KeyboardHitEvent): void {
   }
 
   if (e.key === 'Backspace') {
-    inputState.set(backspaceInput(state))
+    pushInput(backspaceInput(state))
     return
   }
   if (e.key === 'Delete') {
-    inputState.set(deleteInput(state))
+    pushInput(deleteInput(state))
     return
   }
   if (e.key === 'ArrowLeft') {
-    inputState.set(moveInputCaret(state, 'left', e.shiftKey))
+    setInputPresent(moveInputCaret(state, 'left', e.shiftKey))
     return
   }
   if (e.key === 'ArrowRight') {
-    inputState.set(moveInputCaret(state, 'right', e.shiftKey))
+    setInputPresent(moveInputCaret(state, 'right', e.shiftKey))
     return
   }
   if (e.key === 'Enter') {
-    inputState.set(insertInputText(state, '\n'))
+    pushInput(insertInputText(state, '\n'))
     return
   }
   if (e.key === 'Escape') {
@@ -263,7 +293,7 @@ function handleInputKeyDown(e: KeyboardHitEvent): void {
   }
 
   if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
-    inputState.set(insertInputText(state, e.key))
+    pushInput(insertInputText(state, e.key))
   }
 }
 
@@ -278,12 +308,14 @@ function handleInputCompositionUpdate(e: { data: string }): void {
 function handleInputCompositionEnd(e: { data: string }): void {
   compositionDraft.set('')
   if (!e.data) return
-  inputState.set(insertInputText(inputState.peek(), e.data))
+  pushInput(insertInputText(currentInputState(), e.data))
 }
 
 function textInputDemo(): UIElement {
   const w = rootWidth.value
-  const state = inputState.value
+  const state = inputHistory.value.present
+  const undoDepth = inputHistory.value.past.length
+  const redoDepth = inputHistory.value.future.length
   const active = inputFocused.value
   const selected = state.selection
   const collapsed =
@@ -298,7 +330,7 @@ function textInputDemo(): UIElement {
 
   return box({ flexDirection: 'column', padding: 24, gap: 14, width: w, minHeight: 380 }, [
     text({ text: 'Text Input (foundation)', font: 'bold 18px Inter', lineHeight: 24, color: '#ffffff' }),
-    text({ text: 'Keyboard editing on Canvas: type, arrows, backspace/delete, enter, Cmd/Ctrl+A.', font: '14px Inter', lineHeight: 22, color: '#e2e8f0' }),
+    text({ text: 'Keyboard editing on Canvas: type, arrows, backspace/delete, enter, Cmd/Ctrl+A, Cmd/Ctrl+Z.', font: '14px Inter', lineHeight: 22, color: '#e2e8f0' }),
     box({
       backgroundColor: active ? '#111827' : SURFACE,
       borderColor: active ? ACCENT2 : BORDER,
@@ -311,7 +343,7 @@ function textInputDemo(): UIElement {
         const endNode = state.nodes.length - 1
         const endOffset = state.nodes[endNode]?.length ?? 0
         inputFocused.set(true)
-        inputState.set({
+        setInputPresent({
           nodes: state.nodes,
           selection: { anchorNode: endNode, anchorOffset: endOffset, focusNode: endNode, focusOffset: endOffset },
         })
@@ -337,6 +369,10 @@ function textInputDemo(): UIElement {
       box({ backgroundColor: '#1e3a2f', borderRadius: 10, padding: 14, flexGrow: 1, flexDirection: 'column', gap: 4 }, [
         text({ text: 'Selection', font: 'bold 13px Inter', lineHeight: 18, color: '#4ade80' }),
         text({ text: JSON.stringify(state.selection), font: '12px JetBrains Mono', lineHeight: 17, color: '#86efac' }),
+      ]),
+      box({ backgroundColor: '#3b1b52', borderRadius: 10, padding: 14, flexGrow: 1, flexDirection: 'column', gap: 4 }, [
+        text({ text: 'History', font: 'bold 13px Inter', lineHeight: 18, color: '#e9d5ff' }),
+        text({ text: `undo:${undoDepth} redo:${redoDepth}`, font: '12px JetBrains Mono', lineHeight: 17, color: '#f3e8ff' }),
       ]),
     ]),
   ])
@@ -777,6 +813,8 @@ function onDocumentKeyDown(e: KeyboardEvent) {
     handled &&
     (
       ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') ||
+      ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') ||
+      (e.ctrlKey && e.key.toLowerCase() === 'y') ||
       e.key === 'Tab' ||
       e.key === 'ArrowLeft' ||
       e.key === 'ArrowRight' ||
