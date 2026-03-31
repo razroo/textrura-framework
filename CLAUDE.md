@@ -21,6 +21,11 @@ npm install                                    # install all workspace deps
 npm run build                                  # build all packages (tsc)
 npx vite --config demo/vite.config.ts          # dev server for demo site
 npx vite build --config demo/vite.config.ts    # production build → dist-demo/
+
+# Bun alternatives (preferred for faster installs in CI/local)
+bun install
+bun run build
+bun run demo:build
 ```
 
 Note: `tsc` builds may show pre-existing module resolution errors (`nodenext`/TypeScript version). The Vite-based demo build works regardless since Vite handles its own resolution.

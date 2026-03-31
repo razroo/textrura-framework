@@ -20,17 +20,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
 
       - name: Install dependencies
-        run: |
-          rm -f package-lock.json
-          npm install
+        run: bun install
 
       - name: Build demo
-        run: npx vite build --config demo/vite.config.ts
+        run: bun run demo:build
 
       - uses: actions/upload-pages-artifact@v3
         with:

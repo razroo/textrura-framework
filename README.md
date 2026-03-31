@@ -234,6 +234,14 @@ cd demos/server-client && npm run client   # terminal 2
 cd demos/terminal && npm run dev
 ```
 
+Bun equivalents (faster install/startup in many environments):
+
+```bash
+bun install
+bun run demo:build
+bun run test
+```
+
 ## Why Singularity Tech?
 
 The boundary between client and server dissolves. The same geometry protocol that renders pixels on a canvas also feeds data to AI agents. Humans and AI agents are first-class citizens on both sides of the wire.
