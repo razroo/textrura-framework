@@ -2,7 +2,7 @@
 
 Routing primitives for Geometra.
 
-Current scope (foundation): route matching utilities.
+Current scope (foundation): route matching and nested branch composition utilities.
 
 ## Install
 
@@ -13,6 +13,8 @@ npm install @geometra/router
 ## Key Exports
 
 - `matchPath` -- matches path patterns with static, dynamic, optional, and splat segments
+- `matchRouteTree` -- matches nested route trees with layout routes
+- `renderMatchedOutlet` -- composes matched branch render output from leaf to root
 
 ## Usage
 
