@@ -7,7 +7,6 @@ import type {
   ImageElement,
   SelectionRange,
   TextNodeInfo,
-  TextLineInfo,
   AccessibilityNode,
 } from '@geometra/core'
 import {
@@ -45,6 +44,12 @@ export interface CanvasRendererOptions {
 export interface AccessibilityMirrorOptions {
   /** Label for the hidden accessibility region. */
   rootLabel?: string
+}
+
+interface CachedTextLineMetrics {
+  text: string
+  charOffsets: number[]
+  charWidths: number[]
 }
 
 /** Parse a CSS color string into [r, g, b] (0-255). Supports #hex and rgba(). */
@@ -85,6 +90,8 @@ export class CanvasRenderer implements Renderer {
   private showFocusRing: boolean
   private focusRingColor: string
   private focusRingPadding: number
+  /** Cache text wrapping + per-char metrics to avoid recomputing every frame. */
+  private textLineCache = new Map<string, CachedTextLineMetrics[]>()
 
   /** Cached loaded images. */
   private imageCache = new Map<string, HTMLImageElement>()
@@ -160,27 +167,40 @@ export class CanvasRenderer implements Renderer {
   }
 
   private computeTextNodeLines(node: TextNodeInfo): void {
-    const { ctx } = this
-    ctx.font = node.element.props.font
-    const { lineHeight } = node.element.props
-    const wrappedLines = this.wrapText(node.element.props.text, node.width)
-    const lines: TextLineInfo[] = []
+    const { lineHeight, font, text } = node.element.props
+    const width = Math.max(1, Math.round(node.width * 1000) / 1000)
+    const cacheKey = `${font}|${lineHeight}|${width}|${text}`
+    let cached = this.textLineCache.get(cacheKey)
 
-    for (let i = 0; i < wrappedLines.length; i++) {
-      const lineText = wrappedLines[i]!
-      const lineY = node.y + i * lineHeight
-      const charOffsets: number[] = []
-      const charWidths: number[] = []
-      let xOffset = 0
-      for (let c = 0; c < lineText.length; c++) {
-        charOffsets.push(xOffset)
-        const w = ctx.measureText(lineText[c]!).width
-        charWidths.push(w)
-        xOffset += w
+    if (!cached) {
+      const { ctx } = this
+      ctx.font = font
+      const wrappedLines = this.wrapText(text, width)
+      cached = wrappedLines.map((lineText) => {
+        const charOffsets: number[] = []
+        const charWidths: number[] = []
+        let xOffset = 0
+        for (let c = 0; c < lineText.length; c++) {
+          charOffsets.push(xOffset)
+          const w = ctx.measureText(lineText[c]!).width
+          charWidths.push(w)
+          xOffset += w
+        }
+        return { text: lineText, charOffsets, charWidths }
+      })
+      this.textLineCache.set(cacheKey, cached)
+      if (this.textLineCache.size > 500) {
+        this.textLineCache.clear()
       }
-      lines.push({ text: lineText, x: node.x, y: lineY, charOffsets, charWidths })
     }
-    node.lines = lines
+
+    node.lines = cached.map((line, i) => ({
+      text: line.text,
+      x: node.x,
+      y: node.y + i * lineHeight,
+      charOffsets: line.charOffsets,
+      charWidths: line.charWidths,
+    }))
   }
 
   private paintNode(
@@ -732,6 +752,16 @@ export function enableSelection(
   onSelectionChange?: () => void,
 ): () => void {
   let isSelecting = false
+  let rafId: number | null = null
+
+  function scheduleSelectionChange(): void {
+    if (!onSelectionChange) return
+    if (rafId !== null) return
+    rafId = requestAnimationFrame(() => {
+      rafId = null
+      onSelectionChange()
+    })
+  }
 
   function getCanvasPos(e: MouseEvent): { x: number; y: number } {
     const rect = canvas.getBoundingClientRect()
@@ -744,7 +774,7 @@ export function enableSelection(
     if (!hit) {
       if (renderer.selection) {
         renderer.selection = null
-        onSelectionChange?.()
+        scheduleSelectionChange()
       }
       return
     }
@@ -754,7 +784,7 @@ export function enableSelection(
       focusNode: hit.nodeIndex, focusOffset: hit.charOffset,
     }
     canvas.setPointerCapture(e.pointerId)
-    onSelectionChange?.()
+    scheduleSelectionChange()
   }
 
   function onPointerMove(e: PointerEvent) {
@@ -762,9 +792,14 @@ export function enableSelection(
     const pos = getCanvasPos(e)
     const hit = hitTestText(renderer.textNodes, pos.x, pos.y)
     if (hit) {
-      renderer.selection.focusNode = hit.nodeIndex
-      renderer.selection.focusOffset = hit.charOffset
-      onSelectionChange?.()
+      if (
+        renderer.selection.focusNode !== hit.nodeIndex ||
+        renderer.selection.focusOffset !== hit.charOffset
+      ) {
+        renderer.selection.focusNode = hit.nodeIndex
+        renderer.selection.focusOffset = hit.charOffset
+        scheduleSelectionChange()
+      }
     }
   }
 
@@ -790,14 +825,19 @@ export function enableSelection(
     if (renderer.lastTree && renderer.lastLayout) {
       const elementCursor = getCursorAtPoint(renderer.lastTree, renderer.lastLayout, pos.x, pos.y)
       if (elementCursor) {
-        canvas.style.cursor = elementCursor
+        if (canvas.style.cursor !== elementCursor) {
+          canvas.style.cursor = elementCursor
+        }
         return
       }
     }
 
     // Fall back to text selection cursor
     const hit = hitTestText(renderer.textNodes, pos.x, pos.y)
-    canvas.style.cursor = hit ? 'text' : 'default'
+    const nextCursor = hit ? 'text' : 'default'
+    if (canvas.style.cursor !== nextCursor) {
+      canvas.style.cursor = nextCursor
+    }
   }
 
   canvas.addEventListener('pointerdown', onPointerDown)
@@ -811,6 +851,10 @@ export function enableSelection(
   }
 
   return () => {
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId)
+      rafId = null
+    }
     canvas.removeEventListener('pointerdown', onPointerDown)
     canvas.removeEventListener('pointermove', onPointerMove)
     canvas.removeEventListener('pointerup', onPointerUp)
