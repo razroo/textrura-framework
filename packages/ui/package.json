@@ -1,0 +1,31 @@
+{
+  "name": "@geometra/ui",
+  "version": "0.3.2",
+  "description": "Starter UI primitives built on @geometra/core",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/razroo/geometra",
+    "directory": "packages/ui"
+  },
+  "homepage": "https://razroo.github.io/geometra",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@geometra/core": "file:../core"
+  }
+}

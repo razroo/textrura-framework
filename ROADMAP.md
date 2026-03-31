@@ -133,7 +133,7 @@ Tracking fields:
 
 ### 0.4.5 — Ecosystem readiness and adoption
 
-- [ ] Status: `todo` | Owner: `@unassigned` | Publish `@geometra/ui` starter primitives (button/input/list/dialog) built only on core exports.
+- [x] Status: `done` | Owner: `@codex` | Publish `@geometra/ui` starter primitives (button/input/list/dialog) built only on core exports.
 - [ ] Status: `todo` | Owner: `@unassigned` | Add end-to-end starter templates (canvas local app, terminal app, server/client app).
 - [ ] Status: `todo` | Owner: `@unassigned` | Produce migration guide for teams moving from DOM-centric event/layout assumptions.
 - [ ] Status: `todo` | Owner: `@unassigned` | Define 1.0 release criteria and freeze policy for protocol + interaction contract.
