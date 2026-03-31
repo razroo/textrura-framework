@@ -85,6 +85,6 @@ Tracking fields:
 - [x] Status: `done` | Owner: `@codex` | Core unit tests pass.
 - [x] Status: `done` | Owner: `@codex` | Terminal integration suite passes.
 - [x] Status: `done` | Owner: `@codex` | Renderer-specific smoke checks pass.
-- [ ] Status: `todo` | Owner: `@unassigned` | Lint/build pass in CI.
+- [x] Status: `done` | Owner: `@codex` | Lint/build pass in CI.
 - [ ] Status: `todo` | Owner: `@unassigned` | Changelog/release notes include behavior changes plus migration notes.
 - [ ] Status: `todo` | Owner: `@unassigned` | npm published versions verified after release workflow completes.
