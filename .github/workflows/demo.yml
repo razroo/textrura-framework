@@ -34,7 +34,8 @@ jobs:
 
       - name: Build demo
         run: |
-          bun run demo:build || (rm -rf node_modules package-lock.json && npm install && npm run demo:build)
+          node -e "try{require('@rolldown/binding-linux-x64-gnu')}catch{process.exit(1)}" || npm i --no-save @rolldown/binding-linux-x64-gnu
+          npm run demo:build
 
       - uses: actions/upload-pages-artifact@v3
         with:
