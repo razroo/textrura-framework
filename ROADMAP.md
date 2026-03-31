@@ -129,7 +129,7 @@ Tracking fields:
 
 - [x] Status: `done` | Owner: `@codex` | Add canvas visual regression snapshots for text selection, focus ring, gradients, and clipping.
 - [x] Status: `done` | Owner: `@codex` | Add terminal renderer golden-output fixtures for z-index, clipping, and overflow behavior.
-- [ ] Status: `todo` | Owner: `@unassigned` | Add renderer-agnostic fixture suite to assert geometry-in -> expected semantic/layout-out.
+- [x] Status: `done` | Owner: `@codex` | Add renderer-agnostic fixture suite to assert geometry-in -> expected semantic/layout-out.
 
 ### 0.4.5 — Ecosystem readiness and adoption
 
