@@ -19,6 +19,7 @@ npm install @geometra/router
 - `createBrowserHistory` -- browser adapter using pushState/replaceState/popstate
 - `createRouter` -- router lifecycle (`start`, `navigate`, `subscribe`, `dispose`)
 - `router.isActive(to)` / `router.isPending(to)` -- route state helpers for active and transition states
+- `router.addBlocker(fn)` -- guards transitions for unsaved-state and confirmation flows
 - `link` -- declarative link element with click + keyboard activation semantics
 - `scorePathPattern` -- computes route specificity score for deterministic ranking
 - `comparePatternSpecificity` -- compares two patterns by ranking

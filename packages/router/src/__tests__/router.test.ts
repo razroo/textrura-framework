@@ -30,12 +30,12 @@ describe('createRouter lifecycle', () => {
     router.dispose()
   })
 
-  it('navigates with push by default', () => {
+  it('navigates with push by default', async () => {
     const history = createMemoryHistory({ initialEntries: ['/'] })
     const router = createRouter({ routes, history })
     router.start()
 
-    router.navigate('/users/42')
+    await router.navigate('/users/42')
 
     const state = router.getState()
     expect(state.location.pathname).toBe('/users/42')
@@ -43,12 +43,12 @@ describe('createRouter lifecycle', () => {
     expect(state.navigation).toBe('idle')
   })
 
-  it('supports replace navigation', () => {
+  it('supports replace navigation', async () => {
     const history = createMemoryHistory({ initialEntries: ['/users/1'] })
     const router = createRouter({ routes, history })
     router.start()
 
-    router.navigate('/users/2', { replace: true })
+    await router.navigate('/users/2', { replace: true })
     history.go(-1)
 
     expect(router.getState().location.pathname).toBe('/users/2')
@@ -74,7 +74,7 @@ describe('createRouter lifecycle', () => {
     expect(router.isActive('/users/2')).toBe(false)
   })
 
-  it('exposes pending route helper during in-flight navigation', () => {
+  it('exposes pending route helper during in-flight navigation', async () => {
     const pushed: string[] = []
     const history = createMemoryHistory({ initialEntries: ['/'] })
     const realPush = history.push.bind(history)
@@ -85,14 +85,49 @@ describe('createRouter lifecycle', () => {
 
     const router = createRouter({ routes, history })
     router.start()
-    router.navigate('/users/9')
+    const navigatePromise = router.navigate('/users/9')
 
     expect(router.isPending('/users/9')).toBe(true)
     expect(router.isPending('/users/1')).toBe(false)
 
     // Complete pending navigation and ensure pending state clears.
     realPush(pushed[0]!)
+    await navigatePromise
     expect(router.isPending('/users/9')).toBe(false)
     expect(router.isActive('/users/9')).toBe(true)
+  })
+
+  it('supports blockers that can cancel navigation', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/users/1'] })
+    const router = createRouter({ routes, history })
+    router.start()
+
+    const unblock = router.addBlocker(({ to }) => to !== '/users/2')
+    const blocked = await router.navigate('/users/2')
+    const allowed = await router.navigate('/users/3')
+
+    expect(blocked).toBe(false)
+    expect(allowed).toBe(true)
+    expect(router.getState().location.pathname).toBe('/users/3')
+
+    unblock()
+  })
+
+  it('supports async blockers for transition confirmation', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/users/1'] })
+    const router = createRouter({ routes, history })
+    router.start()
+
+    router.addBlocker(async ({ to }) => {
+      await Promise.resolve()
+      return to === '/users/4'
+    })
+
+    const blocked = await router.navigate('/users/5')
+    const allowed = await router.navigate('/users/4')
+
+    expect(blocked).toBe(false)
+    expect(allowed).toBe(true)
+    expect(router.getState().location.pathname).toBe('/users/4')
   })
 })
