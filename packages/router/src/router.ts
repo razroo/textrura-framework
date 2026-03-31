@@ -361,6 +361,8 @@ export function createRouter<T, TRequestContext = unknown>(
           },
         }
         emit()
+        state = withNavigationState(state, 'loading')
+        emit()
         await applyResolvedLocation(state.location, null)
         return true
       } catch (error) {
@@ -376,6 +378,8 @@ export function createRouter<T, TRequestContext = unknown>(
     },
     async revalidate() {
       if (disposed) return false
+      state = withNavigationState(state, 'loading')
+      emit()
       await applyResolvedLocation(state.location, null)
       return true
     },
@@ -403,7 +407,7 @@ export function createRouter<T, TRequestContext = unknown>(
       return state.location.pathname === to
     },
     isPending(to: string) {
-      return state.pending && pendingTo === to
+      return state.pending && (pendingTo === to || (pendingTo === null && state.location.pathname === to))
     },
     addBlocker(blocker: NavigationBlocker) {
       blockers.add(blocker)

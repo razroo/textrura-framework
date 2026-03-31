@@ -392,6 +392,34 @@ describe('createRouter lifecycle', () => {
     expect(router.getState().loaderData.users).toEqual({ id: '1', count: 2 })
   })
 
+  it('marks current route pending during manual revalidate', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/users/1'] })
+    const revalidateRoutes: RouteNode[] = [
+      {
+        id: 'root',
+        path: '/',
+        children: [
+          {
+            id: 'users',
+            path: 'users/:id',
+            loader: () =>
+              new Promise((resolve) => setTimeout(() => resolve({ ok: true }), 20)),
+          },
+        ],
+      },
+    ]
+    const router = createRouter({ routes: revalidateRoutes, history })
+    router.start()
+    await router.revalidate()
+
+    const pending = router.revalidate()
+    expect(router.getState().loading).toBe(true)
+    expect(router.getState().pending).toBe(true)
+    expect(router.isPending('/users/1')).toBe(true)
+    await pending
+    expect(router.getState().pending).toBe(false)
+  })
+
   it('supports loader redirects via helper', async () => {
     const history = createMemoryHistory({ initialEntries: ['/users/1'] })
     const redirectRoutes: RouteNode[] = [
@@ -576,6 +604,36 @@ describe('createRouter lifecycle', () => {
     await submitPromise
     expect(router.getState().submitting).toBe(false)
     expect(router.getState().pending).toBe(false)
+    expect(router.getState().navigation).toBe('idle')
+  })
+
+  it('transitions from submitting to loading when action revalidates', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/users/1'] })
+    const routesWithAction: RouteNode[] = [
+      {
+        id: 'root',
+        path: '/',
+        children: [
+          {
+            id: 'users',
+            path: 'users/:id',
+            loader: () =>
+              new Promise((resolve) => setTimeout(() => resolve({ ok: true }), 20)),
+            action: () => ({ ok: true }),
+          },
+        ],
+      },
+    ]
+    const router = createRouter({ routes: routesWithAction, history })
+    router.start()
+    await router.revalidate()
+
+    const submit = router.submitAction('users', { method: 'POST' })
+    await Promise.resolve()
+    expect(router.getState().submitting).toBe(true)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(router.getState().loading).toBe(true)
+    await submit
     expect(router.getState().navigation).toBe('idle')
   })
 })
