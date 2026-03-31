@@ -773,7 +773,19 @@ function onDocumentKeyDown(e: KeyboardEvent) {
     metaKey: e.metaKey,
     altKey: e.altKey,
   })
-  if (handled && (e.key === 'Tab' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Enter')) {
+  if (
+    handled &&
+    (
+      e.key === 'Tab' ||
+      e.key === 'ArrowLeft' ||
+      e.key === 'ArrowRight' ||
+      e.key === 'Backspace' ||
+      e.key === 'Delete' ||
+      e.key === 'Enter' ||
+      e.key === ' ' ||
+      e.code === 'Space'
+    )
+  ) {
     e.preventDefault()
   }
 }
