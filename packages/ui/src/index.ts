@@ -19,6 +19,7 @@ export function button(label: string, onClick?: EventHandlers['onClick']): UIEle
 
 export interface InputOptions {
   focused?: boolean
+  caretOffset?: number
   onClick?: EventHandlers['onClick']
   onKeyDown?: EventHandlers['onKeyDown']
   onCompositionStart?: EventHandlers['onCompositionStart']
@@ -27,8 +28,32 @@ export interface InputOptions {
 }
 
 export function input(value: string, placeholder = '', options: InputOptions = {}): UIElement {
-  const content = value.length > 0 ? value : placeholder
   const focused = options.focused === true
+  const maxOffset = value.length
+  const requestedOffset = options.caretOffset ?? maxOffset
+  const caretOffset = Math.max(0, Math.min(requestedOffset, maxOffset))
+  const leftText = value.slice(0, caretOffset)
+  const rightText = value.slice(caretOffset)
+  const showPlaceholder = value.length === 0
+
+  const children: UIElement[] = []
+  if (showPlaceholder) {
+    children.push(text({ text: placeholder, font: '13px Inter', lineHeight: 18, color: '#64748b' }))
+  } else {
+    if (leftText.length > 0) {
+      children.push(text({ text: leftText, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }))
+    }
+    if (focused) {
+      children.push(box({ width: 1.5, minHeight: 14, backgroundColor: '#38bdf8' }, []))
+    }
+    if (rightText.length > 0) {
+      children.push(text({ text: rightText, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }))
+    }
+  }
+  if (focused && showPlaceholder) {
+    children.push(box({ width: 1.5, minHeight: 14, backgroundColor: '#38bdf8' }, []))
+  }
+
   return box(
     {
       flexDirection: 'row',
@@ -50,10 +75,7 @@ export function input(value: string, placeholder = '', options: InputOptions = {
       onCompositionUpdate: options.onCompositionUpdate,
       onCompositionEnd: options.onCompositionEnd,
     },
-    [
-      text({ text: content, font: '13px Inter', lineHeight: 18, color: value ? '#e2e8f0' : '#64748b' }),
-      ...(focused ? [box({ width: 1.5, minHeight: 14, backgroundColor: '#38bdf8' }, [])] : []),
-    ],
+    children,
   )
 }
 

@@ -190,4 +190,48 @@ describe('@geometra/ui input', () => {
 
     app.destroy()
   })
+
+  it('positions caret based on caretOffset within same input', async () => {
+    const offset = signal(0)
+    const renderer = new CaptureRenderer()
+
+    const app = await createApp(
+      () =>
+        box({ width: 280, height: 80 }, [
+          input('Charlie', 'Name', { focused: true, caretOffset: offset.value }),
+        ]),
+      renderer,
+      { width: 280, height: 80 },
+    )
+
+    function getCaretPositions(tree: UIElement | null, layout: unknown, ox = 0, oy = 0): Array<{ x: number; y: number }> {
+      if (!tree || !layout || tree.kind !== 'box') return []
+      const node = layout as { x: number; y: number; children?: unknown[] }
+      const absX = ox + node.x
+      const absY = oy + node.y
+      const own = tree.props.backgroundColor === '#38bdf8' && tree.props.width === 1.5
+        ? [{ x: absX, y: absY }]
+        : []
+      const childrenLayouts = node.children ?? []
+      const childPositions = tree.children.flatMap((child, idx) =>
+        getCaretPositions(child, childrenLayouts[idx], absX, absY),
+      )
+      return [...own, ...childPositions]
+    }
+
+    const atStart = getCaretPositions(renderer.lastTree, renderer.lastLayout)
+    expect(atStart).toHaveLength(1)
+
+    offset.set(3)
+    const atMiddle = getCaretPositions(renderer.lastTree, renderer.lastLayout)
+    expect(atMiddle).toHaveLength(1)
+    expect(atMiddle[0]!.x).toBeGreaterThan(atStart[0]!.x)
+
+    offset.set(7)
+    const atEnd = getCaretPositions(renderer.lastTree, renderer.lastLayout)
+    expect(atEnd).toHaveLength(1)
+    expect(atEnd[0]!.x).toBeGreaterThan(atMiddle[0]!.x)
+
+    app.destroy()
+  })
 })

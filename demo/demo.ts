@@ -37,9 +37,10 @@ const rootWidth = signal(600)
 const direction = signal<'row' | 'column'>('row')
 const codeTab = signal('basic')
 const copied = signal(false)
-const inputName = signal('')
-const inputEmail = signal('')
-const inputSearch = signal('')
+type DemoInputField = { value: string; caretOffset: number }
+const inputName = signal<DemoInputField>({ value: '', caretOffset: 0 })
+const inputEmail = signal<DemoInputField>({ value: '', caretOffset: 0 })
+const inputSearch = signal<DemoInputField>({ value: '', caretOffset: 0 })
 const activeDemoInput = signal<'name' | 'email' | 'search' | null>(null)
 let lastPerfTime = '-'
 let lastPerfNodes = '-'
@@ -221,29 +222,64 @@ function selectableText(): UIElement {
 function textInputDemo(): UIElement {
   const w = rootWidth.value
 
-  function applyInputKey(current: string, key: string): string {
-    if (key === 'Backspace') return current.slice(0, -1)
-    if (key === 'Delete') return ''
-    if (key.length === 1) return current + key
+  function applyInputKey(current: DemoInputField, key: string): DemoInputField {
+    if (key === 'ArrowLeft') {
+      return { value: current.value, caretOffset: Math.max(0, current.caretOffset - 1) }
+    }
+    if (key === 'ArrowRight') {
+      return { value: current.value, caretOffset: Math.min(current.value.length, current.caretOffset + 1) }
+    }
+    if (key === 'Home') {
+      return { value: current.value, caretOffset: 0 }
+    }
+    if (key === 'End') {
+      return { value: current.value, caretOffset: current.value.length }
+    }
+    if (key === 'Backspace') {
+      if (current.caretOffset <= 0) return current
+      const left = current.value.slice(0, current.caretOffset - 1)
+      const right = current.value.slice(current.caretOffset)
+      return { value: left + right, caretOffset: current.caretOffset - 1 }
+    }
+    if (key === 'Delete') {
+      if (current.caretOffset >= current.value.length) return current
+      const left = current.value.slice(0, current.caretOffset)
+      const right = current.value.slice(current.caretOffset + 1)
+      return { value: left + right, caretOffset: current.caretOffset }
+    }
+    if (key.length === 1) {
+      const left = current.value.slice(0, current.caretOffset)
+      const right = current.value.slice(current.caretOffset)
+      return { value: left + key + right, caretOffset: current.caretOffset + 1 }
+    }
     return current
   }
 
   function inputNode(
     field: 'name' | 'email' | 'search',
-    value: string,
+    state: DemoInputField,
     placeholder: string,
-    setValue: (next: string) => void,
+    setState: (next: DemoInputField) => void,
   ): UIElement {
-    return uiInput(value, placeholder, {
+    return uiInput(state.value, placeholder, {
       focused: activeDemoInput.value === field,
-      onClick: () => activeDemoInput.set(field),
+      caretOffset: state.caretOffset,
+      onClick: () => {
+        activeDemoInput.set(field)
+        setState({ value: state.value, caretOffset: state.value.length })
+      },
       onKeyDown: (e) => {
-        const next = applyInputKey(value, e.key)
-        if (next !== value) setValue(next)
+        const next = applyInputKey(state, e.key)
+        if (next !== state) setState(next)
       },
       onCompositionEnd: (e) => {
         if (!e.data) return
-        setValue(value + e.data)
+        const left = state.value.slice(0, state.caretOffset)
+        const right = state.value.slice(state.caretOffset)
+        setState({
+          value: left + e.data + right,
+          caretOffset: state.caretOffset + e.data.length,
+        })
       },
     })
   }
