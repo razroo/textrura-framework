@@ -76,14 +76,14 @@ Artifacts:
 
 ## 6) Final release execution (`v1.0.0`)
 
-- [ ] Working tree clean.
-- [ ] Versions finalized.
-- [ ] Release notes include summary, migration notes, performance notes, and verification.
-- [ ] GitHub release created (`gh release create v1.0.0 ...`).
-- [ ] Publish workflow succeeded.
-- [ ] npm versions verified (`npm run release:verify-npm -- 1.0.0`).
+- [x] Working tree clean. (verified before release commit/tag on 2026-03-31)
+- [x] Versions finalized. (set to `1.0.0` in `36edf3f`)
+- [x] Release notes include summary, migration notes, performance notes, and verification. (in `v1.0.0` GitHub release body)
+- [x] GitHub release created (`gh release create v1.0.0 ...`). (created 2026-03-31)
+- [x] Publish workflow succeeded. (`Release to npm` run `23792235485` succeeded)
+- [x] npm versions verified (`npm run release:verify-npm -- 1.0.0`). (verified 2026-03-31)
 
 Artifacts:
 
-- Final release URL: `<link>`
-- Post-release verification notes: `<doc or issue link>`
+- Final release URL: `https://github.com/razroo/geometra/releases/tag/v1.0.0`
+- Post-release verification notes: `Release workflow: https://github.com/razroo/geometra/actions/runs/23792235485; npm verify: npm run release:verify-npm -- 1.0.0`
