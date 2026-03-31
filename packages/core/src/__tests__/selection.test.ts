@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { collectTextNodes, getSelectedText } from '../selection.js'
+import { collectTextNodes, getSelectedText, hitTestText } from '../selection.js'
 import { text } from '../elements.js'
 import { box } from '../elements.js'
 
@@ -108,5 +108,32 @@ describe('getSelectedText', () => {
       nodes as any,
     )
     expect(result).toBe('World\nSecond')
+  })
+})
+
+describe('hitTestText direction mapping', () => {
+  it('maps x positions to logical offsets in rtl text nodes', () => {
+    const textNodes = [
+      {
+        element: { kind: 'text' as const, props: { text: 'abcd', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'rtl' as const,
+        x: 10,
+        y: 20,
+        width: 40,
+        height: 18,
+        index: 0,
+        lines: [
+          { text: 'abcd', x: 10, y: 20, charOffsets: [0, 10, 20, 30], charWidths: [10, 10, 10, 10] },
+        ],
+      },
+    ]
+
+    // Near the left edge of the rendered RTL line maps toward the logical end.
+    const leftHit = hitTestText(textNodes as any, 12, 24)
+    // Near the right edge maps toward logical start.
+    const rightHit = hitTestText(textNodes as any, 48, 24)
+
+    expect(leftHit).toEqual({ nodeIndex: 0, charOffset: 4 })
+    expect(rightHit).toEqual({ nodeIndex: 0, charOffset: 0 })
   })
 })

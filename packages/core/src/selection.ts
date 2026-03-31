@@ -136,11 +136,26 @@ export function hitTestText(
       if (py >= line.y && py < lineBottom) {
         // Find the character within the line
         const localX = px - line.x
-        for (let c = 0; c < line.charOffsets.length; c++) {
-          const charStart = line.charOffsets[c]!
-          const charEnd = charStart + line.charWidths[c]!
-          if (localX < (charStart + charEnd) / 2) {
-            return { nodeIndex: node.index, charOffset: globalCharOffset + c }
+        const lineVisualWidth = line.charOffsets.length > 0
+          ? (line.charOffsets[line.charOffsets.length - 1] ?? 0) + (line.charWidths[line.charWidths.length - 1] ?? 0)
+          : 0
+        if (node.direction === 'rtl') {
+          // In RTL mode, map visual x from the right edge back to logical indices.
+          const visualFromRight = lineVisualWidth - localX
+          for (let c = 0; c < line.charOffsets.length; c++) {
+            const charStart = line.charOffsets[c]!
+            const charEnd = charStart + line.charWidths[c]!
+            if (visualFromRight < (charStart + charEnd) / 2) {
+              return { nodeIndex: node.index, charOffset: globalCharOffset + c }
+            }
+          }
+        } else {
+          for (let c = 0; c < line.charOffsets.length; c++) {
+            const charStart = line.charOffsets[c]!
+            const charEnd = charStart + line.charWidths[c]!
+            if (localX < (charStart + charEnd) / 2) {
+              return { nodeIndex: node.index, charOffset: globalCharOffset + c }
+            }
           }
         }
         // Past the end of the line — snap to end

@@ -311,7 +311,16 @@ export class CanvasRenderer implements Renderer {
 
     node.lines = cached.map((line, i) => ({
       text: line.text,
-      x: node.x,
+      x: node.direction === 'rtl'
+        ? node.x + Math.max(
+          0,
+          node.width - (
+            line.charOffsets.length > 0
+              ? (line.charOffsets[line.charOffsets.length - 1] ?? 0) + (line.charWidths[line.charWidths.length - 1] ?? 0)
+              : 0
+          ),
+        )
+        : node.x,
       y: node.y + i * lineHeight,
       charOffsets: line.charOffsets,
       charWidths: line.charWidths,
@@ -659,7 +668,7 @@ export class CanvasRenderer implements Renderer {
     const textColor = color ?? '#000000'
 
     const isSelectable = selectable !== false
-    const nodeInfo = isSelectable && this.selection ? this.textNodes[this.textNodeIndex] : null
+    const nodeInfo = isSelectable ? this.textNodes[this.textNodeIndex] : null
     const selRanges = nodeInfo ? this.getLineSelectionRanges(nodeInfo) : null
 
     if (selRanges) {
@@ -668,7 +677,8 @@ export class CanvasRenderer implements Renderer {
 
     for (let i = 0; i < lines.length; i++) {
       const lineText = lines[i]!
-      const lineY = y + i * lineHeight
+      const lineY = nodeInfo?.lines[i]?.y ?? (y + i * lineHeight)
+      const lineX = nodeInfo?.lines[i]?.x ?? x
       const lineSelRange = selRanges?.[i]
 
       if (lineSelRange && lineSelRange.start < lineSelRange.end) {
@@ -676,7 +686,7 @@ export class CanvasRenderer implements Renderer {
         const selected = lineText.slice(lineSelRange.start, lineSelRange.end)
         const after = lineText.slice(lineSelRange.end)
 
-        let cx = x
+        let cx = lineX
         if (before) {
           ctx.fillStyle = textColor
           ctx.fillText(before, cx, lineY)
@@ -693,7 +703,7 @@ export class CanvasRenderer implements Renderer {
         }
       } else {
         ctx.fillStyle = textColor
-        ctx.fillText(lineText, x, lineY)
+        ctx.fillText(lineText, lineX, lineY)
       }
     }
 
