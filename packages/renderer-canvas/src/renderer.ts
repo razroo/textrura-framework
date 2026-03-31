@@ -39,6 +39,8 @@ export interface CanvasRendererOptions {
   focusRingColor?: string
   /** Outset from the focused box in CSS pixels. Default 2. */
   focusRingPadding?: number
+  /** Skip debug/focus overlays during active drag interactions. Default true. */
+  optimizeOverlaysDuringInteraction?: boolean
 }
 
 export interface AccessibilityMirrorOptions {
@@ -90,6 +92,8 @@ export class CanvasRenderer implements Renderer {
   private showFocusRing: boolean
   private focusRingColor: string
   private focusRingPadding: number
+  private optimizeOverlaysDuringInteraction: boolean
+  private interactionActive = false
   /** Cache text wrapping + per-char metrics to avoid recomputing every frame. */
   private textLineCache = new Map<string, CachedTextLineMetrics[]>()
   /** Cache child paint order by z-index per box element. */
@@ -121,6 +125,7 @@ export class CanvasRenderer implements Renderer {
     this.showFocusRing = options.showFocusRing ?? true
     this.focusRingColor = options.focusRingColor ?? 'rgba(59, 130, 246, 0.95)'
     this.focusRingPadding = options.focusRingPadding ?? 2
+    this.optimizeOverlaysDuringInteraction = options.optimizeOverlaysDuringInteraction ?? true
 
     if (options.selectedTextColor) {
       this.selectedTextColor = options.selectedTextColor
@@ -158,10 +163,12 @@ export class CanvasRenderer implements Renderer {
     this.lastLayout = layout
     this.paintNode(tree, layout, 0, 0)
 
-    if (this.debugLayoutBounds) {
+    const skipOverlays = this.optimizeOverlaysDuringInteraction && this.interactionActive
+
+    if (this.debugLayoutBounds && !skipOverlays) {
       this.paintLayoutDebug(tree, layout, 0, 0)
     }
-    if (this.showFocusRing) {
+    if (this.showFocusRing && !skipOverlays) {
       const f = focusedElement.peek()
       if (f) {
         this.paintFocusRingForTarget(tree, layout, 0, 0, f.element)
@@ -720,6 +727,10 @@ export class CanvasRenderer implements Renderer {
     return getSelectedText(this.selection, this.textNodes)
   }
 
+  setInteractionActive(active: boolean): void {
+    this.interactionActive = active
+  }
+
   /** Build an accessibility tree for the currently rendered frame. */
   getAccessibilityTree(): AccessibilityNode | null {
     if (!this.lastTree || !this.lastLayout) return null
@@ -810,6 +821,7 @@ export function enableSelection(
       return
     }
     isSelecting = true
+    renderer.setInteractionActive(true)
     renderer.selection = {
       anchorNode: hit.nodeIndex, anchorOffset: hit.charOffset,
       focusNode: hit.nodeIndex, focusOffset: hit.charOffset,
@@ -836,6 +848,8 @@ export function enableSelection(
 
   function onPointerUp() {
     isSelecting = false
+    renderer.setInteractionActive(false)
+    scheduleSelectionChange()
   }
 
   function onKeyDown(e: KeyboardEvent) {
@@ -890,6 +904,7 @@ export function enableSelection(
   }
 
   return () => {
+    renderer.setInteractionActive(false)
     if (rafId !== null) {
       cancelAnimationFrame(rafId)
       rafId = null
