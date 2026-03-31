@@ -428,7 +428,27 @@ function textInputDemo(): UIElement {
       rowChildren.push(text({ text: active && lineIndex === 0 ? '' : ' ', font: '14px JetBrains Mono', lineHeight: 20, color: '#d1d5db' }))
     }
 
-    return box({ flexDirection: 'row', alignItems: 'center', minHeight: 20, width: '100%', overflow: 'hidden' }, rowChildren)
+    return box({
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: 20,
+      width: '100%',
+      overflow: 'hidden',
+      cursor: 'text',
+      onClick: () => {
+        inputFocused.set(true)
+        const lineEnd = line.length
+        setInputPresent({
+          nodes: state.nodes,
+          selection: {
+            anchorNode: lineIndex,
+            anchorOffset: lineEnd,
+            focusNode: lineIndex,
+            focusOffset: lineEnd,
+          },
+        })
+      },
+    }, rowChildren)
   })
 
   return box({ flexDirection: 'column', padding: 24, gap: 14, width: w, minHeight: 380 }, [
