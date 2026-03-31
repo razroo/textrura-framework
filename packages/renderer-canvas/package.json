@@ -1,6 +1,6 @@
 {
   "name": "@geometra/renderer-canvas",
-  "version": "0.4.0",
+  "version": "1.0.0-rc.1",
   "description": "Canvas2D renderer for Geometra \u2014 the singularity frontend framework",
   "license": "MIT",
   "type": "module",

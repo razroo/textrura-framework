@@ -17,6 +17,7 @@ gh release create vX.Y.Z --title "vX.Y.Z" --notes "..."
 - <breaking/non-backward-compatible changes>
 - <required code updates for consumers>
 - <protocol compatibility notes if applicable>
+- Migration guide: `MIGRATION_GUIDE_DOM_TO_GEOMETRA.md`
 
 ## Performance notes
 

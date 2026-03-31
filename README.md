@@ -31,7 +31,7 @@ The framework replaces the entire browser rendering pipeline. Layout is computed
 | `@geometra/renderer-terminal` | ANSI terminal/TUI paint backend |
 | `@geometra/server` | Server-side layout engine with WebSocket geometry streaming (versioned protocol) |
 | `@geometra/client` | Thin client that receives pre-computed geometry and paints it (versioned protocol checks) |
-| `@geometra/router` | Routing foundation package (pattern matching today; navigation/data APIs in progress) |
+| `@geometra/router` | Renderer-agnostic data router: nested routes, loaders/actions, redirects, blockers, lazy/prefetch, protocol-aware navigation |
 
 ## Quick Start
 
@@ -223,9 +223,9 @@ Guarantees:
 Current limitations:
 
 - Accessibility output is structural and does not implement full platform accessibility APIs by itself.
-- Focus management is traversal-based and does not yet provide advanced patterns such as focus traps.
-- Keyboard behavior is currently horizontal/linear (`ArrowLeft`/`ArrowRight`) in text-input primitives; full vertical caret movement is not implemented.
-- True screen reader parity for canvas mode depends on `enableAccessibilityMirror` integration and host/browser behavior.
+- Full platform accessibility API parity is not implemented by core alone; canvas apps should integrate `enableAccessibilityMirror` and validate host/browser assistive-tech behavior.
+- Text measurement parity across environments still depends on available canvas measurement backends and font availability.
+- Terminal keyboard escape-sequence normalization can vary by emulator; keep terminal integration tests in CI for your target environments.
 
 Form semantics examples are available in `FORM_SEMANTICS_EXAMPLES.md`.
 
