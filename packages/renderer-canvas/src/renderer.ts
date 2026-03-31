@@ -99,6 +99,8 @@ export class CanvasRenderer implements Renderer {
 
   /** Text nodes collected during the last render (for selection hit-testing). */
   textNodes: TextNodeInfo[] = []
+  /** Text nodes sorted by vertical position for faster hit prefilter. */
+  textNodesByY: TextNodeInfo[] = []
   /** Current text selection range, or null if nothing is selected. */
   selection: SelectionRange | null = null
   /** The last rendered tree + layout (for cursor queries). */
@@ -144,6 +146,7 @@ export class CanvasRenderer implements Renderer {
 
     this.textNodes = []
     collectTextNodes(tree, layout, 0, 0, this.textNodes)
+    this.textNodesByY = [...this.textNodes].sort((a, b) => a.y - b.y)
     for (const node of this.textNodes) {
       this.computeTextNodeLines(node)
     }
@@ -742,6 +745,40 @@ export class CanvasRenderer implements Renderer {
   }
 }
 
+function hitTestTextFast(
+  textNodesByY: TextNodeInfo[],
+  px: number,
+  py: number,
+): { nodeIndex: number; charOffset: number } | null {
+  if (textNodesByY.length === 0) return null
+
+  let lo = 0
+  let hi = textNodesByY.length - 1
+  let start = textNodesByY.length
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1
+    const node = textNodesByY[mid]!
+    if (node.y + node.height >= py) {
+      start = mid
+      hi = mid - 1
+    } else {
+      lo = mid + 1
+    }
+  }
+  if (start >= textNodesByY.length) return null
+
+  const candidates: TextNodeInfo[] = []
+  for (let i = start; i < textNodesByY.length; i++) {
+    const node = textNodesByY[i]!
+    if (node.y > py) break
+    if (py >= node.y && py <= node.y + node.height) {
+      candidates.push(node)
+    }
+  }
+  if (candidates.length === 0) return null
+  return hitTestText(candidates, px, py)
+}
+
 /**
  * Enable text selection and cursor styles on a canvas rendered by a CanvasRenderer.
  * Returns a cleanup function.
@@ -770,7 +807,7 @@ export function enableSelection(
 
   function onPointerDown(e: PointerEvent) {
     const pos = getCanvasPos(e)
-    const hit = hitTestText(renderer.textNodes, pos.x, pos.y)
+    const hit = hitTestTextFast(renderer.textNodesByY, pos.x, pos.y)
     if (!hit) {
       if (renderer.selection) {
         renderer.selection = null
@@ -790,7 +827,7 @@ export function enableSelection(
   function onPointerMove(e: PointerEvent) {
     if (!isSelecting || !renderer.selection) return
     const pos = getCanvasPos(e)
-    const hit = hitTestText(renderer.textNodes, pos.x, pos.y)
+    const hit = hitTestTextFast(renderer.textNodesByY, pos.x, pos.y)
     if (hit) {
       if (
         renderer.selection.focusNode !== hit.nodeIndex ||
@@ -833,7 +870,7 @@ export function enableSelection(
     }
 
     // Fall back to text selection cursor
-    const hit = hitTestText(renderer.textNodes, pos.x, pos.y)
+    const hit = hitTestTextFast(renderer.textNodesByY, pos.x, pos.y)
     const nextCursor = hit ? 'text' : 'default'
     if (canvas.style.cursor !== nextCursor) {
       canvas.style.cursor = nextCursor
