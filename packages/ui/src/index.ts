@@ -1,7 +1,7 @@
 import { box, text } from '@geometra/core'
-import type { UIElement, BoxElement } from '@geometra/core'
+import type { UIElement, EventHandlers } from '@geometra/core'
 
-export function button(label: string, onClick?: BoxElement['handlers'] extends infer H ? H extends object ? H['onClick'] : never : never): UIElement {
+export function button(label: string, onClick?: EventHandlers['onClick']): UIElement {
   return box(
     {
       paddingLeft: 12,

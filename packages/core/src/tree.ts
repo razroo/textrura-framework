@@ -3,14 +3,25 @@ import type { UIElement } from './types.js'
 
 /** Style/visual props that must be stripped before passing to Yoga layout. */
 function stripStyleProps(props: Record<string, unknown>): Record<string, unknown> {
-  const {
-    backgroundColor: _bg, color: _c, borderColor: _bc, borderRadius: _br, borderWidth: _bw,
-    opacity: _o, cursor: _cur, zIndex: _z, overflow: _ov, scrollX: _sx, scrollY: _sy,
-    boxShadow: _bs, gradient: _g, selectable: _sel,
-    // Image-only props
-    src: _src, alt: _alt, objectFit: _of,
-    ...layoutProps
-  } = props
+  const layoutProps = { ...props }
+  delete layoutProps.backgroundColor
+  delete layoutProps.color
+  delete layoutProps.borderColor
+  delete layoutProps.borderRadius
+  delete layoutProps.borderWidth
+  delete layoutProps.opacity
+  delete layoutProps.cursor
+  delete layoutProps.zIndex
+  delete layoutProps.overflow
+  delete layoutProps.scrollX
+  delete layoutProps.scrollY
+  delete layoutProps.boxShadow
+  delete layoutProps.gradient
+  delete layoutProps.selectable
+  // Image-only props
+  delete layoutProps.src
+  delete layoutProps.alt
+  delete layoutProps.objectFit
   return layoutProps
 }
 

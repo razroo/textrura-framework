@@ -14,6 +14,22 @@ class MemoryStream {
   }
 }
 
+function stripAnsiSequences(input: string): string {
+  let out = ''
+  let i = 0
+  while (i < input.length) {
+    if (input[i] === '\u001b' && input[i + 1] === '[') {
+      i += 2
+      while (i < input.length && !/[A-Za-z]/.test(input[i])) i++
+      if (i < input.length) i++
+      continue
+    }
+    out += input[i]
+    i++
+  }
+  return out
+}
+
 describe('terminal renderer smoke', () => {
   it('renders a basic tree to ANSI output buffer', () => {
     const output = new MemoryStream()
@@ -64,8 +80,7 @@ describe('terminal renderer smoke', () => {
     }
     renderer.render(layout as any, tree)
     const ansi = output.toString()
-    const plain = ansi
-      .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
+    const plain = stripAnsiSequences(ansi)
       .replace(/[^\x20-\x7E\n]/g, '')
       .trim()
 
