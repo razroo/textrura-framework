@@ -18,6 +18,20 @@ describe('extractFontFamiliesFromCSSFont', () => {
   it('handles line-height in shorthand', () => {
     expect(extractFontFamiliesFromCSSFont('italic 12px/18px Georgia, serif')).toEqual(['Georgia'])
   })
+
+  it('does not split on commas inside a quoted family name', () => {
+    expect(extractFontFamiliesFromCSSFont('14px "Foo, Bar", sans-serif')).toEqual(['Foo, Bar'])
+  })
+
+  it('handles single-quoted family with comma', () => {
+    expect(extractFontFamiliesFromCSSFont("14px 'Acme, Inc', monospace")).toEqual(['Acme, Inc'])
+  })
+
+  it('parses multiple quoted families and drops generics', () => {
+    expect(
+      extractFontFamiliesFromCSSFont('12px "First, Name", "Second", serif'),
+    ).toEqual(['First, Name', 'Second'])
+  })
 })
 
 describe('collectFontFamiliesFromTree', () => {
