@@ -37,6 +37,15 @@ const app = createApp(() =>
 )
 ```
 
+## Text input contract
+
+- `TextInputState` is immutable editor state: `{ nodes: string[], selection }`.
+- `selection` is node-local and may be reversed; helpers normalize internally.
+- `insertInputText`/`replaceInputSelection` always collapse caret after replacement.
+- `backspaceInput`/`deleteInput` delete active selections first, then apply boundary merge behavior across nodes.
+- `moveInputCaret` supports range extension via `extendSelection=true`.
+- `getInputCaretGeometry` is defined for collapsed selections with measured line metrics; expanded ranges return `null`.
+
 ## Links
 
 - [Main repo](https://github.com/AiGeekz/geometra)

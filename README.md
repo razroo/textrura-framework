@@ -203,6 +203,15 @@ Geometra now exposes runtime primitives so non-DOM renderers can still provide a
 - `enableAccessibilityMirror(host, renderer)` in `@geometra/renderer-canvas` syncs a hidden DOM mirror for assistive tech.
 - `insertInputText`, `replaceInputSelection`, `backspaceInput`, `deleteInput`, `moveInputCaret` in `@geometra/core` provide selection-aware text editing logic you can wire to keyboard handlers.
 
+### Text-input semantics
+
+- Input state uses `{ nodes, selection }`, where `selection` is `anchor*`/`focus*` node-local offsets.
+- Editing helpers normalize reversed selections, replace selected ranges first, then collapse caret at insertion/deletion end.
+- `moveInputCaret(state, dir, true)` extends selection from the anchor; without extend it collapses to directional edge first, then moves.
+- `Backspace` at node start merges with previous node; `Delete` at node end merges with next node.
+- Composition flow should snapshot selection on `onCompositionStart`, update transient draft on `onCompositionUpdate`, and commit text on `onCompositionEnd`.
+- `getInputCaretGeometry` only returns non-null for collapsed selections and clamps offsets to measured text bounds.
+
 ## Architecture
 
 ```
@@ -255,6 +264,9 @@ cd demos/server-client && npm run client   # terminal 2
 
 # Phase 3: Terminal UI
 cd demos/terminal && npm run dev
+
+# Text input playground (canvas)
+cd demos/text-input-canvas && npm run dev
 ```
 
 Bun equivalents (faster install/startup in many environments):
