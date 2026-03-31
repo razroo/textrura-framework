@@ -37,6 +37,43 @@ describe('dispatchKeyboardEvent', () => {
     expect(pressed).toBe('a')
   })
 
+  it('dispatches keyup only to focused target', () => {
+    let released = ''
+    const tree = box({ onKeyUp: (e) => { released = e.key } }, [])
+    const layout = { x: 0, y: 0, width: 200, height: 100, children: [] }
+
+    const ignored = dispatchKeyboardEvent(tree, layout, 'onKeyUp', {
+      key: 'a',
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    expect(ignored).toBe(false)
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+
+    const handled = dispatchKeyboardEvent(tree, layout, 'onKeyUp', {
+      key: 'a',
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+
+    expect(handled).toBe(true)
+    expect(released).toBe('a')
+  })
+
   it('tab/shift+tab move focus between focusable boxes', () => {
     const tree = box({}, [
       box({ onClick: () => undefined }, []),

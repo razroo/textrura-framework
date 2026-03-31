@@ -50,7 +50,7 @@ Tracking fields:
 ### 0.3.3 — Keyboard/focus contract and a11y
 
 - [x] Status: `done` | Owner: `@codex` | Write a concise interaction spec (Tab/Shift+Tab, Enter/Escape, arrow behavior, focus order rules).
-- [ ] Status: `todo` | Owner: `@unassigned` | Align core + terminal/canvas behavior with the interaction spec.
+- [x] Status: `done` | Owner: `@codex` | Align core + terminal/canvas behavior with the interaction spec.
 - [ ] Status: `todo` | Owner: `@unassigned` | Add end-to-end focus traversal tests for multiple focusable regions.
 - [ ] Status: `todo` | Owner: `@unassigned` | Expand accessibility tree coverage for common patterns (headings, nav, lists, buttons, forms).
 - [ ] Status: `todo` | Owner: `@unassigned` | Add semantic output snapshots for representative UI trees.
