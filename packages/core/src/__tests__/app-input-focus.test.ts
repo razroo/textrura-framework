@@ -2,7 +2,9 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { createApp } from '../app.js'
 import { box } from '../elements.js'
 import { clearFocus } from '../focus.js'
+import { insertInputText } from '../text-input.js'
 import type { Renderer, UIElement } from '../types.js'
+import type { TextInputState } from '../text-input.js'
 
 class TestRenderer implements Renderer {
   render(_layout: unknown, _tree: UIElement): void {
@@ -167,6 +169,64 @@ describe('app input focus routing', () => {
 
     expect(leftTyped).toBe('l')
     expect(rightTyped).toBe('r')
+    app.destroy()
+  })
+
+  it('pressing Enter inserts a newline and moves caret to next line', async () => {
+    let state: TextInputState = {
+      nodes: ['hello'],
+      selection: { anchorNode: 0, anchorOffset: 5, focusNode: 0, focusOffset: 5 },
+    }
+
+    const app = await createApp(
+      () =>
+        box(
+          { width: 220, height: 120 },
+          [
+            box(
+              {
+                width: 180,
+                height: 40,
+                onKeyDown: (e) => {
+                  if (e.key === 'Enter') {
+                    state = insertInputText(state, '\n')
+                    return
+                  }
+                  if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+                    state = insertInputText(state, e.key)
+                  }
+                },
+              },
+              [],
+            ),
+          ],
+        ),
+      new TestRenderer(),
+      { width: 220, height: 120 },
+    )
+
+    app.dispatch('onClick', 10, 10)
+    const enterHandled = app.dispatchKey('onKeyDown', {
+      key: 'Enter',
+      code: 'Enter',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    const charHandled = app.dispatchKey('onKeyDown', {
+      key: 'x',
+      code: 'KeyX',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+
+    expect(enterHandled).toBe(true)
+    expect(charHandled).toBe(true)
+    expect(state.nodes).toEqual(['hello', 'x'])
+    expect(state.selection).toEqual({ anchorNode: 1, anchorOffset: 1, focusNode: 1, focusOffset: 1 })
     app.destroy()
   })
 })
