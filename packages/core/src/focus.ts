@@ -67,7 +67,10 @@ export function resolveFocusedTarget(tree: UIElement, layout: ComputedLayout): F
   collectFocusable(tree, layout, targets)
   if (targets.length === 0) return null
 
-  const idx = findTargetIndex(targets, current)
+  const indexed = current.focusIndex
+  const idx = indexed !== undefined && indexed >= 0 && indexed < targets.length
+    ? indexed
+    : findTargetIndex(targets, current)
   if (idx === -1) return null
 
   const resolved = { ...targets[idx]!, focusIndex: idx }

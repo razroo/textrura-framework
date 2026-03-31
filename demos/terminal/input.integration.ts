@@ -32,6 +32,20 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+async function waitForOutput(
+  getOutput: () => string,
+  needle: string,
+  timeoutMs: number,
+  scenarioName: string,
+): Promise<void> {
+  const started = Date.now()
+  while (Date.now() - started < timeoutMs) {
+    if (getOutput().includes(needle)) return
+    await sleep(50)
+  }
+  throw new Error(`${scenarioName}: timed out waiting for output marker "${needle}"`)
+}
+
 async function runScenario(options: RunOptions): Promise<void> {
   const child = spawnDemo()
   let output = ''
@@ -44,14 +58,17 @@ async function runScenario(options: RunOptions): Promise<void> {
 
   const send = (key: string, delayMs = 300): Promise<void> =>
     new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (child.killed || child.exitCode !== null) {
-          reject(new Error(`${options.name}: process exited before key send`))
+      if (child.killed || child.exitCode !== null) {
+        reject(new Error(`${options.name}: process exited before key send`))
+        return
+      }
+      child.stdin.write(key, 'utf8', (err) => {
+        if (err) {
+          reject(err)
           return
         }
-        child.stdin.write(key, 'utf8')
-        resolve()
-      }, delayMs)
+        setTimeout(() => resolve(), delayMs)
+      })
     })
 
   const exitPromise = new Promise<number>((resolve, reject) => {
@@ -59,7 +76,8 @@ async function runScenario(options: RunOptions): Promise<void> {
     child.on('exit', (code) => resolve(code ?? 1))
   })
 
-  await sleep(options.bootDelayMs ?? 1600)
+  // Prefer an explicit readiness marker over fixed delays to reduce CI flake.
+  await waitForOutput(() => output, '[test-event] boot', options.bootDelayMs ?? 5000, options.name)
   if (child.killed || child.exitCode !== null) {
     throw new Error(`${options.name}: process exited during boot\n${stripAnsi(output)}`)
   }
@@ -70,7 +88,11 @@ async function runScenario(options: RunOptions): Promise<void> {
   const exitCode = await Promise.race<number>([
     exitPromise,
     new Promise<number>((_, reject) => {
-      setTimeout(() => reject(new Error(`${options.name}: timed out waiting for exit`)), 12_000)
+      setTimeout(() => {
+        const plain = stripAnsi(output)
+        const events = observedTestEvents(plain)
+        reject(new Error(`${options.name}: timed out waiting for exit (events: ${events.join(', ') || 'none'})\n${plain}`))
+      }, 15_000)
     }),
   ])
 

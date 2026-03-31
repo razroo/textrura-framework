@@ -5,8 +5,8 @@ import {
   createApp,
   focusNext,
   focusedElement,
-} from '@geometra/core/node'
-import type { App, KeyboardHitEvent } from '@geometra/core/node'
+} from '../../packages/core/src/node.js'
+import type { App, KeyboardHitEvent } from '../../packages/core/src/node.js'
 import { TerminalRenderer } from '@geometra/renderer-terminal'
 
 const cols = process.stdout.columns ?? 80
@@ -279,3 +279,6 @@ process.stdin.on('data', (chunk: string) => {
     }
   }
 })
+
+// Emit readiness marker only after stdin listeners are wired.
+logTest('boot')
