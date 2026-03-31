@@ -14,5 +14,11 @@ export default defineConfig({
   build: {
     outDir: '../dist-demo',
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: path.resolve(import.meta.dirname, 'index.html'),
+        'ai-on-demand': path.resolve(import.meta.dirname, 'ai-on-demand/index.html'),
+      },
+    },
   },
 })

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Geometra — AI On-Demand UIs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #09090b;
+      color: #fafafa;
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+
+    .page {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 32px 24px;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #71717a;
+      text-decoration: none;
+      margin-bottom: 24px;
+      transition: color 0.15s;
+    }
+    .back-link:hover { color: #a1a1aa; }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #a78bfa, #60a5fa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+    }
+    header p {
+      font-size: 15px;
+      color: #71717a;
+      max-width: 600px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+    header p code {
+      background: rgba(167, 139, 250, 0.1);
+      border: 1px solid rgba(167, 139, 250, 0.2);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: #a78bfa;
+    }
+    header .tag {
+      display: inline-block;
+      margin-top: 12px;
+      padding: 4px 12px;
+      background: rgba(167, 139, 250, 0.1);
+      border: 1px solid rgba(167, 139, 250, 0.2);
+      border-radius: 100px;
+      font-size: 12px;
+      color: #a78bfa;
+      font-weight: 500;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 24px;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .sidebar h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #71717a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .prompt-btn {
+      background: #18181b;
+      border: 1px solid #27272a;
+      color: #d4d4d8;
+      padding: 12px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      text-align: left;
+      font-size: 14px;
+      font-family: inherit;
+      transition: all 0.15s;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .prompt-btn:hover {
+      background: #1f1f23;
+      border-color: #3f3f46;
+    }
+    .prompt-btn.active {
+      background: rgba(167, 139, 250, 0.08);
+      border-color: rgba(167, 139, 250, 0.3);
+    }
+    .prompt-btn .label {
+      font-weight: 600;
+      color: #fafafa;
+    }
+    .prompt-btn .desc {
+      font-size: 12px;
+      color: #52525b;
+    }
+
+    .main-content {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .canvas-area {
+      position: relative;
+    }
+    .canvas-area canvas {
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .canvas-label {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(9, 9, 11, 0.8);
+      border: 1px solid #27272a;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      color: #71717a;
+      font-weight: 500;
+      backdrop-filter: blur(8px);
+    }
+
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .code-panel {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid #27272a;
+      background: #111113;
+    }
+    .code-header .title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #a1a1aa;
+    }
+    .code-header .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 100px;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .badge-geometra {
+      background: rgba(167, 139, 250, 0.15);
+      color: #a78bfa;
+    }
+    .badge-html {
+      background: rgba(251, 146, 60, 0.15);
+      color: #fb923c;
+    }
+    .code-body {
+      padding: 16px;
+      overflow-x: auto;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .code-body pre {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.7;
+      color: #d4d4d8;
+      white-space: pre;
+      margin: 0;
+    }
+
+    .stats-bar {
+      display: flex;
+      gap: 24px;
+      padding: 16px 20px;
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 12px;
+    }
+    .stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .stat .stat-label {
+      font-size: 11px;
+      color: #52525b;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .stat .stat-value {
+      font-size: 20px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .stat .stat-value.purple { color: #a78bfa; }
+    .stat .stat-value.orange { color: #fb923c; }
+    .stat .stat-value.green { color: #4ade80; }
+
+    .stat-divider {
+      width: 1px;
+      background: #27272a;
+    }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .comparison { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <a class="back-link" href="../">&larr; Back to Geometra</a>
+
+    <header>
+      <h1>AI-Generated On-Demand UIs</h1>
+      <p>
+        Geometra's tiny API surface — just <code>box()</code> and <code>text()</code> — means
+        AI agents can generate complete, pixel-perfect interfaces with far fewer tokens
+        and zero CSS complexity.
+      </p>
+      <span class="tag">box() + text() = full UI</span>
+    </header>
+
+    <div class="layout">
+      <div class="sidebar">
+        <h2>Agent Prompts</h2>
+        <button class="prompt-btn active" data-prompt="dashboard">
+          <span class="label">Analytics Dashboard</span>
+          <span class="desc">Metric cards, KPIs, status indicators</span>
+        </button>
+        <button class="prompt-btn" data-prompt="pricing">
+          <span class="label">Pricing Table</span>
+          <span class="desc">Three tiers with feature comparison</span>
+        </button>
+        <button class="prompt-btn" data-prompt="profile">
+          <span class="label">User Profile Card</span>
+          <span class="desc">Avatar, stats, bio, action buttons</span>
+        </button>
+        <button class="prompt-btn" data-prompt="kanban">
+          <span class="label">Task Board</span>
+          <span class="desc">Kanban columns with status cards</span>
+        </button>
+        <button class="prompt-btn" data-prompt="settings">
+          <span class="label">Settings Panel</span>
+          <span class="desc">Grouped controls with toggles</span>
+        </button>
+      </div>
+
+      <div class="main-content">
+        <div class="canvas-area">
+          <canvas id="app" width="940" height="520"></canvas>
+          <span class="canvas-label">Rendered on &lt;canvas&gt; — no DOM</span>
+        </div>
+
+        <div class="stats-bar" id="stats">
+          <div class="stat">
+            <span class="stat-label">Geometra Tokens</span>
+            <span class="stat-value purple" id="stat-geo">—</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat">
+            <span class="stat-label">HTML+CSS Tokens</span>
+            <span class="stat-value orange" id="stat-html">—</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat">
+            <span class="stat-label">Token Savings</span>
+            <span class="stat-value green" id="stat-savings">—</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat">
+            <span class="stat-label">API Surface</span>
+            <span class="stat-value purple">2 fns</span>
+          </div>
+        </div>
+
+        <div class="comparison">
+          <div class="code-panel">
+            <div class="code-header">
+              <span class="title">Geometra (AI Output)</span>
+              <span class="badge badge-geometra" id="geo-lines">—</span>
+            </div>
+            <div class="code-body">
+              <pre id="code-geometra"></pre>
+            </div>
+          </div>
+          <div class="code-panel">
+            <div class="code-header">
+              <span class="title">Equivalent HTML+CSS</span>
+              <span class="badge badge-html" id="html-lines">—</span>
+            </div>
+            <div class="code-body">
+              <pre id="code-html"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./app.ts"></script>
+</body>
+</html>
