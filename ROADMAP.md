@@ -2,6 +2,8 @@
 
 Phased plan to grow Geometra from a capable layout-on-geometry stack into a broadly credible UI framework (Yoga + Pretext via Textura).
 
+Routing competitiveness work is tracked in `ROUTING_COMPETITIVENESS_CHECKLIST.md`.
+
 ## Phase A — Foundation (shipping now)
 
 - Web font readiness before first paint (`waitForFonts` + tree collection).
