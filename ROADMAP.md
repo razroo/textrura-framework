@@ -102,7 +102,7 @@ Tracking fields:
 - [x] Status: `done` | Owner: `@codex` | Add word-jump and line-boundary movement semantics (`Alt+Arrow`, `Home`, `End`) with tests.
 - [x] Status: `done` | Owner: `@codex` | Implement pointer-driven text selection drag in canvas and align with text-input helpers.
 - [x] Status: `done` | Owner: `@codex` | Add copy/cut/paste integration tests for selection + edit history behavior.
-- [ ] Status: `todo` | Owner: `@unassigned` | Add IME stress scenarios (focus changes, rapid composition updates, cancellation) across canvas + terminal where applicable.
+- [x] Status: `done` | Owner: `@codex` | Add IME stress scenarios (focus changes, rapid composition updates, cancellation) across canvas + terminal where applicable.
 
 ### 0.4.1 — Scrolling, virtualization, and large-app ergonomics
 

@@ -350,5 +350,41 @@ describe('dispatchKeyboardEvent', () => {
     expect(firstUpdates).toBe(1)
     expect(secondUpdates).toBe(1)
   })
+
+  it('handles rapid composition updates and cancellation without stale commit', () => {
+    let draft = ''
+    let committed = ''
+
+    const tree = box({
+      onCompositionStart: () => {
+        draft = ''
+      },
+      onCompositionUpdate: (e) => {
+        draft = e.data
+      },
+      onCompositionEnd: (e) => {
+        if (e.data) committed = e.data
+        draft = ''
+      },
+    }, [])
+    const layout = { x: 0, y: 0, width: 200, height: 80, children: [] }
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    dispatchCompositionEvent(tree, layout, 'onCompositionStart', { data: '' })
+    dispatchCompositionEvent(tree, layout, 'onCompositionUpdate', { data: 'k' })
+    dispatchCompositionEvent(tree, layout, 'onCompositionUpdate', { data: 'ka' })
+    dispatchCompositionEvent(tree, layout, 'onCompositionUpdate', { data: 'かな' })
+    dispatchCompositionEvent(tree, layout, 'onCompositionEnd', { data: '' })
+
+    expect(draft).toBe('')
+    expect(committed).toBe('')
+  })
 })
 
