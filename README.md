@@ -286,6 +286,8 @@ cd demos/terminal && npm run dev
 cd demos/text-input-canvas && npm run dev
 ```
 
+Terminal input/focus wiring snippets are in `TERMINAL_INPUT_EXAMPLES.md`.
+
 Bun equivalents (faster install/startup in many environments):
 
 ```bash
