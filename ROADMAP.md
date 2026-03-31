@@ -123,7 +123,7 @@ Tracking fields:
 - [x] Status: `done` | Owner: `@codex` | Draft protocol-v2 RFC with backward-compat strategy and migration policy.
 - [x] Status: `done` | Owner: `@codex` | Add message batching/coalescing tests for high-frequency input and layout churn.
 - [x] Status: `done` | Owner: `@codex` | Add chaos-style reconnect tests (out-of-order frames, delayed patches, duplicate messages).
-- [ ] Status: `todo` | Owner: `@unassigned` | Add protocol conformance fixtures runnable by both client and server packages.
+- [x] Status: `done` | Owner: `@codex` | Add protocol conformance fixtures runnable by both client and server packages.
 
 ### 0.4.4 — Visual quality and renderer confidence
 

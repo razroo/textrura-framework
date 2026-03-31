@@ -1,0 +1,16 @@
+{
+  "type": "frame",
+  "protocolVersion": 1,
+  "layout": {
+    "x": 0,
+    "y": 0,
+    "width": 100,
+    "height": 50,
+    "children": []
+  },
+  "tree": {
+    "kind": "box",
+    "props": {},
+    "children": []
+  }
+}

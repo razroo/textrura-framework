@@ -1,0 +1,8 @@
+{
+  "type": "patch",
+  "protocolVersion": 1,
+  "patches": [
+    { "path": [], "width": 120, "height": 60 },
+    { "path": [0], "x": 10 }
+  ]
+}

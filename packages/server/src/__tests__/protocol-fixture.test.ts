@@ -1,0 +1,22 @@
+import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { isProtocolCompatible } from '../protocol.js'
+
+function readJSON(path: string): any {
+  return JSON.parse(readFileSync(path, 'utf8'))
+}
+
+describe('server protocol fixtures', () => {
+  it('accepts shared v1 fixture shapes', () => {
+    const frame = readJSON(new URL('../../../../fixtures/protocol/v1/frame.json', import.meta.url).pathname)
+    const patch = readJSON(new URL('../../../../fixtures/protocol/v1/patch.json', import.meta.url).pathname)
+    const error = readJSON(new URL('../../../../fixtures/protocol/v1/error.json', import.meta.url).pathname)
+
+    expect(frame.type).toBe('frame')
+    expect(patch.type).toBe('patch')
+    expect(error.type).toBe('error')
+    expect(isProtocolCompatible(frame.protocolVersion, 1)).toBe(true)
+    expect(isProtocolCompatible(patch.protocolVersion, 1)).toBe(true)
+    expect(isProtocolCompatible(error.protocolVersion, 1)).toBe(true)
+  })
+})
