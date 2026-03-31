@@ -33,7 +33,7 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
-    "@geometra/core": "^0.2.0",
+    "@geometra/core": "file:../core",
     "ws": "^8.18.0"
   },
   "devDependencies": {

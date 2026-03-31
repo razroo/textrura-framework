@@ -550,15 +550,46 @@ function view(): UIElement {
 
 // ─── Mount ───────────────────────────────────────────────────────────────────
 const canvas = document.getElementById('app') as HTMLCanvasElement
-const renderer = new CanvasRenderer({ canvas, background: BG })
+const geometraDebug =
+  typeof location !== 'undefined' ? new URLSearchParams(location.search).get('geometraDebug') : null
+
+const renderer = new CanvasRenderer({
+  canvas,
+  background: BG,
+  debugLayoutBounds: geometraDebug === 'layout',
+})
+
 let app: App | null = null
 let cleanupSelection: (() => void) | null = null
+let cleanupKeydown: (() => void) | null = null
+
+function onDocumentKeyDown(e: KeyboardEvent) {
+  if (!app) return
+  const handled = app.dispatchKey('onKeyDown', {
+    key: e.key,
+    code: e.code,
+    shiftKey: e.shiftKey,
+    ctrlKey: e.ctrlKey,
+    metaKey: e.metaKey,
+    altKey: e.altKey,
+  })
+  if (handled && e.key === 'Tab') {
+    e.preventDefault()
+  }
+}
 
 async function mount() {
   if (cleanupSelection) { cleanupSelection(); cleanupSelection = null }
+  if (cleanupKeydown) {
+    document.removeEventListener('keydown', cleanupKeydown)
+    cleanupKeydown = null
+  }
   if (app) app.destroy()
 
-  app = await createApp(view, renderer, { width: vw.peek() })
+  app = await createApp(view, renderer, { width: vw.peek(), waitForFonts: true })
+
+  document.addEventListener('keydown', onDocumentKeyDown)
+  cleanupKeydown = () => document.removeEventListener('keydown', onDocumentKeyDown)
 
   const tree = view()
   lastPerfNodes = `${countNodes(tree)}`

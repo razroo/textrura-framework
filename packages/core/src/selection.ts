@@ -64,6 +64,8 @@ export function collectTextNodes(
     return
   }
 
+  if (element.kind !== 'box') return
+
   for (let i = 0; i < element.children.length; i++) {
     const childLayout = layout.children[i]
     if (childLayout) {

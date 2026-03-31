@@ -14,6 +14,14 @@ export { toLayoutTree } from './tree.js'
 
 // Hit testing
 export { dispatchHit, getCursorAtPoint } from './hit-test.js'
+export type { HitDispatchResult } from './hit-test.js'
+
+// Web fonts (browser)
+export {
+  extractFontFamiliesFromCSSFont,
+  collectFontFamiliesFromTree,
+  waitForFonts,
+} from './fonts.js'
 
 // Focus management
 export { focusedElement, setFocus, clearFocus, focusNext, focusPrev } from './focus.js'

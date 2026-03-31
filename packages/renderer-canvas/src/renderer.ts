@@ -1,6 +1,6 @@
 import type { ComputedLayout } from 'textura'
 import type { Renderer, UIElement, BoxElement, TextElement, ImageElement, SelectionRange, TextNodeInfo, TextLineInfo } from '@geometra/core'
-import { collectTextNodes, getSelectedText, hitTestText, getCursorAtPoint } from '@geometra/core'
+import { collectTextNodes, getSelectedText, hitTestText, getCursorAtPoint, focusedElement } from '@geometra/core'
 
 export interface CanvasRendererOptions {
   /** Canvas element to render into. */
@@ -15,6 +15,14 @@ export interface CanvasRendererOptions {
   selectedTextColor?: string
   /** Called when an async image finishes loading. Use to trigger re-render. */
   onImageLoaded?: () => void
+  /** Stroke every layout rect (flex debugging). Default false. */
+  debugLayoutBounds?: boolean
+  /** Draw a ring around the keyboard-focused box. Default true. */
+  showFocusRing?: boolean
+  /** Focus ring stroke color. Default: rgba(59, 130, 246, 0.95). */
+  focusRingColor?: string
+  /** Outset from the focused box in CSS pixels. Default 2. */
+  focusRingPadding?: number
 }
 
 /** Parse a CSS color string into [r, g, b] (0-255). Supports #hex and rgba(). */
@@ -51,6 +59,10 @@ export class CanvasRenderer implements Renderer {
   private selectionColor: string
   private selectedTextColor: string
   private onImageLoaded?: () => void
+  private debugLayoutBounds: boolean
+  private showFocusRing: boolean
+  private focusRingColor: string
+  private focusRingPadding: number
 
   /** Cached loaded images. */
   private imageCache = new Map<string, HTMLImageElement>()
@@ -72,6 +84,10 @@ export class CanvasRenderer implements Renderer {
     this.background = options.background ?? '#ffffff'
     this.selectionColor = options.selectionColor ?? 'rgba(59, 130, 246, 0.4)'
     this.onImageLoaded = options.onImageLoaded
+    this.debugLayoutBounds = options.debugLayoutBounds ?? false
+    this.showFocusRing = options.showFocusRing ?? true
+    this.focusRingColor = options.focusRingColor ?? 'rgba(59, 130, 246, 0.95)'
+    this.focusRingPadding = options.focusRingPadding ?? 2
 
     if (options.selectedTextColor) {
       this.selectedTextColor = options.selectedTextColor
@@ -107,6 +123,16 @@ export class CanvasRenderer implements Renderer {
     this.lastTree = tree
     this.lastLayout = layout
     this.paintNode(tree, layout, 0, 0)
+
+    if (this.debugLayoutBounds) {
+      this.paintLayoutDebug(tree, layout, 0, 0)
+    }
+    if (this.showFocusRing) {
+      const f = focusedElement.peek()
+      if (f) {
+        this.paintFocusRingForTarget(tree, layout, 0, 0, f.element)
+      }
+    }
 
     ctx.setTransform(1, 0, 0, 1, 0, 0)
   }
@@ -524,6 +550,138 @@ export class CanvasRenderer implements Renderer {
     ctx.lineTo(x, y + r)
     ctx.quadraticCurveTo(x, y, x + r, y)
     ctx.closePath()
+  }
+
+  private paintLayoutDebug(
+    element: UIElement,
+    layout: ComputedLayout,
+    offsetX: number,
+    offsetY: number,
+  ): void {
+    const x = offsetX + layout.x
+    const y = offsetY + layout.y
+    const { width, height } = layout
+    const { ctx } = this
+    ctx.save()
+    ctx.strokeStyle = 'rgba(34, 197, 94, 0.45)'
+    ctx.lineWidth = 1
+    const dw = Math.max(0, width - 1)
+    const dh = Math.max(0, height - 1)
+    ctx.strokeRect(x + 0.5, y + 0.5, dw, dh)
+    ctx.restore()
+
+    if (element.kind !== 'box') return
+
+    const { overflow, scrollX, scrollY } = element.props
+    const shouldClip = overflow === 'hidden' || overflow === 'scroll'
+    const childOffsetX = x - (scrollX ?? 0)
+    const childOffsetY = y - (scrollY ?? 0)
+
+    if (shouldClip) {
+      this.ctx.save()
+      this.ctx.beginPath()
+      this.ctx.rect(x, y, width, height)
+      this.ctx.clip()
+    }
+
+    const indices = element.children.map((_, i) => i)
+    const hasZIndex = element.children.some(c => (c.props as Record<string, unknown>).zIndex !== undefined)
+    if (hasZIndex) {
+      indices.sort((a, b) => {
+        const zA = (element.children[a]!.props as Record<string, unknown>).zIndex as number | undefined ?? 0
+        const zB = (element.children[b]!.props as Record<string, unknown>).zIndex as number | undefined ?? 0
+        return zA - zB
+      })
+    }
+
+    for (const i of indices) {
+      const childLayout = layout.children[i]
+      if (childLayout) {
+        this.paintLayoutDebug(element.children[i]!, childLayout, childOffsetX, childOffsetY)
+      }
+    }
+
+    if (shouldClip) {
+      this.ctx.restore()
+    }
+  }
+
+  private paintFocusRingForTarget(
+    element: UIElement,
+    layout: ComputedLayout,
+    offsetX: number,
+    offsetY: number,
+    target: BoxElement,
+  ): boolean {
+    const x = offsetX + layout.x
+    const y = offsetY + layout.y
+    const { width, height } = layout
+
+    if (element.kind === 'box' && element === target) {
+      const pad = this.focusRingPadding
+      const br = element.props.borderRadius ?? 0
+      this.strokeFocusRingOutline(
+        x - pad,
+        y - pad,
+        width + pad * 2,
+        height + pad * 2,
+        br > 0 ? br + pad * 0.5 : 0,
+      )
+      return true
+    }
+
+    if (element.kind !== 'box') return false
+
+    const { overflow, scrollX, scrollY } = element.props
+    const shouldClip = overflow === 'hidden' || overflow === 'scroll'
+    const childOffsetX = x - (scrollX ?? 0)
+    const childOffsetY = y - (scrollY ?? 0)
+
+    if (shouldClip) {
+      this.ctx.save()
+      this.ctx.beginPath()
+      this.ctx.rect(x, y, width, height)
+      this.ctx.clip()
+    }
+
+    const indices = element.children.map((_, i) => i)
+    const hasZIndex = element.children.some(c => (c.props as Record<string, unknown>).zIndex !== undefined)
+    if (hasZIndex) {
+      indices.sort((a, b) => {
+        const zA = (element.children[a]!.props as Record<string, unknown>).zIndex as number | undefined ?? 0
+        const zB = (element.children[b]!.props as Record<string, unknown>).zIndex as number | undefined ?? 0
+        return zA - zB
+      })
+    }
+
+    for (const i of indices) {
+      const childLayout = layout.children[i]
+      if (childLayout) {
+        if (this.paintFocusRingForTarget(element.children[i]!, childLayout, childOffsetX, childOffsetY, target)) {
+          if (shouldClip) this.ctx.restore()
+          return true
+        }
+      }
+    }
+
+    if (shouldClip) {
+      this.ctx.restore()
+    }
+    return false
+  }
+
+  private strokeFocusRingOutline(x: number, y: number, w: number, h: number, borderRadius: number): void {
+    const { ctx } = this
+    ctx.save()
+    ctx.strokeStyle = this.focusRingColor
+    ctx.lineWidth = 2
+    if (borderRadius > 0) {
+      this.roundRect(x, y, w, h, borderRadius)
+      ctx.stroke()
+    } else {
+      ctx.strokeRect(x, y, w, h)
+    }
+    ctx.restore()
   }
 
   getSelectedText(): string {

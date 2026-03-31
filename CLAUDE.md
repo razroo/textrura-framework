@@ -2,10 +2,12 @@
 
 DOM-free UI framework. Replaces the browser rendering pipeline with: `Tree → Yoga WASM → Geometry → Pixels`.
 
+See **`ROADMAP.md`** for phased framework goals (a11y, text input, protocol, etc.).
+
 ## Architecture
 
-- **`packages/core`** — Signals reactivity, `box()`/`text()` element constructors, hit-testing, text selection, SEO, `createApp()`
-- **`packages/renderer-canvas`** — Canvas2D paint backend with text selection highlight rendering
+- **`packages/core`** — Signals reactivity, `box()`/`text()` element constructors, hit-testing, text selection, SEO, `createApp()`, optional `waitForFonts`, font helpers
+- **`packages/renderer-canvas`** — Canvas2D paint backend with text selection highlight rendering, optional layout debug overlay and focus ring
 - **`packages/renderer-terminal`** — ANSI terminal renderer
 - **`packages/server`** — WebSocket server, layout computation, geometry diffing
 - **`packages/client`** — Thin WebSocket client (~2KB), receives pre-computed geometry

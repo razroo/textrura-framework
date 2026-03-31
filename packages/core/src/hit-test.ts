@@ -4,6 +4,14 @@ import type { UIElement, BoxElement, EventHandlers, HitEvent } from './types.js'
 interface HitTarget {
   layout: ComputedLayout
   handlers: EventHandlers
+  element: BoxElement
+}
+
+/** Result of routing a pointer/keyboard-style hit to handlers. */
+export interface HitDispatchResult {
+  handled: boolean
+  /** Set when a focusable box handled `onClick` (for keyboard focus). */
+  focusTarget?: { element: BoxElement; layout: ComputedLayout }
 }
 
 /** Walk the element tree + computed layout in parallel to find hit targets at (x, y). */
@@ -45,7 +53,7 @@ function collectHits(
   if (element.kind === 'box') {
     const boxEl = element as BoxElement
     if (boxEl.handlers) {
-      results.push({ layout, handlers: boxEl.handlers })
+      results.push({ layout, handlers: boxEl.handlers, element: boxEl })
     }
 
     // Sort children by zIndex for hit-testing (highest first)
@@ -73,7 +81,7 @@ export function dispatchHit(
   x: number,
   y: number,
   extra?: Record<string, unknown>,
-): boolean {
+): HitDispatchResult {
   const hits: HitTarget[] = []
   collectHits(element, layout, x, y, 0, 0, hits)
 
@@ -84,10 +92,19 @@ export function dispatchHit(
     if (handler) {
       const event: HitEvent = { x, y, target: hit.layout, ...extra }
       ;(handler as (e: HitEvent) => void)(event)
-      return true
+      const focusable = !!(
+        hit.handlers.onClick ||
+        hit.handlers.onKeyDown ||
+        hit.handlers.onKeyUp
+      )
+      const focusTarget =
+        eventType === 'onClick' && focusable
+          ? { element: hit.element, layout: hit.layout }
+          : undefined
+      return { handled: true, focusTarget }
     }
   }
-  return false
+  return { handled: false }
 }
 
 /** Get the cursor style at a given point by walking the tree. Returns the deepest element's cursor prop. */

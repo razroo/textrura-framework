@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { dispatchHit, getCursorAtPoint } from '../hit-test.js'
-import { box, text } from '../elements.js'
+import { box } from '../elements.js'
 
 describe('dispatchHit', () => {
   it('hit inside a box fires handler', () => {
@@ -9,7 +9,7 @@ describe('dispatchHit', () => {
     const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
 
     const result = dispatchHit(el, layout, 'onClick', 50, 25)
-    expect(result).toBe(true)
+    expect(result.handled).toBe(true)
     expect(fired).toBe(true)
   })
 
@@ -19,7 +19,7 @@ describe('dispatchHit', () => {
     const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
 
     const result = dispatchHit(el, layout, 'onClick', 200, 200)
-    expect(result).toBe(false)
+    expect(result.handled).toBe(false)
     expect(fired).toBe(false)
   })
 

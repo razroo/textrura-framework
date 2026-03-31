@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { collectTextNodes, getSelectedText, hitTestText } from '../selection.js'
+import { collectTextNodes, getSelectedText } from '../selection.js'
 import { text } from '../elements.js'
 import { box } from '../elements.js'
 

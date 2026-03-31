@@ -5,6 +5,7 @@ import { toLayoutTree } from './tree.js'
 import { dispatchHit } from './hit-test.js'
 import { effect } from './signals.js'
 import { focusedElement, setFocus, focusNext, focusPrev } from './focus.js'
+import { collectFontFamiliesFromTree, waitForFonts } from './fonts.js'
 
 export interface AppOptions {
   /** Root width for layout computation. */
@@ -13,6 +14,13 @@ export interface AppOptions {
   height?: number
   /** Called when an error occurs during update. */
   onError?: (error: unknown) => void
+  /**
+   * Await `document.fonts` for families used in the initial view (browser only).
+   * Reduces first-paint layout shift for web fonts.
+   */
+  waitForFonts?: boolean
+  /** Max time to wait for fonts when `waitForFonts` is true. Default 10000. */
+  fontLoadTimeoutMs?: number
 }
 
 export interface App {
@@ -43,6 +51,11 @@ export async function createApp(
 ): Promise<App> {
   await init()
 
+  if (options.waitForFonts && typeof document !== 'undefined') {
+    const initialTree = view()
+    await waitForFonts(collectFontFamiliesFromTree(initialTree), options.fontLoadTimeoutMs ?? 10_000)
+  }
+
   const app: App = {
     layout: null,
     tree: null,
@@ -65,13 +78,10 @@ export async function createApp(
     },
     dispatch(eventType, x, y, extra) {
       if (!app.tree || !app.layout) return false
-      const handled = dispatchHit(app.tree, app.layout, eventType, x, y, extra)
-
-      // Auto-focus on click: if the clicked element has keyboard handlers, focus it
-      if (eventType === 'onClick' && handled) {
-        // The hit-test already fired the handler; focus is set by the element if needed
+      const { handled, focusTarget } = dispatchHit(app.tree, app.layout, eventType, x, y, extra)
+      if (eventType === 'onClick' && focusTarget) {
+        setFocus(focusTarget.element, focusTarget.layout)
       }
-
       return handled
     },
     dispatchKey(eventType, partialEvent) {
@@ -115,6 +125,7 @@ export async function createApp(
   }
 
   const dispose = effect(() => {
+    void focusedElement.value
     app.update()
   })
 
