@@ -93,6 +93,36 @@ The router exposes a single history interface so runtime differences stay behind
 - Querystring and hash parsing must be adapter-neutral.
 - Router state updates must be deterministic and emitted in the same order across adapters.
 
+## Server-computed transition protocol behavior
+
+For `@geometra/server` + `@geometra/client` mode, routing transitions must be explicit protocol events.
+
+### Client -> Server messages
+
+- `navigate`: request navigation to a destination.
+  - shape: `{ type: 'navigate', to, replace?: boolean, requestId, protocolVersion?: 1 }`
+- `history`: request history movement.
+  - shape: `{ type: 'history', delta, requestId, protocolVersion?: 1 }`
+- `prefetch`: request route module/data prefetch.
+  - shape: `{ type: 'prefetch', to, requestId, protocolVersion?: 1 }`
+
+### Server -> Client messages
+
+- `navigationStart`: acknowledges transition start.
+  - shape: `{ type: 'navigationStart', requestId, to, protocolVersion?: 1 }`
+- `frame` / `patch`: existing render transport for resulting UI geometry.
+- `navigationEnd`: confirms transition completion and canonical location.
+  - shape: `{ type: 'navigationEnd', requestId, location, protocolVersion?: 1 }`
+- `error`: transition-level failure with request correlation.
+  - shape: `{ type: 'error', requestId, message, code?, protocolVersion?: 1 }`
+
+### Protocol invariants
+
+- Each client-initiated navigation includes a `requestId` for deterministic correlation.
+- Server must emit `navigationEnd` or `error` for every accepted `navigate`/`history` request.
+- Unknown newer protocol versions must fail explicitly (existing v1 behavior).
+- Navigation events are ordered relative to emitted `frame`/`patch` messages to avoid ambiguous client state.
+
 ## Initial API sketch (non-binding)
 
 ```ts
