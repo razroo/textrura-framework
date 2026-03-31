@@ -65,14 +65,14 @@ Treat RC as a production rehearsal.
 
 - [x] Bump versions for publishable packages. (done in `8b5064a`)
 - [x] Publish `v1.0.0-rc.1` using GitHub release flow. (release created 2026-03-31)
-- [ ] Verify install and smoke usage from each starter template.
-- [ ] Collect and triage feedback into: blocker / must-fix / post-1.0.
-- [ ] Decide go/no-go for `v1.0.0` based on blocker count.
+- [x] Verify install and smoke usage from each starter template. (verified 2026-03-31 via fresh npm installs of `@geometra/*@1.0.0-rc.1` in `/tmp/geometra-rc-smoke` for canvas-local, terminal, and server-client import/runtime smoke)
+- [x] Collect and triage feedback into: blocker / must-fix / post-1.0. (tracked in `RC_1_0_0_RC1_FEEDBACK.md`)
+- [x] Decide go/no-go for `v1.0.0` based on blocker count. (current recommendation: provisional GO in `RC_1_0_0_RC1_FEEDBACK.md`)
 
 Artifacts:
 
 - RC release URL: `https://github.com/razroo/geometra/releases/tag/v1.0.0-rc.1`
-- Dogfood notes: `<doc or issue link>`
+- Dogfood notes: `RC_1_0_0_RC1_FEEDBACK.md` (includes local smoke evidence: `/tmp/geometra-rc-smoke`)
 
 ## 6) Final release execution (`v1.0.0`)
 
