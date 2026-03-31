@@ -1,5 +1,6 @@
 import type { ComputedLayout } from 'textura'
 import type {
+  App,
   Renderer,
   UIElement,
   BoxElement,
@@ -46,6 +47,11 @@ export interface CanvasRendererOptions {
 export interface AccessibilityMirrorOptions {
   /** Label for the hidden accessibility region. */
   rootLabel?: string
+}
+
+export interface CanvasInputForwardingOptions {
+  /** Optional target for keyboard/composition events. Defaults to document. */
+  keyboardTarget?: Document | HTMLElement
 }
 
 interface CachedTextLineMetrics {
@@ -993,5 +999,88 @@ export function enableAccessibilityMirror(
   return () => {
     renderer.render = originalRender
     root.remove()
+  }
+}
+
+/**
+ * Forward browser pointer/keyboard/composition events into a Geometra app.
+ * Returns a cleanup function.
+ */
+export function enableInputForwarding(
+  canvas: HTMLCanvasElement,
+  getApp: () => App | null,
+  options: CanvasInputForwardingOptions = {},
+): () => void {
+  const keyboardTarget = options.keyboardTarget ?? document
+
+  function shouldPreventHandledKey(e: KeyboardEvent): boolean {
+    return (
+      ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') ||
+      ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') ||
+      (e.ctrlKey && e.key.toLowerCase() === 'y') ||
+      e.key === 'Tab' ||
+      e.key === 'ArrowLeft' ||
+      e.key === 'ArrowRight' ||
+      e.key === 'Backspace' ||
+      e.key === 'Delete' ||
+      e.key === 'Enter' ||
+      e.key === ' ' ||
+      e.code === 'Space'
+    )
+  }
+
+  function onPointerDown(e: PointerEvent): void {
+    const app = getApp()
+    if (!app) return
+    const rect = canvas.getBoundingClientRect()
+    app.dispatch('onClick', e.clientX - rect.left, e.clientY - rect.top)
+  }
+
+  function onKeyDown(e: KeyboardEvent): void {
+    const app = getApp()
+    if (!app) return
+    const handled = app.dispatchKey('onKeyDown', {
+      key: e.key,
+      code: e.code,
+      shiftKey: e.shiftKey,
+      ctrlKey: e.ctrlKey,
+      metaKey: e.metaKey,
+      altKey: e.altKey,
+    })
+    if (handled && shouldPreventHandledKey(e)) {
+      e.preventDefault()
+    }
+  }
+
+  function onCompositionStart(e: CompositionEvent): void {
+    const app = getApp()
+    if (!app) return
+    app.dispatchComposition('onCompositionStart', { data: e.data ?? '' })
+  }
+
+  function onCompositionUpdate(e: CompositionEvent): void {
+    const app = getApp()
+    if (!app) return
+    app.dispatchComposition('onCompositionUpdate', { data: e.data ?? '' })
+  }
+
+  function onCompositionEnd(e: CompositionEvent): void {
+    const app = getApp()
+    if (!app) return
+    app.dispatchComposition('onCompositionEnd', { data: e.data ?? '' })
+  }
+
+  canvas.addEventListener('pointerdown', onPointerDown)
+  keyboardTarget.addEventListener('keydown', onKeyDown as EventListener)
+  keyboardTarget.addEventListener('compositionstart', onCompositionStart as EventListener)
+  keyboardTarget.addEventListener('compositionupdate', onCompositionUpdate as EventListener)
+  keyboardTarget.addEventListener('compositionend', onCompositionEnd as EventListener)
+
+  return () => {
+    canvas.removeEventListener('pointerdown', onPointerDown)
+    keyboardTarget.removeEventListener('keydown', onKeyDown as EventListener)
+    keyboardTarget.removeEventListener('compositionstart', onCompositionStart as EventListener)
+    keyboardTarget.removeEventListener('compositionupdate', onCompositionUpdate as EventListener)
+    keyboardTarget.removeEventListener('compositionend', onCompositionEnd as EventListener)
   }
 }

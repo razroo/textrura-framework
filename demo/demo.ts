@@ -6,7 +6,7 @@ import {
   toSemanticHTML,
 } from '@geometra/core'
 import type { App, UIElement } from '@geometra/core'
-import { CanvasRenderer, enableSelection, enableAccessibilityMirror } from '@geometra/renderer-canvas'
+import { CanvasRenderer, enableSelection, enableAccessibilityMirror, enableInputForwarding } from '@geometra/renderer-canvas'
 import {
   button as uiButton,
   input as uiInput,
@@ -755,53 +755,17 @@ const renderer = new CanvasRenderer({
 
 let app: App | null = null
 let cleanupSelection: (() => void) | null = null
-let cleanupKeydown: (() => void) | null = null
 let cleanupA11yMirror: (() => void) | null = null
-
-function onDocumentKeyDown(e: KeyboardEvent) {
-  if (!app) return
-  const handled = app.dispatchKey('onKeyDown', {
-    key: e.key,
-    code: e.code,
-    shiftKey: e.shiftKey,
-    ctrlKey: e.ctrlKey,
-    metaKey: e.metaKey,
-    altKey: e.altKey,
-  })
-  if (
-    handled &&
-    (
-      ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') ||
-      ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') ||
-      (e.ctrlKey && e.key.toLowerCase() === 'y') ||
-      e.key === 'Tab' ||
-      e.key === 'ArrowLeft' ||
-      e.key === 'ArrowRight' ||
-      e.key === 'Backspace' ||
-      e.key === 'Delete' ||
-      e.key === 'Enter' ||
-      e.key === ' ' ||
-      e.code === 'Space'
-    )
-  ) {
-    e.preventDefault()
-  }
-}
+let cleanupInputForwarding: (() => void) | null = null
 
 async function mount() {
   if (cleanupSelection) { cleanupSelection(); cleanupSelection = null }
   if (cleanupA11yMirror) { cleanupA11yMirror(); cleanupA11yMirror = null }
-  if (cleanupKeydown) {
-    cleanupKeydown()
-    cleanupKeydown = null
-  }
   if (app) app.destroy()
 
   app = await createApp(view, renderer, { width: vw.peek(), waitForFonts: true })
-
-  document.addEventListener('keydown', onDocumentKeyDown)
-  cleanupKeydown = () => {
-    document.removeEventListener('keydown', onDocumentKeyDown)
+  if (!cleanupInputForwarding) {
+    cleanupInputForwarding = enableInputForwarding(canvas, () => app)
   }
 
   const tree = view()
@@ -824,13 +788,6 @@ let resizeTimer: ReturnType<typeof setTimeout>
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer)
   resizeTimer = setTimeout(() => { vw.set(window.innerWidth); mount() }, 150)
-})
-
-// ─── Click forwarding ────────────────────────────────────────────────────────
-canvas.addEventListener('click', (e) => {
-  if (!app) return
-  const rect = canvas.getBoundingClientRect()
-  app.dispatch('onClick', e.clientX - rect.left, e.clientY - rect.top)
 })
 
 // ─── Init ────────────────────────────────────────────────────────────────────
