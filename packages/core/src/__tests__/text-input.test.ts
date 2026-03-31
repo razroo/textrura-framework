@@ -141,6 +141,18 @@ describe('text-input foundation', () => {
     expect(extend.selection).toEqual({ anchorNode: 1, anchorOffset: 0, focusNode: 1, focusOffset: 1 })
   })
 
+  it('maps ArrowLeft/ArrowRight against rtl reading direction', () => {
+    const base: TextInputState = {
+      nodes: ['abcd'],
+      selection: { anchorNode: 0, anchorOffset: 2, focusNode: 0, focusOffset: 2 },
+    }
+    const rtlLeft = moveInputCaret(base, 'left', false, undefined, 'rtl')
+    const rtlRight = moveInputCaret(base, 'right', false, undefined, 'rtl')
+
+    expect(rtlLeft.selection).toEqual({ anchorNode: 0, anchorOffset: 3, focusNode: 0, focusOffset: 3 })
+    expect(rtlRight.selection).toEqual({ anchorNode: 0, anchorOffset: 1, focusNode: 0, focusOffset: 1 })
+  })
+
   it('supports word-jump movement left/right', () => {
     const base: TextInputState = {
       nodes: ['hello, brave new world'],
@@ -152,6 +164,18 @@ describe('text-input foundation', () => {
     expect(left2.selection.focusOffset).toBe(13)
     const right = moveInputCaretByWord(left2, 'right')
     expect(right.selection.focusOffset).toBe(16)
+  })
+
+  it('maps word-jump movement for rtl reading direction', () => {
+    const base: TextInputState = {
+      nodes: ['hello brave world'],
+      selection: { anchorNode: 0, anchorOffset: 6, focusNode: 0, focusOffset: 6 },
+    }
+    const rtlLeft = moveInputCaretByWord(base, 'left', false, 'rtl')
+    const rtlRight = moveInputCaretByWord(base, 'right', false, 'rtl')
+
+    expect(rtlLeft.selection.focusOffset).toBe(11)
+    expect(rtlRight.selection.focusOffset).toBe(0)
   })
 
   it('supports line boundary movement (Home/End semantics)', () => {

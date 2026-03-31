@@ -23,6 +23,8 @@ export interface CaretGeometry {
   offset: number
 }
 
+type ReadingDirection = 'ltr' | 'rtl'
+
 function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n))
 }
@@ -62,6 +64,16 @@ function clampSelection(nodes: string[], selection: SelectionRange): SelectionRa
 
 function isWordChar(ch: string): boolean {
   return /[A-Za-z0-9_]/.test(ch)
+}
+
+function resolveHorizontalDirection(
+  direction: 'left' | 'right',
+  readingDirection: ReadingDirection,
+): 'left' | 'right' {
+  if (readingDirection === 'rtl') {
+    return direction === 'left' ? 'right' : 'left'
+  }
+  return direction
 }
 
 /** True when selection is a collapsed caret. */
@@ -227,6 +239,7 @@ export function moveInputCaret(
   direction: 'left' | 'right' | 'up' | 'down',
   extendSelection = false,
   columnIntent?: number,
+  readingDirection: ReadingDirection = 'ltr',
 ): TextInputEditResult {
   const nodes = state.nodes.length > 0 ? state.nodes : ['']
   const selection = clampSelection(nodes, state.selection)
@@ -236,12 +249,17 @@ export function moveInputCaret(
   let offset = extendSelection ? selection.focusOffset : selection.anchorOffset
   let nextColumnIntent: number | undefined = columnIntent
 
+  const horizontalDirection =
+    direction === 'left' || direction === 'right'
+      ? resolveHorizontalDirection(direction, readingDirection)
+      : undefined
+
   if (!collapsed && !extendSelection) {
     const s = normalizeSelection(selection)
-    if (direction === 'left') {
+    if (horizontalDirection === 'left') {
       nodeIndex = s.anchorNode
       offset = s.anchorOffset
-    } else if (direction === 'right') {
+    } else if (horizontalDirection === 'right') {
       nodeIndex = s.focusNode
       offset = s.focusOffset
     } else if (direction === 'up') {
@@ -251,7 +269,7 @@ export function moveInputCaret(
       nodeIndex = s.focusNode
       offset = s.focusOffset
     }
-  } else if (direction === 'left') {
+  } else if (horizontalDirection === 'left') {
     if (offset > 0) {
       offset--
     } else if (nodeIndex > 0) {
@@ -259,7 +277,7 @@ export function moveInputCaret(
       offset = nodes[nodeIndex]!.length
     }
     nextColumnIntent = undefined
-  } else if (direction === 'right') {
+  } else if (horizontalDirection === 'right') {
     const text = nodes[nodeIndex]!
     if (offset < text.length) {
       offset++
@@ -307,6 +325,7 @@ export function moveInputCaretByWord(
   state: TextInputState,
   direction: 'left' | 'right',
   extendSelection = false,
+  readingDirection: ReadingDirection = 'ltr',
 ): TextInputEditResult {
   const nodes = state.nodes.length > 0 ? state.nodes : ['']
   const selection = clampSelection(nodes, state.selection)
@@ -315,11 +334,13 @@ export function moveInputCaretByWord(
   let nodeIndex = extendSelection ? selection.focusNode : selection.anchorNode
   let offset = extendSelection ? selection.focusOffset : selection.anchorOffset
 
+  const horizontalDirection = resolveHorizontalDirection(direction, readingDirection)
+
   if (!collapsed && !extendSelection) {
     const s = normalizeSelection(selection)
-    nodeIndex = direction === 'left' ? s.anchorNode : s.focusNode
-    offset = direction === 'left' ? s.anchorOffset : s.focusOffset
-  } else if (direction === 'left') {
+    nodeIndex = horizontalDirection === 'left' ? s.anchorNode : s.focusNode
+    offset = horizontalDirection === 'left' ? s.anchorOffset : s.focusOffset
+  } else if (horizontalDirection === 'left') {
     if (offset === 0 && nodeIndex > 0) {
       nodeIndex--
       offset = nodes[nodeIndex]!.length
