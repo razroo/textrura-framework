@@ -173,6 +173,28 @@ box({
 ])
 ```
 
+## Routing Quick Start
+
+Geometra routing is available in `@geometra/router` and is renderer-agnostic.
+
+```ts
+import { createRouter, createMemoryHistory, link, matchRouteTree } from '@geometra/router'
+
+const router = createRouter({
+  history: createMemoryHistory({ initialEntries: ['/'] }),
+  routes: [
+    { id: 'home', path: '/' },
+    { id: 'users', path: '/users/:id' },
+    { id: 'not-found', path: '/*' },
+  ],
+})
+
+router.start()
+await router.navigate('/users/42')
+```
+
+For full routing details, see `packages/router/README.md` and `ROUTER_DELIVERY_REPORT.md`.
+
 ## Accessibility and Text Input Foundations
 
 Geometra now exposes runtime primitives so non-DOM renderers can still provide accessibility and editing behavior:
