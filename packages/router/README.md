@@ -16,6 +16,7 @@ npm install @geometra/router
 - `buildPath` -- reverse routing helper with typed params
 - `parseQuery` / `stringifyQuery` -- query parse/stringify helpers with deterministic key ordering
 - `createMemoryHistory` -- history adapter for non-browser runtimes and tests
+- `createBrowserHistory` -- browser adapter using pushState/replaceState/popstate
 - `createRouter` -- router lifecycle (`start`, `navigate`, `subscribe`, `dispose`)
 - `scorePathPattern` -- computes route specificity score for deterministic ranking
 - `comparePatternSpecificity` -- compares two patterns by ranking

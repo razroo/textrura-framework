@@ -1,0 +1,82 @@
+import { describe, expect, it } from 'vitest'
+import { createBrowserHistory, createMemoryHistory, type HistoryUpdate } from '../history.js'
+
+describe('history adapters', () => {
+  it('memory history supports push/replace/go', () => {
+    const history = createMemoryHistory({ initialEntries: ['/a'] })
+
+    history.push('/b')
+    expect(history.location.pathname).toBe('/b')
+
+    history.replace('/c')
+    expect(history.location.pathname).toBe('/c')
+
+    history.go(-1)
+    expect(history.location.pathname).toBe('/a')
+  })
+
+  it('browser history uses pushState/replaceState and popstate listener', () => {
+    let pathname = '/start'
+    let search = ''
+    let hash = ''
+    const popListeners = new Set<() => void>()
+    const updates: HistoryUpdate[] = []
+    const goCalls: number[] = []
+
+    const windowStub = {
+      location: {
+        get pathname() {
+          return pathname
+        },
+        get search() {
+          return search
+        },
+        get hash() {
+          return hash
+        },
+      },
+      history: {
+        pushState(_state: unknown, _title: string, href: string) {
+          const url = new URL(href, 'https://geometra.local')
+          pathname = url.pathname
+          search = url.search
+          hash = url.hash
+        },
+        replaceState(_state: unknown, _title: string, href: string) {
+          const url = new URL(href, 'https://geometra.local')
+          pathname = url.pathname
+          search = url.search
+          hash = url.hash
+        },
+        go(delta: number) {
+          goCalls.push(delta)
+        },
+      },
+      addEventListener(event: string, handler: () => void) {
+        if (event === 'popstate') popListeners.add(handler)
+      },
+      removeEventListener(event: string, handler: () => void) {
+        if (event === 'popstate') popListeners.delete(handler)
+      },
+    } as unknown as Pick<Window, 'location' | 'history' | 'addEventListener' | 'removeEventListener'>
+
+    const history = createBrowserHistory({ window: windowStub })
+    const unsubscribe = history.listen((update) => updates.push(update))
+
+    history.push('/users/1?tab=profile#top')
+    expect(history.location).toEqual({ pathname: '/users/1', search: '?tab=profile', hash: '#top' })
+
+    history.replace('/users/2')
+    expect(history.location).toEqual({ pathname: '/users/2', search: '', hash: '' })
+
+    history.go(-1)
+    expect(goCalls).toEqual([-1])
+
+    for (const listener of popListeners) listener()
+    expect(updates.at(-1)?.action).toBe('pop')
+    expect(updates.at(-1)?.location.pathname).toBe('/users/2')
+
+    unsubscribe()
+    expect(popListeners.size).toBe(0)
+  })
+})

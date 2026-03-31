@@ -19,12 +19,24 @@ export interface HistoryAdapter {
   listen(listener: (update: HistoryUpdate) => void): Unsubscribe
 }
 
+export type BrowserHistoryOptions = {
+  window?: Pick<Window, 'location' | 'history' | 'addEventListener' | 'removeEventListener'>
+}
+
 function parseToLocation(to: string): RouterLocation {
   const url = new URL(to, 'https://geometra.local')
   return {
     pathname: url.pathname || '/',
     search: url.search,
     hash: url.hash,
+  }
+}
+
+function locationFromWindow(windowLike: Pick<Window, 'location'>): RouterLocation {
+  return {
+    pathname: windowLike.location.pathname || '/',
+    search: windowLike.location.search || '',
+    hash: windowLike.location.hash || '',
   }
 }
 
@@ -76,6 +88,62 @@ export function createMemoryHistory(options: MemoryHistoryOptions = {}): History
     listen(listener: (update: HistoryUpdate) => void): Unsubscribe {
       listeners.add(listener)
       return () => listeners.delete(listener)
+    },
+  }
+}
+
+export function createBrowserHistory(options: BrowserHistoryOptions = {}): HistoryAdapter {
+  const windowLike =
+    options.window ??
+    (typeof window !== 'undefined'
+      ? window
+      : null)
+
+  if (!windowLike) {
+    throw new Error('createBrowserHistory requires a browser window')
+  }
+
+  const listeners = new Set<(update: HistoryUpdate) => void>()
+  const notify = (action: HistoryUpdate['action']): void => {
+    const update: HistoryUpdate = {
+      location: locationFromWindow(windowLike),
+      action,
+    }
+    for (const listener of listeners) listener(update)
+  }
+
+  const onPopState = (): void => notify('pop')
+
+  return {
+    get location() {
+      return locationFromWindow(windowLike)
+    },
+    push(to: string) {
+      const next = parseToLocation(to)
+      const href = `${next.pathname}${next.search}${next.hash}`
+      windowLike.history.pushState(null, '', href)
+      notify('push')
+    },
+    replace(to: string) {
+      const next = parseToLocation(to)
+      const href = `${next.pathname}${next.search}${next.hash}`
+      windowLike.history.replaceState(null, '', href)
+      notify('replace')
+    },
+    go(delta: number) {
+      windowLike.history.go(delta)
+    },
+    listen(listener: (update: HistoryUpdate) => void): Unsubscribe {
+      if (listeners.size === 0) {
+        windowLike.addEventListener('popstate', onPopState)
+      }
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+        if (listeners.size === 0) {
+          windowLike.removeEventListener('popstate', onPopState)
+        }
+      }
     },
   }
 }
