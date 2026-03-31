@@ -186,6 +186,86 @@ describe('getCursorAtPoint', () => {
   })
 })
 
+describe('scroll and overflow clipping', () => {
+  it('overflow scroll: pointer outside parent bounds hits nothing', () => {
+    let childFired = false
+    let parentFired = false
+    const child = box({ width: 50, height: 50, onClick: () => { childFired = true } })
+    const parent = box(
+      { width: 100, height: 100, overflow: 'scroll', onClick: () => { parentFired = true } },
+      [child],
+    )
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 50, height: 50, children: [] }],
+    }
+
+    dispatchHit(parent, layout, 'onClick', 150, 50)
+    expect(childFired).toBe(false)
+    expect(parentFired).toBe(false)
+    expect(hitPathAtPoint(parent, layout, 150, 50)).toBe(null)
+    expect(hasInteractiveHitAtPoint(parent, layout, 150, 50)).toBe(false)
+  })
+
+  it('overflow scroll: pointer inside parent still hits stacked children', () => {
+    let childFired = false
+    const child = box({ width: 50, height: 50, onClick: () => { childFired = true } })
+    const parent = box({ width: 100, height: 100, overflow: 'scroll' }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 50, height: 50, children: [] }],
+    }
+
+    dispatchHit(parent, layout, 'onClick', 25, 25)
+    expect(childFired).toBe(true)
+    expect(hitPathAtPoint(parent, layout, 25, 25)).toEqual([0])
+  })
+
+  it('scrollY shifts child bounds; localY matches scrolled content', () => {
+    let localY = -1
+    const child = box({
+      width: 100,
+      height: 50,
+      onClick: (e) => { localY = e.localY ?? -999 },
+    })
+    const parent = box({ width: 100, height: 100, overflow: 'scroll', scrollY: 40 }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 80, width: 100, height: 50, children: [] }],
+    }
+
+    // Child absY = parentAbsY - scrollY + layout.y = 0 - 40 + 80 = 40
+    dispatchHit(parent, layout, 'onClick', 50, 45)
+    expect(localY).toBe(5)
+  })
+
+  it('hitPathAtPoint respects higher z-index when scrolling siblings', () => {
+    const back = box({ width: 40, height: 40, zIndex: 0 })
+    const front = box({ width: 40, height: 40, zIndex: 3 })
+    const parent = box({ width: 100, height: 100, overflow: 'scroll', scrollY: 10 }, [back, front])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+      ],
+    }
+    expect(hitPathAtPoint(parent, layout, 5, 5)).toEqual([1])
+  })
+})
+
 describe('hasInteractiveHitAtPoint', () => {
   it('detects interactive containers at pointer position', () => {
     const interactive = box({ width: 120, height: 40, onClick: () => undefined })
