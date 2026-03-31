@@ -4,6 +4,8 @@ import {
   text,
   createApp,
   toSemanticHTML,
+  spring,
+  animationLoop,
 } from '@geometra/core'
 import type { App, UIElement } from '@geometra/core'
 import { CanvasRenderer, enableSelection, enableAccessibilityMirror, enableInputForwarding } from '@geometra/renderer-canvas'
@@ -44,6 +46,73 @@ const inputSearch = signal<DemoInputField>({ value: '', caretOffset: 0 })
 const activeDemoInput = signal<'name' | 'email' | 'search' | null>(null)
 let lastPerfTime = '-'
 let lastPerfNodes = '-'
+
+// ─── Animation State ──────────────────────────────────────────────────────────
+const animTime = signal(0)
+const animFps = signal(60)
+const springTargetX = signal(0)
+const springTargetY = signal(0)
+const springX = spring(springTargetX, { stiffness: 120, damping: 14, mass: 1 })
+const springY = spring(springTargetY, { stiffness: 120, damping: 14, mass: 1 })
+
+interface Particle { x: number; y: number; vx: number; vy: number; life: number; color: string; size: number }
+let particles: Particle[] = []
+const particleSignal = signal(0)
+
+const ORBIT_COUNT = 12
+const orbitPhase = signal(0)
+
+let animLoopStop: (() => void) | null = null
+function ensureAnimLoop() {
+  if (animLoopStop) return
+  let frameCount = 0
+  let fpsAccum = 0
+  animLoopStop = animationLoop((dt) => {
+    animTime.set(animTime.peek() + dt)
+    orbitPhase.set(orbitPhase.peek() + dt * 0.8)
+
+    frameCount++
+    fpsAccum += dt
+    if (fpsAccum >= 0.5) {
+      animFps.set(Math.round(frameCount / fpsAccum))
+      frameCount = 0
+      fpsAccum = 0
+    }
+
+    let alive = 0
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i]!
+      p.x += p.vx * dt
+      p.y += p.vy * dt
+      p.vy += 220 * dt
+      p.life -= dt
+      if (p.life > 0) alive++
+    }
+    particles = particles.filter(p => p.life > 0)
+    if (alive > 0 || particles.length > 0) particleSignal.set(particleSignal.peek() + 1)
+
+    return scenario.peek() === 'animation'
+  })
+}
+function stopAnimLoop() {
+  if (animLoopStop) { animLoopStop(); animLoopStop = null }
+}
+function spawnParticles(cx: number, cy: number) {
+  const colors = ['#e94560', '#0ea5e9', '#22c55e', '#f59e0b', '#a855f7', '#ec4899', '#38bdf8']
+  for (let i = 0; i < 40; i++) {
+    const angle = Math.random() * Math.PI * 2
+    const speed = 80 + Math.random() * 200
+    particles.push({
+      x: cx, y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 120,
+      life: 0.6 + Math.random() * 1.2,
+      color: colors[Math.floor(Math.random() * colors.length)]!,
+      size: 4 + Math.random() * 8,
+    })
+  }
+  particleSignal.set(particleSignal.peek() + 1)
+}
 
 // ─── Layout Helpers ──────────────────────────────────────────────────────────
 function countNodes(el: UIElement): number {
@@ -317,6 +386,150 @@ function textInputDemo(): UIElement {
   ])
 }
 
+function animationDemo(): UIElement {
+  const w = rootWidth.value
+  ensureAnimLoop()
+
+  // Read signals to subscribe to updates
+  const _t = animTime.value
+  const fps = animFps.value
+  const sx = springX.value
+  const sy = springY.value
+  const _pTick = particleSignal.value
+  const phase = orbitPhase.value
+
+  const areaW = Math.max(w - 48, 250)
+  const areaH = 280
+
+  // --- Spring ball ---
+  const springBall = box({
+    position: 'absolute',
+    left: Math.round(Math.max(0, Math.min(areaW - 40, sx))),
+    top: Math.round(Math.max(0, Math.min(areaH - 40, sy))),
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    gradient: { type: 'linear', angle: 135, stops: [
+      { offset: 0, color: '#e94560' },
+      { offset: 1, color: '#ff6b8a' },
+    ]},
+    boxShadow: { offsetX: 0, offsetY: 4, blur: 20, color: 'rgba(233,69,96,0.5)' },
+  }, [])
+
+  // --- Orbiting dots ---
+  const orbitCx = areaW / 2
+  const orbitCy = areaH / 2
+  const orbitElements: UIElement[] = []
+  for (let i = 0; i < ORBIT_COUNT; i++) {
+    const angle = phase + (i / ORBIT_COUNT) * Math.PI * 2
+    const rx = 80 + i * 6
+    const ry = 50 + i * 3
+    const ox = orbitCx + Math.cos(angle) * rx - 8
+    const oy = orbitCy + Math.sin(angle) * ry - 8
+    const hue = Math.round((i / ORBIT_COUNT) * 360)
+    const alpha = 0.4 + 0.6 * ((Math.sin(angle) + 1) / 2)
+    orbitElements.push(box({
+      position: 'absolute',
+      left: Math.round(Math.max(0, Math.min(areaW - 16, ox))),
+      top: Math.round(Math.max(0, Math.min(areaH - 16, oy))),
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: `hsla(${hue}, 80%, 65%, ${alpha.toFixed(2)})`,
+      boxShadow: { offsetX: 0, offsetY: 0, blur: 12, color: `hsla(${hue}, 80%, 65%, 0.4)` },
+    }, []))
+  }
+
+  // --- Particles ---
+  const particleEls: UIElement[] = particles.map(p => {
+    const alpha = Math.max(0, Math.min(1, p.life / 1.2))
+    return box({
+      position: 'absolute',
+      left: Math.round(Math.max(0, Math.min(areaW - p.size, p.x))),
+      top: Math.round(Math.max(0, Math.min(areaH - p.size, p.y))),
+      width: Math.round(p.size),
+      height: Math.round(p.size),
+      borderRadius: Math.round(p.size / 2),
+      backgroundColor: p.color,
+      opacity: alpha,
+    }, [])
+  })
+
+  // --- Stage ---
+  const stage = box({
+    width: areaW,
+    height: areaH,
+    borderRadius: 14,
+    overflow: 'hidden',
+    gradient: { type: 'linear', angle: 160, stops: [
+      { offset: 0, color: '#0c0c1d' },
+      { offset: 0.5, color: '#0f0f2a' },
+      { offset: 1, color: '#0a0a18' },
+    ]},
+    cursor: 'pointer',
+    onClick: (e) => {
+      const localClickX = (e.localX ?? e.x) 
+      const localClickY = (e.localY ?? e.y)
+      springTargetX.set(Math.max(0, Math.min(areaW - 40, localClickX - 20)))
+      springTargetY.set(Math.max(0, Math.min(areaH - 40, localClickY - 20)))
+      spawnParticles(localClickX, localClickY)
+    },
+  }, [
+    ...orbitElements,
+    springBall,
+    ...particleEls,
+    // Center label
+    box({
+      position: 'absolute',
+      left: Math.round(areaW / 2 - 80),
+      top: Math.round(areaH / 2 - 10),
+      width: 160,
+    }, [
+      text({ text: 'Click anywhere', font: '500 13px Inter', lineHeight: 20, color: 'rgba(255,255,255,0.2)' }),
+    ]),
+  ])
+
+  // --- Info cards ---
+  const infoCard = (title: string, body: string, accent: string): UIElement =>
+    box({
+      backgroundColor: SURFACE,
+      borderColor: BORDER,
+      borderRadius: 12,
+      padding: 14,
+      flexDirection: 'column',
+      gap: 4,
+      flexGrow: 1,
+      minWidth: 130,
+    }, [
+      text({ text: title, font: 'bold 13px Inter', lineHeight: 18, color: accent }),
+      text({ text: body, font: '12px Inter', lineHeight: 17, color: MUTED }),
+    ])
+
+  return box({ flexDirection: 'column', padding: 24, gap: 16, width: w, minHeight: 380 }, [
+    box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, [
+      text({ text: 'Canvas Animations', font: 'bold 20px Inter', lineHeight: 26, color: '#ffffff' }),
+      box({
+        backgroundColor: SURFACE,
+        borderRadius: 8,
+        paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4,
+        flexDirection: 'row', gap: 8, alignItems: 'center',
+      }, [
+        box({ width: 8, height: 8, borderRadius: 4, backgroundColor: fps >= 50 ? '#22c55e' : fps >= 30 ? '#f59e0b' : '#e94560' }, []),
+        text({ text: `${fps} FPS`, font: '600 12px JetBrains Mono', lineHeight: 16, color: fps >= 50 ? '#22c55e' : fps >= 30 ? '#f59e0b' : '#e94560' }),
+        text({ text: `\u00b7 ${particles.length} particles`, font: '12px JetBrains Mono', lineHeight: 16, color: DIM }),
+      ]),
+    ]),
+    text({ text: 'Spring physics, particle bursts, and orbital motion \u2014 running at 60fps with zero DOM reflows or CSS transitions.', font: '14px Inter', lineHeight: 22, color: 'rgba(255,255,255,0.6)' }),
+    stage,
+    box({ flexDirection: direction.value, gap: 12, flexWrap: 'wrap' }, [
+      infoCard('Spring physics', 'The red ball follows your clicks with stiffness + damping. No CSS keyframes.', '#e94560'),
+      infoCard('Particle system', '40 particles per click with gravity, velocity, and fade. Try it in DOM.', '#0ea5e9'),
+      infoCard('Orbital motion', '12 dots orbit with variable radii and depth-faded opacity. 0 reflows.', '#a855f7'),
+      infoCard('Zero layout thrashing', 'Every frame: signals update \u2192 tree rebuilds \u2192 Yoga layouts \u2192 Canvas paints. No DOM touched.', '#22c55e'),
+    ]),
+  ])
+}
+
 function designShowcase(): UIElement {
   const w = rootWidth.value
 
@@ -456,6 +669,7 @@ const SCENARIOS: Record<string, () => UIElement> = {
   nested: nestedLayout,
   selection: selectableText,
   input: textInputDemo,
+  animation: animationDemo,
   design: designShowcase,
   seo: seoDemo,
 }
@@ -651,7 +865,8 @@ function demoSection(): UIElement {
     { key: 'cards', label: 'Cards' }, { key: 'chat', label: 'Chat' },
     { key: 'dashboard', label: 'Dashboard' }, { key: 'nested', label: 'Nested' },
     { key: 'selection', label: 'Selection' }, { key: 'input', label: 'Input' },
-    { key: 'design', label: 'Design' }, { key: 'seo', label: 'SEO' },
+    { key: 'animation', label: 'Animation' }, { key: 'design', label: 'Design' },
+    { key: 'seo', label: 'SEO' },
   ]
   const scenarioFn = SCENARIOS[scenario.value] ?? cardGrid
 
@@ -670,6 +885,7 @@ function demoSection(): UIElement {
     }, [
       text({ text: 'Scenario', font: '600 12px Inter', lineHeight: 18, color: DIM }),
       ...names.map(s => btn(s.label, scenario.value === s.key, () => {
+        if (scenario.peek() === 'animation' && s.key !== 'animation') stopAnimLoop()
         scenario.set(s.key)
         renderer.selection = null
         if (s.key !== 'input') activeDemoInput.set(null)
