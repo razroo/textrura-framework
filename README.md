@@ -227,6 +227,8 @@ Current limitations:
 - Keyboard behavior is currently horizontal/linear (`ArrowLeft`/`ArrowRight`) in text-input primitives; full vertical caret movement is not implemented.
 - True screen reader parity for canvas mode depends on `enableAccessibilityMirror` integration and host/browser behavior.
 
+Form semantics examples are available in `FORM_SEMANTICS_EXAMPLES.md`.
+
 ## Architecture
 
 ```

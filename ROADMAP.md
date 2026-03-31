@@ -115,7 +115,7 @@ Tracking fields:
 
 - [x] Status: `done` | Owner: `@codex` | Expand a11y tree attributes (state/disabled/expanded/selected) and test mappings.
 - [x] Status: `done` | Owner: `@codex` | Add focus trap primitives and tests for modal/overlay flows.
-- [ ] Status: `todo` | Owner: `@unassigned` | Add form-like semantics examples (labels, input groups, error text relationships).
+- [x] Status: `done` | Owner: `@codex` | Add form-like semantics examples (labels, input groups, error text relationships).
 - [ ] Status: `todo` | Owner: `@unassigned` | Add regression snapshots for accessibility tree shape across representative app templates.
 
 ### 0.4.3 — Protocol v2 planning and transport resilience
