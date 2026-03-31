@@ -45,6 +45,7 @@ const inputHistory = signal<TextInputHistoryState>(createTextInputHistory({
 }))
 const inputFocused = signal(false)
 const compositionDraft = signal('')
+const compositionSelection = signal<TextInputState['selection'] | null>(null)
 let lastPerfTime = '-'
 let lastPerfNodes = '-'
 
@@ -75,6 +76,22 @@ function setInputPresent(next: TextInputState): void {
 
 function pushInput(next: TextInputState): void {
   inputHistory.set(pushTextInputHistory(inputHistory.peek(), next))
+}
+
+function normalizedSelection(sel: TextInputState['selection']): { startNode: number; startOffset: number; endNode: number; endOffset: number } {
+  const anchorBeforeFocus =
+    sel.anchorNode < sel.focusNode ||
+    (sel.anchorNode === sel.focusNode && sel.anchorOffset <= sel.focusOffset)
+  return anchorBeforeFocus
+    ? { startNode: sel.anchorNode, startOffset: sel.anchorOffset, endNode: sel.focusNode, endOffset: sel.focusOffset }
+    : { startNode: sel.focusNode, startOffset: sel.focusOffset, endNode: sel.anchorNode, endOffset: sel.anchorOffset }
+}
+
+function withSelection(state: TextInputState, selection: TextInputState['selection']): TextInputState {
+  return {
+    nodes: state.nodes,
+    selection: { ...selection },
+  }
 }
 
 /** Styled button. */
@@ -298,6 +315,7 @@ function handleInputKeyDown(e: KeyboardHitEvent): void {
 }
 
 function handleInputCompositionStart(): void {
+  compositionSelection.set({ ...currentInputState().selection })
   compositionDraft.set('')
 }
 
@@ -307,8 +325,10 @@ function handleInputCompositionUpdate(e: { data: string }): void {
 
 function handleInputCompositionEnd(e: { data: string }): void {
   compositionDraft.set('')
+  const selection = compositionSelection.peek() ?? currentInputState().selection
+  compositionSelection.set(null)
   if (!e.data) return
-  pushInput(insertInputText(currentInputState(), e.data))
+  pushInput(insertInputText(withSelection(currentInputState(), selection), e.data))
 }
 
 function textInputDemo(): UIElement {
@@ -321,12 +341,69 @@ function textInputDemo(): UIElement {
   const collapsed =
     selected.anchorNode === selected.focusNode &&
     selected.anchorOffset === selected.focusOffset
-  const line = state.nodes.join('\n')
-  const caretOffset = collapsed ? selected.focusOffset : -1
   const draft = compositionDraft.value
-  const display = collapsed && active
-    ? `${line.slice(0, caretOffset)}|${draft}${line.slice(caretOffset)}`
-    : line
+  const compositionSel = compositionSelection.value
+  const effectiveSelection = draft && compositionSel ? compositionSel : selected
+  const norm = normalizedSelection(effectiveSelection)
+
+  const lines = state.nodes.map((rawLine, lineIndex) => {
+    const line = rawLine ?? ''
+    const hasSelection = (
+      (lineIndex > norm.startNode || (lineIndex === norm.startNode && norm.startOffset < line.length || norm.startNode !== norm.endNode)) &&
+      (lineIndex < norm.endNode || (lineIndex === norm.endNode && norm.endOffset > 0))
+    )
+    const start = lineIndex === norm.startNode ? Math.max(0, Math.min(norm.startOffset, line.length)) : 0
+    const end = lineIndex === norm.endNode ? Math.max(0, Math.min(norm.endOffset, line.length)) : line.length
+    const isCaretLine = active && collapsed && !draft && lineIndex === selected.focusNode
+    const caretOffset = isCaretLine ? Math.max(0, Math.min(selected.focusOffset, line.length)) : -1
+
+    const left = caretOffset >= 0 ? line.slice(0, caretOffset) : line.slice(0, hasSelection ? start : line.length)
+    const mid = hasSelection ? line.slice(start, end) : ''
+    const right = caretOffset >= 0 ? line.slice(caretOffset) : (hasSelection ? line.slice(end) : '')
+
+    const rowChildren: UIElement[] = []
+    if (left.length > 0) {
+      rowChildren.push(text({ text: left, font: '14px JetBrains Mono', lineHeight: 20, color: '#d1d5db' }))
+    }
+
+    if (isCaretLine) {
+      rowChildren.push(box({
+        width: 1.5,
+        minHeight: 18,
+        backgroundColor: '#38bdf8',
+      }, []))
+    }
+
+    if (draft && compositionSel && lineIndex === norm.startNode) {
+      rowChildren.push(box({
+        backgroundColor: 'rgba(56,189,248,0.18)',
+        borderRadius: 4,
+        paddingLeft: 1,
+        paddingRight: 1,
+      }, [
+        text({ text: draft, font: '14px JetBrains Mono', lineHeight: 20, color: '#67e8f9' }),
+      ]))
+    } else if (hasSelection && mid.length > 0) {
+      rowChildren.push(box({
+        backgroundColor: 'rgba(14,165,233,0.24)',
+        borderRadius: 4,
+        paddingLeft: 1,
+        paddingRight: 1,
+      }, [
+        text({ text: mid, font: '14px JetBrains Mono', lineHeight: 20, color: '#e0f2fe' }),
+      ]))
+    }
+
+    if (right.length > 0) {
+      rowChildren.push(text({ text: right, font: '14px JetBrains Mono', lineHeight: 20, color: '#d1d5db' }))
+    }
+
+    if (rowChildren.length === 0) {
+      rowChildren.push(text({ text: active && lineIndex === 0 ? '' : ' ', font: '14px JetBrains Mono', lineHeight: 20, color: '#d1d5db' }))
+    }
+
+    return box({ flexDirection: 'row', alignItems: 'center', minHeight: 20 }, rowChildren)
+  })
 
   return box({ flexDirection: 'column', padding: 24, gap: 14, width: w, minHeight: 380 }, [
     text({ text: 'Text Input (foundation)', font: 'bold 18px Inter', lineHeight: 24, color: '#ffffff' }),
@@ -353,13 +430,15 @@ function textInputDemo(): UIElement {
       onCompositionUpdate: handleInputCompositionUpdate,
       onCompositionEnd: handleInputCompositionEnd,
     }, [
-      text({
-        text: display.length > 0 ? display : (active ? '|' : 'Click to focus and type...'),
-        font: '14px JetBrains Mono',
-        lineHeight: 20,
-        color: display.length > 0 ? '#d1d5db' : DIM,
-        whiteSpace: 'pre-wrap',
-      }),
+      ...(state.nodes.length > 0
+        ? lines
+        : [text({
+            text: active ? '' : 'Click to focus and type...',
+            font: '14px JetBrains Mono',
+            lineHeight: 20,
+            color: DIM,
+            whiteSpace: 'pre-wrap',
+          })]),
     ]),
     box({ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }, [
       box({ backgroundColor: '#0f3460', borderRadius: 10, padding: 14, flexGrow: 1, flexDirection: 'column', gap: 4 }, [
