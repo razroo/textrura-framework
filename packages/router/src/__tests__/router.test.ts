@@ -130,4 +130,40 @@ describe('createRouter lifecycle', () => {
     expect(allowed).toBe(true)
     expect(router.getState().location.pathname).toBe('/users/4')
   })
+
+  it('applies default scroll and focus restoration after navigation', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/users/1'] })
+    const restored: string[] = []
+    const router = createRouter({
+      routes,
+      history,
+      restoration: {
+        restoreScroll: ({ from, to }) => restored.push(`scroll:${from.pathname}->${to.pathname}`),
+        restoreFocus: ({ from, to }) => restored.push(`focus:${from.pathname}->${to.pathname}`),
+      },
+    })
+    router.start()
+
+    await router.navigate('/users/2')
+
+    expect(restored).toEqual(['scroll:/users/1->/users/2', 'focus:/users/1->/users/2'])
+  })
+
+  it('supports per-navigation restoration opt-out', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/users/1'] })
+    const restored: string[] = []
+    const router = createRouter({
+      routes,
+      history,
+      restoration: {
+        restoreScroll: () => restored.push('scroll'),
+        restoreFocus: () => restored.push('focus'),
+      },
+    })
+    router.start()
+
+    await router.navigate('/users/2', { restoreScroll: false, restoreFocus: false })
+
+    expect(restored).toEqual([])
+  })
 })

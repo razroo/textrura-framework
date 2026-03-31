@@ -27,7 +27,7 @@ Goal: deliver a Geometra routing stack that is competitive with modern data rout
 - [x] Add declarative link primitive with keyboard activation semantics.
 - [x] Add active/pending route state helpers.
 - [x] Add blockers/guards for unsaved state and transition confirmation.
-- [ ] Add scroll and focus restoration policy per navigation.
+- [x] Add scroll and focus restoration policy per navigation.
 
 ## 3) Data loading and mutations (React Router class parity)
 
