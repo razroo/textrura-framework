@@ -5,6 +5,8 @@ import {
   createApp,
   toSemanticHTML,
   spring,
+  transition,
+  easing,
   animationLoop,
 } from '@geometra/core'
 import type { App, UIElement } from '@geometra/core'
@@ -46,6 +48,44 @@ const inputSearch = signal<DemoInputField>({ value: '', caretOffset: 0 })
 const activeDemoInput = signal<'name' | 'email' | 'search' | null>(null)
 let lastPerfTime = '-'
 let lastPerfNodes = '-'
+
+// ─── Page-Level Ambient Effects ───────────────────────────────────────────────
+const mouseX = signal(0)
+const mouseY = signal(0)
+const mouseGlowX = spring(mouseX, { stiffness: 40, damping: 20, mass: 1 })
+const mouseGlowY = spring(mouseY, { stiffness: 40, damping: 20, mass: 1 })
+
+const heroEntrance = transition(0, 1, 1200, easing.easeOut)
+const heroEntrance2 = transition(0, 1, 1400, easing.easeOut)
+const heroEntrance3 = transition(0, 1, 1800, easing.easeOut)
+const heroSlide = transition(40, 0, 1200, easing.easeOut)
+const heroSlide2 = transition(60, 0, 1400, easing.easeOut)
+const heroSlide3 = transition(80, 0, 1800, easing.easeOut)
+
+interface NebulaOrb { x: number; y: number; vx: number; vy: number; size: number; color: string }
+const nebulaOrbs: NebulaOrb[] = [
+  { x: 0.2, y: 0.1, vx: 0.012, vy: 0.008, size: 350, color: 'rgba(233,69,96,0.07)' },
+  { x: 0.7, y: 0.3, vx: -0.008, vy: 0.010, size: 280, color: 'rgba(14,165,233,0.06)' },
+  { x: 0.5, y: 0.6, vx: 0.006, vy: -0.012, size: 320, color: 'rgba(168,85,247,0.05)' },
+  { x: 0.1, y: 0.8, vx: 0.010, vy: -0.006, size: 260, color: 'rgba(34,197,94,0.04)' },
+  { x: 0.85, y: 0.7, vx: -0.007, vy: -0.009, size: 300, color: 'rgba(245,158,11,0.05)' },
+]
+const nebulaTick = signal(0)
+
+let ambientStop: (() => void) | null = null
+function startAmbientLoop() {
+  if (ambientStop) return
+  ambientStop = animationLoop((dt) => {
+    for (const orb of nebulaOrbs) {
+      orb.x += orb.vx * dt
+      orb.y += orb.vy * dt
+      if (orb.x < -0.1 || orb.x > 1.1) orb.vx *= -1
+      if (orb.y < -0.1 || orb.y > 1.1) orb.vy *= -1
+    }
+    nebulaTick.set(nebulaTick.peek() + 1)
+    return true
+  })
+}
 
 // ─── Animation State ──────────────────────────────────────────────────────────
 const animTime = signal(0)
@@ -772,57 +812,82 @@ function heroSection(): UIElement {
   const titleSize = vw.value > 980 ? 56 : vw.value > 760 ? 48 : 38
   const titleLine = vw.value > 980 ? 64 : vw.value > 760 ? 56 : 46
 
+  const e1 = heroEntrance.value
+  const e2 = heroEntrance2.value
+  const e3 = heroEntrance3.value
+  const s1 = heroSlide.value
+  const s2 = heroSlide2.value
+  const s3 = heroSlide3.value
+
   return box({ flexDirection: 'column', paddingTop: 96, paddingBottom: 64, gap: 20 }, [
-    center(
-      box({
-        gradient: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#e94560' }, { offset: 1, color: '#0ea5e9' }] },
-        borderRadius: 20,
-        paddingLeft: 16, paddingRight: 16, paddingTop: 5, paddingBottom: 5,
-      }, [
-        text({ text: 'THE SINGULARITY FRONTEND FRAMEWORK', font: '600 11px Inter', lineHeight: 15, color: '#ffffff' }),
-      ]),
-    ),
+    // Badge
+    box({ opacity: e1, marginTop: Math.round(s1) }, [
+      center(
+        box({
+          gradient: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#e94560' }, { offset: 1, color: '#0ea5e9' }] },
+          borderRadius: 20,
+          paddingLeft: 16, paddingRight: 16, paddingTop: 5, paddingBottom: 5,
+          boxShadow: { offsetX: 0, offsetY: 0, blur: 30, color: 'rgba(233,69,96,0.25)' },
+        }, [
+          text({ text: 'THE SINGULARITY FRONTEND FRAMEWORK', font: '600 11px Inter', lineHeight: 15, color: '#ffffff' }),
+        ]),
+      ),
+    ]),
     spacer(8),
-    center(text({ text: 'The client is the server.', font: `bold ${titleSize}px Inter`, lineHeight: titleLine, color: TEXT_COLOR })),
-    center(text({ text: 'The server is the client.', font: `bold ${titleSize}px Inter`, lineHeight: titleLine, color: ACCENT })),
+    // Title lines
+    box({ opacity: e1, marginTop: Math.round(s1) }, [
+      center(text({ text: 'The client is the server.', font: `bold ${titleSize}px Inter`, lineHeight: titleLine, color: TEXT_COLOR })),
+    ]),
+    box({ opacity: e2, marginTop: Math.round(s2) }, [
+      center(text({ text: 'The server is the client.', font: `bold ${titleSize}px Inter`, lineHeight: titleLine, color: ACCENT })),
+    ]),
     spacer(4),
-    center(text({
-      text: 'Geometra replaces the entire browser rendering pipeline. One JSON geometry protocol powers Canvas, Terminal, and AI agents.',
-      font: '17px Inter', lineHeight: 26, color: MUTED,
-    })),
+    // Subtitle
+    box({ opacity: e2, marginTop: Math.round(s2) }, [
+      center(text({
+        text: 'Geometra replaces the entire browser rendering pipeline. One JSON geometry protocol powers Canvas, Terminal, and AI agents.',
+        font: '17px Inter', lineHeight: 26, color: MUTED,
+      })),
+    ]),
     spacer(12),
-    center(
-      box({
-        backgroundColor: CODE_BG,
-        borderColor: BORDER,
-        borderRadius: 10,
-        paddingTop: 14, paddingBottom: 14, paddingLeft: 24, paddingRight: 24,
-        flexDirection: 'row', gap: 16,
-        cursor: 'pointer',
-        boxShadow: { offsetX: 0, offsetY: 8, blur: 28, color: GLOW },
-        onClick: () => {
-          navigator.clipboard.writeText('npm i @geometra/core @geometra/renderer-canvas')
-          copied.set(true)
-          setTimeout(() => copied.set(false), 1500)
-        },
-      }, [
-        text({ text: '$ npm i @geometra/core @geometra/renderer-canvas', font: '14px JetBrains Mono', lineHeight: 20, color: TEXT_COLOR }),
-        text({ text: copied.value ? '\u2713 Copied' : 'Copy', font: '600 12px Inter', lineHeight: 20, color: copied.value ? ACCENT3 : DIM }),
-      ]),
-    ),
-    center(
-      box({ flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }, [
-        box({ backgroundColor: 'rgba(14,165,233,0.12)', borderRadius: 999, paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4 }, [
-          text({ text: 'Yoga WASM layout', font: '600 11px Inter', lineHeight: 14, color: '#67e8f9' }),
+    // Install command
+    box({ opacity: e3, marginTop: Math.round(s3) }, [
+      center(
+        box({
+          backgroundColor: CODE_BG,
+          borderColor: BORDER,
+          borderRadius: 10,
+          paddingTop: 14, paddingBottom: 14, paddingLeft: 24, paddingRight: 24,
+          flexDirection: 'row', gap: 16,
+          cursor: 'pointer',
+          boxShadow: { offsetX: 0, offsetY: 8, blur: 28, color: GLOW },
+          onClick: () => {
+            navigator.clipboard.writeText('npm i @geometra/core @geometra/renderer-canvas')
+            copied.set(true)
+            setTimeout(() => copied.set(false), 1500)
+          },
+        }, [
+          text({ text: '$ npm i @geometra/core @geometra/renderer-canvas', font: '14px JetBrains Mono', lineHeight: 20, color: TEXT_COLOR }),
+          text({ text: copied.value ? '\u2713 Copied' : 'Copy', font: '600 12px Inter', lineHeight: 20, color: copied.value ? ACCENT3 : DIM }),
         ]),
-        box({ backgroundColor: 'rgba(34,197,94,0.12)', borderRadius: 999, paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4 }, [
-          text({ text: 'Pretext metrics', font: '600 11px Inter', lineHeight: 14, color: '#86efac' }),
+      ),
+    ]),
+    // Pills
+    box({ opacity: e3, marginTop: Math.round(s3) }, [
+      center(
+        box({ flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }, [
+          box({ backgroundColor: 'rgba(14,165,233,0.12)', borderRadius: 999, paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4 }, [
+            text({ text: 'Yoga WASM layout', font: '600 11px Inter', lineHeight: 14, color: '#67e8f9' }),
+          ]),
+          box({ backgroundColor: 'rgba(34,197,94,0.12)', borderRadius: 999, paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4 }, [
+            text({ text: 'Pretext metrics', font: '600 11px Inter', lineHeight: 14, color: '#86efac' }),
+          ]),
+          box({ backgroundColor: 'rgba(233,69,96,0.12)', borderRadius: 999, paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4 }, [
+            text({ text: 'Canvas + Terminal + WS', font: '600 11px Inter', lineHeight: 14, color: '#fda4af' }),
+          ]),
         ]),
-        box({ backgroundColor: 'rgba(233,69,96,0.12)', borderRadius: 999, paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4 }, [
-          text({ text: 'Canvas + Terminal + WS', font: '600 11px Inter', lineHeight: 14, color: '#fda4af' }),
-        ]),
-      ]),
-    ),
+      ),
+    ]),
   ])
 }
 
@@ -1054,19 +1119,55 @@ function footerSection(): UIElement {
   ])
 }
 
+// ─── Nebula Background ───────────────────────────────────────────────────────
+function nebulaBackground(viewportWidth: number, viewportHeight: number): UIElement[] {
+  const _tick = nebulaTick.value
+  return nebulaOrbs.map(orb => box({
+    position: 'absolute',
+    left: Math.round(orb.x * viewportWidth - orb.size / 2),
+    top: Math.round(orb.y * viewportHeight - orb.size / 2),
+    width: orb.size,
+    height: orb.size,
+    borderRadius: orb.size / 2,
+    backgroundColor: orb.color,
+    boxShadow: { offsetX: 0, offsetY: 0, blur: orb.size * 0.8, color: orb.color },
+  }, []))
+}
+
+// ─── Mouse Glow ──────────────────────────────────────────────────────────────
+function mouseGlow(): UIElement {
+  const gx = mouseGlowX.value
+  const gy = mouseGlowY.value
+  const glowSize = 500
+  return box({
+    position: 'absolute',
+    left: Math.round(gx - glowSize / 2),
+    top: Math.round(gy - glowSize / 2),
+    width: glowSize,
+    height: glowSize,
+    borderRadius: glowSize / 2,
+    backgroundColor: 'rgba(233,69,96,0.04)',
+    boxShadow: { offsetX: 0, offsetY: 0, blur: 200, color: 'rgba(233,69,96,0.06)' },
+  }, [])
+}
+
 // ─── Main View ───────────────────────────────────────────────────────────────
 function view(): UIElement {
   const viewportWidth = vw.value
   const contentWidth = Math.min(viewportWidth, 1100)
   const sidePad = Math.max(24, (viewportWidth - contentWidth) / 2)
 
-  return box({ flexDirection: 'column', width: viewportWidth, backgroundColor: BG, paddingLeft: sidePad, paddingRight: sidePad }, [
-    heroSection(),
-    pipelineSection(),
-    demoSection(),
-    archSection(),
-    codeSection(),
-    footerSection(),
+  return box({ flexDirection: 'column', width: viewportWidth, backgroundColor: BG, overflow: 'hidden' }, [
+    ...nebulaBackground(viewportWidth, 4000),
+    mouseGlow(),
+    box({ flexDirection: 'column', paddingLeft: sidePad, paddingRight: sidePad }, [
+      heroSection(),
+      pipelineSection(),
+      demoSection(),
+      archSection(),
+      codeSection(),
+      footerSection(),
+    ]),
   ])
 }
 
@@ -1118,5 +1219,12 @@ window.addEventListener('resize', () => {
   resizeTimer = setTimeout(() => { vw.set(window.innerWidth); mount() }, 150)
 })
 
+// ─── Mouse Tracking ──────────────────────────────────────────────────────────
+canvas.addEventListener('mousemove', (e) => {
+  mouseX.set(e.clientX)
+  mouseY.set(e.clientY + (canvas.parentElement?.scrollTop ?? 0))
+})
+
 // ─── Init ────────────────────────────────────────────────────────────────────
+startAmbientLoop()
 mount()
