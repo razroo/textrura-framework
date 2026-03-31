@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createMemoryHistory } from '../history.js'
 import { createRouter, type RouterState } from '../router.js'
+import { json, redirect, response } from '../responses.js'
 import type { RouteNode } from '../tree.js'
 
 describe('createRouter lifecycle', () => {
@@ -277,5 +278,80 @@ describe('createRouter lifecycle', () => {
 
     const success = await router.submitAction('missing', { method: 'POST', data: { x: 1 } })
     expect(success).toBe(false)
+  })
+
+  it('supports loader redirects via helper', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/users/1'] })
+    const redirectRoutes: RouteNode[] = [
+      {
+        id: 'root',
+        path: '/',
+        children: [
+          {
+            id: 'users',
+            path: 'users/:id',
+            loader: () => redirect('/login', { replace: true }),
+          },
+          {
+            id: 'login',
+            path: 'login',
+            loader: () => response({ page: 'login' }, { status: 200 }),
+          },
+        ],
+      },
+    ]
+    const router = createRouter({ routes: redirectRoutes, history })
+    router.start()
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+    expect(router.getState().location.pathname).toBe('/login')
+    expect(router.getState().loaderData.login).toEqual({
+      kind: 'response',
+      status: 200,
+      headers: undefined,
+      data: { page: 'login' },
+    })
+  })
+
+  it('supports action redirects and response helpers', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/users/1'] })
+    const actionRoutes: RouteNode[] = [
+      {
+        id: 'root',
+        path: '/',
+        children: [
+          {
+            id: 'users',
+            path: 'users/:id',
+            action: ({ submission }) => {
+              if ((submission.data as { next?: string })?.next === 'login') {
+                return redirect('/login')
+              }
+              return json({ ok: true }, { status: 201 })
+            },
+          },
+          {
+            id: 'login',
+            path: 'login',
+          },
+        ],
+      },
+    ]
+    const router = createRouter({ routes: actionRoutes, history })
+    router.start()
+
+    const wrote = await router.submitAction('users', { method: 'POST', data: { next: 'none' } })
+    expect(wrote).toBe(true)
+    expect(router.getState().actionData.users).toEqual({
+      kind: 'response',
+      status: 201,
+      headers: { 'content-type': 'application/json' },
+      data: { ok: true },
+    })
+
+    const redirected = await router.submitAction('users', { method: 'POST', data: { next: 'login' } })
+    expect(redirected).toBe(true)
+    expect(router.getState().location.pathname).toBe('/login')
   })
 })

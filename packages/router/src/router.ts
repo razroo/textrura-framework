@@ -2,6 +2,7 @@ import { createMemoryHistory, type HistoryAdapter, type RouterLocation, type Uns
 import { matchRouteTree, type RouteBranchMatch, type RouteNode } from './tree.js'
 import { parseQuery, type ParsedQuery } from './query.js'
 import type { RouteActionSubmission } from './tree.js'
+import { isRedirectResult } from './responses.js'
 
 export type RouterNavigationState = 'idle' | 'navigating'
 export type NavigationOptions = {
@@ -62,6 +63,7 @@ type ResolvedState<T = unknown, TRequestContext = unknown> = {
   location: RouterLocation
   matches: RouteBranchMatch<T, TRequestContext> | null
   loaderData: Record<string, unknown>
+  redirect: { to: string; replace: boolean } | null
 }
 
 function createRouteDataKey(route: { id?: string }, index: number): string {
@@ -75,6 +77,7 @@ async function resolveState<T, TRequestContext>(
 ): Promise<ResolvedState<T, TRequestContext>> {
   const matches = matchRouteTree(routes, location.pathname)
   const loaderData: Record<string, unknown> = {}
+  let redirect: { to: string; replace: boolean } | null = null
 
   if (matches) {
     const query: ParsedQuery = parseQuery(location.search)
@@ -87,13 +90,18 @@ async function resolveState<T, TRequestContext>(
       const route = matches.matches[i]
       if (!route?.loader) continue
       const key = createRouteDataKey(route, i)
-      loaderData[key] = await route.loader({
+      const result = await route.loader({
         params: matches.params,
         query,
         location,
         requestContext,
         route,
       })
+      if (isRedirectResult(result)) {
+        redirect = { to: result.to, replace: result.replace ?? false }
+        break
+      }
+      loaderData[key] = result
     }
   }
 
@@ -101,6 +109,7 @@ async function resolveState<T, TRequestContext>(
     location,
     matches,
     loaderData,
+    redirect,
   }
 }
 
@@ -153,6 +162,17 @@ export function createRouter<T, TRequestContext = unknown>(
       return
     }
 
+    if (resolved.redirect) {
+      if (resolved.redirect.replace) {
+        history.replace(resolved.redirect.to)
+      } else {
+        history.push(resolved.redirect.to)
+      }
+      previousNavigation?.resolve(true)
+      pendingNavigation = null
+      return
+    }
+
     pendingTo = null
     state = {
       location: resolved.location,
@@ -186,6 +206,37 @@ export function createRouter<T, TRequestContext = unknown>(
     void applyResolvedLocation(history.location, previous)
   }
 
+  const navigateInternal = async (to: string, navigationOptions?: NavigationOptions): Promise<boolean> => {
+    if (disposed) return false
+    const replace = navigationOptions?.replace ?? false
+    const restoreScroll = navigationOptions?.restoreScroll ?? true
+    const restoreFocus = navigationOptions?.restoreFocus ?? true
+    for (const blocker of blockers) {
+      const allowed = await blocker({ from: state.location, to, replace })
+      if (!allowed) return false
+    }
+    pendingNavigation?.resolve(false)
+    pendingTo = to
+    const completion = new Promise<boolean>((resolve) => {
+      pendingNavigation = {
+        from: state.location,
+        to,
+        replace,
+        restoreScroll,
+        restoreFocus,
+        resolve,
+      }
+    })
+    state = { ...state, navigation: 'navigating' }
+    emit()
+    if (replace) {
+      history.replace(to)
+    } else {
+      history.push(to)
+    }
+    return completion
+  }
+
   return {
     start() {
       if (disposed || started) return
@@ -195,34 +246,7 @@ export function createRouter<T, TRequestContext = unknown>(
       emit()
     },
     async navigate(to: string, navigationOptions?: NavigationOptions) {
-      if (disposed) return false
-      const replace = navigationOptions?.replace ?? false
-      const restoreScroll = navigationOptions?.restoreScroll ?? true
-      const restoreFocus = navigationOptions?.restoreFocus ?? true
-      for (const blocker of blockers) {
-        const allowed = await blocker({ from: state.location, to, replace })
-        if (!allowed) return false
-      }
-      pendingNavigation?.resolve(false)
-      pendingTo = to
-      const completion = new Promise<boolean>((resolve) => {
-        pendingNavigation = {
-          from: state.location,
-          to,
-          replace,
-          restoreScroll,
-          restoreFocus,
-          resolve,
-        }
-      })
-      state = { ...state, navigation: 'navigating' }
-      emit()
-      if (replace) {
-        history.replace(to)
-      } else {
-        history.push(to)
-      }
-      return completion
+      return navigateInternal(to, navigationOptions)
     },
     async submitAction(routeId: string, submission: RouteActionSubmission = {}) {
       if (disposed) return false
@@ -242,6 +266,10 @@ export function createRouter<T, TRequestContext = unknown>(
         route,
         submission,
       })
+
+      if (isRedirectResult(result)) {
+        return navigateInternal(result.to, { replace: result.replace })
+      }
 
       state = {
         ...state,

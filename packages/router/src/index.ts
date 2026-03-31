@@ -9,6 +9,8 @@ export { createBrowserHistory } from './history.js'
 export type { RouterLocation, HistoryUpdate, HistoryAdapter, BrowserHistoryOptions } from './history.js'
 export { link } from './link.js'
 export type { LinkProps } from './link.js'
+export { redirect, response, json } from './responses.js'
+export type { RedirectResult, ResponseResult } from './responses.js'
 export { scorePathPattern, comparePatternSpecificity } from './ranking.js'
 export { createRouter } from './router.js'
 export type {
