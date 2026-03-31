@@ -853,6 +853,22 @@ export function enableSelection(
   }
 
   function onKeyDown(e: KeyboardEvent) {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+      if (renderer.textNodes.length > 0) {
+        const first = renderer.textNodes[0]!
+        const last = renderer.textNodes[renderer.textNodes.length - 1]!
+        renderer.selection = {
+          anchorNode: first.index,
+          anchorOffset: 0,
+          focusNode: last.index,
+          focusOffset: last.element.props.text.length,
+        }
+        scheduleSelectionChange()
+        e.preventDefault()
+        return
+      }
+    }
+
     if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
       const selectedText = renderer.getSelectedText()
       if (selectedText) {

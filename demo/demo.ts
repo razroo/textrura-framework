@@ -776,6 +776,7 @@ function onDocumentKeyDown(e: KeyboardEvent) {
   if (
     handled &&
     (
+      ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') ||
       e.key === 'Tab' ||
       e.key === 'ArrowLeft' ||
       e.key === 'ArrowRight' ||
