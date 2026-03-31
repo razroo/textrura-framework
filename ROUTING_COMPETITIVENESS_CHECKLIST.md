@@ -19,7 +19,7 @@ Goal: deliver a Geometra routing stack that is competitive with modern data rout
 - [x] Add `createRouter()` lifecycle (`start`, `navigate`, `subscribe`, `dispose`).
 - [ ] Add history adapters:
   - [ ] Browser history (push/replace/popstate).
-  - [ ] Memory history (tests, terminal, server runtime).
+  - [x] Memory history (tests, terminal, server runtime).
 
 ## 2) Navigation APIs (must have)
 
