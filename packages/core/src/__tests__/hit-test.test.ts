@@ -86,6 +86,22 @@ describe('dispatchHit', () => {
     expect(result.focusTarget?.element).toBe(el)
   })
 
+  it('merges extra fields into the hit event', () => {
+    let received: Record<string, unknown> | null = null
+    const el = box({
+      width: 100,
+      height: 50,
+      onClick: (e) => { received = e as Record<string, unknown> },
+    })
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
+
+    dispatchHit(el, layout, 'onClick', 50, 25, { button: 2, shiftKey: true })
+    expect(received?.button).toBe(2)
+    expect(received?.shiftKey).toBe(true)
+    expect(received?.localX).toBe(50)
+    expect(received?.localY).toBe(25)
+  })
+
   it('overlapping siblings: higher z-index wins (matches paint order)', () => {
     const log: string[] = []
     const back = box(
@@ -276,5 +292,35 @@ describe('hasInteractiveHitAtPoint', () => {
     }
     expect(hasInteractiveHitAtPoint(root, layout, 30, 30)).toBe(true)
     expect(hasInteractiveHitAtPoint(root, layout, 5, 5)).toBe(false)
+  })
+
+  it('detects onPointerDown without onClick', () => {
+    const inner = box({ width: 40, height: 40, onPointerDown: () => undefined })
+    const root = box({ width: 100, height: 100 }, [inner])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+    expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(true)
+  })
+
+  it('detects onWheel on deepest hit', () => {
+    const inner = box({ width: 40, height: 40, onWheel: () => undefined })
+    const root = box({ width: 100, height: 100 }, [inner])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+    expect(hasInteractiveHitAtPoint(root, layout, 5, 5)).toBe(true)
+  })
+
+  it('ignores key-only focusable handlers for hover hit-test', () => {
+    const inner = box({ width: 40, height: 40, onKeyDown: () => undefined })
+    const root = box({ width: 100, height: 100 }, [inner])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+    expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(false)
   })
 })

@@ -32,9 +32,26 @@ describe('extractFontFamiliesFromCSSFont', () => {
       extractFontFamiliesFromCSSFont('12px "First, Name", "Second", serif'),
     ).toEqual(['First, Name', 'Second'])
   })
+
+  it('parses numeric weight before size and family', () => {
+    expect(extractFontFamiliesFromCSSFont('500 14px Inter')).toEqual(['Inter'])
+  })
+
+  it('returns empty when only generic families remain', () => {
+    expect(extractFontFamiliesFromCSSFont('14px sans-serif, serif')).toEqual([])
+  })
+
+  it('parses unquoted multi-word family as single name', () => {
+    expect(extractFontFamiliesFromCSSFont('12px Times New Roman, serif')).toEqual(['Times New Roman'])
+  })
 })
 
 describe('collectFontFamiliesFromTree', () => {
+  it('returns empty when tree has no text nodes', () => {
+    const tree = box({ width: 10, height: 10 })
+    expect(collectFontFamiliesFromTree(tree)).toEqual([])
+  })
+
   it('dedupes families from text nodes', () => {
     const tree = box({}, [
       text({ text: 'a', font: '14px Inter', lineHeight: 20 }),
