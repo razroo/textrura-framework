@@ -51,7 +51,7 @@ Tracking fields:
 
 - [x] Status: `done` | Owner: `@codex` | Write a concise interaction spec (Tab/Shift+Tab, Enter/Escape, arrow behavior, focus order rules).
 - [x] Status: `done` | Owner: `@codex` | Align core + terminal/canvas behavior with the interaction spec.
-- [ ] Status: `todo` | Owner: `@unassigned` | Add end-to-end focus traversal tests for multiple focusable regions.
+- [x] Status: `done` | Owner: `@codex` | Add end-to-end focus traversal tests for multiple focusable regions.
 - [ ] Status: `todo` | Owner: `@unassigned` | Expand accessibility tree coverage for common patterns (headings, nav, lists, buttons, forms).
 - [ ] Status: `todo` | Owner: `@unassigned` | Add semantic output snapshots for representative UI trees.
 - [ ] Status: `todo` | Owner: `@unassigned` | Document accessibility guarantees and known limitations.

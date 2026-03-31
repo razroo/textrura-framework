@@ -139,6 +139,24 @@ async function run(): Promise<void> {
   })
 
   await runScenario({
+    name: 'tab-wrap-focus-cycles',
+    bootDelayMs: 1600,
+    steps: [{ keys: '\t\tq', delayMs: 400 }],
+    assert: ({ events, exitCode }) => {
+      const focusEvents = events.filter(e => e.startsWith('focus-slot-'))
+      if (!focusEvents.includes('focus-slot-1')) {
+        throw new Error(`Expected first Tab to reach focus-slot-1 (saw: ${events.join(', ')})`)
+      }
+      if (!focusEvents.includes('focus-slot-0')) {
+        throw new Error(`Expected second Tab to wrap back to focus-slot-0 (saw: ${events.join(', ')})`)
+      }
+      if (exitCode !== 0) {
+        throw new Error(`Expected exit 0, got ${exitCode}`)
+      }
+    },
+  })
+
+  await runScenario({
     name: 'ctrl-c-exit',
     steps: [{ keys: '\x03', delayMs: 500 }],
     assert: ({ events, exitCode }) => {
