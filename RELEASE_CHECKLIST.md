@@ -36,6 +36,7 @@ gh release create vX.Y.Z --title "vX.Y.Z" --notes "..."
 
 - [ ] Summarize behavior changes.
 - [ ] Include migration notes for API/protocol changes.
+- [ ] Follow `RELEASE_NOTES_TEMPLATE.md` structure.
 - [ ] Add **performance notes**:
   - mention perf-sensitive changes (hit-test, text metrics, geometry diff)
   - confirm `PERF_BASELINES.md` thresholds remain valid or explain updates
