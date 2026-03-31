@@ -64,4 +64,35 @@ describe('createRouter lifecycle', () => {
 
     expect(router.getState().location.pathname).toBe('/users/1')
   })
+
+  it('exposes active route helper', () => {
+    const history = createMemoryHistory({ initialEntries: ['/users/1'] })
+    const router = createRouter({ routes, history })
+    router.start()
+
+    expect(router.isActive('/users/1')).toBe(true)
+    expect(router.isActive('/users/2')).toBe(false)
+  })
+
+  it('exposes pending route helper during in-flight navigation', () => {
+    const pushed: string[] = []
+    const history = createMemoryHistory({ initialEntries: ['/'] })
+    const realPush = history.push.bind(history)
+    history.push = (to: string) => {
+      pushed.push(to)
+      // Delay actual history update to simulate in-flight navigation.
+    }
+
+    const router = createRouter({ routes, history })
+    router.start()
+    router.navigate('/users/9')
+
+    expect(router.isPending('/users/9')).toBe(true)
+    expect(router.isPending('/users/1')).toBe(false)
+
+    // Complete pending navigation and ensure pending state clears.
+    realPush(pushed[0]!)
+    expect(router.isPending('/users/9')).toBe(false)
+    expect(router.isActive('/users/9')).toBe(true)
+  })
 })

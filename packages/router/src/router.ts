@@ -17,6 +17,8 @@ export interface Router<T = unknown> {
   subscribe(listener: RouterSubscriber<T>): Unsubscribe
   dispose(): void
   getState(): RouterState<T>
+  isActive(to: string): boolean
+  isPending(to: string): boolean
 }
 
 export type CreateRouterOptions<T = unknown> = {
@@ -40,6 +42,7 @@ export function createRouter<T>(options: CreateRouterOptions<T>): Router<T> {
   let disposed = false
   let unlisten: Unsubscribe | null = null
   let state = resolveState(routes, history.location)
+  let pendingTo: string | null = null
   const listeners = new Set<RouterSubscriber<T>>()
 
   const emit = (): void => {
@@ -47,6 +50,7 @@ export function createRouter<T>(options: CreateRouterOptions<T>): Router<T> {
   }
 
   const onHistoryUpdate = (): void => {
+    pendingTo = null
     state = resolveState(routes, history.location)
     emit()
   }
@@ -61,6 +65,7 @@ export function createRouter<T>(options: CreateRouterOptions<T>): Router<T> {
     },
     navigate(to: string, navigationOptions?: { replace?: boolean }) {
       if (disposed) return
+      pendingTo = to
       state = { ...state, navigation: 'navigating' }
       emit()
       if (navigationOptions?.replace) {
@@ -86,6 +91,12 @@ export function createRouter<T>(options: CreateRouterOptions<T>): Router<T> {
     },
     getState() {
       return state
+    },
+    isActive(to: string) {
+      return state.location.pathname === to
+    },
+    isPending(to: string) {
+      return state.navigation === 'navigating' && pendingTo === to
     },
   }
 }
