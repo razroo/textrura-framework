@@ -74,7 +74,7 @@ Tracking fields:
 
 ### Docs and developer experience (parallel track)
 
-- [ ] Status: `todo` | Owner: `@unassigned` | Keep README/API exports aligned with shipped behavior every release.
+- [x] Status: `done` | Owner: `@codex` | Keep README/API exports aligned with shipped behavior every release.
 - [ ] Status: `todo` | Owner: `@unassigned` | Add a testing matrix doc (unit vs integration vs renderer-specific).
 - [ ] Status: `todo` | Owner: `@unassigned` | Provide copy-paste examples for terminal input/focus wiring.
 - [ ] Status: `todo` | Owner: `@unassigned` | Add release playbook checklist (version bump, tests, notes, verification).

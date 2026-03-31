@@ -6,6 +6,7 @@ Use this checklist before creating a new `vX.Y.Z` GitHub release.
 
 - [ ] Ensure working tree is clean.
 - [ ] Update versions for publishable packages.
+- [ ] Verify public exports and README/API docs are aligned (`packages/*/README.md`, root `README.md`).
 - [ ] Run targeted suites:
   - [ ] `npm run test`
   - [ ] `npm run test:terminal-input`
