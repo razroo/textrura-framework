@@ -1,11 +1,26 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createApp } from '../app.js'
-import { box } from '../elements.js'
+import { box, text } from '../elements.js'
 import { clearFocus } from '../focus.js'
 import { signal } from '../signals.js'
 import { backspaceInput, insertInputText, moveInputCaret } from '../text-input.js'
 import type { Renderer, UIElement } from '../types.js'
 import type { TextInputState } from '../text-input.js'
+
+if (typeof globalThis.OffscreenCanvas === 'undefined') {
+  // Minimal text-measurement mock for Node test environment.
+  ;(globalThis as unknown as { OffscreenCanvas: unknown }).OffscreenCanvas = class {
+    getContext(type: string) {
+      if (type !== '2d') return null
+      return {
+        font: '',
+        measureText(value: string) {
+          return { width: value.length * 8 }
+        },
+      }
+    }
+  }
+}
 
 class TestRenderer implements Renderer {
   render(_layout: unknown, _tree: UIElement): void {
@@ -495,6 +510,182 @@ describe('app input focus routing', () => {
 
     expect(state.nodes).toEqual(['abc'])
     expect(state.selection).toEqual({ anchorNode: 0, anchorOffset: 2, focusNode: 0, focusOffset: 2 })
+    app.destroy()
+  })
+
+  it('Cmd/Ctrl+A selects only within the focused input', async () => {
+    let left: TextInputState = {
+      nodes: ['left value'],
+      selection: { anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 0 },
+    }
+    let right: TextInputState = {
+      nodes: ['right value'],
+      selection: { anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 0 },
+    }
+
+    const app = await createApp(
+      () =>
+        box(
+          { width: 340, height: 120, flexDirection: 'row' },
+          [
+            box(
+              {
+                width: 150,
+                height: 40,
+                onKeyDown: (e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+                    left = {
+                      nodes: left.nodes,
+                      selection: {
+                        anchorNode: 0,
+                        anchorOffset: 0,
+                        focusNode: 0,
+                        focusOffset: left.nodes[0]!.length,
+                      },
+                    }
+                  }
+                },
+              },
+              [],
+            ),
+            box({ width: 20, height: 40 }, []),
+            box(
+              {
+                width: 150,
+                height: 40,
+                onKeyDown: (e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+                    right = {
+                      nodes: right.nodes,
+                      selection: {
+                        anchorNode: 0,
+                        anchorOffset: 0,
+                        focusNode: 0,
+                        focusOffset: right.nodes[0]!.length,
+                      },
+                    }
+                  }
+                },
+              },
+              [],
+            ),
+          ],
+        ),
+      new TestRenderer(),
+      { width: 340, height: 120 },
+    )
+
+    app.dispatch('onClick', 10, 10)
+    const leftHandled = app.dispatchKey('onKeyDown', {
+      key: 'a',
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: true,
+      metaKey: false,
+      altKey: false,
+    })
+    expect(leftHandled).toBe(true)
+    expect(left.selection.focusOffset).toBe(left.nodes[0]!.length)
+    expect(right.selection.focusOffset).toBe(0)
+
+    app.dispatch('onClick', 190, 10)
+    const rightHandled = app.dispatchKey('onKeyDown', {
+      key: 'a',
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: true,
+      altKey: false,
+    })
+    expect(rightHandled).toBe(true)
+    expect(right.selection.focusOffset).toBe(right.nodes[0]!.length)
+    // Left remains unchanged from the prior selection action.
+    expect(left.selection.focusOffset).toBe(left.nodes[0]!.length)
+
+    app.destroy()
+  })
+
+  it('Cmd/Ctrl+A does not trigger outside-text select-all handlers when input is focused', async () => {
+    let inputState: TextInputState = {
+      nodes: ['inside input'],
+      selection: { anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 0 },
+    }
+    let outsideSelectAllTriggered = false
+
+    const app = await createApp(
+      () =>
+        box(
+          {
+            width: 420,
+            height: 160,
+            onKeyDown: (e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+                outsideSelectAllTriggered = true
+              }
+            },
+          },
+          [
+            // Text content outside the input.
+            box({ width: 360, height: 32 }, [
+              text({ text: 'outside text that should not be selected', font: '14px Inter', lineHeight: 20 }),
+            ]),
+            box(
+              {
+                width: 220,
+                height: 40,
+                onKeyDown: (e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+                    inputState = {
+                      nodes: inputState.nodes,
+                      selection: {
+                        anchorNode: 0,
+                        anchorOffset: 0,
+                        focusNode: 0,
+                        focusOffset: inputState.nodes[0]!.length,
+                      },
+                    }
+                  }
+                },
+              },
+              [],
+            ),
+          ],
+        ),
+      new TestRenderer(),
+      { width: 420, height: 160 },
+    )
+
+    // Focus traversal: root (first) -> input (second).
+    app.dispatchKey('onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    app.dispatchKey('onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    const handled = app.dispatchKey('onKeyDown', {
+      key: 'a',
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: true,
+      metaKey: false,
+      altKey: false,
+    })
+
+    expect(handled).toBe(true)
+    expect(inputState.selection.anchorOffset).toBe(0)
+    expect(inputState.selection.focusOffset).toBe(inputState.nodes[0]!.length)
+    expect(outsideSelectAllTriggered).toBe(false)
+
     app.destroy()
   })
 })
