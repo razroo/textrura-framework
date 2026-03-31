@@ -48,6 +48,18 @@ const compositionDraft = signal('')
 const compositionSelection = signal<TextInputState['selection'] | null>(null)
 let lastPerfTime = '-'
 let lastPerfNodes = '-'
+let inputMeasureCtx: CanvasRenderingContext2D | null = null
+
+function measureInputTextWidth(textValue: string): number {
+  if (!textValue) return 0
+  if (!inputMeasureCtx) {
+    const measureCanvas = document.createElement('canvas')
+    inputMeasureCtx = measureCanvas.getContext('2d')
+  }
+  if (!inputMeasureCtx) return 0
+  inputMeasureCtx.font = '14px JetBrains Mono'
+  return Math.ceil(inputMeasureCtx.measureText(textValue).width)
+}
 
 // ─── Layout Helpers ──────────────────────────────────────────────────────────
 function countNodes(el: UIElement): number {
@@ -363,7 +375,12 @@ function textInputDemo(): UIElement {
 
     const rowChildren: UIElement[] = []
     if (left.length > 0) {
-      rowChildren.push(text({ text: left, font: '14px JetBrains Mono', lineHeight: 20, color: '#d1d5db' }))
+      rowChildren.push(box({
+        width: measureInputTextWidth(left),
+        flexShrink: 0,
+      }, [
+        text({ text: left, font: '14px JetBrains Mono', lineHeight: 20, color: '#d1d5db' }),
+      ]))
     }
 
     if (isCaretLine) {
@@ -376,6 +393,8 @@ function textInputDemo(): UIElement {
 
     if (draft && compositionSel && lineIndex === norm.startNode) {
       rowChildren.push(box({
+        width: measureInputTextWidth(draft) + 2,
+        flexShrink: 0,
         backgroundColor: 'rgba(56,189,248,0.18)',
         borderRadius: 4,
         paddingLeft: 1,
@@ -385,6 +404,8 @@ function textInputDemo(): UIElement {
       ]))
     } else if (hasSelection && mid.length > 0) {
       rowChildren.push(box({
+        width: measureInputTextWidth(mid) + 2,
+        flexShrink: 0,
         backgroundColor: 'rgba(14,165,233,0.24)',
         borderRadius: 4,
         paddingLeft: 1,
@@ -395,14 +416,19 @@ function textInputDemo(): UIElement {
     }
 
     if (right.length > 0) {
-      rowChildren.push(text({ text: right, font: '14px JetBrains Mono', lineHeight: 20, color: '#d1d5db' }))
+      rowChildren.push(box({
+        width: measureInputTextWidth(right),
+        flexShrink: 0,
+      }, [
+        text({ text: right, font: '14px JetBrains Mono', lineHeight: 20, color: '#d1d5db' }),
+      ]))
     }
 
     if (rowChildren.length === 0) {
       rowChildren.push(text({ text: active && lineIndex === 0 ? '' : ' ', font: '14px JetBrains Mono', lineHeight: 20, color: '#d1d5db' }))
     }
 
-    return box({ flexDirection: 'row', alignItems: 'center', minHeight: 20 }, rowChildren)
+    return box({ flexDirection: 'row', alignItems: 'center', minHeight: 20, width: '100%', overflow: 'hidden' }, rowChildren)
   })
 
   return box({ flexDirection: 'column', padding: 24, gap: 14, width: w, minHeight: 380 }, [
@@ -415,6 +441,7 @@ function textInputDemo(): UIElement {
       borderRadius: 10,
       padding: 14,
       minHeight: 100,
+      overflow: 'hidden',
       cursor: 'text',
       onClick: () => {
         const endNode = state.nodes.length - 1
