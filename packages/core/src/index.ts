@@ -42,10 +42,17 @@ export {
   easing,
   animationLoop,
   createTweenTimeline,
+  createPropertyTimeline,
   setMotionPreference,
   getMotionPreference,
 } from './animation.js'
-export type { EasingFn, TweenPlaybackState, TweenTimeline, MotionPreference } from './animation.js'
+export type {
+  EasingFn,
+  TweenPlaybackState,
+  TweenTimeline,
+  PropertyTimeline,
+  MotionPreference,
+} from './animation.js'
 
 // Virtual scroll helpers
 export { syncVirtualWindow } from './virtual-scroll.js'

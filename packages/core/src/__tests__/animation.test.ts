@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  createPropertyTimeline,
   createTweenTimeline,
   easing,
   getMotionPreference,
@@ -65,5 +66,24 @@ describe('animation timeline', () => {
     expect(timeline.state()).toBe('cancelled')
     timeline.step(100)
     expect(timeline.value.peek()).toBe(15)
+  })
+
+  it('animates multiple geometry/paint properties deterministically', () => {
+    const props = createPropertyTimeline({ x: 0, y: 0, width: 100, opacity: 0 })
+    props.to({ x: 40, y: 20, width: 140, opacity: 1 }, 400, easing.linear)
+
+    let next = props.step(200)
+    expect(next.x).toBe(20)
+    expect(next.y).toBe(10)
+    expect(next.width).toBe(120)
+    expect(next.opacity).toBe(0.5)
+    expect(props.state()).toBe('running')
+
+    next = props.step(200)
+    expect(next.x).toBe(40)
+    expect(next.y).toBe(20)
+    expect(next.width).toBe(140)
+    expect(next.opacity).toBe(1)
+    expect(props.state()).toBe('finished')
   })
 })

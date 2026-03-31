@@ -32,6 +32,16 @@ export interface TweenTimeline {
   state(): TweenPlaybackState
 }
 
+export interface PropertyTimeline {
+  values: Record<string, Signal<number>>
+  to(targets: Record<string, number>, durationMs: number, easingFn?: EasingFn): void
+  step(deltaMs: number): Record<string, number>
+  pause(): void
+  resume(): void
+  cancel(): void
+  state(): TweenPlaybackState
+}
+
 export type MotionPreference = 'full' | 'reduced'
 
 const motionPreference = signal<MotionPreference>('full')
@@ -142,6 +152,77 @@ export function createTweenTimeline(initialValue: number): TweenTimeline {
     cancel,
     state: () => playbackState,
   }
+}
+
+/**
+ * Multi-property deterministic timeline for geometry/paint numeric fields.
+ * Typical usage includes x/y/width/height/opacity style numeric transitions.
+ */
+export function createPropertyTimeline(initialValues: Record<string, number>): PropertyTimeline {
+  const timelines = new Map<string, TweenTimeline>()
+  const values: Record<string, Signal<number>> = {}
+
+  for (const key of Object.keys(initialValues)) {
+    const timeline = createTweenTimeline(initialValues[key] ?? 0)
+    timelines.set(key, timeline)
+    values[key] = timeline.value
+  }
+
+  function ensureTimeline(key: string): TweenTimeline {
+    const existing = timelines.get(key)
+    if (existing) return existing
+    const created = createTweenTimeline(0)
+    timelines.set(key, created)
+    values[key] = created.value
+    return created
+  }
+
+  function to(targets: Record<string, number>, durationMs: number, easingFn: EasingFn = easing.easeInOut): void {
+    for (const key of Object.keys(targets)) {
+      ensureTimeline(key).to(targets[key] ?? 0, durationMs, easingFn)
+    }
+  }
+
+  function step(deltaMs: number): Record<string, number> {
+    const next: Record<string, number> = {}
+    for (const [key, timeline] of timelines) {
+      next[key] = timeline.step(deltaMs)
+    }
+    return next
+  }
+
+  function pause(): void {
+    for (const timeline of timelines.values()) timeline.pause()
+  }
+
+  function resume(): void {
+    for (const timeline of timelines.values()) timeline.resume()
+  }
+
+  function cancel(): void {
+    for (const timeline of timelines.values()) timeline.cancel()
+  }
+
+  function state(): TweenPlaybackState {
+    let hasRunning = false
+    let hasPaused = false
+    let hasCancelled = false
+    let hasFinished = false
+    for (const timeline of timelines.values()) {
+      const s = timeline.state()
+      hasRunning = hasRunning || s === 'running'
+      hasPaused = hasPaused || s === 'paused'
+      hasCancelled = hasCancelled || s === 'cancelled'
+      hasFinished = hasFinished || s === 'finished'
+    }
+    if (hasRunning) return 'running'
+    if (hasPaused) return 'paused'
+    if (hasCancelled) return 'cancelled'
+    if (hasFinished) return 'finished'
+    return 'idle'
+  }
+
+  return { values, to, step, pause, resume, cancel, state }
 }
 
 /**
