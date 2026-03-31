@@ -131,6 +131,41 @@ describe('text-input foundation', () => {
     expect(caret?.height).toBe(20)
   })
 
+  it('computes caret geometry across multiline boundaries and clamps edges', () => {
+    const textNodes = [
+      {
+        element: { kind: 'text', props: { text: 'abcd', font: '14px Inter', lineHeight: 18 } },
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 36,
+        index: 0,
+        lines: [
+          { text: 'ab', x: 10, y: 20, charOffsets: [0, 6], charWidths: [6, 6] },
+          { text: 'cd', x: 10, y: 38, charOffsets: [0, 7], charWidths: [7, 7] },
+        ],
+      },
+    ] as any
+
+    const firstLineStart = getInputCaretGeometry(textNodes, {
+      anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 0,
+    })
+    const secondLineOffset = getInputCaretGeometry(textNodes, {
+      anchorNode: 0, anchorOffset: 3, focusNode: 0, focusOffset: 3,
+    })
+    const clampedEnd = getInputCaretGeometry(textNodes, {
+      anchorNode: 0, anchorOffset: 99, focusNode: 0, focusOffset: 99,
+    })
+
+    expect(firstLineStart?.x).toBe(10)
+    expect(firstLineStart?.y).toBe(20)
+    expect(secondLineOffset?.x).toBe(17)
+    expect(secondLineOffset?.y).toBe(38)
+    expect(clampedEnd?.x).toBe(24)
+    expect(clampedEnd?.y).toBe(38)
+    expect(clampedEnd?.offset).toBe(4)
+  })
+
   it('supports undo/redo history for edits', () => {
     let history = createTextInputHistory({
       nodes: ['hello'],
