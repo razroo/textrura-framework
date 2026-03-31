@@ -281,5 +281,34 @@ describe('text-input foundation', () => {
     history = redoTextInputHistory(history)
     expect(history.present.nodes).toEqual(['hello!'])
   })
+
+  it('supports copy/cut/paste flow with selection and history', () => {
+    let history = createTextInputHistory({
+      nodes: ['hello world'],
+      selection: { anchorNode: 0, anchorOffset: 6, focusNode: 0, focusOffset: 11 },
+    })
+
+    const copied = getInputSelectionText(history.present.nodes, history.present.selection)
+    expect(copied).toBe('world')
+
+    const cut = replaceInputSelection(history.present.nodes, history.present.selection, '')
+    history = pushTextInputHistory(history, cut)
+    expect(history.present.nodes).toEqual(['hello '])
+
+    const pasted = insertInputText(
+      {
+        nodes: history.present.nodes,
+        selection: { anchorNode: 0, anchorOffset: 6, focusNode: 0, focusOffset: 6 },
+      },
+      copied,
+    )
+    history = pushTextInputHistory(history, pasted)
+    expect(history.present.nodes).toEqual(['hello world'])
+
+    history = undoTextInputHistory(history)
+    expect(history.present.nodes).toEqual(['hello '])
+    history = undoTextInputHistory(history)
+    expect(history.present.nodes).toEqual(['hello world'])
+  })
 })
 
