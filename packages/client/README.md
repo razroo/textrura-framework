@@ -26,6 +26,10 @@ const client = createClient({
   // forwards pointer + keyboard + IME composition events to server
   forwardKeyboard: true,
   forwardComposition: true,
+  // optional telemetry hook for decode/apply/render budget tracking
+  onFrameMetrics: (m) => {
+    console.log('frame metrics', m.messageType, m.decodeMs, m.applyMs, m.renderMs)
+  },
 })
 ```
 

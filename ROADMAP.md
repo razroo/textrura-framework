@@ -102,7 +102,7 @@ Acceptance criteria:
 
 - [ ] Status: `todo` | Owner: `@unassigned` | Add optional binary frame encoding path behind explicit protocol version/capability negotiation.
 - [ ] Status: `todo` | Owner: `@unassigned` | Add backpressure-aware batching/coalescing policy with bounded memory behavior.
-- [ ] Status: `todo` | Owner: `@unassigned` | Expose frame budget instrumentation (encode/decode/apply timings, dropped/coalesced counters).
+- [ ] Status: `in_progress` | Owner: `@codex` | Expose frame budget instrumentation (encode/decode/apply timings, dropped/coalesced counters). (client decode/apply/render telemetry shipped; dropped/coalesced counters pending)
 - [ ] Status: `todo` | Owner: `@unassigned` | Add large-app stress scenarios (rapid input + layout churn + reconnect) with deterministic pass criteria.
 
 Definition of done:

@@ -30,6 +30,14 @@ interface ServerError {
 
 type ServerMessage = ServerFrame | ServerPatch | ServerError
 
+export interface ClientFrameMetrics {
+  messageType: ServerMessage['type']
+  decodeMs: number
+  applyMs: number
+  renderMs: number
+  patchCount?: number
+}
+
 interface ClientStateShape {
   layout: ComputedLayout | null
   tree: UIElement | null
@@ -54,6 +62,8 @@ export interface TexturaClientOptions {
   resizeTarget?: Window
   /** Called on WebSocket or message parsing errors. */
   onError?: (error: unknown) => void
+  /** Optional frame-budget telemetry hook per processed server message. */
+  onFrameMetrics?: (metrics: ClientFrameMetrics) => void
   /** Enable automatic reconnection on disconnect. Default: true. */
   reconnect?: boolean
 }
@@ -87,7 +97,12 @@ export function applyServerMessage(
   renderer: Renderer,
   msg: ServerMessage,
   onError?: (error: unknown) => void,
+  onMetrics?: (metrics: ClientFrameMetrics) => void,
+  decodeMs = 0,
 ): void {
+  const applyStart = performance.now()
+  let renderMs = 0
+  let didRender = false
   if (msg.protocolVersion && msg.protocolVersion > PROTOCOL_VERSION) {
     onError?.(
       new Error(
@@ -99,13 +114,27 @@ export function applyServerMessage(
   if (msg.type === 'frame') {
     state.layout = msg.layout
     state.tree = msg.tree
+    const renderStart = performance.now()
     renderer.render(msg.layout, msg.tree)
+    renderMs = performance.now() - renderStart
+    didRender = true
   } else if (msg.type === 'patch' && state.layout && state.tree) {
     applyPatches(state.layout, msg.patches)
+    const renderStart = performance.now()
     renderer.render(state.layout, state.tree)
+    renderMs = performance.now() - renderStart
+    didRender = true
   } else if (msg.type === 'error') {
     onError?.(new Error(msg.message))
   }
+  const applyMs = performance.now() - applyStart
+  onMetrics?.({
+    messageType: msg.type,
+    decodeMs,
+    applyMs,
+    renderMs: didRender ? renderMs : 0,
+    patchCount: msg.type === 'patch' ? msg.patches.length : undefined,
+  })
 }
 
 /**
@@ -117,7 +146,7 @@ export function applyServerMessage(
  */
 export function createClient(options: TexturaClientOptions): TexturaClient {
   const url = options.url ?? 'ws://localhost:3100'
-  const { renderer, canvas, onError } = options
+  const { renderer, canvas, onError, onFrameMetrics } = options
   const shouldReconnect = options.reconnect !== false
 
   let ws: WebSocket
@@ -154,8 +183,10 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
 
     ws.addEventListener('message', (event) => {
       try {
+        const decodeStart = performance.now()
         const msg = JSON.parse(String(event.data)) as ServerMessage
-        applyServerMessage(state, renderer, msg, onError)
+        const decodeMs = performance.now() - decodeStart
+        applyServerMessage(state, renderer, msg, onError, onFrameMetrics, decodeMs)
       } catch (err) {
         onError?.(err)
       }

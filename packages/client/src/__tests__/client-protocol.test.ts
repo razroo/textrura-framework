@@ -111,4 +111,34 @@ describe('applyServerMessage', () => {
     expect(state.layout?.width).toBe(120)
     expect(renders.length).toBe(4)
   })
+
+  it('emits frame metrics for frame and patch processing', () => {
+    const { renderer } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const metrics: Array<{ messageType: string; decodeMs: number; applyMs: number; renderMs: number; patchCount?: number }> = []
+
+    applyServerMessage(
+      state,
+      renderer,
+      { type: 'frame', layout: layout(), tree: tree(), protocolVersion: 1 },
+      undefined,
+      (m) => metrics.push(m),
+      0.25,
+    )
+    applyServerMessage(
+      state,
+      renderer,
+      { type: 'patch', patches: [{ path: [], width: 200 }], protocolVersion: 1 },
+      undefined,
+      (m) => metrics.push(m),
+      0.1,
+    )
+
+    expect(metrics).toHaveLength(2)
+    expect(metrics[0]?.messageType).toBe('frame')
+    expect(metrics[0]?.decodeMs).toBeGreaterThanOrEqual(0)
+    expect(metrics[0]?.renderMs).toBeGreaterThanOrEqual(0)
+    expect(metrics[1]?.messageType).toBe('patch')
+    expect(metrics[1]?.patchCount).toBe(1)
+  })
 })
