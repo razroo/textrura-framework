@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { diffLayout, isProtocolCompatible } from '../protocol.js'
+import { diffLayout, isProtocolCompatible, coalescePatches } from '../protocol.js'
 
 interface TestLayout {
   x: number
@@ -86,5 +86,19 @@ describe('diffLayout', () => {
     expect(isProtocolCompatible(1, 1)).toBe(true)
     expect(isProtocolCompatible(0, 1)).toBe(true)
     expect(isProtocolCompatible(2, 1)).toBe(false)
+  })
+
+  it('coalesces repeated path updates with last-write wins semantics', () => {
+    const merged = coalescePatches([
+      { path: [1, 2], x: 10 },
+      { path: [1, 2], y: 20 },
+      { path: [1, 2], x: 30, width: 40 },
+      { path: [3], height: 9 },
+      { path: [3], y: 5 },
+    ])
+    expect(merged).toEqual([
+      { path: [1, 2], x: 30, y: 20, width: 40 },
+      { path: [3], height: 9, y: 5 },
+    ])
   })
 })

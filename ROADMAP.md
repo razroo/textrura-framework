@@ -121,7 +121,7 @@ Tracking fields:
 ### 0.4.3 — Protocol v2 planning and transport resilience
 
 - [x] Status: `done` | Owner: `@codex` | Draft protocol-v2 RFC with backward-compat strategy and migration policy.
-- [ ] Status: `todo` | Owner: `@unassigned` | Add message batching/coalescing tests for high-frequency input and layout churn.
+- [x] Status: `done` | Owner: `@codex` | Add message batching/coalescing tests for high-frequency input and layout churn.
 - [ ] Status: `todo` | Owner: `@unassigned` | Add chaos-style reconnect tests (out-of-order frames, delayed patches, duplicate messages).
 - [ ] Status: `todo` | Owner: `@unassigned` | Add protocol conformance fixtures runnable by both client and server packages.
 

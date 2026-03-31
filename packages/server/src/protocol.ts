@@ -57,6 +57,25 @@ export interface LayoutPatch {
   height?: number
 }
 
+/** Coalesce multiple patches on the same path (last write wins per field). */
+export function coalescePatches(patches: LayoutPatch[]): LayoutPatch[] {
+  const byPath = new Map<string, LayoutPatch>()
+  const order: string[] = []
+  for (const patch of patches) {
+    const key = patch.path.join('.')
+    if (!byPath.has(key)) {
+      byPath.set(key, { path: [...patch.path] })
+      order.push(key)
+    }
+    const next = byPath.get(key)!
+    if (patch.x !== undefined) next.x = patch.x
+    if (patch.y !== undefined) next.y = patch.y
+    if (patch.width !== undefined) next.width = patch.width
+    if (patch.height !== undefined) next.height = patch.height
+  }
+  return order.map(k => byPath.get(k)!)
+}
+
 /** Diff two computed layouts and return patches for changed nodes. */
 export function diffLayout(
   prev: ComputedLayout,
