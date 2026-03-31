@@ -31,6 +31,7 @@ describe('core perf smoke', () => {
     const elapsed = nowMs() - start
 
     expect(elapsed).toBeGreaterThan(0)
+    expect(elapsed).toBeLessThanOrEqual(200)
   })
 
   it('caret geometry lookup scales across many measured lines', () => {
@@ -62,5 +63,6 @@ describe('core perf smoke', () => {
     }
     const elapsed = nowMs() - start
     expect(elapsed).toBeGreaterThan(0)
+    expect(elapsed).toBeLessThanOrEqual(300)
   })
 })

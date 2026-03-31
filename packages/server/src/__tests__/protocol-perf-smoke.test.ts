@@ -52,5 +52,6 @@ describe('protocol perf smoke', () => {
     }
     const elapsed = nowMs() - start
     expect(elapsed).toBeGreaterThan(0)
+    expect(elapsed).toBeLessThanOrEqual(500)
   })
 })

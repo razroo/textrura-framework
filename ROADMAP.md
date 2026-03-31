@@ -67,7 +67,7 @@ Tracking fields:
 ### 0.3.5 — Performance guardrails
 
 - [x] Status: `done` | Owner: `@codex` | Add microbenchmarks for hit-testing, text measurement, and geometry diffing.
-- [ ] Status: `todo` | Owner: `@unassigned` | Establish baseline metrics and acceptable regression thresholds.
+- [x] Status: `done` | Owner: `@codex` | Establish baseline metrics and acceptable regression thresholds.
 - [ ] Status: `todo` | Owner: `@unassigned` | Wire benchmark/performance checks into CI reporting.
 - [ ] Status: `todo` | Owner: `@unassigned` | Add smoke perf test for large tree updates (worst-case UI churn).
 - [ ] Status: `todo` | Owner: `@unassigned` | Track perf notes in release checklist before each tag.
