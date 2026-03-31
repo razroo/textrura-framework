@@ -107,8 +107,8 @@ function walk(
 
   return {
     role: roleFor(element),
-    name: inferName(element),
-    state: stateFor(element),
+    ...(inferName(element) !== undefined ? { name: inferName(element) } : {}),
+    ...(stateFor(element) !== undefined ? { state: stateFor(element) } : {}),
     bounds: { x, y, width: layout.width, height: layout.height },
     path,
     children,

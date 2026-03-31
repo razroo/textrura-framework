@@ -141,5 +141,166 @@ describe('toAccessibilityTree', () => {
     expect(a11y.children[0]?.state).toEqual({ disabled: true, expanded: false })
     expect(a11y.children[1]?.state).toEqual({ selected: true })
   })
+
+  it('matches accessibility snapshot for dashboard-like template', () => {
+    const tree = box({ semantic: { tag: 'main' } }, [
+      text({ text: 'Overview', font: 'bold 24px Inter', lineHeight: 30, semantic: { tag: 'h1' } }),
+      box({ semantic: { tag: 'section', ariaLabel: 'Stats' } }, [
+        box({ semantic: { tag: 'button', ariaLabel: 'Refresh' }, onClick: () => undefined }, []),
+      ]),
+    ])
+    const layout = {
+      x: 0, y: 0, width: 320, height: 140,
+      children: [
+        { x: 0, y: 0, width: 320, height: 30, children: [] },
+        {
+          x: 0, y: 40, width: 320, height: 100,
+          children: [{ x: 0, y: 0, width: 90, height: 30, children: [] }],
+        },
+      ],
+    }
+    expect(toAccessibilityTree(tree, layout)).toMatchInlineSnapshot(`
+      {
+        "bounds": {
+          "height": 140,
+          "width": 320,
+          "x": 0,
+          "y": 0,
+        },
+        "children": [
+          {
+            "bounds": {
+              "height": 30,
+              "width": 320,
+              "x": 0,
+              "y": 0,
+            },
+            "children": [],
+            "focusable": false,
+            "name": "Overview",
+            "path": [
+              0,
+            ],
+            "role": "heading",
+          },
+          {
+            "bounds": {
+              "height": 100,
+              "width": 320,
+              "x": 0,
+              "y": 40,
+            },
+            "children": [
+              {
+                "bounds": {
+                  "height": 30,
+                  "width": 90,
+                  "x": 0,
+                  "y": 40,
+                },
+                "children": [],
+                "focusable": true,
+                "name": "Refresh",
+                "path": [
+                  1,
+                  0,
+                ],
+                "role": "button",
+              },
+            ],
+            "focusable": false,
+            "name": "Stats",
+            "path": [
+              1,
+            ],
+            "role": "region",
+          },
+        ],
+        "focusable": false,
+        "path": [],
+        "role": "main",
+      }
+    `)
+  })
+
+  it('matches accessibility snapshot for form template', () => {
+    const tree = box({ semantic: { tag: 'form', ariaLabel: 'Checkout form' } }, [
+      box({ semantic: { tag: 'label', ariaLabel: 'Address label' } }, []),
+      box({ semantic: { tag: 'input', ariaLabel: 'Address input', ariaDisabled: false } }, []),
+      box({ semantic: { tag: 'button', ariaLabel: 'Submit order' }, onClick: () => undefined }, []),
+    ])
+    const layout = {
+      x: 0, y: 0, width: 300, height: 120,
+      children: [
+        { x: 0, y: 0, width: 120, height: 20, children: [] },
+        { x: 0, y: 26, width: 240, height: 24, children: [] },
+        { x: 0, y: 60, width: 120, height: 30, children: [] },
+      ],
+    }
+    expect(toAccessibilityTree(tree, layout)).toMatchInlineSnapshot(`
+      {
+        "bounds": {
+          "height": 120,
+          "width": 300,
+          "x": 0,
+          "y": 0,
+        },
+        "children": [
+          {
+            "bounds": {
+              "height": 20,
+              "width": 120,
+              "x": 0,
+              "y": 0,
+            },
+            "children": [],
+            "focusable": false,
+            "name": "Address label",
+            "path": [
+              0,
+            ],
+            "role": "label",
+          },
+          {
+            "bounds": {
+              "height": 24,
+              "width": 240,
+              "x": 0,
+              "y": 26,
+            },
+            "children": [],
+            "focusable": false,
+            "name": "Address input",
+            "path": [
+              1,
+            ],
+            "role": "textbox",
+            "state": {
+              "disabled": false,
+            },
+          },
+          {
+            "bounds": {
+              "height": 30,
+              "width": 120,
+              "x": 0,
+              "y": 60,
+            },
+            "children": [],
+            "focusable": true,
+            "name": "Submit order",
+            "path": [
+              2,
+            ],
+            "role": "button",
+          },
+        ],
+        "focusable": false,
+        "name": "Checkout form",
+        "path": [],
+        "role": "form",
+      }
+    `)
+  })
 })
 
