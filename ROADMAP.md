@@ -128,7 +128,7 @@ Tracking fields:
 ### 0.4.4 — Visual quality and renderer confidence
 
 - [x] Status: `done` | Owner: `@codex` | Add canvas visual regression snapshots for text selection, focus ring, gradients, and clipping.
-- [ ] Status: `todo` | Owner: `@unassigned` | Add terminal renderer golden-output fixtures for z-index, clipping, and overflow behavior.
+- [x] Status: `done` | Owner: `@codex` | Add terminal renderer golden-output fixtures for z-index, clipping, and overflow behavior.
 - [ ] Status: `todo` | Owner: `@unassigned` | Add renderer-agnostic fixture suite to assert geometry-in -> expected semantic/layout-out.
 
 ### 0.4.5 — Ecosystem readiness and adoption
