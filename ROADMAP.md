@@ -83,10 +83,10 @@ Goal: prove one extra backend can consume shared geometry without divergence.
 
 Acceptance criteria:
 
-- [ ] Status: `todo` | Owner: `@unassigned` | Select and document target (`WebGPU` or `PDF`) with rationale and non-goals.
-- [ ] Status: `todo` | Owner: `@unassigned` | Implement MVP renderer path that consumes existing geometry output (no protocol fork).
-- [ ] Status: `todo` | Owner: `@unassigned` | Add renderer-agnostic fixture reuse to assert semantic/layout parity with existing backends.
-- [ ] Status: `todo` | Owner: `@unassigned` | Document feature support matrix and fallback behavior.
+- [x] Status: `done` | Owner: `@codex` | Select and document target (`WebGPU` or `PDF`) with rationale and non-goals.
+- [x] Status: `done` | Owner: `@codex` | Implement MVP renderer path that consumes existing geometry output (no protocol fork).
+- [x] Status: `done` | Owner: `@codex` | Add renderer-agnostic fixture reuse to assert semantic/layout parity with existing backends.
+- [x] Status: `done` | Owner: `@codex` | Document feature support matrix and fallback behavior.
 
 Definition of done:
 
