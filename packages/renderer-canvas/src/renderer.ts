@@ -92,6 +92,8 @@ export class CanvasRenderer implements Renderer {
   private focusRingPadding: number
   /** Cache text wrapping + per-char metrics to avoid recomputing every frame. */
   private textLineCache = new Map<string, CachedTextLineMetrics[]>()
+  /** Cache child paint order by z-index per box element. */
+  private paintOrderCache = new WeakMap<BoxElement, { signature: string; asc: number[] }>()
 
   /** Cached loaded images. */
   private imageCache = new Map<string, HTMLImageElement>()
@@ -206,6 +208,21 @@ export class CanvasRenderer implements Renderer {
     }))
   }
 
+  private zIndexOf(element: UIElement): number {
+    return (element.props as Record<string, unknown>).zIndex as number | undefined ?? 0
+  }
+
+  private getChildrenByZAsc(box: BoxElement): number[] {
+    const signature = box.children.map((c, i) => `${i}:${this.zIndexOf(c)}`).join('|')
+    const cached = this.paintOrderCache.get(box)
+    if (cached && cached.signature === signature) {
+      return cached.asc
+    }
+    const asc = box.children.map((_, i) => i).sort((a, b) => this.zIndexOf(box.children[a]!) - this.zIndexOf(box.children[b]!))
+    this.paintOrderCache.set(box, { signature, asc })
+    return asc
+  }
+
   private paintNode(
     element: UIElement,
     layout: ComputedLayout,
@@ -231,18 +248,7 @@ export class CanvasRenderer implements Renderer {
         this.ctx.clip()
       }
 
-      // Sort children by zIndex for paint order
-      const indices = element.children.map((_, i) => i)
-      const hasZIndex = element.children.some(c => (c.props as Record<string, unknown>).zIndex !== undefined)
-      if (hasZIndex) {
-        indices.sort((a, b) => {
-          const zA = (element.children[a]!.props as Record<string, unknown>).zIndex as number | undefined ?? 0
-          const zB = (element.children[b]!.props as Record<string, unknown>).zIndex as number | undefined ?? 0
-          return zA - zB
-        })
-      }
-
-      for (const i of indices) {
+      for (const i of this.getChildrenByZAsc(element)) {
         const childLayout = layout.children[i]
         if (childLayout) {
           this.paintNode(element.children[i]!, childLayout, childOffsetX, childOffsetY)
@@ -629,17 +635,7 @@ export class CanvasRenderer implements Renderer {
       this.ctx.clip()
     }
 
-    const indices = element.children.map((_, i) => i)
-    const hasZIndex = element.children.some(c => (c.props as Record<string, unknown>).zIndex !== undefined)
-    if (hasZIndex) {
-      indices.sort((a, b) => {
-        const zA = (element.children[a]!.props as Record<string, unknown>).zIndex as number | undefined ?? 0
-        const zB = (element.children[b]!.props as Record<string, unknown>).zIndex as number | undefined ?? 0
-        return zA - zB
-      })
-    }
-
-    for (const i of indices) {
+    for (const i of this.getChildrenByZAsc(element)) {
       const childLayout = layout.children[i]
       if (childLayout) {
         this.paintLayoutDebug(element.children[i]!, childLayout, childOffsetX, childOffsetY)
@@ -689,17 +685,7 @@ export class CanvasRenderer implements Renderer {
       this.ctx.clip()
     }
 
-    const indices = element.children.map((_, i) => i)
-    const hasZIndex = element.children.some(c => (c.props as Record<string, unknown>).zIndex !== undefined)
-    if (hasZIndex) {
-      indices.sort((a, b) => {
-        const zA = (element.children[a]!.props as Record<string, unknown>).zIndex as number | undefined ?? 0
-        const zB = (element.children[b]!.props as Record<string, unknown>).zIndex as number | undefined ?? 0
-        return zA - zB
-      })
-    }
-
-    for (const i of indices) {
+    for (const i of this.getChildrenByZAsc(element)) {
       const childLayout = layout.children[i]
       if (childLayout) {
         if (this.paintFocusRingForTarget(element.children[i]!, childLayout, childOffsetX, childOffsetY, target)) {
