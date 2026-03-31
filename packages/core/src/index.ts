@@ -26,6 +26,7 @@ export {
 // Focus management
 export { focusedElement, setFocus, clearFocus, focusNext, focusPrev } from './focus.js'
 export { dispatchKeyboardEvent } from './keyboard.js'
+export { dispatchCompositionEvent } from './keyboard.js'
 
 // Text selection
 export { collectTextNodes, getSelectedText, hitTestText } from './selection.js'
@@ -66,6 +67,7 @@ export type {
   EventHandlers,
   HitEvent,
   KeyboardHitEvent,
+  CompositionHitEvent,
   Component,
   Renderer,
 } from './types.js'

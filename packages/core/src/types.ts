@@ -93,6 +93,9 @@ export interface EventHandlers {
   onWheel?: (e: HitEvent & { deltaX: number; deltaY: number }) => void
   onKeyDown?: (e: KeyboardHitEvent) => void
   onKeyUp?: (e: KeyboardHitEvent) => void
+  onCompositionStart?: (e: CompositionHitEvent) => void
+  onCompositionUpdate?: (e: CompositionHitEvent) => void
+  onCompositionEnd?: (e: CompositionHitEvent) => void
 }
 
 /** Event delivered to handlers after hit-testing. */
@@ -110,6 +113,12 @@ export interface KeyboardHitEvent {
   ctrlKey: boolean
   metaKey: boolean
   altKey: boolean
+  target: ComputedLayout
+}
+
+/** IME/composition event delivered to the focused element. */
+export interface CompositionHitEvent {
+  data: string
   target: ComputedLayout
 }
 

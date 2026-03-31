@@ -27,6 +27,11 @@ export type ClientMessage =
       metaKey: boolean
       altKey: boolean
     })
+  | (VersionedMessage & {
+      type: 'composition'
+      eventType: 'onCompositionStart' | 'onCompositionUpdate' | 'onCompositionEnd'
+      data: string
+    })
   | (VersionedMessage & { type: 'resize'; width: number; height: number })
 
 /** A patch describing a change to a single node's geometry. */

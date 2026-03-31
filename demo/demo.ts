@@ -40,6 +40,7 @@ const inputState = signal<TextInputState>({
   selection: { anchorNode: 0, anchorOffset: 29, focusNode: 0, focusOffset: 29 },
 })
 const inputFocused = signal(false)
+const compositionDraft = signal('')
 let lastPerfTime = '-'
 let lastPerfNodes = '-'
 
@@ -220,6 +221,8 @@ function selectableText(): UIElement {
 function handleInputKeyDown(e: KeyboardHitEvent): void {
   const state = inputState.peek()
 
+  if (e.key === 'Process') return
+
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
     const last = state.nodes.length - 1
     inputState.set({
@@ -264,6 +267,20 @@ function handleInputKeyDown(e: KeyboardHitEvent): void {
   }
 }
 
+function handleInputCompositionStart(): void {
+  compositionDraft.set('')
+}
+
+function handleInputCompositionUpdate(e: { data: string }): void {
+  compositionDraft.set(e.data)
+}
+
+function handleInputCompositionEnd(e: { data: string }): void {
+  compositionDraft.set('')
+  if (!e.data) return
+  inputState.set(insertInputText(inputState.peek(), e.data))
+}
+
 function textInputDemo(): UIElement {
   const w = rootWidth.value
   const state = inputState.value
@@ -274,8 +291,9 @@ function textInputDemo(): UIElement {
     selected.anchorOffset === selected.focusOffset
   const line = state.nodes.join('\n')
   const caretOffset = collapsed ? selected.focusOffset : -1
+  const draft = compositionDraft.value
   const display = collapsed && active
-    ? `${line.slice(0, caretOffset)}|${line.slice(caretOffset)}`
+    ? `${line.slice(0, caretOffset)}|${draft}${line.slice(caretOffset)}`
     : line
 
   return box({ flexDirection: 'column', padding: 24, gap: 14, width: w, minHeight: 380 }, [
@@ -299,6 +317,9 @@ function textInputDemo(): UIElement {
         })
       },
       onKeyDown: handleInputKeyDown,
+      onCompositionStart: handleInputCompositionStart,
+      onCompositionUpdate: handleInputCompositionUpdate,
+      onCompositionEnd: handleInputCompositionEnd,
     }, [
       text({
         text: display.length > 0 ? display : (active ? '|' : 'Click to focus and type...'),
@@ -757,11 +778,26 @@ function onDocumentKeyDown(e: KeyboardEvent) {
   }
 }
 
+function onDocumentCompositionStart(e: CompositionEvent) {
+  if (!app) return
+  app.dispatchComposition('onCompositionStart', { data: e.data ?? '' })
+}
+
+function onDocumentCompositionUpdate(e: CompositionEvent) {
+  if (!app) return
+  app.dispatchComposition('onCompositionUpdate', { data: e.data ?? '' })
+}
+
+function onDocumentCompositionEnd(e: CompositionEvent) {
+  if (!app) return
+  app.dispatchComposition('onCompositionEnd', { data: e.data ?? '' })
+}
+
 async function mount() {
   if (cleanupSelection) { cleanupSelection(); cleanupSelection = null }
   if (cleanupA11yMirror) { cleanupA11yMirror(); cleanupA11yMirror = null }
   if (cleanupKeydown) {
-    document.removeEventListener('keydown', cleanupKeydown)
+    cleanupKeydown()
     cleanupKeydown = null
   }
   if (app) app.destroy()
@@ -769,7 +805,15 @@ async function mount() {
   app = await createApp(view, renderer, { width: vw.peek(), waitForFonts: true })
 
   document.addEventListener('keydown', onDocumentKeyDown)
-  cleanupKeydown = () => document.removeEventListener('keydown', onDocumentKeyDown)
+  document.addEventListener('compositionstart', onDocumentCompositionStart as EventListener)
+  document.addEventListener('compositionupdate', onDocumentCompositionUpdate as EventListener)
+  document.addEventListener('compositionend', onDocumentCompositionEnd as EventListener)
+  cleanupKeydown = () => {
+    document.removeEventListener('keydown', onDocumentKeyDown)
+    document.removeEventListener('compositionstart', onDocumentCompositionStart as EventListener)
+    document.removeEventListener('compositionupdate', onDocumentCompositionUpdate as EventListener)
+    document.removeEventListener('compositionend', onDocumentCompositionEnd as EventListener)
+  }
 
   const tree = view()
   lastPerfNodes = `${countNodes(tree)}`

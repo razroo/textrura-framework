@@ -6,7 +6,7 @@ import { dispatchHit } from './hit-test.js'
 import { effect } from './signals.js'
 import { focusedElement, setFocus } from './focus.js'
 import { collectFontFamiliesFromTree, waitForFonts } from './fonts.js'
-import { dispatchKeyboardEvent } from './keyboard.js'
+import { dispatchKeyboardEvent, dispatchCompositionEvent } from './keyboard.js'
 
 export interface AppOptions {
   /** Root width for layout computation. */
@@ -35,6 +35,11 @@ export interface App {
   dispatch(eventType: keyof EventHandlers, x: number, y: number, extra?: Record<string, unknown>): boolean
   /** Dispatch a keyboard event to the focused element. */
   dispatchKey(eventType: 'onKeyDown' | 'onKeyUp', event: Omit<KeyboardHitEvent, 'target'>): boolean
+  /** Dispatch an IME composition event to the focused element. */
+  dispatchComposition(
+    eventType: 'onCompositionStart' | 'onCompositionUpdate' | 'onCompositionEnd',
+    event: { data: string },
+  ): boolean
   /** Tear down the app. */
   destroy(): void
 }
@@ -88,6 +93,10 @@ export async function createApp(
     dispatchKey(eventType, partialEvent) {
       if (!app.tree || !app.layout) return false
       return dispatchKeyboardEvent(app.tree, app.layout, eventType, partialEvent)
+    },
+    dispatchComposition(eventType, partialEvent) {
+      if (!app.tree || !app.layout) return false
+      return dispatchCompositionEvent(app.tree, app.layout, eventType, partialEvent)
     },
     destroy() {
       dispose()

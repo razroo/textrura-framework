@@ -2,7 +2,7 @@ import { WebSocketServer } from 'ws'
 import type { WebSocket } from 'ws'
 import { init, computeLayout } from 'textura'
 import type { ComputedLayout } from 'textura'
-import { toLayoutTree, dispatchHit, dispatchKeyboardEvent } from '@geometra/core'
+import { toLayoutTree, dispatchHit, dispatchKeyboardEvent, dispatchCompositionEvent } from '@geometra/core'
 import type { UIElement, EventHandlers } from '@geometra/core'
 import { diffLayout, PROTOCOL_VERSION } from './protocol.js'
 import type { ServerMessage, ClientMessage } from './protocol.js'
@@ -137,6 +137,11 @@ export async function createServer(
             ctrlKey: msg.ctrlKey,
             metaKey: msg.metaKey,
             altKey: msg.altKey,
+          })
+          computeAndBroadcast()
+        } else if (msg.type === 'composition' && currentTree && prevLayout) {
+          dispatchCompositionEvent(currentTree, prevLayout, msg.eventType, {
+            data: msg.data,
           })
           computeAndBroadcast()
         } else if (msg.type === 'resize') {

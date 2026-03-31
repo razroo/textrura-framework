@@ -39,6 +39,8 @@ export interface TexturaClientOptions {
   canvas?: HTMLCanvasElement
   /** Capture keyboard on canvas/document and forward to server. Default: true when canvas provided. */
   forwardKeyboard?: boolean
+  /** Capture IME composition events and forward to server. Default: true when canvas provided. */
+  forwardComposition?: boolean
   /** Keyboard event target. Default: canvas, else document. */
   keyboardTarget?: HTMLElement | Document
   /** Forward resize events to server. Default: true when canvas provided. */
@@ -181,6 +183,19 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
     }))
   }
 
+  const sendCompositionEvent = (
+    eventType: 'onCompositionStart' | 'onCompositionUpdate' | 'onCompositionEnd',
+    e: CompositionEvent,
+  ) => {
+    if (ws.readyState !== WebSocket.OPEN) return
+    ws.send(JSON.stringify({
+      type: 'composition',
+      eventType,
+      data: e.data ?? '',
+      protocolVersion: PROTOCOL_VERSION,
+    }))
+  }
+
   const sendResize = () => {
     if (!canvas || ws.readyState !== WebSocket.OPEN) return
     ws.send(JSON.stringify({
@@ -211,18 +226,36 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
   }
 
   const forwardKeyboard = options.forwardKeyboard ?? !!canvas
+  const keyboardTarget = options.keyboardTarget ?? canvas ?? document
   if (forwardKeyboard) {
-    const target = options.keyboardTarget ?? canvas ?? document
-    if (target instanceof HTMLElement && !target.hasAttribute('tabindex')) {
-      target.setAttribute('tabindex', '0')
+    if (keyboardTarget instanceof HTMLElement && !keyboardTarget.hasAttribute('tabindex')) {
+      keyboardTarget.setAttribute('tabindex', '0')
     }
     const onKeyDown = (e: KeyboardEvent) => sendKeyEvent('onKeyDown', e)
     const onKeyUp = (e: KeyboardEvent) => sendKeyEvent('onKeyUp', e)
-    target.addEventListener('keydown', onKeyDown as EventListener)
-    target.addEventListener('keyup', onKeyUp as EventListener)
+    keyboardTarget.addEventListener('keydown', onKeyDown as EventListener)
+    keyboardTarget.addEventListener('keyup', onKeyUp as EventListener)
     handlers.push(
-      [target, 'keydown', onKeyDown as EventListener],
-      [target, 'keyup', onKeyUp as EventListener],
+      [keyboardTarget, 'keydown', onKeyDown as EventListener],
+      [keyboardTarget, 'keyup', onKeyUp as EventListener],
+    )
+  }
+
+  const forwardComposition = options.forwardComposition ?? !!canvas
+  if (forwardComposition) {
+    if (keyboardTarget instanceof HTMLElement && !keyboardTarget.hasAttribute('tabindex')) {
+      keyboardTarget.setAttribute('tabindex', '0')
+    }
+    const onCompositionStart = (e: CompositionEvent) => sendCompositionEvent('onCompositionStart', e)
+    const onCompositionUpdate = (e: CompositionEvent) => sendCompositionEvent('onCompositionUpdate', e)
+    const onCompositionEnd = (e: CompositionEvent) => sendCompositionEvent('onCompositionEnd', e)
+    keyboardTarget.addEventListener('compositionstart', onCompositionStart as EventListener)
+    keyboardTarget.addEventListener('compositionupdate', onCompositionUpdate as EventListener)
+    keyboardTarget.addEventListener('compositionend', onCompositionEnd as EventListener)
+    handlers.push(
+      [keyboardTarget, 'compositionstart', onCompositionStart as EventListener],
+      [keyboardTarget, 'compositionupdate', onCompositionUpdate as EventListener],
+      [keyboardTarget, 'compositionend', onCompositionEnd as EventListener],
     )
   }
 

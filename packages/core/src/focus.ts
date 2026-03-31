@@ -28,7 +28,14 @@ function collectFocusable(
   results: FocusTarget[],
 ): void {
   if (element.kind === 'box') {
-    if (element.handlers?.onKeyDown || element.handlers?.onKeyUp || element.handlers?.onClick) {
+    if (
+      element.handlers?.onKeyDown ||
+      element.handlers?.onKeyUp ||
+      element.handlers?.onCompositionStart ||
+      element.handlers?.onCompositionUpdate ||
+      element.handlers?.onCompositionEnd ||
+      element.handlers?.onClick
+    ) {
       results.push({ element, layout })
     }
     for (let i = 0; i < element.children.length; i++) {

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { box } from '../elements.js'
-import { dispatchKeyboardEvent } from '../keyboard.js'
+import { dispatchKeyboardEvent, dispatchCompositionEvent } from '../keyboard.js'
 import { clearFocus, focusedElement } from '../focus.js'
 
 describe('dispatchKeyboardEvent', () => {
@@ -82,6 +82,25 @@ describe('dispatchKeyboardEvent', () => {
     expect(second).not.toBeNull()
     expect(second?.element).not.toBe(first?.element)
     expect(back?.element).toBe(first?.element)
+  })
+
+  it('dispatches composition events to focused element', () => {
+    let value = ''
+    const tree = box({ onCompositionUpdate: (e) => { value = e.data } }, [])
+    const layout = { x: 0, y: 0, width: 200, height: 100, children: [] }
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+
+    const handled = dispatchCompositionEvent(tree, layout, 'onCompositionUpdate', { data: 'に' })
+    expect(handled).toBe(true)
+    expect(value).toBe('に')
   })
 })
 

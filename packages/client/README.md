@@ -23,8 +23,9 @@ const client = createClient({
   url: 'ws://localhost:3000',
   renderer: new CanvasRenderer({ canvas }),
   canvas,
-  // forwards pointer + keyboard events to server
+  // forwards pointer + keyboard + IME composition events to server
   forwardKeyboard: true,
+  forwardComposition: true,
 })
 ```
 

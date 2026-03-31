@@ -21,7 +21,21 @@ type ImageProps = FlexProps & StyleProps & {
 
 /** Create a box (container) element. */
 export function box(props: BoxProps, children: UIElement[] = []): BoxElement {
-  const { onClick, onPointerDown, onPointerUp, onPointerMove, onWheel, onKeyDown, onKeyUp, key, semantic, ...rest } = props
+  const {
+    onClick,
+    onPointerDown,
+    onPointerUp,
+    onPointerMove,
+    onWheel,
+    onKeyDown,
+    onKeyUp,
+    onCompositionStart,
+    onCompositionUpdate,
+    onCompositionEnd,
+    key,
+    semantic,
+    ...rest
+  } = props
   const handlers: EventHandlers = {}
   if (onClick) handlers.onClick = onClick
   if (onPointerDown) handlers.onPointerDown = onPointerDown
@@ -30,6 +44,9 @@ export function box(props: BoxProps, children: UIElement[] = []): BoxElement {
   if (onWheel) handlers.onWheel = onWheel
   if (onKeyDown) handlers.onKeyDown = onKeyDown
   if (onKeyUp) handlers.onKeyUp = onKeyUp
+  if (onCompositionStart) handlers.onCompositionStart = onCompositionStart
+  if (onCompositionUpdate) handlers.onCompositionUpdate = onCompositionUpdate
+  if (onCompositionEnd) handlers.onCompositionEnd = onCompositionEnd
 
   return {
     kind: 'box',
