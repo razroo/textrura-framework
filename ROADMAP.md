@@ -88,3 +88,52 @@ Tracking fields:
 - [x] Status: `done` | Owner: `@codex` | Lint/build pass in CI.
 - [x] Status: `done` | Owner: `@codex` | Changelog/release notes include behavior changes plus migration notes.
 - [x] Status: `done` | Owner: `@codex` | npm published versions verified after release workflow completes.
+
+## Next frontier checklist (toward 1.0 quality)
+
+Tracking fields:
+
+- Status: `todo` | `in_progress` | `blocked` | `done`
+- Owner: `@unassigned` by default
+
+### 0.4.0 — Input parity and editing completeness
+
+- [x] Status: `done` | Owner: `@codex` | Add vertical caret movement (`ArrowUp`/`ArrowDown`) for multi-line text input with stable column intent.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add word-jump and line-boundary movement semantics (`Alt+Arrow`, `Home`, `End`) with tests.
+- [ ] Status: `todo` | Owner: `@unassigned` | Implement pointer-driven text selection drag in canvas and align with text-input helpers.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add copy/cut/paste integration tests for selection + edit history behavior.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add IME stress scenarios (focus changes, rapid composition updates, cancellation) across canvas + terminal where applicable.
+
+### 0.4.1 — Scrolling, virtualization, and large-app ergonomics
+
+- [ ] Status: `todo` | Owner: `@unassigned` | Add scroll-container keyboard behavior contract (focus retention, key routing, wheel/scroll sync).
+- [ ] Status: `todo` | Owner: `@unassigned` | Implement virtualized list primitive example with stable focus and selection behavior.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add integration tests for large scroll regions with rapid update bursts.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add dev overlay panel with node count, layout time, and repaint hot spots.
+
+### 0.4.2 — Accessibility and semantics depth
+
+- [ ] Status: `todo` | Owner: `@unassigned` | Expand a11y tree attributes (state/disabled/expanded/selected) and test mappings.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add focus trap primitives and tests for modal/overlay flows.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add form-like semantics examples (labels, input groups, error text relationships).
+- [ ] Status: `todo` | Owner: `@unassigned` | Add regression snapshots for accessibility tree shape across representative app templates.
+
+### 0.4.3 — Protocol v2 planning and transport resilience
+
+- [ ] Status: `todo` | Owner: `@unassigned` | Draft protocol-v2 RFC with backward-compat strategy and migration policy.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add message batching/coalescing tests for high-frequency input and layout churn.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add chaos-style reconnect tests (out-of-order frames, delayed patches, duplicate messages).
+- [ ] Status: `todo` | Owner: `@unassigned` | Add protocol conformance fixtures runnable by both client and server packages.
+
+### 0.4.4 — Visual quality and renderer confidence
+
+- [ ] Status: `todo` | Owner: `@unassigned` | Add canvas visual regression snapshots for text selection, focus ring, gradients, and clipping.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add terminal renderer golden-output fixtures for z-index, clipping, and overflow behavior.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add renderer-agnostic fixture suite to assert geometry-in -> expected semantic/layout-out.
+
+### 0.4.5 — Ecosystem readiness and adoption
+
+- [ ] Status: `todo` | Owner: `@unassigned` | Publish `@geometra/ui` starter primitives (button/input/list/dialog) built only on core exports.
+- [ ] Status: `todo` | Owner: `@unassigned` | Add end-to-end starter templates (canvas local app, terminal app, server/client app).
+- [ ] Status: `todo` | Owner: `@unassigned` | Produce migration guide for teams moving from DOM-centric event/layout assumptions.
+- [ ] Status: `todo` | Owner: `@unassigned` | Define 1.0 release criteria and freeze policy for protocol + interaction contract.

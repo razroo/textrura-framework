@@ -11,6 +11,8 @@ export interface TextInputState {
 export interface TextInputEditResult {
   nodes: string[]
   selection: SelectionRange
+  /** Preserved preferred column for vertical caret movement. */
+  caretColumnIntent?: number
 }
 
 export interface CaretGeometry {
@@ -218,8 +220,9 @@ export function deleteInput(state: TextInputState): TextInputEditResult {
 /** Move caret by one character; optionally extend existing selection. */
 export function moveInputCaret(
   state: TextInputState,
-  direction: 'left' | 'right',
+  direction: 'left' | 'right' | 'up' | 'down',
   extendSelection = false,
+  columnIntent?: number,
 ): TextInputEditResult {
   const nodes = state.nodes.length > 0 ? state.nodes : ['']
   const selection = clampSelection(nodes, state.selection)
@@ -227,10 +230,17 @@ export function moveInputCaret(
 
   let nodeIndex = extendSelection ? selection.focusNode : selection.anchorNode
   let offset = extendSelection ? selection.focusOffset : selection.anchorOffset
+  let nextColumnIntent: number | undefined = columnIntent
 
   if (!collapsed && !extendSelection) {
     const s = normalizeSelection(selection)
     if (direction === 'left') {
+      nodeIndex = s.anchorNode
+      offset = s.anchorOffset
+    } else if (direction === 'right') {
+      nodeIndex = s.focusNode
+      offset = s.focusOffset
+    } else if (direction === 'up') {
       nodeIndex = s.anchorNode
       offset = s.anchorOffset
     } else {
@@ -244,7 +254,8 @@ export function moveInputCaret(
       nodeIndex--
       offset = nodes[nodeIndex]!.length
     }
-  } else {
+    nextColumnIntent = undefined
+  } else if (direction === 'right') {
     const text = nodes[nodeIndex]!
     if (offset < text.length) {
       offset++
@@ -252,6 +263,18 @@ export function moveInputCaret(
       nodeIndex++
       offset = 0
     }
+    nextColumnIntent = undefined
+  } else {
+    const verticalIntent = nextColumnIntent ?? offset
+    if (direction === 'up') {
+      if (nodeIndex > 0) {
+        nodeIndex--
+      }
+    } else if (nodeIndex < nodes.length - 1) {
+      nodeIndex++
+    }
+    offset = clamp(verticalIntent, 0, nodes[nodeIndex]!.length)
+    nextColumnIntent = verticalIntent
   }
 
   const nextSelection = extendSelection
@@ -268,7 +291,11 @@ export function moveInputCaret(
         focusOffset: offset,
       }
 
-  return { nodes: [...nodes], selection: nextSelection }
+  return {
+    nodes: [...nodes],
+    selection: nextSelection,
+    caretColumnIntent: nextColumnIntent,
+  }
 }
 
 /**

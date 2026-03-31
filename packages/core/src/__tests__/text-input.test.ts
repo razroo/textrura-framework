@@ -139,6 +139,36 @@ describe('text-input foundation', () => {
     expect(extend.selection).toEqual({ anchorNode: 1, anchorOffset: 0, focusNode: 1, focusOffset: 1 })
   })
 
+  it('moves caret vertically with stable column intent across uneven lines', () => {
+    const base: TextInputState = {
+      nodes: ['abcdefghij', 'xy', 'abcdefghijkl'],
+      selection: { anchorNode: 0, anchorOffset: 8, focusNode: 0, focusOffset: 8 },
+    }
+
+    const downToShort = moveInputCaret(base, 'down', false)
+    expect(downToShort.selection).toEqual({ anchorNode: 1, anchorOffset: 2, focusNode: 1, focusOffset: 2 })
+    expect(downToShort.caretColumnIntent).toBe(8)
+
+    const downToLong = moveInputCaret(
+      { nodes: downToShort.nodes, selection: downToShort.selection },
+      'down',
+      false,
+      downToShort.caretColumnIntent,
+    )
+    expect(downToLong.selection).toEqual({ anchorNode: 2, anchorOffset: 8, focusNode: 2, focusOffset: 8 })
+    expect(downToLong.caretColumnIntent).toBe(8)
+  })
+
+  it('extends selection vertically with preserved anchor and column intent', () => {
+    const base: TextInputState = {
+      nodes: ['abcd', 'abcdefghijkl'],
+      selection: { anchorNode: 0, anchorOffset: 3, focusNode: 0, focusOffset: 3 },
+    }
+    const extended = moveInputCaret(base, 'down', true)
+    expect(extended.selection).toEqual({ anchorNode: 0, anchorOffset: 3, focusNode: 1, focusOffset: 3 })
+    expect(extended.caretColumnIntent).toBe(3)
+  })
+
   it('computes caret geometry from measured lines', () => {
     const caret = getInputCaretGeometry([
       {

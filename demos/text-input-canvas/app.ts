@@ -25,6 +25,7 @@ const history = signal<TextInputHistoryState>(createTextInputHistory({
 const focused = signal(false)
 const compositionDraft = signal('')
 const compositionSelection = signal<TextInputState['selection'] | null>(null)
+const caretColumnIntent = signal<number | null>(null)
 
 function state(): TextInputState {
   return history.peek().present
@@ -85,22 +86,39 @@ function onKeyDown(e: KeyboardHitEvent): void {
 
   if (e.key === 'Backspace') {
     push(backspaceInput(current))
+    caretColumnIntent.set(null)
     return
   }
   if (e.key === 'Delete') {
     push(deleteInput(current))
+    caretColumnIntent.set(null)
     return
   }
   if (e.key === 'ArrowLeft') {
     setPresent(moveInputCaret(current, 'left', e.shiftKey))
+    caretColumnIntent.set(null)
     return
   }
   if (e.key === 'ArrowRight') {
     setPresent(moveInputCaret(current, 'right', e.shiftKey))
+    caretColumnIntent.set(null)
+    return
+  }
+  if (e.key === 'ArrowUp') {
+    const moved = moveInputCaret(current, 'up', e.shiftKey, caretColumnIntent.peek() ?? undefined)
+    setPresent({ nodes: moved.nodes, selection: moved.selection })
+    caretColumnIntent.set(moved.caretColumnIntent ?? null)
+    return
+  }
+  if (e.key === 'ArrowDown') {
+    const moved = moveInputCaret(current, 'down', e.shiftKey, caretColumnIntent.peek() ?? undefined)
+    setPresent({ nodes: moved.nodes, selection: moved.selection })
+    caretColumnIntent.set(moved.caretColumnIntent ?? null)
     return
   }
   if (e.key === 'Enter') {
     push(insertInputText(current, '\n'))
+    caretColumnIntent.set(null)
     return
   }
   if (e.key === 'Escape') {
@@ -110,6 +128,7 @@ function onKeyDown(e: KeyboardHitEvent): void {
 
   if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
     push(insertInputText(current, e.key))
+    caretColumnIntent.set(null)
   }
 }
 
