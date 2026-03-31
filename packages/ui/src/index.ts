@@ -493,3 +493,285 @@ export function commandPalette(commands: CommandItem[], options: CommandPaletteO
     ),
   )
 }
+
+export interface MenuItem {
+  id: string
+  label: string
+  disabled?: boolean
+  /** Style as destructive (e.g. delete). */
+  danger?: boolean
+}
+
+export interface MenuOptions {
+  onSelect?: (id: string) => void
+  /** Accessible name for the menu surface. */
+  ariaLabel?: string
+}
+
+/**
+ * Vertical menu (`role="menu"`). App owns open/close and positioning.
+ */
+export function menu(items: MenuItem[], options: MenuOptions = {}): UIElement {
+  return box(
+    {
+      flexDirection: 'column',
+      gap: 2,
+      padding: 6,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: '#334155',
+      backgroundColor: '#020617',
+      semantic: { role: 'menu', ariaLabel: options.ariaLabel ?? 'Menu' },
+    },
+    items.map((item) => {
+      const color = item.disabled ? '#475569' : item.danger ? '#fca5a5' : '#e2e8f0'
+      return box(
+        {
+          paddingLeft: 10,
+          paddingRight: 10,
+          paddingTop: 8,
+          paddingBottom: 8,
+          borderRadius: 8,
+          cursor: item.disabled ? 'not-allowed' : 'pointer',
+          semantic: {
+            role: 'menuitem',
+            ariaLabel: item.label,
+            ariaDisabled: item.disabled === true,
+          },
+          onClick: item.disabled ? undefined : () => options.onSelect?.(item.id),
+        },
+        [text({ text: item.label, font: '13px Inter', lineHeight: 18, color })],
+      )
+    }),
+  )
+}
+
+export interface SelectOption {
+  value: string
+  label: string
+  disabled?: boolean
+}
+
+export interface SelectControlOptions {
+  options: SelectOption[]
+  /** Current value (may be empty string when unset). */
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  /** When true, option list is shown (app toggles). */
+  open: boolean
+  onToggle?: () => void
+}
+
+/**
+ * Select / dropdown trigger + optional `menu` panel. Caller should set `open: false`
+ * after `onChange` if the panel should close.
+ */
+export function selectControl(opts: SelectControlOptions): UIElement {
+  const selected = opts.options.find(o => o.value === opts.value)
+  const label = selected?.label ?? opts.placeholder ?? 'Select…'
+  const trigger = box(
+    {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingLeft: 10,
+      paddingRight: 10,
+      paddingTop: 8,
+      paddingBottom: 8,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: '#334155',
+      backgroundColor: '#0f172a',
+      cursor: 'pointer',
+      semantic: { role: 'button', ariaLabel: 'Select', ariaExpanded: opts.open },
+      onClick: () => opts.onToggle?.(),
+    },
+    [
+      text({ text: label, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }),
+      text({
+        text: opts.open ? '▲' : '▼',
+        font: '10px Inter',
+        lineHeight: 18,
+        color: '#94a3b8',
+      }),
+    ],
+  )
+  if (!opts.open) {
+    return box({ flexDirection: 'column', gap: 4 }, [trigger])
+  }
+  const panel = menu(
+    opts.options.map(o => ({
+      id: o.value,
+      label: o.label,
+      disabled: o.disabled,
+    })),
+    {
+      ariaLabel: 'Options',
+      onSelect: (id) => opts.onChange(id),
+    },
+  )
+  return box({ flexDirection: 'column', gap: 4 }, [trigger, panel])
+}
+
+export interface DataTableColumn {
+  key: string
+  header: string
+}
+
+export interface DataTableOptions {
+  /** Invoked with row index when a data row is clicked. */
+  onRowClick?: (rowIndex: number) => void
+  ariaLabel?: string
+}
+
+/**
+ * Simple columnar table (header + uniform rows). Keys in each row match `columns[].key`.
+ */
+export function dataTable(
+  columns: DataTableColumn[],
+  rows: Array<Record<string, string>>,
+  options: DataTableOptions = {},
+): UIElement {
+  const headerRow = box(
+    {
+      flexDirection: 'row',
+      gap: 8,
+      paddingBottom: 8,
+      semantic: { role: 'row' },
+    },
+    columns.map(col =>
+      box(
+        { flexGrow: 1, semantic: { role: 'columnheader', ariaLabel: col.header } },
+        [text({ text: col.header, font: 'bold 12px Inter', lineHeight: 16, color: '#94a3b8' })],
+      ),
+    ),
+  )
+  const divider = box({ height: 1, backgroundColor: '#334155' }, [])
+  const bodyRows = rows.map((row, ri) =>
+    box(
+      {
+        flexDirection: 'row',
+        gap: 8,
+        paddingTop: 6,
+        paddingBottom: 6,
+        cursor: options.onRowClick ? 'pointer' : 'default',
+        semantic: { role: 'row' },
+        onClick: options.onRowClick ? () => options.onRowClick?.(ri) : undefined,
+      },
+      columns.map(col =>
+        box({ flexGrow: 1, semantic: { role: 'cell' } }, [
+          text({ text: row[col.key] ?? '', font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }),
+        ]),
+      ),
+    ),
+  )
+  return box(
+    {
+      flexDirection: 'column',
+      gap: 0,
+      semantic: { role: 'table', ariaLabel: options.ariaLabel ?? 'Table' },
+    },
+    [headerRow, divider, ...bodyRows],
+  )
+}
+
+export interface TreeNode {
+  id: string
+  label: string
+  children?: TreeNode[]
+}
+
+export interface TreeViewOptions {
+  /** Expanded branch ids. */
+  expandedIds: ReadonlySet<string>
+  onToggle: (id: string) => void
+  selectedId?: string
+  onSelect?: (id: string) => void
+  ariaLabel?: string
+}
+
+function treeNodeElement(node: TreeNode, depth: number, options: TreeViewOptions): UIElement {
+  const hasChildren = !!(node.children && node.children.length > 0)
+  const expanded = options.expandedIds.has(node.id)
+  const selected = options.selectedId === node.id
+  const row = box(
+    {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingLeft: 8 + depth * 14,
+      paddingTop: 4,
+      paddingBottom: 4,
+      borderRadius: 6,
+      backgroundColor: selected ? '#1e3a5f' : undefined,
+      cursor: 'pointer',
+      semantic: {
+        role: 'treeitem',
+        ariaLabel: node.label,
+        ariaExpanded: hasChildren ? expanded : undefined,
+      },
+      onClick: () => {
+        if (hasChildren) options.onToggle(node.id)
+        options.onSelect?.(node.id)
+      },
+    },
+    [
+      hasChildren
+        ? text({
+            text: expanded ? '▼' : '▶',
+            font: '10px Inter',
+            lineHeight: 14,
+            color: '#94a3b8',
+          })
+        : box({ width: 14 }, []),
+      text({ text: node.label, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }),
+    ],
+  )
+  if (!hasChildren || !expanded) return row
+  return box(
+    { flexDirection: 'column', gap: 2 },
+    [
+      row,
+      ...node.children!.map(c => treeNodeElement(c, depth + 1, options)),
+    ],
+  )
+}
+
+/**
+ * Expandable tree (`role="tree"`). Expansion and selection are app-controlled.
+ */
+export function treeView(nodes: TreeNode[], options: TreeViewOptions): UIElement {
+  return box(
+    {
+      flexDirection: 'column',
+      gap: 2,
+      semantic: { role: 'tree', ariaLabel: options.ariaLabel ?? 'Tree' },
+    },
+    nodes.map(n => treeNodeElement(n, 0, options)),
+  )
+}
+
+export interface ComboboxFieldOptions {
+  /** Props forwarded to `input()` (caret, key handlers, etc.). */
+  input: InputOptions
+  onPickSuggestion?: (value: string) => void
+}
+
+/**
+ * Text field stacked above a `commandPalette` of suggestions (app filters the list).
+ */
+export function comboboxField(
+  value: string,
+  placeholder: string,
+  suggestions: CommandItem[],
+  options: ComboboxFieldOptions,
+): UIElement {
+  const palette = commandPalette(suggestions, {
+    onSelect: (id) => options.onPickSuggestion?.(id),
+  })
+  return box(
+    { flexDirection: 'column', gap: 8 },
+    [input(value, placeholder, options.input), palette],
+  )
+}

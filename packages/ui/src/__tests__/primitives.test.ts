@@ -1,7 +1,18 @@
 import { describe, it, expect } from 'vitest'
 import type { HitEvent, KeyboardHitEvent } from '../../../core/src/types.js'
 import { box, text } from '../../../core/src/index.js'
-import { checkbox, commandPalette, radio, tabs, toast } from '../index.js'
+import {
+  checkbox,
+  comboboxField,
+  commandPalette,
+  dataTable,
+  menu,
+  radio,
+  selectControl,
+  tabs,
+  toast,
+  treeView,
+} from '../index.js'
 
 describe('@geometra/ui primitives', () => {
   it('checkbox toggles on click and keyboard', () => {
@@ -103,5 +114,107 @@ describe('@geometra/ui primitives', () => {
     if (!first || first.kind !== 'box') return
     first.handlers?.onClick?.({ x: 0, y: 0, target: {} as HitEvent['target'] })
     expect(id).toBe('a')
+  })
+
+  it('menu does not fire onSelect for disabled rows', () => {
+    let picked = ''
+    const el = menu(
+      [
+        { id: 'a', label: 'A' },
+        { id: 'b', label: 'B', disabled: true },
+      ],
+      { onSelect: (id) => { picked = id } },
+    )
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    const disabledRow = el.children[1]
+    expect(disabledRow?.kind).toBe('box')
+    if (!disabledRow || disabledRow.kind !== 'box') return
+    expect(disabledRow.handlers?.onClick).toBeUndefined()
+    disabledRow.handlers?.onClick?.({ x: 0, y: 0, target: {} as HitEvent['target'] })
+    expect(picked).toBe('')
+  })
+
+  it('selectControl routes menu picks to onChange when open', () => {
+    let v = ''
+    const el = selectControl({
+      options: [
+        { value: 'x', label: 'X' },
+        { value: 'y', label: 'Y' },
+      ],
+      value: 'x',
+      open: true,
+      onChange: (nv) => { v = nv },
+    })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    const menuBox = el.children[1]
+    expect(menuBox?.kind).toBe('box')
+    if (!menuBox || menuBox.kind !== 'box') return
+    const secondItem = menuBox.children[1]
+    expect(secondItem?.kind).toBe('box')
+    if (!secondItem || secondItem.kind !== 'box') return
+    secondItem.handlers?.onClick?.({ x: 0, y: 0, target: {} as HitEvent['target'] })
+    expect(v).toBe('y')
+  })
+
+  it('dataTable invokes onRowClick with row index', () => {
+    let row = -1
+    const el = dataTable(
+      [{ key: 'a', header: 'A' }],
+      [{ a: '1' }, { a: '2' }],
+      { onRowClick: (i) => { row = i } },
+    )
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    const firstBody = el.children[2]
+    expect(firstBody?.kind).toBe('box')
+    if (!firstBody || firstBody.kind !== 'box') return
+    firstBody.handlers?.onClick?.({ x: 0, y: 0, target: {} as HitEvent['target'] })
+    expect(row).toBe(0)
+  })
+
+  it('treeView calls onToggle for expandable rows', () => {
+    let toggled = ''
+    const el = treeView(
+      [
+        {
+          id: 'r',
+          label: 'Root',
+          children: [{ id: 'c', label: 'Child' }],
+        },
+      ],
+      {
+        expandedIds: new Set<string>(),
+        onToggle: (id) => { toggled = id },
+      },
+    )
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    const rootRow = el.children[0]
+    expect(rootRow?.kind).toBe('box')
+    if (!rootRow || rootRow.kind !== 'box') return
+    rootRow.handlers?.onClick?.({ x: 0, y: 0, target: {} as HitEvent['target'] })
+    expect(toggled).toBe('r')
+  })
+
+  it('comboboxField forwards palette selection to onPickSuggestion', () => {
+    let picked = ''
+    const el = comboboxField(
+      '',
+      'Search…',
+      [{ id: 'foo', label: 'Foo' }],
+      { input: {}, onPickSuggestion: (s) => { picked = s } },
+    )
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    const palette = el.children[1]
+    expect(palette?.kind).toBe('box')
+    if (!palette || palette.kind !== 'box') return
+    const opt = palette.children[0]
+    expect(opt?.kind).toBe('box')
+    if (!opt || opt.kind !== 'box') return
+    opt.handlers?.onClick?.({ x: 0, y: 0, target: {} as HitEvent['target'] })
+    expect(picked).toBe('foo')
   })
 })

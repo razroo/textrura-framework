@@ -117,7 +117,7 @@ Goal: reduce adoption friction with high-quality primitives and better introspec
 
 Acceptance criteria:
 
-- [ ] Status: `in_progress` | Owner: `@codex` | Expand `@geometra/ui` with advanced primitives (`toast`, `commandPalette` shipped; combobox/menu/tree/data-table remaining).
+- [ ] Status: `in_progress` | Owner: `@codex` | Expand `@geometra/ui` with advanced primitives (`toast`, `commandPalette`, `menu`, `selectControl`, `dataTable`, `treeView`, `comboboxField` shipped; polish + docs pass remaining).
 - [ ] Status: `in_progress` | Owner: `@codex` | Add behavior contracts + interaction/a11y fixtures for each new primitive. (`primitives.test.ts` covers toast + command palette handlers)
 - [ ] Status: `in_progress` | Owner: `@codex` | Extend dev overlay into inspector view (canvas `layoutInspector` HUD: nodes, depth, root size, focus; full tree/path + repaint reasons TBD).
 - [ ] Status: `todo` | Owner: `@unassigned` | Publish integration cookbooks for common app stacks and DOM-assumption migration patterns.
