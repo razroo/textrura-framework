@@ -118,6 +118,21 @@ export function dispatchHit(
       return { handled: true, focusTarget }
     }
   }
+  // Click-to-focus fallback: allow focusable boxes to receive focus on click
+  // even when they do not implement an onClick handler.
+  if (eventType === 'onClick') {
+    for (let i = hits.length - 1; i >= 0; i--) {
+      const hit = hits[i]!
+      const focusable = !!(
+        hit.handlers.onClick ||
+        hit.handlers.onKeyDown ||
+        hit.handlers.onKeyUp
+      )
+      if (focusable) {
+        return { handled: false, focusTarget: { element: hit.element, layout: hit.layout } }
+      }
+    }
+  }
   return { handled: false }
 }
 

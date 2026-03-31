@@ -940,7 +940,7 @@ let cleanupA11yMirror: (() => void) | null = null
 
 function onDocumentKeyDown(e: KeyboardEvent) {
   if (!app) return
-  let handled = app.dispatchKey('onKeyDown', {
+  const handled = app.dispatchKey('onKeyDown', {
     key: e.key,
     code: e.code,
     shiftKey: e.shiftKey,
@@ -948,21 +948,6 @@ function onDocumentKeyDown(e: KeyboardEvent) {
     metaKey: e.metaKey,
     altKey: e.altKey,
   })
-  // Demo safety net: if visual input focus is active but framework focus missed,
-  // route key events to the input handler directly.
-  if (!handled && inputFocused.peek()) {
-    handleInputKeyDown({
-      key: e.key,
-      code: e.code,
-      shiftKey: e.shiftKey,
-      ctrlKey: e.ctrlKey,
-      metaKey: e.metaKey,
-      altKey: e.altKey,
-      // target is unused by demo input handler
-      target: {} as KeyboardHitEvent['target'],
-    })
-    handled = true
-  }
   if (
     handled &&
     (
@@ -985,26 +970,17 @@ function onDocumentKeyDown(e: KeyboardEvent) {
 
 function onDocumentCompositionStart(e: CompositionEvent) {
   if (!app) return
-  const handled = app.dispatchComposition('onCompositionStart', { data: e.data ?? '' })
-  if (!handled && inputFocused.peek()) {
-    handleInputCompositionStart()
-  }
+  app.dispatchComposition('onCompositionStart', { data: e.data ?? '' })
 }
 
 function onDocumentCompositionUpdate(e: CompositionEvent) {
   if (!app) return
-  const handled = app.dispatchComposition('onCompositionUpdate', { data: e.data ?? '' })
-  if (!handled && inputFocused.peek()) {
-    handleInputCompositionUpdate({ data: e.data ?? '' })
-  }
+  app.dispatchComposition('onCompositionUpdate', { data: e.data ?? '' })
 }
 
 function onDocumentCompositionEnd(e: CompositionEvent) {
   if (!app) return
-  const handled = app.dispatchComposition('onCompositionEnd', { data: e.data ?? '' })
-  if (!handled && inputFocused.peek()) {
-    handleInputCompositionEnd({ data: e.data ?? '' })
-  }
+  app.dispatchComposition('onCompositionEnd', { data: e.data ?? '' })
 }
 
 async function mount() {
