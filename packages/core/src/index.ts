@@ -36,8 +36,16 @@ export { collectTextNodes, getSelectedText, hitTestText } from './selection.js'
 export type { TextNodeInfo, TextLineInfo, SelectionRange } from './selection.js'
 
 // Animation
-export { transition, spring, easing, animationLoop, createTweenTimeline } from './animation.js'
-export type { EasingFn, TweenPlaybackState, TweenTimeline } from './animation.js'
+export {
+  transition,
+  spring,
+  easing,
+  animationLoop,
+  createTweenTimeline,
+  setMotionPreference,
+  getMotionPreference,
+} from './animation.js'
+export type { EasingFn, TweenPlaybackState, TweenTimeline, MotionPreference } from './animation.js'
 
 // Virtual scroll helpers
 export { syncVirtualWindow } from './virtual-scroll.js'

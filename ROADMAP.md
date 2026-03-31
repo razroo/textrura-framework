@@ -67,7 +67,7 @@ Acceptance criteria:
 
 - [ ] Status: `in_progress` | Owner: `@codex` | Add a declarative animation API for geometry-driven transitions (position/size) and paint properties (opacity/color). (baseline timeline API landed; geometry property orchestration pending)
 - [x] Status: `done` | Owner: `@codex` | Add interrupt/cancel/resume semantics that are deterministic across rapid state updates.
-- [ ] Status: `todo` | Owner: `@unassigned` | Add reduced-motion policy and explicit defaults for accessibility-sensitive behavior.
+- [x] Status: `done` | Owner: `@codex` | Add reduced-motion policy and explicit defaults for accessibility-sensitive behavior.
 - [x] Status: `done` | Owner: `@codex` | Add deterministic frame-step test harness for unit/integration assertions (no timing flake).
 - [ ] Status: `todo` | Owner: `@unassigned` | Provide representative demo scenarios (list reorder, dialog enter/exit, focus transition polish).
 

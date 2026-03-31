@@ -1,7 +1,28 @@
 import { describe, it, expect } from 'vitest'
-import { createTweenTimeline, easing } from '../animation.js'
+import {
+  createTweenTimeline,
+  easing,
+  getMotionPreference,
+  setMotionPreference,
+  transition,
+} from '../animation.js'
 
 describe('animation timeline', () => {
+  it('supports reduced-motion policy for transition and timeline helpers', () => {
+    setMotionPreference('reduced')
+    expect(getMotionPreference()).toBe('reduced')
+
+    const reducedTransition = transition(0, 50, 1000, easing.linear, { respectReducedMotion: true })
+    expect(reducedTransition.peek()).toBe(50)
+
+    const reducedTimeline = createTweenTimeline(0)
+    reducedTimeline.to(80, 1000, easing.linear)
+    expect(reducedTimeline.value.peek()).toBe(80)
+    expect(reducedTimeline.state()).toBe('finished')
+
+    setMotionPreference('full')
+  })
+
   it('steps deterministically to completion', () => {
     const timeline = createTweenTimeline(0)
     timeline.to(100, 1000, easing.linear)

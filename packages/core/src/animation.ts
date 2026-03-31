@@ -32,6 +32,20 @@ export interface TweenTimeline {
   state(): TweenPlaybackState
 }
 
+export type MotionPreference = 'full' | 'reduced'
+
+const motionPreference = signal<MotionPreference>('full')
+
+/** Set global motion preference for animation helpers. */
+export function setMotionPreference(preference: MotionPreference): void {
+  motionPreference.set(preference)
+}
+
+/** Read current global motion preference. */
+export function getMotionPreference(): MotionPreference {
+  return motionPreference.peek()
+}
+
 /**
  * Create an animated signal that transitions from `from` to `to` over `duration` ms.
  * Returns a signal whose `.value` tracks the current interpolated value.
@@ -41,8 +55,13 @@ export function transition(
   to: number,
   duration: number,
   easingFn: EasingFn = easing.easeInOut,
+  options: { respectReducedMotion?: boolean } = {},
 ): Signal<number> {
   const s = signal(from)
+  if (options.respectReducedMotion && getMotionPreference() === 'reduced') {
+    s.set(to)
+    return s
+  }
   const start = Date.now()
 
   function tick() {
@@ -70,6 +89,16 @@ export function createTweenTimeline(initialValue: number): TweenTimeline {
   let playbackState: TweenPlaybackState = 'idle'
 
   function toTarget(nextTo: number, durationMs: number, nextEasing: EasingFn = easing.easeInOut): void {
+    if (getMotionPreference() === 'reduced') {
+      value.set(nextTo)
+      from = nextTo
+      to = nextTo
+      elapsed = 0
+      duration = 1
+      easingFn = nextEasing
+      playbackState = 'finished'
+      return
+    }
     from = value.peek()
     to = nextTo
     elapsed = 0
