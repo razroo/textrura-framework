@@ -60,7 +60,7 @@ Tracking fields:
 
 - [x] Status: `done` | Owner: `@codex` | Add protocol version fixtures and compatibility tests (including mismatch handling).
 - [x] Status: `done` | Owner: `@codex` | Add tests for geometry diff correctness under rapid update bursts.
-- [ ] Status: `todo` | Owner: `@unassigned` | Validate error surfacing and recovery behavior in server/client flows.
+- [x] Status: `done` | Owner: `@codex` | Validate error surfacing and recovery behavior in server/client flows.
 - [ ] Status: `todo` | Owner: `@unassigned` | Add reconnect/retry integration scenario with state resync.
 - [ ] Status: `todo` | Owner: `@unassigned` | Ensure protocol changes are explicit and backward-safe.
 

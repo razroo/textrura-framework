@@ -30,6 +30,11 @@ interface ServerError {
 
 type ServerMessage = ServerFrame | ServerPatch | ServerError
 
+interface ClientStateShape {
+  layout: ComputedLayout | null
+  tree: UIElement | null
+}
+
 export interface TexturaClientOptions {
   /** WebSocket URL to connect to. Default: 'ws://localhost:3100'. */
   url?: string
@@ -74,6 +79,32 @@ function applyPatches(layout: ComputedLayout, patches: ServerPatch['patches']): 
     if (patch.y !== undefined) node.y = patch.y
     if (patch.width !== undefined) node.width = patch.width
     if (patch.height !== undefined) node.height = patch.height
+  }
+}
+
+export function applyServerMessage(
+  state: ClientStateShape,
+  renderer: Renderer,
+  msg: ServerMessage,
+  onError?: (error: unknown) => void,
+): void {
+  if (msg.protocolVersion && msg.protocolVersion > PROTOCOL_VERSION) {
+    onError?.(
+      new Error(
+        `Server protocol ${msg.protocolVersion} is newer than client protocol ${PROTOCOL_VERSION}`,
+      ),
+    )
+    return
+  }
+  if (msg.type === 'frame') {
+    state.layout = msg.layout
+    state.tree = msg.tree
+    renderer.render(msg.layout, msg.tree)
+  } else if (msg.type === 'patch' && state.layout && state.tree) {
+    applyPatches(state.layout, msg.patches)
+    renderer.render(state.layout, state.tree)
+  } else if (msg.type === 'error') {
+    onError?.(new Error(msg.message))
   }
 }
 
@@ -124,24 +155,7 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
     ws.addEventListener('message', (event) => {
       try {
         const msg = JSON.parse(String(event.data)) as ServerMessage
-        if (msg.protocolVersion && msg.protocolVersion > PROTOCOL_VERSION) {
-          onError?.(
-            new Error(
-              `Server protocol ${msg.protocolVersion} is newer than client protocol ${PROTOCOL_VERSION}`,
-            ),
-          )
-          return
-        }
-        if (msg.type === 'frame') {
-          state.layout = msg.layout
-          state.tree = msg.tree
-          renderer.render(msg.layout, msg.tree)
-        } else if (msg.type === 'patch' && state.layout && state.tree) {
-          applyPatches(state.layout, msg.patches)
-          renderer.render(state.layout, state.tree)
-        } else if (msg.type === 'error') {
-          onError?.(new Error(msg.message))
-        }
+        applyServerMessage(state, renderer, msg, onError)
       } catch (err) {
         onError?.(err)
       }
