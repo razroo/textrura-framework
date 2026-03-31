@@ -8,6 +8,7 @@ export type RouteLoaderContext<T = unknown, TRequestContext = unknown> = {
   query: ParsedQuery
   location: RouterLocation
   requestContext: TRequestContext
+  signal: AbortSignal
   route: RouteNode<T, TRequestContext>
 }
 
@@ -21,6 +22,7 @@ export type RouteActionContext<T = unknown, TRequestContext = unknown> = {
   query: ParsedQuery
   location: RouterLocation
   requestContext: TRequestContext
+  signal: AbortSignal
   route: RouteNode<T, TRequestContext>
   submission: RouteActionSubmission
 }

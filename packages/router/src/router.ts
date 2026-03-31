@@ -66,6 +66,16 @@ type ResolvedState<T = unknown, TRequestContext = unknown> = {
   redirect: { to: string; replace: boolean } | null
 }
 
+function createAbortError(): Error {
+  const error = new Error('Navigation aborted')
+  error.name = 'AbortError'
+  return error
+}
+
+function isAbortError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { name?: string }).name === 'AbortError'
+}
+
 function createRouteDataKey(route: { id?: string }, index: number): string {
   return route.id ?? `__route_${index}`
 }
@@ -73,8 +83,10 @@ function createRouteDataKey(route: { id?: string }, index: number): string {
 async function resolveState<T, TRequestContext>(
   routes: RouteNode<T, TRequestContext>[],
   location: RouterLocation,
+  signal: AbortSignal,
   requestContextProvider?: TRequestContext | (() => TRequestContext | Promise<TRequestContext>),
 ): Promise<ResolvedState<T, TRequestContext>> {
+  if (signal.aborted) throw createAbortError()
   const matches = matchRouteTree(routes, location.pathname)
   const loaderData: Record<string, unknown> = {}
   let redirect: { to: string; replace: boolean } | null = null
@@ -95,8 +107,10 @@ async function resolveState<T, TRequestContext>(
         query,
         location,
         requestContext,
+        signal,
         route,
       })
+      if (signal.aborted) throw createAbortError()
       if (isRedirectResult(result)) {
         redirect = { to: result.to, replace: result.replace ?? false }
         break
@@ -140,6 +154,7 @@ export function createRouter<T, TRequestContext = unknown>(
   const listeners = new Set<RouterSubscriber<T, TRequestContext>>()
   const blockers = new Set<NavigationBlocker>()
   let resolutionVersion = 0
+  let inFlightController: AbortController | null = null
 
   const emit = (): void => {
     for (const listener of listeners) listener(state)
@@ -156,8 +171,17 @@ export function createRouter<T, TRequestContext = unknown>(
     previousNavigation: typeof pendingNavigation,
   ): Promise<void> => {
     const version = ++resolutionVersion
-    const resolved = await resolveState(routes, location, options.requestContext)
-    if (disposed || version !== resolutionVersion) {
+    inFlightController?.abort()
+    const controller = new AbortController()
+    inFlightController = controller
+    let resolved: ResolvedState<T, TRequestContext>
+    try {
+      resolved = await resolveState(routes, location, controller.signal, options.requestContext)
+    } catch (error) {
+      if (isAbortError(error)) return
+      throw error
+    }
+    if (disposed || version !== resolutionVersion || controller !== inFlightController) {
       previousNavigation?.resolve(false)
       return
     }
@@ -198,6 +222,7 @@ export function createRouter<T, TRequestContext = unknown>(
       previousNavigation.resolve(true)
       pendingNavigation = null
     }
+    inFlightController = null
     emit()
   }
 
@@ -258,11 +283,13 @@ export function createRouter<T, TRequestContext = unknown>(
 
       const requestContext = await getRequestContext()
       const query = parseQuery(state.location.search)
+      const controller = new AbortController()
       const result = await route.action({
         params: branch.params,
         query,
         location: state.location,
         requestContext,
+        signal: controller.signal,
         route,
         submission,
       })
@@ -291,6 +318,8 @@ export function createRouter<T, TRequestContext = unknown>(
       if (disposed) return
       disposed = true
       started = false
+      inFlightController?.abort()
+      inFlightController = null
       if (unlisten) {
         unlisten()
         unlisten = null

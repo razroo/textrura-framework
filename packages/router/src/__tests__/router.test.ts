@@ -354,4 +354,44 @@ describe('createRouter lifecycle', () => {
     expect(redirected).toBe(true)
     expect(router.getState().location.pathname).toBe('/login')
   })
+
+  it('cancels in-flight loader work on interrupted transitions', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/'] })
+    const abortedIds: string[] = []
+    const cancelRoutes: RouteNode[] = [
+      {
+        id: 'root',
+        path: '/',
+        children: [
+          {
+            id: 'users',
+            path: 'users/:id',
+            loader: ({ params, signal }) =>
+              new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => resolve({ id: params.id }), 40)
+                signal.addEventListener('abort', () => {
+                  clearTimeout(timeout)
+                  abortedIds.push(params.id ?? '')
+                  const error = new Error('aborted')
+                  error.name = 'AbortError'
+                  reject(error)
+                })
+              }),
+          },
+        ],
+      },
+    ]
+    const router = createRouter({ routes: cancelRoutes, history })
+    router.start()
+
+    const first = router.navigate('/users/1')
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    const second = router.navigate('/users/2')
+
+    expect(await first).toBe(false)
+    expect(await second).toBe(true)
+    expect(abortedIds).toContain('1')
+    expect(router.getState().location.pathname).toBe('/users/2')
+    expect(router.getState().loaderData.users).toEqual({ id: '2' })
+  })
 })
