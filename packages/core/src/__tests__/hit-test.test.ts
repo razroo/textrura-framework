@@ -257,6 +257,20 @@ describe('getCursorAtPoint', () => {
     // Child absX = 0 - 30 + 40 = 10; point (35, 50) lies inside the child
     expect(getCursorAtPoint(parent, layout, 35, 50)).toBe('crosshair')
   })
+
+  it('uses child cursor under vertical scroll offset', () => {
+    const child = box({ width: 50, height: 50, cursor: 'grab' })
+    const parent = box({ width: 100, height: 100, overflow: 'scroll', scrollY: 25 }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 20, y: 40, width: 50, height: 50, children: [] }],
+    }
+    // Child absY = 0 - 25 + 40 = 15; point (35, 35) lies inside the child
+    expect(getCursorAtPoint(parent, layout, 35, 35)).toBe('grab')
+  })
 })
 
 describe('scroll and overflow clipping', () => {
@@ -281,6 +295,7 @@ describe('scroll and overflow clipping', () => {
     expect(parentFired).toBe(false)
     expect(hitPathAtPoint(parent, layout, 150, 50)).toBe(null)
     expect(hasInteractiveHitAtPoint(parent, layout, 150, 50)).toBe(false)
+    expect(getCursorAtPoint(parent, layout, 150, 50)).toBeNull()
   })
 
   it('overflow scroll: pointer inside parent still hits stacked children', () => {
@@ -395,6 +410,7 @@ describe('overflow hidden clipping', () => {
     expect(parentFired).toBe(false)
     expect(hitPathAtPoint(parent, layout, 150, 50)).toBe(null)
     expect(hasInteractiveHitAtPoint(parent, layout, 150, 50)).toBe(false)
+    expect(getCursorAtPoint(parent, layout, 150, 50)).toBeNull()
   })
 
   it('overflow hidden: pointer inside parent still hits children', () => {
