@@ -83,7 +83,7 @@ Tracking fields:
 ### Release readiness gate (every release)
 
 - [x] Status: `done` | Owner: `@codex` | Core unit tests pass.
-- [ ] Status: `todo` | Owner: `@unassigned` | Terminal integration suite passes.
+- [x] Status: `done` | Owner: `@codex` | Terminal integration suite passes.
 - [ ] Status: `todo` | Owner: `@unassigned` | Renderer-specific smoke checks pass.
 - [ ] Status: `todo` | Owner: `@unassigned` | Lint/build pass in CI.
 - [ ] Status: `todo` | Owner: `@unassigned` | Changelog/release notes include behavior changes plus migration notes.
