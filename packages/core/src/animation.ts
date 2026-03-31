@@ -18,6 +18,19 @@ export const easing = {
 }
 
 export type EasingFn = (t: number) => number
+export type TweenPlaybackState = 'idle' | 'running' | 'paused' | 'finished' | 'cancelled'
+
+export interface TweenTimeline {
+  value: Signal<number>
+  /** Schedule/interrupt toward a new target. */
+  to(to: number, durationMs: number, easingFn?: EasingFn): void
+  /** Deterministically advance timeline by fixed milliseconds. */
+  step(deltaMs: number): number
+  pause(): void
+  resume(): void
+  cancel(): void
+  state(): TweenPlaybackState
+}
 
 /**
  * Create an animated signal that transitions from `from` to `to` over `duration` ms.
@@ -41,6 +54,65 @@ export function transition(
 
   raf(tick)
   return s
+}
+
+/**
+ * Deterministic tween timeline for tests and frame-stepped animation orchestration.
+ * Unlike `transition()`, this helper does not use `requestAnimationFrame`.
+ */
+export function createTweenTimeline(initialValue: number): TweenTimeline {
+  const value = signal(initialValue)
+  let from = initialValue
+  let to = initialValue
+  let elapsed = 0
+  let duration = 0
+  let easingFn: EasingFn = easing.linear
+  let playbackState: TweenPlaybackState = 'idle'
+
+  function toTarget(nextTo: number, durationMs: number, nextEasing: EasingFn = easing.easeInOut): void {
+    from = value.peek()
+    to = nextTo
+    elapsed = 0
+    duration = Math.max(1, durationMs)
+    easingFn = nextEasing
+    playbackState = 'running'
+  }
+
+  function step(deltaMs: number): number {
+    if (playbackState !== 'running') return value.peek()
+    elapsed += Math.max(0, deltaMs)
+    const t = Math.min(elapsed / duration, 1)
+    const next = from + (to - from) * easingFn(t)
+    value.set(next)
+    if (t >= 1) {
+      playbackState = 'finished'
+    }
+    return next
+  }
+
+  function pause(): void {
+    if (playbackState === 'running') playbackState = 'paused'
+  }
+
+  function resume(): void {
+    if (playbackState === 'paused') playbackState = 'running'
+  }
+
+  function cancel(): void {
+    if (playbackState === 'running' || playbackState === 'paused') {
+      playbackState = 'cancelled'
+    }
+  }
+
+  return {
+    value,
+    to: toTarget,
+    step,
+    pause,
+    resume,
+    cancel,
+    state: () => playbackState,
+  }
 }
 
 /**

@@ -18,7 +18,7 @@ npm install @geometra/core
 - `insertInputText`, `backspaceInput`, `deleteInput` -- text-input editing primitives
 - `getInputCaretGeometry` -- caret x/y/height from measured text lines
 - `createTextInputHistory`, `undoTextInputHistory` -- undo/redo state helpers
-- `transition`, `spring` -- animation utilities
+- `transition`, `spring`, `createTweenTimeline` -- animation utilities
 
 ## Usage
 
