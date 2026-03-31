@@ -49,6 +49,12 @@ const activeDemoInput = signal<'name' | 'email' | 'search' | null>(null)
 let lastPerfTime = '-'
 let lastPerfNodes = '-'
 
+// Primitives showcase state
+const primitivesDialogOpen = signal(true)
+const primitivesSearch = signal<DemoInputField>({ value: '', caretOffset: 0 })
+const primitivesSearchFocused = signal(false)
+const ALL_PRIMITIVES = ['button()', 'input()', 'list()', 'dialog()', 'text()', 'box()', 'image()']
+
 // ─── Page-Level Ambient Effects ───────────────────────────────────────────────
 const mouseX = signal(-9999)
 const mouseY = signal(-9999)
@@ -1140,16 +1146,56 @@ function archSection(): UIElement {
       gap: 12,
     }, [
       text({ text: '@geometra/ui primitives (starter)', font: '600 15px Inter', lineHeight: 20, color: TEXT_COLOR }),
-      text({ text: 'The demo consumes primitives from @geometra/ui directly.', font: '13px Inter', lineHeight: 20, color: MUTED }),
-      uiDialog(
-        'Quick Start',
-        'Composable starter primitives built on top of core elements.',
-        [
-          uiButton('View on GitHub', () => window.open('https://github.com/razroo/geometra/tree/main/packages/ui', '_blank')),
-        ],
-      ),
-      uiInput('Search components...', 'Type to filter'),
-      uiList(['button()', 'input()', 'list()', 'dialog()']),
+      text({ text: 'These are live primitives \u2014 click, type, and interact. Not screenshots.', font: '13px Inter', lineHeight: 20, color: MUTED }),
+      // Toggle dialog button
+      box({ flexDirection: 'row', gap: 8 }, [
+        uiButton(
+          primitivesDialogOpen.value ? 'Hide dialog' : 'Show dialog',
+          () => primitivesDialogOpen.set(!primitivesDialogOpen.peek()),
+        ),
+      ]),
+      // Conditional dialog
+      ...(primitivesDialogOpen.value ? [
+        uiDialog(
+          'Quick Start',
+          'Composable starter primitives built on top of core elements.',
+          [
+            uiButton('View on GitHub', () => window.open('https://github.com/razroo/geometra/tree/main/packages/ui', '_blank')),
+            uiButton('Dismiss', () => primitivesDialogOpen.set(false)),
+          ],
+        ),
+      ] : []),
+      // Interactive search input
+      uiInput(primitivesSearch.value.value, 'Search components\u2026', {
+        focused: primitivesSearchFocused.value,
+        caretOffset: primitivesSearch.value.caretOffset,
+        onClick: () => primitivesSearchFocused.set(true),
+        onCaretOffsetChange: (offset) => {
+          primitivesSearch.set({ value: primitivesSearch.peek().value, caretOffset: offset })
+        },
+        onKeyDown: (e) => {
+          const curr = primitivesSearch.peek()
+          if (e.key === 'Backspace') {
+            if (curr.caretOffset <= 0) return
+            const left = curr.value.slice(0, curr.caretOffset - 1)
+            const right = curr.value.slice(curr.caretOffset)
+            primitivesSearch.set({ value: left + right, caretOffset: curr.caretOffset - 1 })
+          } else if (e.key === 'ArrowLeft') {
+            primitivesSearch.set({ value: curr.value, caretOffset: Math.max(0, curr.caretOffset - 1) })
+          } else if (e.key === 'ArrowRight') {
+            primitivesSearch.set({ value: curr.value, caretOffset: Math.min(curr.value.length, curr.caretOffset + 1) })
+          } else if (e.key.length === 1) {
+            const left = curr.value.slice(0, curr.caretOffset)
+            const right = curr.value.slice(curr.caretOffset)
+            primitivesSearch.set({ value: left + e.key + right, caretOffset: curr.caretOffset + 1 })
+          }
+        },
+      }),
+      // Filtered list
+      uiList((() => {
+        const q = primitivesSearch.value.value.toLowerCase()
+        return q.length === 0 ? ALL_PRIMITIVES : ALL_PRIMITIVES.filter(p => p.includes(q))
+      })()),
     ]),
   ])
 }
