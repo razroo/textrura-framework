@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import { box, createApp } from '../../../core/src/index.js'
 import { clearFocus } from '../../../core/src/focus.js'
 import { signal } from '../../../core/src/signals.js'
-import type { CompositionHitEvent, HitEvent, KeyboardHitEvent, UIElement } from '../../../core/src/types.js'
+import type { CompositionHitEvent, HitEvent, KeyboardHitEvent, Renderer, UIElement } from '../../../core/src/types.js'
 import { input } from '../index.js'
 
 if (typeof globalThis.OffscreenCanvas === 'undefined') {
@@ -16,6 +17,16 @@ if (typeof globalThis.OffscreenCanvas === 'undefined') {
         },
       }
     }
+  }
+}
+
+class CaptureRenderer implements Renderer {
+  lastTree: UIElement | null = null
+  render(_layout: unknown, tree: UIElement): void {
+    this.lastTree = tree
+  }
+  destroy(): void {
+    // no-op
   }
 }
 
@@ -132,5 +143,37 @@ describe('@geometra/ui input', () => {
 
     expect(first.peek()).toBe('abc')
     expect(second.peek()).toBe('xy')
+  })
+
+  it('shows caret on focused input and moves it on focus change', async () => {
+    const active = signal<'name' | 'email' | null>(null)
+    const renderer = new CaptureRenderer()
+
+    const app = await createApp(
+      () =>
+        box({ width: 280, height: 140, flexDirection: 'column', gap: 12 }, [
+          input('', 'Name', { focused: active.value === 'name', onClick: () => active.set('name') }),
+          input('', 'Email', { focused: active.value === 'email', onClick: () => active.set('email') }),
+        ]),
+      renderer,
+      { width: 280, height: 140 },
+    )
+
+    function countCaretBoxes(tree: UIElement | null): number {
+      if (!tree) return 0
+      if (tree.kind === 'text') return 0
+      const selfCaret = tree.props.backgroundColor === '#38bdf8' && tree.props.width === 1.5 ? 1 : 0
+      return selfCaret + tree.children.reduce((sum, child) => sum + countCaretBoxes(child), 0)
+    }
+
+    expect(countCaretBoxes(renderer.lastTree)).toBe(0)
+
+    app.dispatch('onClick', 10, 10)
+    expect(countCaretBoxes(renderer.lastTree)).toBe(1)
+
+    app.dispatch('onClick', 10, 70)
+    expect(countCaretBoxes(renderer.lastTree)).toBe(1)
+
+    app.destroy()
   })
 })
