@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { TerminalRenderer } from '../renderer.js'
-import { box, text } from '@geometra/core'
+import { box, text } from '../../../core/src/index.js'
 import { readFileSync } from 'node:fs'
 
 class MemoryStream {
