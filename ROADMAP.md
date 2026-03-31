@@ -113,7 +113,7 @@ Tracking fields:
 
 ### 0.4.2 — Accessibility and semantics depth
 
-- [ ] Status: `todo` | Owner: `@unassigned` | Expand a11y tree attributes (state/disabled/expanded/selected) and test mappings.
+- [x] Status: `done` | Owner: `@codex` | Expand a11y tree attributes (state/disabled/expanded/selected) and test mappings.
 - [ ] Status: `todo` | Owner: `@unassigned` | Add focus trap primitives and tests for modal/overlay flows.
 - [ ] Status: `todo` | Owner: `@unassigned` | Add form-like semantics examples (labels, input groups, error text relationships).
 - [ ] Status: `todo` | Owner: `@unassigned` | Add regression snapshots for accessibility tree shape across representative app templates.

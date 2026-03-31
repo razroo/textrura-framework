@@ -123,5 +123,23 @@ describe('toAccessibilityTree', () => {
     expect(submit.role).toBe('button')
     expect(submit.focusable).toBe(true)
   })
+
+  it('maps aria state attributes to accessibility node state', () => {
+    const tree = box({}, [
+      box({ semantic: { tag: 'button', ariaDisabled: true, ariaExpanded: false } }, []),
+      box({ semantic: { tag: 'li', ariaSelected: true } }, []),
+    ])
+    const layout = {
+      x: 0, y: 0, width: 200, height: 80,
+      children: [
+        { x: 0, y: 0, width: 100, height: 30, children: [] },
+        { x: 0, y: 40, width: 100, height: 30, children: [] },
+      ],
+    }
+
+    const a11y = toAccessibilityTree(tree, layout)
+    expect(a11y.children[0]?.state).toEqual({ disabled: true, expanded: false })
+    expect(a11y.children[1]?.state).toEqual({ selected: true })
+  })
 })
 

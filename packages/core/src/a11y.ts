@@ -11,6 +11,11 @@ export interface AccessibilityBounds {
 export interface AccessibilityNode {
   role: string
   name?: string
+  state?: {
+    disabled?: boolean
+    expanded?: boolean
+    selected?: boolean
+  }
   bounds: AccessibilityBounds
   path: number[]
   children: AccessibilityNode[]
@@ -62,6 +67,16 @@ function isFocusable(element: UIElement): boolean {
   )
 }
 
+function stateFor(element: UIElement): AccessibilityNode['state'] | undefined {
+  const s = element.semantic
+  if (!s) return undefined
+  const state: NonNullable<AccessibilityNode['state']> = {}
+  if (s.ariaDisabled !== undefined) state.disabled = s.ariaDisabled
+  if (s.ariaExpanded !== undefined) state.expanded = s.ariaExpanded
+  if (s.ariaSelected !== undefined) state.selected = s.ariaSelected
+  return Object.keys(state).length > 0 ? state : undefined
+}
+
 function roleFor(element: UIElement): string {
   if (element.kind === 'text') return inferTextRole(element)
   if (element.kind === 'image') return inferImageRole(element)
@@ -93,6 +108,7 @@ function walk(
   return {
     role: roleFor(element),
     name: inferName(element),
+    state: stateFor(element),
     bounds: { x, y, width: layout.width, height: layout.height },
     path,
     children,

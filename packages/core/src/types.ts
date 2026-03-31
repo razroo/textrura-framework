@@ -39,6 +39,12 @@ export interface SemanticProps {
   alt?: string
   /** Aria-label for screen readers. */
   ariaLabel?: string
+  /** State: disabled. */
+  ariaDisabled?: boolean
+  /** State: expanded/collapsed. */
+  ariaExpanded?: boolean
+  /** State: selected. */
+  ariaSelected?: boolean
 }
 
 /** A text node in the component tree. */
