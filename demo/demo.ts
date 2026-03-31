@@ -62,6 +62,90 @@ const primitivesRadio = signal(0)
 const primitivesTab = signal(0)
 const ALL_PRIMITIVES = ['button()', 'checkbox()', 'radio()', 'tabs()', 'input()', 'list()', 'dialog()', 'text()', 'box()', 'image()']
 
+// ─── Agent Demo State ──────────────────────────────────────────────────────────
+interface AgentTask { id: number; label: string; done: boolean }
+const INITIAL_AGENT_TASKS: AgentTask[] = [
+  { id: 0, label: 'Deploy v2.1 to staging', done: false },
+  { id: 1, label: 'Fix auth token refresh', done: false },
+  { id: 2, label: 'Update API docs', done: false },
+  { id: 3, label: 'Run integration tests', done: false },
+]
+interface AgentLogEntry { dir: string; msg: string; color: string }
+const agentTasks = signal<AgentTask[]>(INITIAL_AGENT_TASKS.map(t => ({ ...t })))
+const agentLog = signal<AgentLogEntry[]>([])
+const agentRunning = signal(false)
+const agentDone = signal(false)
+const agentElapsedMs = signal(0)
+let agentTimers: ReturnType<typeof setTimeout>[] = []
+
+function resetAgent() {
+  for (const t of agentTimers) clearTimeout(t)
+  agentTimers = []
+  agentTasks.set(INITIAL_AGENT_TASKS.map(t => ({ ...t })))
+  agentLog.set([])
+  agentRunning.set(false)
+  agentDone.set(false)
+  agentElapsedMs.set(0)
+}
+
+function runAgent() {
+  resetAgent()
+  agentRunning.set(true)
+
+  const tasks = INITIAL_AGENT_TASKS
+  const steps: Array<{ delay: number; fn: () => void }> = []
+
+  steps.push({ delay: 300, fn: () => {
+    agentLog.set([...agentLog.peek(),
+      { dir: '\u2190', msg: 'frame { nodes:14, interactive:5, proto:1 }', color: ACCENT2 },
+    ])
+    agentElapsedMs.set(0.8)
+  }})
+
+  steps.push({ delay: 500, fn: () => {
+    agentLog.set([...agentLog.peek(),
+      { dir: '\u26A1', msg: `scan \u2192 ${tasks.length} tasks, 0 checked`, color: ACCENT4 },
+    ])
+    agentElapsedMs.set(1.2)
+  }})
+
+  for (let i = 0; i < tasks.length; i++) {
+    const task = tasks[i]!
+    const y = 86 + i * 38
+
+    steps.push({ delay: 300, fn: () => {
+      agentLog.set([...agentLog.peek(),
+        { dir: '\u2192', msg: `click { x:24, y:${y} }  "${task.label}"`, color: ACCENT },
+      ])
+      const current = agentTasks.peek()
+      agentTasks.set(current.map(t => t.id === task.id ? { ...t, done: true } : t))
+      agentElapsedMs.set(1.2 + (i + 1) * 0.7)
+    }})
+
+    steps.push({ delay: 150, fn: () => {
+      agentLog.set([...agentLog.peek(),
+        { dir: '\u2190', msg: `patch { path:[${2 + i},0], checked:true }`, color: ACCENT3 },
+      ])
+      agentElapsedMs.set(1.2 + (i + 1) * 0.7 + 0.2)
+    }})
+  }
+
+  steps.push({ delay: 350, fn: () => {
+    agentLog.set([...agentLog.peek(),
+      { dir: '\u2713', msg: `done \u2014 ${tasks.length} tasks, ${tasks.length * 2 + 2} ops`, color: ACCENT3 },
+    ])
+    agentRunning.set(false)
+    agentDone.set(true)
+    agentElapsedMs.set(4.7)
+  }})
+
+  let cumDelay = 0
+  for (const step of steps) {
+    cumDelay += step.delay
+    agentTimers.push(setTimeout(step.fn, cumDelay))
+  }
+}
+
 // ─── Page-Level Ambient Effects ───────────────────────────────────────────────
 const mouseX = signal(-9999)
 const mouseY = signal(-9999)
@@ -797,6 +881,196 @@ function seoDemo(): UIElement {
   ])
 }
 
+function agentDemo(): UIElement {
+  const w = rootWidth.value
+  const tasks = agentTasks.value
+  const log = agentLog.value
+  const running = agentRunning.value
+  const done = agentDone.value
+  const elapsed = agentElapsedMs.value
+  const isWide = w >= 500
+
+  const completedCount = tasks.filter(t => t.done).length
+
+  const taskPanel = box({
+    backgroundColor: SURFACE,
+    borderRadius: 10,
+    padding: 14,
+    flexDirection: 'column',
+    gap: 4,
+    flexGrow: 1,
+    flexBasis: isWide ? 0 : undefined,
+    minWidth: isWide ? 170 : undefined,
+  }, [
+    box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 6 }, [
+      text({ text: 'Task Board', font: 'bold 13px Inter', lineHeight: 18, color: TEXT_COLOR }),
+      box({
+        backgroundColor: completedCount === tasks.length ? 'rgba(34,197,94,0.15)' : 'rgba(14,165,233,0.15)',
+        borderRadius: 4,
+        paddingLeft: 6, paddingRight: 6, paddingTop: 2, paddingBottom: 2,
+      }, [
+        text({
+          text: `${completedCount}/${tasks.length}`,
+          font: '600 10px JetBrains Mono', lineHeight: 14,
+          color: completedCount === tasks.length ? ACCENT3 : ACCENT2,
+        }),
+      ]),
+    ]),
+    ...tasks.map(t => box({
+      flexDirection: 'row',
+      gap: 8,
+      alignItems: 'center',
+      padding: 8,
+      borderRadius: 6,
+      backgroundColor: t.done ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.02)',
+    }, [
+      box({
+        width: 16, height: 16, borderRadius: 4,
+        borderColor: t.done ? ACCENT3 : BORDER,
+        borderWidth: 1,
+        backgroundColor: t.done ? ACCENT3 : 'transparent',
+        justifyContent: 'center', alignItems: 'center',
+      }, [
+        ...(t.done ? [text({ text: '\u2713', font: 'bold 10px Inter', lineHeight: 16, color: '#fff' })] : []),
+      ]),
+      text({
+        text: t.label,
+        font: '12px Inter',
+        lineHeight: 16,
+        color: t.done ? DIM : TEXT_COLOR,
+      }),
+    ])),
+  ])
+
+  const logPanel = box({
+    backgroundColor: CODE_BG,
+    borderColor: 'rgba(63,63,70,0.5)',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    flexDirection: 'column',
+    gap: 2,
+    flexGrow: isWide ? 1.5 : 1,
+    flexBasis: isWide ? 0 : undefined,
+    minHeight: isWide ? undefined : 160,
+    overflow: 'hidden',
+  }, [
+    box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 4 }, [
+      text({ text: 'Protocol Feed', font: 'bold 11px JetBrains Mono', lineHeight: 14, color: DIM }),
+      box({ flexDirection: 'row', gap: 6, alignItems: 'center' }, [
+        box({
+          width: 6, height: 6, borderRadius: 3,
+          backgroundColor: running ? ACCENT3 : (log.length > 0 ? DIM : BORDER),
+        }, []),
+        text({
+          text: running ? 'live' : (log.length > 0 ? 'idle' : ''),
+          font: '10px JetBrains Mono', lineHeight: 12,
+          color: running ? ACCENT3 : DIM,
+        }),
+      ]),
+    ]),
+    ...(log.length === 0 ? [
+      text({ text: 'Waiting for agent\u2026', font: '11px JetBrains Mono', lineHeight: 16, color: BORDER }),
+      spacer(4),
+      text({ text: 'The agent connects via WebSocket and', font: '10px Inter', lineHeight: 14, color: 'rgba(113,113,122,0.6)' }),
+      text({ text: 'receives structured geometry \u2014 not DOM.', font: '10px Inter', lineHeight: 14, color: 'rgba(113,113,122,0.6)' }),
+      text({ text: 'It sends click events by coordinate.', font: '10px Inter', lineHeight: 14, color: 'rgba(113,113,122,0.6)' }),
+      text({ text: 'No browser. No scraping. Just JSON.', font: '10px Inter', lineHeight: 14, color: 'rgba(113,113,122,0.6)' }),
+    ] : log.map(entry =>
+      box({ flexDirection: 'row', gap: 6, paddingTop: 1, paddingBottom: 1 }, [
+        text({ text: entry.dir, font: '11px JetBrains Mono', lineHeight: 15, color: entry.color }),
+        text({
+          text: entry.msg, font: '11px JetBrains Mono', lineHeight: 15,
+          color: entry.color, whiteSpace: 'pre-wrap',
+        }),
+      ])
+    )),
+  ])
+
+  const speedComparison = done ? box({
+    flexDirection: 'row',
+    gap: 12,
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    backgroundColor: SURFACE,
+    borderRadius: 10,
+    padding: 12,
+  }, [
+    box({ flexDirection: 'row', gap: 6, alignItems: 'center' }, [
+      box({ width: 8, height: 8, borderRadius: 4, backgroundColor: ACCENT3 }, []),
+      text({
+        text: `Geometra: ${(tasks.length * 2 + 2)} ops in ${elapsed.toFixed(1)}ms`,
+        font: '600 12px JetBrains Mono', lineHeight: 16, color: ACCENT3,
+      }),
+    ]),
+    box({ flexDirection: 'row', gap: 6, alignItems: 'center' }, [
+      box({ width: 8, height: 8, borderRadius: 4, backgroundColor: DIM }, []),
+      text({
+        text: 'Playwright est: ~12,000ms',
+        font: '12px JetBrains Mono', lineHeight: 16, color: DIM,
+      }),
+    ]),
+    box({
+      backgroundColor: 'rgba(233,69,96,0.12)',
+      borderRadius: 6,
+      paddingLeft: 8, paddingRight: 8, paddingTop: 3, paddingBottom: 3,
+    }, [
+      text({
+        text: `${Math.round(12000 / elapsed)}\u00d7 faster`,
+        font: 'bold 12px Inter', lineHeight: 16, color: ACCENT,
+      }),
+    ]),
+  ]) : null
+
+  return box({ flexDirection: 'column', padding: 20, gap: 12, width: w, minHeight: 380 }, [
+    box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }, [
+      box({ flexDirection: 'column', gap: 2 }, [
+        text({ text: 'AI Agent Interaction', font: 'bold 18px Inter', lineHeight: 24, color: TEXT_COLOR }),
+        text({
+          text: 'Agent reads geometry and sends events via protocol \u2014 no browser needed',
+          font: '12px Inter', lineHeight: 16, color: DIM,
+        }),
+      ]),
+      box({ flexDirection: 'row', gap: 6 }, [
+        box({
+          backgroundColor: running ? SURFACE : 'rgba(233,69,96,0.15)',
+          borderColor: running ? BORDER : ACCENT,
+          borderWidth: 1,
+          borderRadius: 8,
+          paddingTop: 6, paddingBottom: 6, paddingLeft: 14, paddingRight: 14,
+          cursor: running ? 'default' : 'pointer',
+          opacity: running ? 0.5 : 1,
+          onClick: running ? undefined : () => runAgent(),
+        }, [
+          text({
+            text: running ? 'Running\u2026' : '\u25B6 Run Agent',
+            font: '600 12px Inter', lineHeight: 16,
+            color: running ? DIM : ACCENT,
+          }),
+        ]),
+        box({
+          backgroundColor: SURFACE,
+          borderColor: BORDER,
+          borderWidth: 1,
+          borderRadius: 8,
+          paddingTop: 6, paddingBottom: 6, paddingLeft: 12, paddingRight: 12,
+          cursor: 'pointer',
+          onClick: () => resetAgent(),
+        }, [
+          text({ text: '\u21BA Reset', font: '12px Inter', lineHeight: 16, color: MUTED }),
+        ]),
+      ]),
+    ]),
+
+    box({ flexDirection: isWide ? 'row' : 'column', gap: 12, flexGrow: 1 }, [
+      taskPanel,
+      logPanel,
+    ]),
+
+    ...(speedComparison ? [speedComparison] : []),
+  ])
+}
+
 const SCENARIOS: Record<string, () => UIElement> = {
   cards: cardGrid,
   chat: chatMessages,
@@ -807,6 +1081,7 @@ const SCENARIOS: Record<string, () => UIElement> = {
   animation: animationDemo,
   design: designShowcase,
   seo: seoDemo,
+  agent: agentDemo,
 }
 
 // ─── Code Examples ───────────────────────────────────────────────────────────
@@ -899,6 +1174,40 @@ const html = toSemanticHTML(tree, {
   og: { title: 'My App', type: 'website' },
 })
 // Serve html to crawlers, Canvas to users`,
+
+  agent: `// AI agent connects via the same WebSocket protocol
+// No browser. No Puppeteer. Just JSON geometry.
+import WebSocket from 'ws'
+
+const ws = new WebSocket('ws://localhost:3100')
+
+ws.on('message', (raw) => {
+  const msg = JSON.parse(String(raw))
+
+  if (msg.type === 'frame') {
+    // Agent receives structured geometry — not DOM
+    // Every node: { x, y, width, height, text?, onClick? }
+    const tasks = scanForCheckboxes(msg.layout, msg.tree)
+
+    for (const task of tasks) {
+      // Click by coordinate — no CSS selectors needed
+      ws.send(JSON.stringify({
+        type: 'event',
+        eventType: 'onClick',
+        x: task.x + 8,
+        y: task.y + 8,
+      }))
+    }
+  }
+
+  if (msg.type === 'patch') {
+    // Server confirms: UI updated at path
+    // No re-scraping. No stale DOM refs.
+    applyPatch(msg.patches)
+  }
+})
+
+// 10 ops in 4.7ms. No browser launched.`,
 }
 
 // ─── Page Sections ───────────────────────────────────────────────────────────
@@ -1041,7 +1350,7 @@ function demoSection(): UIElement {
     { key: 'dashboard', label: 'Dashboard' }, { key: 'nested', label: 'Nested' },
     { key: 'selection', label: 'Selection' }, { key: 'input', label: 'Input' },
     { key: 'animation', label: 'Animation' }, { key: 'design', label: 'Design' },
-    { key: 'seo', label: 'SEO' },
+    { key: 'seo', label: 'SEO' }, { key: 'agent', label: 'AI Agent' },
   ]
   const scenarioFn = SCENARIOS[scenario.value] ?? cardGrid
 
@@ -1061,6 +1370,7 @@ function demoSection(): UIElement {
       text({ text: 'Scenario', font: '600 12px Inter', lineHeight: 18, color: DIM }),
       ...names.map(s => btn(s.label, scenario.value === s.key, () => {
         if (scenario.peek() === 'animation' && s.key !== 'animation') stopAnimLoop()
+        if (scenario.peek() === 'agent' && s.key !== 'agent') resetAgent()
         scenario.set(s.key)
         renderer.selection = null
         if (s.key !== 'input') activeDemoInput.set(null)
@@ -1290,8 +1600,8 @@ function archSection(): UIElement {
 }
 
 function codeSection(): UIElement {
-  const tabs = ['basic', 'reactive', 'server', 'selection', 'seo']
-  const labels: Record<string, string> = { basic: 'Basic', reactive: 'Reactive', server: 'Server', selection: 'Selection', seo: 'SEO' }
+  const tabs = ['basic', 'reactive', 'server', 'selection', 'seo', 'agent']
+  const labels: Record<string, string> = { basic: 'Basic', reactive: 'Reactive', server: 'Server', selection: 'Selection', seo: 'SEO', agent: 'AI Agent' }
   return section([
     ...heading('One protocol, every target', 'The same element tree powers Canvas, Terminal, and AI agents.'),
     // Tabs + code in a single card
