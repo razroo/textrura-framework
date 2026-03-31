@@ -30,6 +30,13 @@ function inferBoxRole(element: BoxElement): string {
   if (tag === 'nav') return 'navigation'
   if (tag === 'main') return 'main'
   if (tag === 'article') return 'article'
+  if (tag === 'section') return 'region'
+  if (tag === 'ul' || tag === 'ol') return 'list'
+  if (tag === 'li') return 'listitem'
+  if (tag === 'form') return 'form'
+  if (tag === 'label') return 'label'
+  if (tag === 'button') return 'button'
+  if (tag === 'input') return 'textbox'
   if (element.handlers?.onClick) return 'button'
   return 'group'
 }
