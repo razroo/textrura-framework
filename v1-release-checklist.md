@@ -63,15 +63,15 @@ If any gate fails, log the issue link here and block release until resolved:
 
 Treat RC as a production rehearsal.
 
-- [ ] Bump versions for publishable packages.
-- [ ] Publish `v1.0.0-rc.1` using GitHub release flow.
+- [x] Bump versions for publishable packages. (done in `8b5064a`)
+- [x] Publish `v1.0.0-rc.1` using GitHub release flow. (release created 2026-03-31)
 - [ ] Verify install and smoke usage from each starter template.
 - [ ] Collect and triage feedback into: blocker / must-fix / post-1.0.
 - [ ] Decide go/no-go for `v1.0.0` based on blocker count.
 
 Artifacts:
 
-- RC release URL: `<link>`
+- RC release URL: `https://github.com/razroo/geometra/releases/tag/v1.0.0-rc.1`
 - Dogfood notes: `<doc or issue link>`
 
 ## 6) Final release execution (`v1.0.0`)
