@@ -55,6 +55,18 @@ The router must remain declarative and renderer-agnostic so the same route model
 - Preserve focus/selection/text input correctness through route transitions.
 - Maintain Bun-first compatibility and reliable CI behavior.
 
+## Runtime support confirmation
+
+`@geometra/router` is required to be first-class across all primary Geometra runtimes.
+
+| Runtime | Status | Required behavior |
+|---|---|---|
+| Local canvas (`createApp` + `CanvasRenderer`) | Required | Route transitions render as normal tree updates with no DOM dependency in matching/navigation core. |
+| Terminal (`createApp` + `TerminalRenderer`) | Required | Same route definitions and matching behavior via memory history; keyboard navigation supported. |
+| Server/client protocol (`@geometra/server` + `@geometra/client`) | Required | Initial route match works server-side and navigation behavior is explicit over protocol messages. |
+
+Acceptance gate: no router release is considered complete unless all three runtimes are covered by integration tests and examples.
+
 ## Initial API sketch (non-binding)
 
 ```ts

@@ -5,7 +5,7 @@ Goal: deliver a Geometra routing stack that is competitive with modern data rout
 ## 0) Define target and scope
 
 - [x] Publish an RFC for `@geometra/router` with success criteria and non-goals.
-- [ ] Confirm first-class support for local canvas, terminal, and server/client protocol modes.
+- [x] Confirm first-class support for local canvas, terminal, and server/client protocol modes.
 - [ ] Define compatibility contract for browser history mode and memory history mode.
 - [ ] Define protocol behavior for route transitions in server-computed layouts.
 
