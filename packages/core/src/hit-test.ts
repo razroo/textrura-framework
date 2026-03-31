@@ -7,6 +7,28 @@ interface HitTarget {
   element: BoxElement
 }
 
+interface ZIndexCacheEntry {
+  signature: string
+  desc: number[]
+}
+
+const zIndexOrderCache = new WeakMap<BoxElement, ZIndexCacheEntry>()
+
+function zIndexOf(el: UIElement): number {
+  return (el.props as Record<string, unknown>).zIndex as number | undefined ?? 0
+}
+
+function getChildrenByZDesc(boxEl: BoxElement): number[] {
+  const signature = boxEl.children.map((child, i) => `${i}:${zIndexOf(child)}`).join('|')
+  const cached = zIndexOrderCache.get(boxEl)
+  if (cached && cached.signature === signature) {
+    return cached.desc
+  }
+  const desc = boxEl.children.map((_, i) => i).sort((a, b) => zIndexOf(boxEl.children[b]!) - zIndexOf(boxEl.children[a]!))
+  zIndexOrderCache.set(boxEl, { signature, desc })
+  return desc
+}
+
 /** Result of routing a pointer/keyboard-style hit to handlers. */
 export interface HitDispatchResult {
   handled: boolean
@@ -56,15 +78,7 @@ function collectHits(
       results.push({ layout, handlers: boxEl.handlers, element: boxEl })
     }
 
-    // Sort children by zIndex for hit-testing (highest first)
-    const indices = boxEl.children.map((_, i) => i)
-    indices.sort((a, b) => {
-      const zA = (boxEl.children[a]!.props as Record<string, unknown>).zIndex as number | undefined ?? 0
-      const zB = (boxEl.children[b]!.props as Record<string, unknown>).zIndex as number | undefined ?? 0
-      return zB - zA // highest zIndex first for hit-testing
-    })
-
-    for (const i of indices) {
+    for (const i of getChildrenByZDesc(boxEl)) {
       const childLayout = layout.children[i]
       if (childLayout) {
         collectHits(boxEl.children[i]!, childLayout, x, y, childOffsetX, childOffsetY, results)
@@ -132,7 +146,9 @@ export function getCursorAtPoint(
     if (element.props.scrollX) childOffX -= element.props.scrollX
     if (element.props.scrollY) childOffY -= element.props.scrollY
 
-    for (let i = element.children.length - 1; i >= 0; i--) {
+    const indices = getChildrenByZDesc(element)
+    for (let ii = 0; ii < indices.length; ii++) {
+      const i = indices[ii]!
       const childLayout = layout.children[i]
       if (childLayout) {
         const childCursor = getCursorAtPoint(element.children[i]!, childLayout, x, y, childOffX, childOffY)
