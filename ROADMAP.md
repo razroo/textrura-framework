@@ -70,7 +70,7 @@ Tracking fields:
 - [x] Status: `done` | Owner: `@codex` | Establish baseline metrics and acceptable regression thresholds.
 - [x] Status: `done` | Owner: `@codex` | Wire benchmark/performance checks into CI reporting.
 - [x] Status: `done` | Owner: `@codex` | Add smoke perf test for large tree updates (worst-case UI churn).
-- [ ] Status: `todo` | Owner: `@unassigned` | Track perf notes in release checklist before each tag.
+- [x] Status: `done` | Owner: `@codex` | Track perf notes in release checklist before each tag.
 
 ### Docs and developer experience (parallel track)
 
