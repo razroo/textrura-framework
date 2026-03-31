@@ -29,10 +29,12 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        run: bun install
+        run: |
+          bun install || npm install
 
       - name: Build demo
-        run: bun run demo:build
+        run: |
+          bun run demo:build || npm run demo:build
 
       - uses: actions/upload-pages-artifact@v3
         with:
