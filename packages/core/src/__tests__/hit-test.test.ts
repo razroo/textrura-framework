@@ -52,6 +52,15 @@ describe('dispatchHit', () => {
     expect(result.handled).toBe(false)
     expect(result.focusTarget?.element).toBe(el)
   })
+
+  it('click returns focus target for composition-only focusable boxes', () => {
+    const el = box({ width: 100, height: 50, onCompositionStart: () => undefined })
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
+
+    const result = dispatchHit(el, layout, 'onClick', 50, 25)
+    expect(result.handled).toBe(false)
+    expect(result.focusTarget?.element).toBe(el)
+  })
 })
 
 describe('getCursorAtPoint', () => {

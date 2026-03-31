@@ -109,7 +109,10 @@ export function dispatchHit(
       const focusable = !!(
         hit.handlers.onClick ||
         hit.handlers.onKeyDown ||
-        hit.handlers.onKeyUp
+        hit.handlers.onKeyUp ||
+        hit.handlers.onCompositionStart ||
+        hit.handlers.onCompositionUpdate ||
+        hit.handlers.onCompositionEnd
       )
       const focusTarget =
         eventType === 'onClick' && focusable
@@ -126,7 +129,10 @@ export function dispatchHit(
       const focusable = !!(
         hit.handlers.onClick ||
         hit.handlers.onKeyDown ||
-        hit.handlers.onKeyUp
+        hit.handlers.onKeyUp ||
+        hit.handlers.onCompositionStart ||
+        hit.handlers.onCompositionUpdate ||
+        hit.handlers.onCompositionEnd
       )
       if (focusable) {
         return { handled: false, focusTarget: { element: hit.element, layout: hit.layout } }

@@ -59,4 +59,51 @@ describe('app input focus routing', () => {
 
     app.destroy()
   })
+
+  it('click-focused input receives composition lifecycle and commits text', async () => {
+    let committed = ''
+    let draft = ''
+
+    const app = await createApp(
+      () =>
+        box(
+          { width: 220, height: 120 },
+          [
+            box(
+              {
+                width: 180,
+                height: 40,
+                onCompositionStart: () => {
+                  draft = ''
+                },
+                onCompositionUpdate: (e) => {
+                  draft = e.data
+                },
+                onCompositionEnd: (e) => {
+                  if (e.data) committed += e.data
+                  draft = ''
+                },
+              },
+              [],
+            ),
+          ],
+        ),
+      new TestRenderer(),
+      { width: 220, height: 120 },
+    )
+
+    app.dispatch('onClick', 10, 10)
+
+    const started = app.dispatchComposition('onCompositionStart', { data: '' })
+    const updated = app.dispatchComposition('onCompositionUpdate', { data: 'に' })
+    const ended = app.dispatchComposition('onCompositionEnd', { data: 'に' })
+
+    expect(started).toBe(true)
+    expect(updated).toBe(true)
+    expect(ended).toBe(true)
+    expect(draft).toBe('')
+    expect(committed).toBe('に')
+
+    app.destroy()
+  })
 })
