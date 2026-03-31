@@ -46,6 +46,11 @@ This document defines expected keyboard/focus behavior across renderers.
 - Root direction fallback is `ltr`.
 - Direction semantics are defined at the core tree level so renderers can implement consistent caret/selection behavior.
 
+Current limits:
+
+- `dir=auto` currently inherits parent direction; script-level automatic direction detection is not implemented yet.
+- Bidirectional behavior is validated for core caret helpers and canvas/terminal baseline rendering, but full Unicode bidi algorithm parity is still a post-1.0 track.
+
 ## Composition / IME
 
 - `onCompositionStart`: snapshot active selection for composition anchor.

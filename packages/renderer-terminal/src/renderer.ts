@@ -176,16 +176,26 @@ export class TerminalRenderer implements Renderer {
   }
 
   private paintText(element: TextElement, x: number, y: number, w: number, _h: number): void {
-    const { text, color, backgroundColor } = element.props
+    const { text, color, backgroundColor, dir } = element.props
     const fg = color ?? '#ffffff'
     const bg = backgroundColor ?? ''
+    const rtl = dir === 'rtl'
 
-    let col = 0, row = 0
-    for (const ch of text) {
-      if (ch === '\n') { row++; col = 0; continue }
-      if (col >= w) { row++; col = 0 }
-      this.setCell(x + col, y + row, ch, fg, bg)
-      col++
+    let row = 0
+    const paragraphs = text.split('\n')
+    for (const paragraph of paragraphs) {
+      if (paragraph.length === 0) {
+        row++
+        continue
+      }
+      for (let i = 0; i < paragraph.length; i += w) {
+        const chunk = paragraph.slice(i, i + w)
+        const startCol = rtl ? Math.max(0, w - chunk.length) : 0
+        for (let c = 0; c < chunk.length; c++) {
+          this.setCell(x + startCol + c, y + row, chunk[c]!, fg, bg)
+        }
+        row++
+      }
     }
   }
 

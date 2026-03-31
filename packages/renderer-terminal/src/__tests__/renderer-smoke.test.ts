@@ -93,4 +93,27 @@ describe('terminal renderer smoke', () => {
     const fixture = readFileSync(new URL('./fixtures/zindex-clipping-overflow.txt', import.meta.url), 'utf8').trim()
     expect(plain.includes(fixture)).toBe(true)
   })
+
+  it('right-aligns rtl text within line width', () => {
+    const output = new MemoryStream()
+    const renderer = new TerminalRenderer({
+      width: 12,
+      height: 3,
+      output: output as unknown as NodeJS.WritableStream,
+    })
+    const tree = box({}, [
+      text({ text: 'AB', dir: 'rtl', font: '14px monospace', lineHeight: 18, color: '#ffffff' }),
+    ])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 80, // 80 * 0.15 => 12 columns
+      height: 20,
+      children: [{ x: 0, y: 0, width: 80, height: 20, children: [] }],
+    }
+
+    renderer.render(layout as any, tree)
+    const plain = stripAnsiSequences(output.toString())
+    expect(plain).toContain('          AB')
+  })
 })

@@ -47,9 +47,9 @@ Goal: make mixed-direction text and interaction credible for production apps.
 
 Acceptance criteria:
 
-- [ ] Status: `todo` | Owner: `@unassigned` | Direction model is explicit: root and per-node `dir` (`ltr`/`rtl`/`auto`) semantics are documented and enforced consistently.
-- [ ] Status: `todo` | Owner: `@unassigned` | Caret movement semantics are correct for bidi text (left/right visual movement, home/end behavior, word jumps) with integration tests.
-- [ ] Status: `todo` | Owner: `@unassigned` | Selection range mapping and paint are stable for mixed LTR/RTL runs in canvas and terminal renderers.
+- [x] Status: `done` | Owner: `@codex` | Direction model is explicit: root and per-node `dir` (`ltr`/`rtl`/`auto`) semantics are documented and enforced consistently.
+- [x] Status: `done` | Owner: `@codex` | Caret movement semantics are correct for bidi text (left/right visual movement, home/end behavior, word jumps) with integration tests.
+- [ ] Status: `in_progress` | Owner: `@codex` | Selection range mapping and paint are stable for mixed LTR/RTL runs in canvas and terminal renderers. (canvas baseline landed; terminal parity pending)
 - [ ] Status: `todo` | Owner: `@unassigned` | Text measurement and geometry mapping stay parity-safe across local canvas and server/client paths.
 - [ ] Status: `todo` | Owner: `@unassigned` | Known limitations (complex scripts edge cases, terminal constraints) are explicitly documented.
 
