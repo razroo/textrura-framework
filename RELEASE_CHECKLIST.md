@@ -2,6 +2,26 @@
 
 Use this checklist before creating a new `vX.Y.Z` GitHub release.
 
+## Playbook commands
+
+```bash
+# 1) version bumps (example)
+npm version 0.3.2 --no-git-tag-version -w @geometra/core -w @geometra/renderer-canvas -w @geometra/renderer-terminal -w @geometra/server -w @geometra/client
+
+# 2) required checks
+npm run test
+npm run test:terminal-input
+npm run test:perf
+
+# 3) commit + push
+git add .
+git commit -m "chore: release vX.Y.Z"
+git push origin HEAD
+
+# 4) trigger publish workflow
+gh release create vX.Y.Z --title "vX.Y.Z" --notes "..."
+```
+
 ## Pre-release
 
 - [ ] Ensure working tree is clean.
