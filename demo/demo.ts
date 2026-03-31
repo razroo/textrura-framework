@@ -15,6 +15,12 @@ import {
 } from '@geometra/core'
 import type { App, UIElement, TextInputState, TextInputHistoryState, KeyboardHitEvent } from '@geometra/core'
 import { CanvasRenderer, enableSelection, enableAccessibilityMirror } from '@geometra/renderer-canvas'
+import {
+  button as uiButton,
+  input as uiInput,
+  list as uiList,
+  dialog as uiDialog,
+} from '@geometra/ui'
 
 // ─── Design Tokens ───────────────────────────────────────────────────────────
 const BG = '#09090b'
@@ -828,6 +834,26 @@ function archSection(): UIElement {
         text({ text: p.desc, font: '13px Inter', lineHeight: 20, color: MUTED }),
       ]),
     )),
+    box({
+      backgroundColor: SURFACE,
+      borderColor: BORDER,
+      borderRadius: 14,
+      padding: 20,
+      flexDirection: 'column',
+      gap: 12,
+    }, [
+      text({ text: '@geometra/ui primitives (starter)', font: '600 15px Inter', lineHeight: 20, color: TEXT_COLOR }),
+      text({ text: 'The demo consumes primitives from @geometra/ui directly.', font: '13px Inter', lineHeight: 20, color: MUTED }),
+      uiDialog(
+        'Quick Start',
+        'Composable starter primitives built on top of core elements.',
+        [
+          uiButton('View on GitHub', () => window.open('https://github.com/razroo/geometra/tree/main/packages/ui', '_blank')),
+        ],
+      ),
+      uiInput('Search components...', 'Type to filter'),
+      uiList(['button()', 'input()', 'list()', 'dialog()']),
+    ]),
   ])
 }
 
