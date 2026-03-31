@@ -11,7 +11,8 @@ npm install @geometra/renderer-canvas
 ## Key exports
 
 - `CanvasRenderer` — renders Geometra element trees to a canvas context
-- `layoutInspector` option — optional HUD overlay (node count, depth, root size, focus hint); off by default
+- `layoutInspector` — optional HUD (frame counter, node count, depth, root size, focus + Tab order index, optional hit path when `inspectorProbe` is set); off by default
+- `inspectorProbe` — set `{ x, y }` in layout coordinates before `render` to show `hitPathAtPoint` in the HUD
 - `enableSelection` — text selection on the canvas
 - `enableAccessibilityMirror` — hidden accessibility DOM mirror from geometry
 

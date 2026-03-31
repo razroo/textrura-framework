@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { dispatchHit, getCursorAtPoint, hasInteractiveHitAtPoint } from '../hit-test.js'
+import { dispatchHit, getCursorAtPoint, hasInteractiveHitAtPoint, hitPathAtPoint } from '../hit-test.js'
 import { box } from '../elements.js'
 
 describe('dispatchHit', () => {
@@ -84,6 +84,32 @@ describe('dispatchHit', () => {
     const result = dispatchHit(el, layout, 'onClick', 50, 25)
     expect(result.handled).toBe(false)
     expect(result.focusTarget?.element).toBe(el)
+  })
+})
+
+describe('hitPathAtPoint', () => {
+  it('returns child index path for nested boxes', () => {
+    const child = box({ width: 40, height: 40 })
+    const parent = box({ width: 100, height: 100 }, [child])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+      ],
+    }
+    expect(hitPathAtPoint(parent, layout, 20, 20)).toEqual([0])
+  })
+
+  it('returns null when point misses root', () => {
+    const el = box({ width: 10, height: 10 })
+    const layout = { x: 0, y: 0, width: 10, height: 10, children: [] }
+    expect(hitPathAtPoint(el, layout, 99, 99)).toBe(null)
+  })
+
+  it('returns empty path for root-only hit', () => {
+    const el = box({ width: 50, height: 50 })
+    const layout = { x: 0, y: 0, width: 50, height: 50, children: [] }
+    expect(hitPathAtPoint(el, layout, 10, 10)).toEqual([])
   })
 })
 

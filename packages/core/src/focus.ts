@@ -3,7 +3,7 @@ import type { UIElement, BoxElement } from './types.js'
 import { signal } from './signals.js'
 import type { Signal } from './signals.js'
 
-interface FocusTarget {
+export interface FocusTarget {
   element: BoxElement
   layout: ComputedLayout
   focusIndex?: number
@@ -20,6 +20,16 @@ export function setFocus(element: BoxElement, layout: ComputedLayout): void {
 /** Clear the current focus. */
 export function clearFocus(): void {
   focusedElement.set(null)
+}
+
+/** Document-order focusable elements (Tab order). Useful for inspector overlays. */
+export function collectFocusOrder(
+  element: UIElement,
+  layout: ComputedLayout,
+): FocusTarget[] {
+  const results: FocusTarget[] = []
+  collectFocusable(element, layout, results)
+  return results
 }
 
 /** Collect all focusable elements (those with keyboard or click handlers) in document order. */

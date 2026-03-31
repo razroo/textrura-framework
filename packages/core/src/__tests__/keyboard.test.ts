@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { box } from '../elements.js'
 import { dispatchKeyboardEvent, dispatchCompositionEvent } from '../keyboard.js'
-import { clearFocus, focusedElement, setFocus } from '../focus.js'
+import { clearFocus, collectFocusOrder, focusedElement, setFocus } from '../focus.js'
 import { insertInputText, moveInputCaret } from '../text-input.js'
 import type { TextInputState } from '../text-input.js'
 
@@ -385,6 +385,25 @@ describe('dispatchKeyboardEvent', () => {
 
     expect(draft).toBe('')
     expect(committed).toBe('')
+  })
+})
+
+describe('collectFocusOrder', () => {
+  it('returns focusable boxes in document order', () => {
+    const a = box({ width: 10, height: 10, onClick: () => {} })
+    const b = box({ width: 10, height: 10, onKeyDown: () => {} })
+    const root = box({ width: 100, height: 100 }, [a, b])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 10, height: 10, children: [] },
+        { x: 0, y: 0, width: 10, height: 10, children: [] },
+      ],
+    }
+    const order = collectFocusOrder(root, layout)
+    expect(order.length).toBe(2)
+    expect(order[0]?.element).toBe(a)
+    expect(order[1]?.element).toBe(b)
   })
 })
 

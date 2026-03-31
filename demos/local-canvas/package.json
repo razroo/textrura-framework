@@ -8,7 +8,8 @@
   },
   "dependencies": {
     "@geometra/core": "*",
-    "@geometra/renderer-canvas": "*"
+    "@geometra/renderer-canvas": "*",
+    "@geometra/ui": "*"
   },
   "devDependencies": {
     "vite": "^8.0.3"

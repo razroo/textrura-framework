@@ -175,6 +175,56 @@ export function hasInteractiveHitAtPoint(
   return false
 }
 
+/**
+ * Child indices from root to the deepest box under (x, y), matching hit-test z-order.
+ * Returns `null` when the point misses the tree. Returns `[]` when the point hits the
+ * root (or a leaf box) with no deeper box hit.
+ */
+export function hitPathAtPoint(
+  element: UIElement,
+  layout: ComputedLayout,
+  x: number,
+  y: number,
+  offsetX = 0,
+  offsetY = 0,
+): number[] | null {
+  const absX = offsetX + layout.x
+  const absY = offsetY + layout.y
+
+  if (element.kind === 'box') {
+    const { overflow } = element.props
+    if (overflow === 'hidden' || overflow === 'scroll') {
+      if (x < absX || x > absX + layout.width || y < absY || y > absY + layout.height) {
+        return null
+      }
+    }
+  }
+
+  const inside =
+    x >= absX &&
+    x <= absX + layout.width &&
+    y >= absY &&
+    y <= absY + layout.height
+
+  if (!inside) return null
+
+  if (element.kind !== 'box') return null
+
+  const boxEl = element as BoxElement
+  let childOffsetX = absX
+  let childOffsetY = absY
+  if (boxEl.props.scrollX) childOffsetX -= boxEl.props.scrollX
+  if (boxEl.props.scrollY) childOffsetY -= boxEl.props.scrollY
+
+  for (const i of getChildrenByZDesc(boxEl)) {
+    const childLayout = layout.children[i]
+    if (!childLayout) continue
+    const sub = hitPathAtPoint(boxEl.children[i]!, childLayout, x, y, childOffsetX, childOffsetY)
+    if (sub !== null) return [i, ...sub]
+  }
+  return []
+}
+
 /** Get the cursor style at a given point by walking the tree. Returns the deepest element's cursor prop. */
 export function getCursorAtPoint(
   element: UIElement,

@@ -17,6 +17,8 @@ import {
   getCursorAtPoint,
   focusedElement,
   toAccessibilityTree,
+  hitPathAtPoint,
+  collectFocusOrder,
 } from '@geometra/core'
 
 export interface CanvasRendererOptions {
@@ -214,6 +216,15 @@ export class CanvasRenderer implements Renderer {
   lastTree: UIElement | null = null
   lastLayout: ComputedLayout | null = null
 
+  /**
+   * When `layoutInspector` is enabled, optional pointer in layout coordinates
+   * to show `hitPathAtPoint` in the HUD. Set each frame from pointer move (or clear).
+   */
+  inspectorProbe: { x: number; y: number } | null = null
+
+  /** Increments every `render()`; shown in the layout inspector HUD. */
+  renderFrame = 0
+
   private textNodeIndex = 0
 
   constructor(options: CanvasRendererOptions) {
@@ -271,6 +282,7 @@ export class CanvasRenderer implements Renderer {
     this.textNodeIndex = 0
     this.lastTree = tree
     this.lastLayout = layout
+    this.renderFrame++
     this.paintNode(tree, layout, 0, 0)
 
     const skipOverlays = this.optimizeOverlaysDuringInteraction && this.interactionActive
@@ -904,11 +916,23 @@ export class CanvasRenderer implements Renderer {
     const focusHint = ft
       ? (ft.element.semantic?.role ?? ft.element.semantic?.tag ?? 'box')
       : 'none'
+    const order = collectFocusOrder(tree, layout)
+    let focusOrdinal = '—'
+    if (ft) {
+      const idx = order.findIndex(t => t.element === ft.element)
+      if (idx >= 0) focusOrdinal = `${idx + 1}/${order.length}`
+    }
     const lines = [
+      `frame ${this.renderFrame}`,
       `nodes ${nodes}  depth ${depth}`,
       `root ${Math.round(layout.width)}×${Math.round(layout.height)}`,
-      `focus ${focusHint}`,
+      `focus ${focusHint}  (${focusOrdinal})`,
     ]
+    const probe = this.inspectorProbe
+    if (probe) {
+      const path = hitPathAtPoint(tree, layout, probe.x, probe.y)
+      lines.push(`hit [${path === null ? 'miss' : path.join(',')}] @ ${Math.round(probe.x)},${Math.round(probe.y)}`)
+    }
     ctx.save()
     ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
     const pad = 8

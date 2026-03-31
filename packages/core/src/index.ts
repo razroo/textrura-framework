@@ -15,7 +15,7 @@ export { resolveDirectionValue, resolveElementDirection } from './direction.js'
 export type { ResolvedDirection } from './direction.js'
 
 // Hit testing
-export { dispatchHit, getCursorAtPoint, hasInteractiveHitAtPoint } from './hit-test.js'
+export { dispatchHit, getCursorAtPoint, hasInteractiveHitAtPoint, hitPathAtPoint } from './hit-test.js'
 export type { HitDispatchResult } from './hit-test.js'
 
 // Web fonts (browser)
@@ -26,7 +26,8 @@ export {
 } from './fonts.js'
 
 // Focus management
-export { focusedElement, setFocus, clearFocus, focusNext, focusPrev } from './focus.js'
+export { focusedElement, setFocus, clearFocus, focusNext, focusPrev, collectFocusOrder } from './focus.js'
+export type { FocusTarget } from './focus.js'
 export { trapFocusStep } from './focus-trap.js'
 export { dispatchKeyboardEvent } from './keyboard.js'
 export { dispatchCompositionEvent } from './keyboard.js'

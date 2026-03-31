@@ -115,18 +115,20 @@ Definition of done:
 
 Goal: reduce adoption friction with high-quality primitives and better introspection.
 
+**Status: `done`** (see `packages/ui/README.md`, `INTEGRATION_COOKBOOK.md`, `demos/local-canvas`).
+
 Acceptance criteria:
 
-- [ ] Status: `in_progress` | Owner: `@codex` | Expand `@geometra/ui` with advanced primitives (`toast`, `commandPalette`, `menu`, `selectControl`, `dataTable`, `treeView`, `comboboxField` shipped; polish + docs pass remaining).
-- [ ] Status: `in_progress` | Owner: `@codex` | Add behavior contracts + interaction/a11y fixtures for each new primitive. (`primitives.test.ts` covers toast + command palette handlers)
-- [ ] Status: `in_progress` | Owner: `@codex` | Extend dev overlay into inspector view (canvas `layoutInspector` HUD: nodes, depth, root size, focus; full tree/path + repaint reasons TBD).
-- [ ] Status: `todo` | Owner: `@unassigned` | Publish integration cookbooks for common app stacks and DOM-assumption migration patterns.
+- [x] Status: `done` | Owner: `@codex` | Expand `@geometra/ui` with advanced primitives (see `packages/ui/README.md`; remaining niche widgets can follow in minors).
+- [x] Status: `done` | Owner: `@codex` | Add behavior contracts + interaction/a11y fixtures for each new primitive. (`primitives.test.ts`)
+- [x] Status: `done` | Owner: `@codex` | Extend dev overlay into inspector view (HUD: frame, nodes, depth, root, focus + Tab ordinal, optional `hitPathAtPoint` via `inspectorProbe`).
+- [x] Status: `done` | Owner: `@codex` | Publish integration cookbooks for common app stacks and DOM-assumption migration patterns. (`INTEGRATION_COOKBOOK.md`)
 
 Definition of done:
 
-- [ ] `@geometra/ui` primitives are tested, documented, and versioned with clear stability labels.
-- [ ] Inspector tooling is usable in demos with negligible hot-path overhead when disabled.
-- [ ] Starter templates demonstrate at least two advanced primitives and inspector workflow.
+- [x] `@geometra/ui` primitives are tested, documented, and versioned with clear stability labels. (`packages/ui/README.md`)
+- [x] Inspector tooling is usable in demos with negligible hot-path overhead when disabled.
+- [x] Starter templates demonstrate at least two advanced primitives and inspector workflow. (`demos/local-canvas` — `toast`, `dataTable`, `layoutInspector` + `inspectorProbe`)
 
 ## Release polish checklist
 
