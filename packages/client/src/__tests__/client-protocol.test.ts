@@ -123,7 +123,7 @@ describe('applyServerMessage', () => {
       { type: 'frame', layout: layout(), tree: tree(), protocolVersion: 1 },
       undefined,
       (m) => metrics.push(m),
-      0.25,
+      { decodeMs: 0.25, encoding: 'json', bytesReceived: 10 },
     )
     applyServerMessage(
       state,
@@ -131,14 +131,18 @@ describe('applyServerMessage', () => {
       { type: 'patch', patches: [{ path: [], width: 200 }], protocolVersion: 1 },
       undefined,
       (m) => metrics.push(m),
-      0.1,
+      { decodeMs: 0.1, encoding: 'binary', bytesReceived: 64 },
     )
 
     expect(metrics).toHaveLength(2)
     expect(metrics[0]?.messageType).toBe('frame')
-    expect(metrics[0]?.decodeMs).toBeGreaterThanOrEqual(0)
+    expect(metrics[0]?.decodeMs).toBe(0.25)
+    expect(metrics[0]?.encoding).toBe('json')
+    expect(metrics[0]?.bytesReceived).toBe(10)
     expect(metrics[0]?.renderMs).toBeGreaterThanOrEqual(0)
     expect(metrics[1]?.messageType).toBe('patch')
     expect(metrics[1]?.patchCount).toBe(1)
+    expect(metrics[1]?.encoding).toBe('binary')
+    expect(metrics[1]?.bytesReceived).toBe(64)
   })
 })

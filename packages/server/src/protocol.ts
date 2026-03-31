@@ -52,7 +52,13 @@ export type ClientMessage =
       eventType: 'onCompositionStart' | 'onCompositionUpdate' | 'onCompositionEnd'
       data: string
     })
-  | (VersionedMessage & { type: 'resize'; width: number; height: number })
+  | (VersionedMessage & {
+      type: 'resize'
+      width: number
+      height: number
+      /** Optional capability negotiation (v1+). */
+      capabilities?: { binaryFraming?: boolean }
+    })
 
 /** A patch describing a change to a single node's geometry. */
 export interface LayoutPatch {

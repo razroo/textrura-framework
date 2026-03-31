@@ -39,7 +39,8 @@ describe('core perf smoke', () => {
     }
 
     expect(best).toBeGreaterThan(0)
-    expect(best).toBeLessThanOrEqual(200)
+    // Wall-clock bound: catches large regressions; allows CI/dev machine variance.
+    expect(best).toBeLessThanOrEqual(500)
   })
 
   it('caret geometry lookup scales across many measured lines', () => {

@@ -100,15 +100,15 @@ Goal: improve high-frequency server/client behavior under realistic load.
 
 Acceptance criteria:
 
-- [ ] Status: `todo` | Owner: `@unassigned` | Add optional binary frame encoding path behind explicit protocol version/capability negotiation.
-- [ ] Status: `in_progress` | Owner: `@codex` | Add backpressure-aware batching/coalescing policy with bounded memory behavior. (server coalescing + bufferedAmount deferral/resync landed; stress validation pending)
-- [ ] Status: `in_progress` | Owner: `@codex` | Expose frame budget instrumentation (encode/decode/apply timings, dropped/coalesced counters). (client decode/apply/render telemetry shipped; dropped/coalesced counters pending)
+- [x] Status: `done` | Owner: `@codex` | Add optional binary frame encoding path behind explicit protocol version/capability negotiation. (GEOM v1 JSON envelope; `resize.capabilities.binaryFraming`)
+- [x] Status: `done` | Owner: `@codex` | Add backpressure-aware batching/coalescing policy with bounded memory behavior. (`bufferedAmount` deferral, full-frame resync, `coalescePatches` for duplicate paths)
+- [x] Status: `done` | Owner: `@codex` | Expose frame budget instrumentation (encode/decode/apply timings, coalesced patch delta, binary/deferred counts). (`onFrameMetrics` client; `onTransportMetrics` server; optional dropped counters deferred)
 - [ ] Status: `todo` | Owner: `@unassigned` | Add large-app stress scenarios (rapid input + layout churn + reconnect) with deterministic pass criteria.
 
 Definition of done:
 
-- [ ] Conformance fixtures cover text and binary paths.
-- [ ] Latency/throughput results are documented against baseline scenarios.
+- [x] Conformance fixtures cover text and binary paths. (`protocol-binary-conformance`, `binary-frame` tests)
+- [ ] Latency/throughput results are documented against baseline scenarios. (`TRANSPORT_1_4.md` describes behavior; numeric baselines TBD)
 - [ ] Reconnect/resync correctness remains stable under chaos tests.
 
 ### 1.5.0 — UI primitives and developer tooling

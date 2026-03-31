@@ -8,9 +8,12 @@ Server-side layout engine with WebSocket streaming for Geometra. Computes layout
 npm install @geometra/server
 ```
 
-## Key Export
+## Key exports
 
-- `createServer` -- creates a Geometra layout server with WebSocket support
+- `createServer` — Geometra layout server with WebSocket streaming
+- `shouldDeferClientSend` — backpressure helper (used by the server and tests)
+- `onTransportMetrics` (option) — per-broadcast deferred send count, coalesced patch delta, binary outbound count
+- Binary frame helpers (`encodeBinaryFrameJson`, …) — optional GEOM v1 JSON envelopes; see repo `PROTOCOL_COMPATIBILITY.md`
 
 ## Usage
 

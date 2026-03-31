@@ -8,9 +8,11 @@ Thin WebSocket client (~2KB) for Geometra. Connects to a Geometra server and ren
 npm install @geometra/client
 ```
 
-## Key Export
+## Key exports
 
-- `createClient` -- creates a WebSocket client that connects to a Geometra server
+- `createClient` — WebSocket client connected to a Geometra server
+- `applyServerMessage` — apply a parsed server message to renderer state (advanced/testing)
+- `binaryFraming` option — negotiate optional binary GEOM envelopes (same JSON as text frames)
 
 ## Usage
 

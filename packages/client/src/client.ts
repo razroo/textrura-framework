@@ -1,5 +1,6 @@
 import type { ComputedLayout } from 'textura'
 import type { Renderer, UIElement } from '@geometra/core'
+import { decodeBinaryFrameJson } from './binary-frame.js'
 
 const PROTOCOL_VERSION = 1
 
@@ -30,12 +31,20 @@ interface ServerError {
 
 type ServerMessage = ServerFrame | ServerPatch | ServerError
 
+export interface ServerMessageDecodeMeta {
+  decodeMs: number
+  encoding?: 'json' | 'binary'
+  bytesReceived?: number
+}
+
 export interface ClientFrameMetrics {
   messageType: ServerMessage['type']
   decodeMs: number
   applyMs: number
   renderMs: number
   patchCount?: number
+  encoding?: 'json' | 'binary'
+  bytesReceived?: number
 }
 
 interface ClientStateShape {
@@ -66,6 +75,11 @@ export interface TexturaClientOptions {
   onFrameMetrics?: (metrics: ClientFrameMetrics) => void
   /** Enable automatic reconnection on disconnect. Default: true. */
   reconnect?: boolean
+  /**
+   * Negotiate optional binary JSON envelopes for server→client frames (same JSON payload as text).
+   * Requires `resize` with `capabilities.binaryFraming` (sent automatically when true).
+   */
+  binaryFraming?: boolean
 }
 
 export interface TexturaClient {
@@ -98,7 +112,7 @@ export function applyServerMessage(
   msg: ServerMessage,
   onError?: (error: unknown) => void,
   onMetrics?: (metrics: ClientFrameMetrics) => void,
-  decodeMs = 0,
+  decodeMeta: ServerMessageDecodeMeta = { decodeMs: 0 },
 ): void {
   const applyStart = performance.now()
   let renderMs = 0
@@ -130,10 +144,12 @@ export function applyServerMessage(
   const applyMs = performance.now() - applyStart
   onMetrics?.({
     messageType: msg.type,
-    decodeMs,
+    decodeMs: decodeMeta.decodeMs,
     applyMs,
     renderMs: didRender ? renderMs : 0,
     patchCount: msg.type === 'patch' ? msg.patches.length : undefined,
+    encoding: decodeMeta.encoding,
+    bytesReceived: decodeMeta.bytesReceived,
   })
 }
 
@@ -168,25 +184,50 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
 
   function connect() {
     ws = new WebSocket(url)
+    if (options.binaryFraming) {
+      ws.binaryType = 'arraybuffer'
+    }
 
     ws.addEventListener('open', () => {
       retryCount = 0
       if (canvas && (options.forwardResize ?? true)) {
-        ws.send(JSON.stringify({
+        const payload: Record<string, unknown> = {
           type: 'resize',
           width: Math.max(1, Math.round(canvas.clientWidth || canvas.width)),
           height: Math.max(1, Math.round(canvas.clientHeight || canvas.height)),
           protocolVersion: PROTOCOL_VERSION,
-        }))
+        }
+        if (options.binaryFraming) {
+          payload.capabilities = { binaryFraming: true }
+        }
+        ws.send(JSON.stringify(payload))
       }
     })
 
     ws.addEventListener('message', (event) => {
       try {
-        const decodeStart = performance.now()
-        const msg = JSON.parse(String(event.data)) as ServerMessage
-        const decodeMs = performance.now() - decodeStart
-        applyServerMessage(state, renderer, msg, onError, onFrameMetrics, decodeMs)
+        const parseStart = performance.now()
+        let msg: ServerMessage
+        let decodeMeta: ServerMessageDecodeMeta
+        if (typeof event.data === 'string') {
+          const text = event.data
+          msg = JSON.parse(text) as ServerMessage
+          decodeMeta = {
+            decodeMs: performance.now() - parseStart,
+            encoding: 'json',
+            bytesReceived: new TextEncoder().encode(text).length,
+          }
+        } else {
+          const buf = event.data as ArrayBuffer
+          const json = decodeBinaryFrameJson(buf)
+          msg = JSON.parse(json) as ServerMessage
+          decodeMeta = {
+            decodeMs: performance.now() - parseStart,
+            encoding: 'binary',
+            bytesReceived: buf.byteLength,
+          }
+        }
+        applyServerMessage(state, renderer, msg, onError, onFrameMetrics, decodeMeta)
       } catch (err) {
         onError?.(err)
       }
@@ -243,12 +284,16 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
 
   const sendResize = () => {
     if (!canvas || ws.readyState !== WebSocket.OPEN) return
-    ws.send(JSON.stringify({
+    const payload: Record<string, unknown> = {
       type: 'resize',
       width: Math.max(1, Math.round(canvas.clientWidth || canvas.width)),
       height: Math.max(1, Math.round(canvas.clientHeight || canvas.height)),
       protocolVersion: PROTOCOL_VERSION,
-    }))
+    }
+    if (options.binaryFraming) {
+      payload.capabilities = { binaryFraming: true }
+    }
+    ws.send(JSON.stringify(payload))
   }
 
   if (canvas) {

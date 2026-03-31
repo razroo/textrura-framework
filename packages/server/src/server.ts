@@ -7,6 +7,7 @@ import { toLayoutTree, dispatchHit, dispatchKeyboardEvent, dispatchCompositionEv
 import type { UIElement, EventHandlers } from '@geometra/core'
 import { diffLayout, coalescePatches, PROTOCOL_VERSION, isProtocolCompatible, CLOSE_AUTH_FAILED, CLOSE_FORBIDDEN } from './protocol.js'
 import type { ServerMessage, ClientMessage } from './protocol.js'
+import { encodeBinaryFrameJson } from './binary-frame.js'
 
 export interface TexturaServerOptions {
   /** Port to listen on. Default: 3100. */
@@ -34,6 +35,17 @@ export interface TexturaServerOptions {
   onMessage?: (message: ClientMessage, context: unknown) => boolean
   /** Backpressure threshold; clients above this buffered amount are deferred. */
   backpressureBytes?: number
+  /** Per-broadcast transport telemetry (backpressure, coalescing, binary outbound). */
+  onTransportMetrics?: (metrics: ServerTransportMetrics) => void
+}
+
+/** Emitted after each successful broadcast (not on early no-op returns). */
+export interface ServerTransportMetrics {
+  deferredSends: number
+  /** How many raw patches were merged by coalescing (0 when no previous layout). */
+  coalescedPatchDelta: number
+  /** Count of clients that received a binary WebSocket frame this round. */
+  binaryOutboundFrames: number
 }
 
 export interface TexturaServer {
@@ -68,6 +80,8 @@ export async function createServer(
 
   const clients = new Set<WebSocket>()
   const needsResync = new Set<WebSocket>()
+  /** Clients that negotiated optional binary JSON envelopes for server→client frames. */
+  const clientBinaryFraming = new Map<WebSocket, boolean>()
   const contexts = new Map<WebSocket, unknown>()
   let prevLayout: ComputedLayout | null = null
   let currentTree: UIElement | null = null
@@ -80,8 +94,11 @@ export async function createServer(
     const layout = computeLayout(layoutTree, { width, height })
 
     let msg: ServerMessage
+    let coalescedPatchDelta = 0
     if (prevLayout) {
-      const patches = coalescePatches(diffLayout(prevLayout, layout))
+      const rawPatches = diffLayout(prevLayout, layout)
+      const patches = coalescePatches(rawPatches)
+      coalescedPatchDelta = Math.max(0, rawPatches.length - patches.length)
       if (patches.length === 0) return
       // If patches are more than half the tree, just send full frame
       if (patches.length > 20) {
@@ -94,9 +111,12 @@ export async function createServer(
     }
 
     prevLayout = layout
+    let deferredSends = 0
+    let binaryOutboundFrames = 0
     for (const client of clients) {
       if (client.readyState === client.OPEN) {
         if (shouldDeferClientSend(client.bufferedAmount, backpressureBytes)) {
+          deferredSends++
           needsResync.add(client)
           continue
         }
@@ -105,9 +125,20 @@ export async function createServer(
             ? { type: 'frame', layout, tree: currentTree, protocolVersion: PROTOCOL_VERSION }
             : msg
         if (needsResync.has(client)) needsResync.delete(client)
-        client.send(JSON.stringify(clientMsg))
+        const json = JSON.stringify(clientMsg)
+        if (clientBinaryFraming.get(client)) {
+          binaryOutboundFrames++
+          client.send(encodeBinaryFrameJson(json), { binary: true })
+        } else {
+          client.send(json)
+        }
       }
     }
+    options.onTransportMetrics?.({
+      deferredSends,
+      coalescedPatchDelta,
+      binaryOutboundFrames,
+    })
     } catch (err) {
       if (options.onError) {
         options.onError(err)
@@ -130,6 +161,7 @@ export async function createServer(
   function acceptConnection(ws: WebSocket): void {
     clients.add(ws)
     needsResync.delete(ws)
+    clientBinaryFraming.delete(ws)
 
     if (prevLayout && currentTree) {
       const msg: ServerMessage = {
@@ -138,7 +170,12 @@ export async function createServer(
         tree: currentTree,
         protocolVersion: PROTOCOL_VERSION,
       }
-      ws.send(JSON.stringify(msg))
+      const json = JSON.stringify(msg)
+      if (clientBinaryFraming.get(ws)) {
+        ws.send(encodeBinaryFrameJson(json), { binary: true })
+      } else {
+        ws.send(json)
+      }
     } else {
       computeAndBroadcast()
     }
@@ -193,6 +230,9 @@ export async function createServer(
           })
           computeAndBroadcast()
         } else if (msg.type === 'resize') {
+          if (msg.capabilities?.binaryFraming) {
+            clientBinaryFraming.set(ws, true)
+          }
           width = Math.max(1, msg.width)
           height = Math.max(1, msg.height)
           prevLayout = null
@@ -207,6 +247,7 @@ export async function createServer(
       const ctx = contexts.get(ws)
       clients.delete(ws)
       needsResync.delete(ws)
+      clientBinaryFraming.delete(ws)
       contexts.delete(ws)
       if (options.onDisconnect && ctx !== undefined) {
         options.onDisconnect(ctx)
@@ -244,6 +285,8 @@ export async function createServer(
     close() {
       wss.close()
       clients.clear()
+      needsResync.clear()
+      clientBinaryFraming.clear()
       contexts.clear()
     },
   }
