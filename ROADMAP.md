@@ -87,4 +87,4 @@ Tracking fields:
 - [x] Status: `done` | Owner: `@codex` | Renderer-specific smoke checks pass.
 - [x] Status: `done` | Owner: `@codex` | Lint/build pass in CI.
 - [x] Status: `done` | Owner: `@codex` | Changelog/release notes include behavior changes plus migration notes.
-- [ ] Status: `todo` | Owner: `@unassigned` | npm published versions verified after release workflow completes.
+- [x] Status: `done` | Owner: `@codex` | npm published versions verified after release workflow completes.

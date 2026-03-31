@@ -47,3 +47,4 @@ gh release create vX.Y.Z --title "vX.Y.Z" --notes "..."
 - [ ] Create GitHub release tag (`gh release create vX.Y.Z ...`).
 - [ ] Verify release workflow success.
 - [ ] Verify npm published versions.
+  - [ ] `npm run release:verify-npm -- X.Y.Z`
