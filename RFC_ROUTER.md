@@ -67,6 +67,32 @@ The router must remain declarative and renderer-agnostic so the same route model
 
 Acceptance gate: no router release is considered complete unless all three runtimes are covered by integration tests and examples.
 
+## History compatibility contract
+
+The router exposes a single history interface so runtime differences stay behind adapters.
+
+### Browser history contract
+
+- Uses `window.history.pushState` / `replaceState` for navigations.
+- Subscribes to `popstate` for back/forward transitions.
+- Normalizes location as `{ pathname, search, hash }`.
+- Treats trailing slash and base path handling consistently with memory history.
+- Never requires DOM nodes for core navigation behavior (only `window` history APIs).
+
+### Memory history contract
+
+- Maintains an internal stack (`entries[]`, `index`) for non-browser runtimes and tests.
+- Supports `push`, `replace`, `back`, and `forward` with browser-equivalent semantics.
+- Emits updates through the same subscription API used by browser history.
+- Serves as the default adapter for terminal/runtime contexts without `window`.
+
+### Cross-adapter invariants
+
+- `navigate(to)` and `navigate(to, { replace: true })` must yield equivalent final locations across adapters.
+- `back()` and `forward()` behavior must match for the same sequence of operations.
+- Querystring and hash parsing must be adapter-neutral.
+- Router state updates must be deterministic and emitted in the same order across adapters.
+
 ## Initial API sketch (non-binding)
 
 ```ts
