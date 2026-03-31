@@ -1,6 +1,6 @@
 import type { ComputedLayout } from 'textura'
 import type { UIElement, KeyboardHitEvent, CompositionHitEvent } from './types.js'
-import { focusedElement, focusNext, focusPrev } from './focus.js'
+import { focusNext, focusPrev, resolveFocusedTarget } from './focus.js'
 
 /**
  * Dispatch keyboard events to the focused element.
@@ -21,7 +21,7 @@ export function dispatchKeyboardEvent(
     return true
   }
 
-  const focused = focusedElement.peek()
+  const focused = resolveFocusedTarget(tree, layout)
   if (!focused) return false
 
   const handler = focused.element.handlers?.[eventType]
@@ -36,12 +36,12 @@ export function dispatchKeyboardEvent(
 
 /** Dispatch IME composition events to the focused element. */
 export function dispatchCompositionEvent(
-  _tree: UIElement,
-  _layout: ComputedLayout,
+  tree: UIElement,
+  layout: ComputedLayout,
   eventType: 'onCompositionStart' | 'onCompositionUpdate' | 'onCompositionEnd',
   partialEvent: Omit<CompositionHitEvent, 'target'>,
 ): boolean {
-  const focused = focusedElement.peek()
+  const focused = resolveFocusedTarget(tree, layout)
   if (!focused) return false
   const handler = focused.element.handlers?.[eventType]
   if (!handler) return false

@@ -58,6 +58,25 @@ function findTargetIndex(targets: FocusTarget[], current: FocusTarget): number {
   return targets.findIndex(t => sameBounds(t.layout, current.layout))
 }
 
+/** Resolve currently focused target against the latest tree/layout after rerenders. */
+export function resolveFocusedTarget(tree: UIElement, layout: ComputedLayout): FocusTarget | null {
+  const current = focusedElement.peek()
+  if (!current) return null
+
+  const targets: FocusTarget[] = []
+  collectFocusable(tree, layout, targets)
+  if (targets.length === 0) return null
+
+  const idx = findTargetIndex(targets, current)
+  if (idx === -1) return null
+
+  const resolved = { ...targets[idx]!, focusIndex: idx }
+  if (resolved.element !== current.element || !sameBounds(resolved.layout, current.layout)) {
+    focusedElement.set(resolved)
+  }
+  return resolved
+}
+
 /** Move focus to the next focusable element. */
 export function focusNext(tree: UIElement, layout: ComputedLayout): void {
   const targets: FocusTarget[] = []

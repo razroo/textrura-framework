@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { createApp } from '../app.js'
 import { box } from '../elements.js'
 import { clearFocus } from '../focus.js'
+import { signal } from '../signals.js'
 import { insertInputText } from '../text-input.js'
 import type { Renderer, UIElement } from '../types.js'
 import type { TextInputState } from '../text-input.js'
@@ -227,6 +228,43 @@ describe('app input focus routing', () => {
     expect(charHandled).toBe(true)
     expect(state.nodes).toEqual(['hello', 'x'])
     expect(state.selection).toEqual({ anchorNode: 1, anchorOffset: 1, focusNode: 1, focusOffset: 1 })
+    app.destroy()
+  })
+
+  it('keeps focused key handlers fresh across rerenders for controlled inputs', async () => {
+    const value = signal('')
+
+    const app = await createApp(
+      () => {
+        const current = value.value
+        return box(
+          { width: 240, height: 120 },
+          [
+            box(
+              {
+                width: 200,
+                height: 40,
+                onKeyDown: (e) => {
+                  if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+                    value.set(current + e.key)
+                  }
+                },
+              },
+              [],
+            ),
+          ],
+        )
+      },
+      new TestRenderer(),
+      { width: 240, height: 120 },
+    )
+
+    app.dispatch('onClick', 10, 10)
+    app.dispatchKey('onKeyDown', { key: 'a', code: 'KeyA', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false })
+    app.dispatchKey('onKeyDown', { key: 'b', code: 'KeyB', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false })
+    app.dispatchKey('onKeyDown', { key: 'c', code: 'KeyC', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false })
+
+    expect(value.peek()).toBe('abc')
     app.destroy()
   })
 })
