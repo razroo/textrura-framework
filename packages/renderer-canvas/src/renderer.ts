@@ -32,6 +32,30 @@ export interface CanvasRendererOptions {
   selectedTextColor?: string
   /** Called when an async image finishes loading. Use to trigger re-render. */
   onImageLoaded?: () => void
+  /** Max number of decoded images to keep in memory. Default: 256. */
+  imageCacheMaxEntries?: number
+  /** Placeholder color while an image is loading. Default: '#27272a'. */
+  imagePlaceholderColor?: string
+  /** Fallback fill color when image loading fails. Default: '#3f1d1d'. */
+  imageErrorColor?: string
+  /** TTL in ms for decoded images. 0 disables expiry. Default: 0. */
+  imageCacheTTLms?: number
+  /** Max retries after image load failure. Default: 2. */
+  imageRetryCount?: number
+  /** Base delay for exponential backoff retries in ms. Default: 500. */
+  imageRetryBaseDelayMs?: number
+  /** Custom placeholder painter for loading/error states. */
+  imagePlaceholderRenderer?: (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    state: 'loading' | 'error',
+    src: string,
+  ) => void
+  /** Factory for creating image objects (useful for tests/custom loaders). */
+  createImage?: () => HTMLImageElement
   /** Stroke every layout rect (flex debugging). Default false. */
   debugLayoutBounds?: boolean
   /** Draw a ring around the keyboard-focused box. Default true. */
@@ -58,6 +82,17 @@ interface CachedTextLineMetrics {
   text: string
   charOffsets: number[]
   charWidths: number[]
+}
+
+interface CachedImageEntry {
+  image: HTMLImageElement
+  lastUsedAt: number
+  cachedAt: number
+}
+
+interface FailedImageEntry {
+  attempts: number
+  nextRetryAt: number
 }
 
 function hasInteractiveHitAtPoint(
@@ -139,6 +174,14 @@ export class CanvasRenderer implements Renderer {
   private selectionColor: string
   private selectedTextColor: string
   private onImageLoaded?: () => void
+  private imageCacheMaxEntries: number
+  private imagePlaceholderColor: string
+  private imageErrorColor: string
+  private imageCacheTTLms: number
+  private imageRetryCount: number
+  private imageRetryBaseDelayMs: number
+  private imagePlaceholderRenderer?: CanvasRendererOptions['imagePlaceholderRenderer']
+  private createImage: () => HTMLImageElement
   private debugLayoutBounds: boolean
   private showFocusRing: boolean
   private focusRingColor: string
@@ -150,9 +193,11 @@ export class CanvasRenderer implements Renderer {
   /** Cache child paint order by z-index per box element. */
   private paintOrderCache = new WeakMap<BoxElement, { signature: string; asc: number[] }>()
 
-  /** Cached loaded images. */
-  private imageCache = new Map<string, HTMLImageElement>()
+  /** Cached loaded images (LRU by lastUsedAt). */
+  private imageCache = new Map<string, CachedImageEntry>()
   private pendingImages = new Set<string>()
+  private failedImages = new Map<string, FailedImageEntry>()
+  private retryTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
   /** Text nodes collected during the last render (for selection hit-testing). */
   textNodes: TextNodeInfo[] = []
@@ -172,6 +217,14 @@ export class CanvasRenderer implements Renderer {
     this.background = options.background ?? '#ffffff'
     this.selectionColor = options.selectionColor ?? 'rgba(59, 130, 246, 0.4)'
     this.onImageLoaded = options.onImageLoaded
+    this.imageCacheMaxEntries = Math.max(1, options.imageCacheMaxEntries ?? 256)
+    this.imagePlaceholderColor = options.imagePlaceholderColor ?? '#27272a'
+    this.imageErrorColor = options.imageErrorColor ?? '#3f1d1d'
+    this.imageCacheTTLms = Math.max(0, options.imageCacheTTLms ?? 0)
+    this.imageRetryCount = Math.max(0, options.imageRetryCount ?? 2)
+    this.imageRetryBaseDelayMs = Math.max(1, options.imageRetryBaseDelayMs ?? 500)
+    this.imagePlaceholderRenderer = options.imagePlaceholderRenderer
+    this.createImage = options.createImage ?? (() => new Image())
     this.debugLayoutBounds = options.debugLayoutBounds ?? false
     this.showFocusRing = options.showFocusRing ?? true
     this.focusRingColor = options.focusRingColor ?? 'rgba(59, 130, 246, 0.95)'
@@ -427,8 +480,20 @@ export class CanvasRenderer implements Renderer {
 
     if (opacity !== undefined) ctx.globalAlpha = opacity
 
+    const now = Date.now()
     const cached = this.imageCache.get(src)
     if (cached) {
+      if (this.imageCacheTTLms > 0 && now - cached.cachedAt > this.imageCacheTTLms) {
+        this.imageCache.delete(src)
+      } else {
+        cached.lastUsedAt = now
+      }
+    }
+
+    const fresh = this.imageCache.get(src)
+    if (fresh) {
+      const cached = fresh
+      const img = cached.image
       if (borderRadius) {
         ctx.save()
         this.roundRect(x, y, width, height, borderRadius)
@@ -436,46 +501,139 @@ export class CanvasRenderer implements Renderer {
       }
 
       if (objectFit === 'cover' || objectFit === 'contain') {
-        const imgRatio = cached.naturalWidth / cached.naturalHeight
+        const imgRatio = img.naturalWidth / img.naturalHeight
         const boxRatio = width / height
         let sw: number, sh: number, sx: number, sy: number
         if ((objectFit === 'cover' && imgRatio > boxRatio) || (objectFit === 'contain' && imgRatio < boxRatio)) {
-          sh = cached.naturalHeight
+          sh = img.naturalHeight
           sw = sh * boxRatio
-          sx = (cached.naturalWidth - sw) / 2
+          sx = (img.naturalWidth - sw) / 2
           sy = 0
         } else {
-          sw = cached.naturalWidth
+          sw = img.naturalWidth
           sh = sw / boxRatio
           sx = 0
-          sy = (cached.naturalHeight - sh) / 2
+          sy = (img.naturalHeight - sh) / 2
         }
-        ctx.drawImage(cached, sx, sy, sw, sh, x, y, width, height)
+        ctx.drawImage(img, sx, sy, sw, sh, x, y, width, height)
       } else {
-        ctx.drawImage(cached, x, y, width, height)
+        ctx.drawImage(img, x, y, width, height)
       }
 
       if (borderRadius) ctx.restore()
+    } else if (this.pendingImages.has(src)) {
+      this.paintImagePlaceholder(ctx, x, y, width, height, 'loading', src)
+    } else if (this.failedImages.has(src)) {
+      const failed = this.failedImages.get(src)!
+      if (now >= failed.nextRetryAt && failed.attempts <= this.imageRetryCount) {
+        this.startImageLoad(src)
+        this.paintImagePlaceholder(ctx, x, y, width, height, 'loading', src)
+      } else {
+        this.paintImagePlaceholder(ctx, x, y, width, height, 'error', src)
+      }
     } else if (!this.pendingImages.has(src)) {
-      // Start loading
-      this.pendingImages.add(src)
-      const img = new Image()
-      img.onload = () => {
-        this.imageCache.set(src, img)
-        this.pendingImages.delete(src)
-        this.onImageLoaded?.()
-      }
-      img.onerror = () => {
-        this.pendingImages.delete(src)
-      }
-      img.src = src
-
-      // Placeholder
-      ctx.fillStyle = '#27272a'
-      ctx.fillRect(x, y, width, height)
+      this.startImageLoad(src)
+      this.paintImagePlaceholder(ctx, x, y, width, height, 'loading', src)
+    } else {
+      this.paintImagePlaceholder(ctx, x, y, width, height, 'loading', src)
     }
 
     if (opacity !== undefined) ctx.globalAlpha = 1
+  }
+
+  /** Warm image cache before first paint. */
+  preloadImages(urls: string[]): void {
+    for (const src of urls) {
+      if (this.imageCache.has(src) || this.pendingImages.has(src)) continue
+      this.startImageLoad(src)
+    }
+  }
+
+  clearImageCache(): void {
+    this.imageCache.clear()
+    this.pendingImages.clear()
+    this.failedImages.clear()
+    for (const timer of this.retryTimers.values()) {
+      clearTimeout(timer)
+    }
+    this.retryTimers.clear()
+  }
+
+  getImageCacheStats(): { cached: number; pending: number; failed: number; maxEntries: number } {
+    return {
+      cached: this.imageCache.size,
+      pending: this.pendingImages.size,
+      failed: this.failedImages.size,
+      maxEntries: this.imageCacheMaxEntries,
+    }
+  }
+
+  private paintImagePlaceholder(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    state: 'loading' | 'error',
+    src: string,
+  ): void {
+    if (this.imagePlaceholderRenderer) {
+      this.imagePlaceholderRenderer(ctx, x, y, width, height, state, src)
+      return
+    }
+    ctx.fillStyle = state === 'loading' ? this.imagePlaceholderColor : this.imageErrorColor
+    ctx.fillRect(x, y, width, height)
+    ctx.fillStyle = state === 'loading' ? '#a1a1aa' : '#fca5a5'
+    ctx.font = '11px sans-serif'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(state === 'loading' ? 'Loading image...' : 'Image failed', x + 8, y + Math.max(10, height / 2))
+  }
+
+  private startImageLoad(src: string): void {
+    if (this.pendingImages.has(src)) return
+    this.pendingImages.add(src)
+    const img = this.createImage()
+    img.onload = () => {
+      const now = Date.now()
+      this.imageCache.set(src, { image: img, lastUsedAt: now, cachedAt: now })
+      this.pendingImages.delete(src)
+      this.failedImages.delete(src)
+      const timer = this.retryTimers.get(src)
+      if (timer) {
+        clearTimeout(timer)
+        this.retryTimers.delete(src)
+      }
+      this.enforceImageCacheLimit()
+      this.onImageLoaded?.()
+    }
+    img.onerror = () => {
+      this.pendingImages.delete(src)
+      const prev = this.failedImages.get(src)
+      const attempts = (prev?.attempts ?? 0) + 1
+      const backoff = this.imageRetryBaseDelayMs * Math.pow(2, Math.max(0, attempts - 1))
+      const nextRetryAt = Date.now() + backoff
+      this.failedImages.set(src, { attempts, nextRetryAt })
+      if (attempts <= this.imageRetryCount) {
+        const timer = setTimeout(() => {
+          this.retryTimers.delete(src)
+          this.onImageLoaded?.()
+        }, backoff)
+        this.retryTimers.set(src, timer)
+      }
+      this.onImageLoaded?.()
+    }
+    img.src = src
+  }
+
+  private enforceImageCacheLimit(): void {
+    if (this.imageCache.size <= this.imageCacheMaxEntries) return
+    const entries = [...this.imageCache.entries()]
+    entries.sort((a, b) => a[1].lastUsedAt - b[1].lastUsedAt)
+    const removeCount = this.imageCache.size - this.imageCacheMaxEntries
+    for (let i = 0; i < removeCount; i++) {
+      const victim = entries[i]
+      if (victim) this.imageCache.delete(victim[0])
+    }
   }
 
   private paintText(
@@ -789,7 +947,7 @@ export class CanvasRenderer implements Renderer {
   }
 
   destroy(): void {
-    // Nothing to clean up for canvas
+    this.clearImageCache()
   }
 }
 

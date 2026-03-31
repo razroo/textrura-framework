@@ -29,6 +29,7 @@ The framework replaces the entire browser rendering pipeline. Layout is computed
 | `@geometra/core` | Component model, signals, hit-testing, semantic/a11y tree generation, text-input primitives |
 | `@geometra/renderer-canvas` | Canvas2D paint backend + selection + optional accessibility mirror |
 | `@geometra/renderer-terminal` | ANSI terminal/TUI paint backend |
+| `@geometra/renderer-webgpu` | WebGPU renderer scaffold (capability detection + initialization surface) |
 | `@geometra/server` | Server-side layout engine with WebSocket geometry streaming (versioned protocol) |
 | `@geometra/client` | Thin client that receives pre-computed geometry and paints it (versioned protocol checks) |
 | `@geometra/router` | Renderer-agnostic data router: nested routes, loaders/actions, redirects, blockers, lazy/prefetch, protocol-aware navigation |

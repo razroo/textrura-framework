@@ -1,0 +1,38 @@
+{
+  "name": "@geometra/renderer-webgpu",
+  "version": "1.0.0",
+  "description": "WebGPU renderer scaffold for Geometra",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/razroo/geometra",
+    "directory": "packages/renderer-webgpu"
+  },
+  "homepage": "https://razroo.github.io/geometra",
+  "keywords": [
+    "geometra",
+    "renderer",
+    "webgpu",
+    "dom-free",
+    "gpu"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@geometra/core": "file:../core"
+  }
+}

@@ -7,7 +7,7 @@
     "demos/*"
   ],
   "scripts": {
-    "build": "bun run --filter @geometra/core build && bun run --filter @geometra/renderer-canvas build && bun run --filter @geometra/renderer-terminal build && bun run --filter @geometra/server build && bun run --filter @geometra/client build && bun run --filter @geometra/ui build && bun run --filter @geometra/router build",
+    "build": "bun run --filter @geometra/core build && bun run --filter @geometra/renderer-canvas build && bun run --filter @geometra/renderer-terminal build && bun run --filter @geometra/renderer-webgpu build && bun run --filter @geometra/server build && bun run --filter @geometra/client build && bun run --filter @geometra/ui build && bun run --filter @geometra/router build",
     "check": "bun run --workspaces --if-present check",
     "test": "vitest run",
     "test:terminal-input": "bun run --filter @geometra/demo-terminal test:input",

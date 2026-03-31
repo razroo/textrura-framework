@@ -2,6 +2,7 @@ import {
   signal,
   box,
   text,
+  image,
   createApp,
   toSemanticHTML,
   spring,
@@ -1165,6 +1166,42 @@ function archSection(): UIElement {
           ],
         ),
       ] : []),
+      box({ flexDirection: 'column', gap: 8 }, [
+        text({ text: 'Image primitive', font: '600 13px Inter', lineHeight: 18, color: TEXT_COLOR }),
+        box({ borderRadius: 10, overflow: 'hidden', borderColor: BORDER, borderWidth: 1 }, [
+          image({
+            src: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1200&q=80',
+            alt: 'Neon geometric scene',
+            width: 640,
+            height: 180,
+            objectFit: 'cover',
+          }),
+        ]),
+        text({
+          text: 'Rendered via core image() with async loading + cache in renderer-canvas.',
+          font: '12px Inter',
+          lineHeight: 17,
+          color: DIM,
+        }),
+      ]),
+      box({ flexDirection: 'column', gap: 8 }, [
+        text({ text: 'Image error/retry state', font: '600 13px Inter', lineHeight: 18, color: TEXT_COLOR }),
+        box({ borderRadius: 10, overflow: 'hidden', borderColor: BORDER, borderWidth: 1 }, [
+          image({
+            src: 'https://example.invalid/geometra-missing-image.png',
+            alt: 'Broken image placeholder demo',
+            width: 640,
+            height: 120,
+            objectFit: 'cover',
+          }),
+        ]),
+        text({
+          text: 'Invalid URL intentionally triggers renderer-canvas fallback placeholder + retry logic.',
+          font: '12px Inter',
+          lineHeight: 17,
+          color: DIM,
+        }),
+      ]),
       // Interactive search input
       uiInput(primitivesSearch.value.value, 'Search components\u2026', {
         focused: primitivesSearchFocused.value,
