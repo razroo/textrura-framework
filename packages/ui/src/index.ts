@@ -1,6 +1,35 @@
 import { box, text } from '@geometra/core'
 import type { UIElement, EventHandlers } from '@geometra/core'
 
+let caretMeasureCtx: CanvasRenderingContext2D | null = null
+
+function getCaretMeasureCtx(): CanvasRenderingContext2D | null {
+  if (caretMeasureCtx) return caretMeasureCtx
+  if (typeof document === 'undefined') return null
+  const canvas = document.createElement('canvas')
+  caretMeasureCtx = canvas.getContext('2d')
+  return caretMeasureCtx
+}
+
+function getCaretOffsetFromLocalX(textValue: string, localX: number): number {
+  if (textValue.length === 0) return 0
+  const clampedX = Math.max(0, localX)
+  const ctx = getCaretMeasureCtx()
+  if (!ctx) {
+    const approxCharWidth = 8
+    return Math.max(0, Math.min(textValue.length, Math.round(clampedX / approxCharWidth)))
+  }
+  ctx.font = '13px Inter'
+  let running = 0
+  for (let i = 0; i < textValue.length; i++) {
+    const ch = textValue[i]!
+    const w = ctx.measureText(ch).width
+    if (clampedX < running + w / 2) return i
+    running += w
+  }
+  return textValue.length
+}
+
 export function button(label: string, onClick?: EventHandlers['onClick']): UIElement {
   return box(
     {
@@ -62,11 +91,9 @@ export function input(value: string, placeholder = '', options: InputOptions = {
       options.onCaretOffsetChange(0)
       return
     }
-    const horizontalPadding = 20 // paddingLeft + paddingRight
-    const usableWidth = Math.max(1, e.target.width - horizontalPadding)
     const pointerX = e.localX ?? e.x
-    const localX = Math.max(0, Math.min(usableWidth, pointerX - 10))
-    const nextOffset = Math.max(0, Math.min(value.length, Math.round((localX / usableWidth) * value.length)))
+    const localX = pointerX - 10 // paddingLeft
+    const nextOffset = getCaretOffsetFromLocalX(value, localX)
     options.onCaretOffsetChange(nextOffset)
   }
 

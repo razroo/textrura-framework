@@ -249,11 +249,11 @@ describe('@geometra/ui input', () => {
     el.handlers?.onClick?.({
       x: 200,
       y: 10,
-      localX: 80,
+      localX: 40,
       target: { x: 100, y: 0, width: 200, height: 30, children: [] } as HitEvent['target'],
     })
 
-    expect(seenOffset).toBeGreaterThan(0)
-    expect(seenOffset).toBeLessThan('Charlie'.length)
+    expect(seenOffset).toBeGreaterThanOrEqual(2)
+    expect(seenOffset).toBeLessThanOrEqual(5)
   })
 })
