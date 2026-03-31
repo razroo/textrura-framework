@@ -48,3 +48,7 @@ Direction and caret semantics are tracked separately in **`RTL_PARITY_MATRIX.md`
 ## Code entry points
 
 - `packages/core/src/fonts.ts` — `extractFontFamiliesFromCSSFont`, `collectFontFamiliesFromTree`, `waitForFonts`
+
+## Regression coverage
+
+- `packages/renderer-canvas/src/__tests__/visual-regression.test.ts` — ensures the canvas paint path sets **`ctx.font` per text node** when multiple families appear in one tree (guards accidental reuse of a stale font).

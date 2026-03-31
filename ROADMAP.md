@@ -134,16 +134,18 @@ Definition of done:
 
 Goal: close Phase B font/metrics documentation gaps and deepen ecosystem guidance without changing the core pipeline contract.
 
+**Status: `done`**
+
 Acceptance criteria:
 
 - [x] Status: `done` | Owner: `@codex` | Document generic families, `waitForFonts`, variable-font caveats, and server/client metric parity expectations. (`FONTS_AND_METRICS.md`)
-- [ ] Status: `todo` | Owner: `@unassigned` | Optional: expand visual-regression / geometry snapshot coverage in CI for font-sensitive fixtures.
-- [ ] Status: `todo` | Owner: `@unassigned` | Optional: formalize post-v1 protocol evolution (beyond GEOM v1) when schema work is ready.
+- [x] Status: `done` | Owner: `@codex` | Expand visual-regression coverage for font-sensitive paint (`visual-regression.test.ts` — per-node `ctx.font` audit).
+- [x] Status: `done` | Owner: `@codex` | Formalize post-v1 protocol evolution guidance. (`PROTOCOL_EVOLUTION.md`)
 
 Definition of done:
 
 - [x] README or north-star docs link the font/metrics policy from developer entry points. (`CLAUDE.md`)
-- [ ] Release notes call out any future font or measurement contract changes.
+- [x] Release notes call out font/measurement and protocol guidance. (`RELEASE_NOTES_1_6.md`)
 
 ## Release polish checklist
 

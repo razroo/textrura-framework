@@ -38,6 +38,15 @@ class FakeCtx {
   }
 }
 
+/** Extends fake context to record `ctx.font` whenever text is painted (font-sensitive regression). */
+class FontAuditCtx extends FakeCtx {
+  fontsAtFillText: string[] = []
+  override fillText(): void {
+    this.fontsAtFillText.push(this.font)
+    this.ops.push('fillText')
+  }
+}
+
 describe('canvas visual operation snapshots', () => {
   it('emits operations for selection, focus ring, gradient, and clipping', () => {
     ;(globalThis as any).window = { devicePixelRatio: 1 }
@@ -96,5 +105,36 @@ describe('canvas visual operation snapshots', () => {
         "setTransform",
       ]
     `)
+  })
+
+  it('applies distinct ctx.font values per text node (font stack regression)', () => {
+    ;(globalThis as any).window = { devicePixelRatio: 1 }
+    const ctx = new FontAuditCtx()
+    const canvas = {
+      style: {} as Record<string, string>,
+      getContext: () => ctx,
+    } as unknown as HTMLCanvasElement
+
+    const tree = box(
+      { flexDirection: 'column', gap: 4, padding: 8, width: 220, height: 80 },
+      [
+        text({ text: 'Inter line', font: '14px Inter, sans-serif', lineHeight: 18 }),
+        text({ text: 'Mono line', font: 'bold 12px ui-monospace, monospace', lineHeight: 16 }),
+      ],
+    )
+    const layout = {
+      x: 0, y: 0, width: 220, height: 80,
+      children: [
+        { x: 8, y: 8, width: 204, height: 18, children: [{ x: 0, y: 0, width: 80, height: 18, children: [] }] },
+        { x: 8, y: 30, width: 204, height: 16, children: [{ x: 0, y: 0, width: 80, height: 16, children: [] }] },
+      ],
+    }
+
+    const renderer = new CanvasRenderer({ canvas, showFocusRing: false })
+    renderer.render(layout as any, tree)
+
+    expect(ctx.fontsAtFillText.length).toBeGreaterThanOrEqual(2)
+    expect(ctx.fontsAtFillText).toContain('14px Inter, sans-serif')
+    expect(ctx.fontsAtFillText).toContain('bold 12px ui-monospace, monospace')
   })
 })

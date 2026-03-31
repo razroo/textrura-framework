@@ -37,3 +37,7 @@ Server→client messages are normally UTF-8 JSON text frames. Clients may negoti
 **Negotiation:** the client sends `resize` with `capabilities: { binaryFraming: true }`. The server records that socket as binary-capable and uses binary outbound frames for that client when enabled.
 
 This does not change message semantics or `protocolVersion`; it is a transport encoding only. See `TRANSPORT_1_4.md` for telemetry and backpressure notes.
+
+## Longer-term evolution
+
+See **`PROTOCOL_EVOLUTION.md`** for how future capabilities and version bumps should be handled beyond GEOM v1.
