@@ -15,7 +15,7 @@ Goal: deliver a Geometra routing stack that is competitive with modern data rout
 - [x] Add nested route tree with layout routes and child outlet rendering.
 - [x] Add route ranking and deterministic conflict resolution.
 - [x] Add path generation utilities (reverse routing) with typed params.
-- [ ] Add querystring parse/stringify helpers with stable ordering.
+- [x] Add querystring parse/stringify helpers with stable ordering.
 - [ ] Add `createRouter()` lifecycle (`start`, `navigate`, `subscribe`, `dispose`).
 - [ ] Add history adapters:
   - [ ] Browser history (push/replace/popstate).
