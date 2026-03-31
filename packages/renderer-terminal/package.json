@@ -25,7 +25,7 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
-    "@geometra/core": "^0.1.0"
+    "@geometra/core": "^0.2.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0"

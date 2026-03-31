@@ -27,6 +27,10 @@ export interface TexturaClientOptions {
   renderer: Renderer
   /** Optional canvas element for forwarding pointer events. */
   canvas?: HTMLCanvasElement
+  /** Called on WebSocket or message parsing errors. */
+  onError?: (error: unknown) => void
+  /** Enable automatic reconnection on disconnect. Default: true. */
+  reconnect?: boolean
 }
 
 export interface TexturaClient {
@@ -34,15 +38,11 @@ export interface TexturaClient {
   layout: ComputedLayout | null
   /** Current tree (if received). */
   tree: UIElement | null
-  /** Disconnect from server. */
+  /** Disconnect from server (no reconnect). */
   close(): void
 }
 
-/** Apply patches to a computed layout tree (mutates in place). */
-function applyPatches(
-  layout: ComputedLayout,
-  patches: ServerPatch['patches'],
-): void {
+function applyPatches(layout: ComputedLayout, patches: ServerPatch['patches']): void {
   for (const patch of patches) {
     let node = layout
     for (const idx of patch.path) {
@@ -58,40 +58,70 @@ function applyPatches(
 }
 
 /**
- * Connect to a Textura server and render received geometry.
+ * Connect to a Geometra server and render received geometry.
  *
  * The client is a thin paint layer — all layout computation happens server-side.
  * Pointer events on the canvas are forwarded to the server for hit-testing.
+ * Automatically reconnects on disconnect with exponential backoff.
  */
 export function createClient(options: TexturaClientOptions): TexturaClient {
   const url = options.url ?? 'ws://localhost:3100'
-  const { renderer, canvas } = options
+  const { renderer, canvas, onError } = options
+  const shouldReconnect = options.reconnect !== false
+
+  let ws: WebSocket
+  let closed = false
+  let retryCount = 0
+  let retryTimer: ReturnType<typeof setTimeout> | null = null
+  const handlers: Array<[string, (e: MouseEvent) => void]> = []
 
   const state: TexturaClient = {
     layout: null,
     tree: null,
     close() {
+      closed = true
+      if (retryTimer) clearTimeout(retryTimer)
       ws.close()
       cleanup()
     },
   }
 
-  const ws = new WebSocket(url)
+  function connect() {
+    ws = new WebSocket(url)
 
-  ws.addEventListener('message', (event) => {
-    const msg = JSON.parse(String(event.data)) as ServerMessage
+    ws.addEventListener('open', () => {
+      retryCount = 0
+    })
 
-    if (msg.type === 'frame') {
-      state.layout = msg.layout
-      state.tree = msg.tree
-      renderer.render(msg.layout, msg.tree)
-    } else if (msg.type === 'patch' && state.layout && state.tree) {
-      applyPatches(state.layout, msg.patches)
-      renderer.render(state.layout, state.tree)
-    }
-  })
+    ws.addEventListener('message', (event) => {
+      try {
+        const msg = JSON.parse(String(event.data)) as ServerMessage
+        if (msg.type === 'frame') {
+          state.layout = msg.layout
+          state.tree = msg.tree
+          renderer.render(msg.layout, msg.tree)
+        } else if (msg.type === 'patch' && state.layout && state.tree) {
+          applyPatches(state.layout, msg.patches)
+          renderer.render(state.layout, state.tree)
+        }
+      } catch (err) {
+        onError?.(err)
+      }
+    })
 
-  // Forward pointer events to server
+    ws.addEventListener('error', (event) => {
+      onError?.(event)
+    })
+
+    ws.addEventListener('close', () => {
+      if (!closed && shouldReconnect) {
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 30000)
+        retryCount++
+        retryTimer = setTimeout(connect, delay)
+      }
+    })
+  }
+
   const sendEvent = (eventType: string, e: MouseEvent) => {
     if (ws.readyState !== WebSocket.OPEN) return
     const rect = canvas?.getBoundingClientRect()
@@ -99,8 +129,6 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
     const y = rect ? e.clientY - rect.top : e.clientY
     ws.send(JSON.stringify({ type: 'event', eventType, x, y }))
   }
-
-  const handlers: Array<[string, (e: MouseEvent) => void]> = []
 
   if (canvas) {
     const onClick = (e: MouseEvent) => sendEvent('onClick', e)
@@ -129,6 +157,8 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
     }
     renderer.destroy()
   }
+
+  connect()
 
   return state
 }

@@ -1,4 +1,4 @@
-import type { UIElement, BoxElement, TextElement } from './types.js'
+import type { UIElement, BoxElement, TextElement, ImageElement } from './types.js'
 
 /** Options for semantic HTML generation. */
 export interface SemanticHTMLOptions {
@@ -54,6 +54,12 @@ function escapeHTML(str: string): string {
 /** Convert a UIElement tree to a semantic HTML string body. */
 function elementToHTML(element: UIElement, indent: number): string {
   const pad = '  '.repeat(indent)
+
+  if (element.kind === 'image') {
+    const imgEl = element as ImageElement
+    const alt = imgEl.semantic?.alt ?? imgEl.props.alt ?? ''
+    return `${pad}<img src="${escapeHTML(imgEl.props.src)}" alt="${escapeHTML(alt)}">`
+  }
 
   if (element.kind === 'text') {
     const tag = element.semantic?.tag ?? inferTag(element)

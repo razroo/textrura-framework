@@ -14,6 +14,8 @@ export interface TexturaServerOptions {
   width?: number
   /** Root height. Default: 600. */
   height?: number
+  /** Called on errors during layout computation or broadcasting. */
+  onError?: (error: unknown) => void
 }
 
 export interface TexturaServer {
@@ -44,6 +46,7 @@ export async function createServer(
   let currentTree: UIElement | null = null
 
   function computeAndBroadcast(): void {
+    try {
     currentTree = view()
     const layoutTree = toLayoutTree(currentTree)
     const layout = computeLayout(layoutTree, { width, height })
@@ -67,6 +70,21 @@ export async function createServer(
     for (const client of clients) {
       if (client.readyState === client.OPEN) {
         client.send(data)
+      }
+    }
+    } catch (err) {
+      if (options.onError) {
+        options.onError(err)
+      } else {
+        console.error('Geometra server error:', err)
+      }
+      // Send error to clients
+      const errorMsg: ServerMessage = { type: 'error', message: String(err) }
+      const data = JSON.stringify(errorMsg)
+      for (const client of clients) {
+        if (client.readyState === client.OPEN) {
+          client.send(data)
+        }
       }
     }
   }

@@ -1,5 +1,5 @@
 import type { FlexProps } from 'textura'
-import type { StyleProps, BoxElement, TextElement, UIElement, EventHandlers, SemanticProps } from './types.js'
+import type { StyleProps, BoxElement, TextElement, ImageElement, UIElement, EventHandlers, SemanticProps } from './types.js'
 
 type BoxProps = FlexProps & StyleProps & EventHandlers & { key?: string; semantic?: SemanticProps }
 type TextProps = FlexProps & StyleProps & {
@@ -11,15 +11,25 @@ type TextProps = FlexProps & StyleProps & {
   key?: string
   semantic?: SemanticProps
 }
+type ImageProps = FlexProps & StyleProps & {
+  src: string
+  alt?: string
+  objectFit?: 'fill' | 'contain' | 'cover'
+  key?: string
+  semantic?: SemanticProps
+}
 
 /** Create a box (container) element. */
 export function box(props: BoxProps, children: UIElement[] = []): BoxElement {
-  const { onClick, onPointerDown, onPointerUp, onPointerMove, key, semantic, ...rest } = props
+  const { onClick, onPointerDown, onPointerUp, onPointerMove, onWheel, onKeyDown, onKeyUp, key, semantic, ...rest } = props
   const handlers: EventHandlers = {}
   if (onClick) handlers.onClick = onClick
   if (onPointerDown) handlers.onPointerDown = onPointerDown
   if (onPointerUp) handlers.onPointerUp = onPointerUp
   if (onPointerMove) handlers.onPointerMove = onPointerMove
+  if (onWheel) handlers.onWheel = onWheel
+  if (onKeyDown) handlers.onKeyDown = onKeyDown
+  if (onKeyUp) handlers.onKeyUp = onKeyUp
 
   return {
     kind: 'box',
@@ -35,4 +45,10 @@ export function box(props: BoxProps, children: UIElement[] = []): BoxElement {
 export function text(props: TextProps): TextElement {
   const { key, semantic, ...rest } = props
   return { kind: 'text', props: rest, key, semantic }
+}
+
+/** Create an image element. */
+export function image(props: ImageProps): ImageElement {
+  const { key, semantic, ...rest } = props
+  return { kind: 'image', props: rest, key, semantic }
 }

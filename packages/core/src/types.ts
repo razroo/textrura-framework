@@ -6,7 +6,27 @@ export interface StyleProps {
   color?: string
   borderColor?: string
   borderRadius?: number
+  borderWidth?: number
   opacity?: number
+  /** Cursor to show when hovering this element. */
+  cursor?: 'default' | 'pointer' | 'grab' | 'grabbing' | 'text' | 'not-allowed' | 'crosshair' | 'move'
+  /** Z-index for paint ordering among siblings. Higher values paint on top. */
+  zIndex?: number
+  /** Overflow behavior for children. */
+  overflow?: 'visible' | 'hidden' | 'scroll'
+  /** Horizontal scroll offset (used with overflow: 'scroll'). */
+  scrollX?: number
+  /** Vertical scroll offset (used with overflow: 'scroll'). */
+  scrollY?: number
+  /** Box shadow. */
+  boxShadow?: { offsetX: number; offsetY: number; blur: number; color: string }
+  /** Linear gradient background (overrides backgroundColor when set). */
+  gradient?: {
+    type: 'linear'
+    /** Angle in degrees. Default: 180 (top to bottom). */
+    angle?: number
+    stops: Array<{ offset: number; color: string }>
+  }
 }
 
 /** Semantic properties for SEO and accessibility. */
@@ -49,8 +69,20 @@ export interface BoxElement {
   semantic?: SemanticProps
 }
 
+/** An image element in the component tree. */
+export interface ImageElement {
+  kind: 'image'
+  props: FlexProps & StyleProps & {
+    src: string
+    alt?: string
+    objectFit?: 'fill' | 'contain' | 'cover'
+  }
+  key?: string
+  semantic?: SemanticProps
+}
+
 /** Union of all element types. */
-export type UIElement = TextElement | BoxElement
+export type UIElement = TextElement | BoxElement | ImageElement
 
 /** Supported event handlers on box elements. */
 export interface EventHandlers {
@@ -58,12 +90,26 @@ export interface EventHandlers {
   onPointerDown?: (e: HitEvent) => void
   onPointerUp?: (e: HitEvent) => void
   onPointerMove?: (e: HitEvent) => void
+  onWheel?: (e: HitEvent & { deltaX: number; deltaY: number }) => void
+  onKeyDown?: (e: KeyboardHitEvent) => void
+  onKeyUp?: (e: KeyboardHitEvent) => void
 }
 
 /** Event delivered to handlers after hit-testing. */
 export interface HitEvent {
   x: number
   y: number
+  target: ComputedLayout
+}
+
+/** Keyboard event delivered to the focused element. */
+export interface KeyboardHitEvent {
+  key: string
+  code: string
+  shiftKey: boolean
+  ctrlKey: boolean
+  metaKey: boolean
+  altKey: boolean
   target: ComputedLayout
 }
 

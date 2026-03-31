@@ -1,0 +1,30 @@
+# @geometra/renderer-canvas
+
+Canvas2D renderer for Geometra. Renders UI element trees to an HTML `<canvas>` element with full hit-testing and text selection support.
+
+## Install
+
+```bash
+npm install @geometra/renderer-canvas
+```
+
+## Key Exports
+
+- `CanvasRenderer` -- renders Geometra element trees to a canvas context
+- `enableSelection` -- enables text selection on the canvas
+
+## Usage
+
+```ts
+import { CanvasRenderer, enableSelection } from '@geometra/renderer-canvas'
+
+const canvas = document.getElementById('app') as HTMLCanvasElement
+const renderer = new CanvasRenderer(canvas)
+
+enableSelection(renderer)
+renderer.render(tree, layout)
+```
+
+## Links
+
+- [Main repo](https://github.com/AiGeekz/geometra)
