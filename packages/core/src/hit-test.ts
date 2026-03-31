@@ -151,6 +151,31 @@ export function dispatchHit(
   return { handled: false }
 }
 
+/** True when point is over an interactive element (click/key/composition handlers). */
+export function hasInteractiveHitAtPoint(
+  element: UIElement,
+  layout: ComputedLayout,
+  x: number,
+  y: number,
+): boolean {
+  const hits: HitTarget[] = []
+  collectHits(element, layout, x, y, 0, 0, hits)
+  for (let i = hits.length - 1; i >= 0; i--) {
+    const handlers = hits[i]!.handlers
+    if (
+      handlers.onClick ||
+      handlers.onKeyDown ||
+      handlers.onKeyUp ||
+      handlers.onCompositionStart ||
+      handlers.onCompositionUpdate ||
+      handlers.onCompositionEnd
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
 /** Get the cursor style at a given point by walking the tree. Returns the deepest element's cursor prop. */
 export function getCursorAtPoint(
   element: UIElement,

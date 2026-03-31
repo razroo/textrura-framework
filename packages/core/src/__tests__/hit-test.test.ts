@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { dispatchHit, getCursorAtPoint } from '../hit-test.js'
+import { dispatchHit, getCursorAtPoint, hasInteractiveHitAtPoint } from '../hit-test.js'
 import { box } from '../elements.js'
 
 describe('dispatchHit', () => {
@@ -108,5 +108,18 @@ describe('getCursorAtPoint', () => {
 
     const cursor = getCursorAtPoint(el, layout, 50, 25)
     expect(cursor).toBeNull()
+  })
+})
+
+describe('hasInteractiveHitAtPoint', () => {
+  it('detects interactive containers at pointer position', () => {
+    const interactive = box({ width: 120, height: 40, onKeyDown: () => undefined })
+    const root = box({ width: 200, height: 100 }, [interactive])
+    const layout = {
+      x: 0, y: 0, width: 200, height: 100,
+      children: [{ x: 20, y: 20, width: 120, height: 40, children: [] }],
+    }
+    expect(hasInteractiveHitAtPoint(root, layout, 30, 30)).toBe(true)
+    expect(hasInteractiveHitAtPoint(root, layout, 5, 5)).toBe(false)
   })
 })

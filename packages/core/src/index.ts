@@ -13,7 +13,7 @@ export type { App, AppOptions } from './app.js'
 export { toLayoutTree } from './tree.js'
 
 // Hit testing
-export { dispatchHit, getCursorAtPoint } from './hit-test.js'
+export { dispatchHit, getCursorAtPoint, hasInteractiveHitAtPoint } from './hit-test.js'
 export type { HitDispatchResult } from './hit-test.js'
 
 // Web fonts (browser)

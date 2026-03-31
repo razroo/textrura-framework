@@ -60,6 +60,51 @@ interface CachedTextLineMetrics {
   charWidths: number[]
 }
 
+function hasInteractiveHitAtPoint(
+  element: UIElement,
+  layout: ComputedLayout,
+  x: number,
+  y: number,
+  offsetX = 0,
+  offsetY = 0,
+): boolean {
+  const absX = offsetX + layout.x
+  const absY = offsetY + layout.y
+  const inside =
+    x >= absX &&
+    x <= absX + layout.width &&
+    y >= absY &&
+    y <= absY + layout.height
+  if (!inside) return false
+
+  if (element.kind === 'box') {
+    let childOffX = absX
+    let childOffY = absY
+    if (element.props.scrollX) childOffX -= element.props.scrollX
+    if (element.props.scrollY) childOffY -= element.props.scrollY
+
+    for (let i = element.children.length - 1; i >= 0; i--) {
+      const child = element.children[i]!
+      const childLayout = layout.children[i]
+      if (childLayout && hasInteractiveHitAtPoint(child, childLayout, x, y, childOffX, childOffY)) {
+        return true
+      }
+    }
+
+    const h = element.handlers
+    return !!(
+      h?.onClick ||
+      h?.onKeyDown ||
+      h?.onKeyUp ||
+      h?.onCompositionStart ||
+      h?.onCompositionUpdate ||
+      h?.onCompositionEnd
+    )
+  }
+
+  return false
+}
+
 /** Parse a CSS color string into [r, g, b] (0-255). Supports #hex and rgba(). */
 function parseColorRGB(color: string): [number, number, number] {
   if (color.startsWith('#')) {
@@ -818,6 +863,16 @@ export function enableSelection(
 
   function onPointerDown(e: PointerEvent) {
     const pos = getCanvasPos(e)
+    if (renderer.lastTree && renderer.lastLayout) {
+      const overInteractive = hasInteractiveHitAtPoint(renderer.lastTree, renderer.lastLayout, pos.x, pos.y)
+      if (overInteractive) {
+        if (renderer.selection) {
+          renderer.selection = null
+          scheduleSelectionChange()
+        }
+        return
+      }
+    }
     const hit = hitTestTextFast(renderer.textNodesByY, pos.x, pos.y)
     if (!hit) {
       if (renderer.selection) {
