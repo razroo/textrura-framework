@@ -7,8 +7,8 @@
     "demos/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
-    "check": "npm run check --workspaces --if-present",
+    "build": "bun run --workspaces build",
+    "check": "bun run --workspaces --if-present check",
     "test": "vitest run",
     "lint": "eslint packages/*/src",
     "format": "prettier --write 'packages/*/src/**/*.ts'",
