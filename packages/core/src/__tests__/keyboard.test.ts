@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { box } from '../elements.js'
 import { dispatchKeyboardEvent, dispatchCompositionEvent } from '../keyboard.js'
 import { clearFocus, focusedElement, setFocus } from '../focus.js'
+import { insertInputText, moveInputCaret } from '../text-input.js'
+import type { TextInputState } from '../text-input.js'
 
 describe('dispatchKeyboardEvent', () => {
   beforeEach(() => {
@@ -168,6 +170,100 @@ describe('dispatchKeyboardEvent', () => {
     const handled = dispatchCompositionEvent(tree, layout, 'onCompositionUpdate', { data: 'に' })
     expect(handled).toBe(true)
     expect(value).toBe('に')
+  })
+
+  it('routes composition start/update/end lifecycle and commits draft', () => {
+    let state: TextInputState = {
+      nodes: ['ab'],
+      selection: { anchorNode: 0, anchorOffset: 2, focusNode: 0, focusOffset: 2 },
+    }
+    let draft = ''
+    let compSelection: TextInputState['selection'] | null = null
+
+    const tree = box({
+      onCompositionStart: () => {
+        compSelection = { ...state.selection }
+        draft = ''
+      },
+      onCompositionUpdate: (e) => {
+        draft = e.data
+      },
+      onCompositionEnd: (e) => {
+        draft = ''
+        if (!e.data) return
+        const baseSelection = compSelection ?? state.selection
+        compSelection = null
+        state = insertInputText({ nodes: state.nodes, selection: baseSelection }, e.data)
+      },
+    }, [])
+    const layout = { x: 0, y: 0, width: 200, height: 80, children: [] }
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    const started = dispatchCompositionEvent(tree, layout, 'onCompositionStart', { data: '' })
+    const updated = dispatchCompositionEvent(tree, layout, 'onCompositionUpdate', { data: 'に' })
+    const ended = dispatchCompositionEvent(tree, layout, 'onCompositionEnd', { data: 'に' })
+
+    expect(started).toBe(true)
+    expect(updated).toBe(true)
+    expect(ended).toBe(true)
+    expect(draft).toBe('')
+    expect(state.nodes[0]).toBe('abに')
+    expect(state.selection.focusOffset).toBe(3)
+  })
+
+  it('keeps composition insertion anchored when caret moves mid-composition', () => {
+    let state: TextInputState = {
+      nodes: ['ab'],
+      selection: { anchorNode: 0, anchorOffset: 2, focusNode: 0, focusOffset: 2 },
+    }
+    let compSelection: TextInputState['selection'] | null = null
+
+    const tree = box({
+      onKeyDown: (e) => {
+        if (e.key === 'ArrowLeft') {
+          state = moveInputCaret(state, 'left', false)
+        }
+      },
+      onCompositionStart: () => {
+        compSelection = { ...state.selection }
+      },
+      onCompositionEnd: (e) => {
+        if (!e.data) return
+        const baseSelection = compSelection ?? state.selection
+        compSelection = null
+        state = insertInputText({ nodes: state.nodes, selection: baseSelection }, e.data)
+      },
+    }, [])
+    const layout = { x: 0, y: 0, width: 200, height: 80, children: [] }
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    dispatchCompositionEvent(tree, layout, 'onCompositionStart', { data: '' })
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'ArrowLeft',
+      code: 'ArrowLeft',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    dispatchCompositionEvent(tree, layout, 'onCompositionEnd', { data: 'に' })
+
+    expect(state.nodes[0]).toBe('abに')
+    expect(state.selection.focusOffset).toBe(3)
   })
 })
 
