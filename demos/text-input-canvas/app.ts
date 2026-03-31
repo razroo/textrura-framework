@@ -28,6 +28,7 @@ const focused = signal(false)
 const compositionDraft = signal('')
 const compositionSelection = signal<TextInputState['selection'] | null>(null)
 const caretColumnIntent = signal<number | null>(null)
+const dragAnchor = signal<{ node: number; offset: number } | null>(null)
 
 function state(): TextInputState {
   return history.peek().present
@@ -58,6 +59,15 @@ function normalizeSelection(sel: TextInputState['selection']): {
 
 function withSelection(nextState: TextInputState, selection: TextInputState['selection']): TextInputState {
   return { nodes: nextState.nodes, selection: { ...selection } }
+}
+
+function pointToSelection(x: number, y: number): { node: number; offset: number } {
+  const startY = 24 + 12 + 30 + 12 + 19 + 14
+  const lineHeight = 22
+  const charWidth = 9
+  const line = Math.max(0, Math.min(state().nodes.length - 1, Math.floor((y - startY) / lineHeight)))
+  const offset = Math.max(0, Math.min(state().nodes[line]!.length, Math.round((x - 24 - 14) / charWidth)))
+  return { node: line, offset }
 }
 
 function onKeyDown(e: KeyboardHitEvent): void {
@@ -284,6 +294,44 @@ canvas.addEventListener('click', (e) => {
   if (!app) return
   const rect = canvas.getBoundingClientRect()
   app.dispatch('onClick', e.clientX - rect.left, e.clientY - rect.top)
+})
+
+canvas.addEventListener('pointerdown', (e) => {
+  if (!focused.peek()) return
+  const rect = canvas.getBoundingClientRect()
+  const p = pointToSelection(e.clientX - rect.left, e.clientY - rect.top)
+  dragAnchor.set(p)
+  const current = state()
+  setPresent({
+    nodes: current.nodes,
+    selection: {
+      anchorNode: p.node,
+      anchorOffset: p.offset,
+      focusNode: p.node,
+      focusOffset: p.offset,
+    },
+  })
+})
+
+canvas.addEventListener('pointermove', (e) => {
+  const anchor = dragAnchor.peek()
+  if (!anchor || !focused.peek()) return
+  const rect = canvas.getBoundingClientRect()
+  const p = pointToSelection(e.clientX - rect.left, e.clientY - rect.top)
+  const current = state()
+  setPresent({
+    nodes: current.nodes,
+    selection: {
+      anchorNode: anchor.node,
+      anchorOffset: anchor.offset,
+      focusNode: p.node,
+      focusOffset: p.offset,
+    },
+  })
+})
+
+window.addEventListener('pointerup', () => {
+  dragAnchor.set(null)
 })
 
 window.addEventListener('compositionstart', () => {
