@@ -5,7 +5,7 @@ import { init, computeLayout } from 'textura'
 import type { ComputedLayout } from 'textura'
 import { toLayoutTree, dispatchHit, dispatchKeyboardEvent, dispatchCompositionEvent } from '@geometra/core'
 import type { UIElement, EventHandlers } from '@geometra/core'
-import { diffLayout, PROTOCOL_VERSION, isProtocolCompatible, CLOSE_AUTH_FAILED, CLOSE_FORBIDDEN } from './protocol.js'
+import { diffLayout, coalescePatches, PROTOCOL_VERSION, isProtocolCompatible, CLOSE_AUTH_FAILED, CLOSE_FORBIDDEN } from './protocol.js'
 import type { ServerMessage, ClientMessage } from './protocol.js'
 
 export interface TexturaServerOptions {
@@ -32,6 +32,8 @@ export interface TexturaServerOptions {
    * the message (sends a 4003 error to the client, event is not dispatched).
    */
   onMessage?: (message: ClientMessage, context: unknown) => boolean
+  /** Backpressure threshold; clients above this buffered amount are deferred. */
+  backpressureBytes?: number
 }
 
 export interface TexturaServer {
@@ -39,6 +41,13 @@ export interface TexturaServer {
   update(): void
   /** Shut down the server. */
   close(): void
+}
+
+export function shouldDeferClientSend(
+  bufferedAmount: number,
+  backpressureBytes: number,
+): boolean {
+  return bufferedAmount > backpressureBytes
 }
 
 /**
@@ -58,9 +67,11 @@ export async function createServer(
   let height = options.height ?? 600
 
   const clients = new Set<WebSocket>()
+  const needsResync = new Set<WebSocket>()
   const contexts = new Map<WebSocket, unknown>()
   let prevLayout: ComputedLayout | null = null
   let currentTree: UIElement | null = null
+  const backpressureBytes = Math.max(1024, options.backpressureBytes ?? 512 * 1024)
 
   function computeAndBroadcast(): void {
     try {
@@ -70,7 +81,7 @@ export async function createServer(
 
     let msg: ServerMessage
     if (prevLayout) {
-      const patches = diffLayout(prevLayout, layout)
+      const patches = coalescePatches(diffLayout(prevLayout, layout))
       if (patches.length === 0) return
       // If patches are more than half the tree, just send full frame
       if (patches.length > 20) {
@@ -83,10 +94,18 @@ export async function createServer(
     }
 
     prevLayout = layout
-    const data = JSON.stringify(msg)
     for (const client of clients) {
       if (client.readyState === client.OPEN) {
-        client.send(data)
+        if (shouldDeferClientSend(client.bufferedAmount, backpressureBytes)) {
+          needsResync.add(client)
+          continue
+        }
+        const clientMsg: ServerMessage =
+          needsResync.has(client)
+            ? { type: 'frame', layout, tree: currentTree, protocolVersion: PROTOCOL_VERSION }
+            : msg
+        if (needsResync.has(client)) needsResync.delete(client)
+        client.send(JSON.stringify(clientMsg))
       }
     }
     } catch (err) {
@@ -110,6 +129,7 @@ export async function createServer(
 
   function acceptConnection(ws: WebSocket): void {
     clients.add(ws)
+    needsResync.delete(ws)
 
     if (prevLayout && currentTree) {
       const msg: ServerMessage = {
@@ -186,6 +206,7 @@ export async function createServer(
     ws.on('close', () => {
       const ctx = contexts.get(ws)
       clients.delete(ws)
+      needsResync.delete(ws)
       contexts.delete(ws)
       if (options.onDisconnect && ctx !== undefined) {
         options.onDisconnect(ctx)
