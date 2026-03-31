@@ -243,6 +243,20 @@ describe('getCursorAtPoint', () => {
     }
     expect(getCursorAtPoint(root, layout, 5, 5)).toBe('pointer')
   })
+
+  it('uses child cursor under horizontal scroll offset', () => {
+    const child = box({ width: 50, height: 50, cursor: 'crosshair' })
+    const parent = box({ width: 100, height: 100, overflow: 'scroll', scrollX: 30 }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 40, y: 25, width: 50, height: 50, children: [] }],
+    }
+    // Child absX = 0 - 30 + 40 = 10; point (35, 50) lies inside the child
+    expect(getCursorAtPoint(parent, layout, 35, 50)).toBe('crosshair')
+  })
 })
 
 describe('scroll and overflow clipping', () => {
@@ -305,6 +319,40 @@ describe('scroll and overflow clipping', () => {
     // Child absY = parentAbsY - scrollY + layout.y = 0 - 40 + 80 = 40
     dispatchHit(parent, layout, 'onClick', 50, 45)
     expect(localY).toBe(5)
+  })
+
+  it('scrollX shifts child bounds; localX matches scrolled content', () => {
+    let localX = -1
+    const child = box({
+      width: 50,
+      height: 100,
+      onClick: (e) => { localX = e.localX ?? -999 },
+    })
+    const parent = box({ width: 100, height: 100, overflow: 'scroll', scrollX: 40 }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 80, y: 0, width: 50, height: 100, children: [] }],
+    }
+
+    // Child absX = parentAbsX - scrollX + layout.x = 0 - 40 + 80 = 40
+    dispatchHit(parent, layout, 'onClick', 45, 50)
+    expect(localX).toBe(5)
+  })
+
+  it('hitPathAtPoint resolves path under scrollX', () => {
+    const child = box({ width: 50, height: 50 })
+    const parent = box({ width: 100, height: 100, overflow: 'scroll', scrollX: 40 }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 80, y: 0, width: 50, height: 50, children: [] }],
+    }
+    expect(hitPathAtPoint(parent, layout, 45, 25)).toEqual([0])
   })
 
   it('hitPathAtPoint respects higher z-index when scrolling siblings', () => {
