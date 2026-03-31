@@ -26,11 +26,11 @@ The framework replaces the entire browser rendering pipeline. Layout is computed
 
 | Package | Description |
 |---|---|
-| `@geometra/core` | Component model, signals reactivity, hit-testing, tree reconciler |
-| `@geometra/renderer-canvas` | Canvas2D paint backend |
+| `@geometra/core` | Component model, signals, hit-testing, semantic/a11y tree generation, text-input primitives |
+| `@geometra/renderer-canvas` | Canvas2D paint backend + selection + optional accessibility mirror |
 | `@geometra/renderer-terminal` | ANSI terminal/TUI paint backend |
-| `@geometra/server` | Server-side layout engine with WebSocket geometry streaming |
-| `@geometra/client` | Thin client that receives pre-computed geometry and paints it |
+| `@geometra/server` | Server-side layout engine with WebSocket geometry streaming (versioned protocol) |
+| `@geometra/client` | Thin client that receives pre-computed geometry and paints it (versioned protocol checks) |
 
 ## Quick Start
 
@@ -171,6 +171,14 @@ box({
   text({ text: 'Click me', font: '16px Inter', lineHeight: 22, color: '#fff' }),
 ])
 ```
+
+## Accessibility and Text Input Foundations
+
+Geometra now exposes runtime primitives so non-DOM renderers can still provide accessibility and editing behavior:
+
+- `toAccessibilityTree(tree, layout)` in `@geometra/core` maps UI + geometry to role/name/bounds/focusable nodes.
+- `enableAccessibilityMirror(host, renderer)` in `@geometra/renderer-canvas` syncs a hidden DOM mirror for assistive tech.
+- `insertInputText`, `replaceInputSelection`, `backspaceInput`, `deleteInput`, `moveInputCaret` in `@geometra/core` provide selection-aware text editing logic you can wire to keyboard handlers.
 
 ## Architecture
 

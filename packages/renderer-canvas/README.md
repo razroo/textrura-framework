@@ -12,6 +12,7 @@ npm install @geometra/renderer-canvas
 
 - `CanvasRenderer` -- renders Geometra element trees to a canvas context
 - `enableSelection` -- enables text selection on the canvas
+- `enableAccessibilityMirror` -- syncs a hidden accessibility DOM mirror from geometry
 
 ## Usage
 

@@ -1,6 +1,23 @@
 import type { ComputedLayout } from 'textura'
-import type { Renderer, UIElement, BoxElement, TextElement, ImageElement, SelectionRange, TextNodeInfo, TextLineInfo } from '@geometra/core'
-import { collectTextNodes, getSelectedText, hitTestText, getCursorAtPoint, focusedElement } from '@geometra/core'
+import type {
+  Renderer,
+  UIElement,
+  BoxElement,
+  TextElement,
+  ImageElement,
+  SelectionRange,
+  TextNodeInfo,
+  TextLineInfo,
+  AccessibilityNode,
+} from '@geometra/core'
+import {
+  collectTextNodes,
+  getSelectedText,
+  hitTestText,
+  getCursorAtPoint,
+  focusedElement,
+  toAccessibilityTree,
+} from '@geometra/core'
 
 export interface CanvasRendererOptions {
   /** Canvas element to render into. */
@@ -23,6 +40,11 @@ export interface CanvasRendererOptions {
   focusRingColor?: string
   /** Outset from the focused box in CSS pixels. Default 2. */
   focusRingPadding?: number
+}
+
+export interface AccessibilityMirrorOptions {
+  /** Label for the hidden accessibility region. */
+  rootLabel?: string
 }
 
 /** Parse a CSS color string into [r, g, b] (0-255). Supports #hex and rgba(). */
@@ -689,6 +711,12 @@ export class CanvasRenderer implements Renderer {
     return getSelectedText(this.selection, this.textNodes)
   }
 
+  /** Build an accessibility tree for the currently rendered frame. */
+  getAccessibilityTree(): AccessibilityNode | null {
+    if (!this.lastTree || !this.lastLayout) return null
+    return toAccessibilityTree(this.lastTree, this.lastLayout)
+  }
+
   destroy(): void {
     // Nothing to clean up for canvas
   }
@@ -788,5 +816,63 @@ export function enableSelection(
     canvas.removeEventListener('pointerup', onPointerUp)
     canvas.removeEventListener('mousemove', onMouseMove)
     document.removeEventListener('keydown', onKeyDown)
+  }
+}
+
+function createAccessibilityElement(node: AccessibilityNode, doc: Document): HTMLElement {
+  const el = doc.createElement('div')
+  el.setAttribute('role', node.role)
+  if (node.name) el.setAttribute('aria-label', node.name)
+  el.style.position = 'absolute'
+  el.style.left = `${node.bounds.x}px`
+  el.style.top = `${node.bounds.y}px`
+  el.style.width = `${Math.max(1, node.bounds.width)}px`
+  el.style.height = `${Math.max(1, node.bounds.height)}px`
+  el.style.pointerEvents = 'none'
+  el.style.background = 'transparent'
+  if (node.focusable) el.setAttribute('tabindex', '0')
+  for (const child of node.children) {
+    el.appendChild(createAccessibilityElement(child, doc))
+  }
+  return el
+}
+
+/**
+ * Mirror canvas semantics into a hidden DOM subtree for assistive tech.
+ * The mirror auto-syncs after every canvas render.
+ */
+export function enableAccessibilityMirror(
+  host: HTMLElement,
+  renderer: CanvasRenderer,
+  options: AccessibilityMirrorOptions = {},
+): () => void {
+  const doc = host.ownerDocument
+  const root = doc.createElement('div')
+  root.setAttribute('aria-label', options.rootLabel ?? 'Geometra accessibility mirror')
+  root.style.position = 'absolute'
+  root.style.left = '0'
+  root.style.top = '0'
+  root.style.width = '1px'
+  root.style.height = '1px'
+  root.style.overflow = 'hidden'
+  root.style.clipPath = 'inset(50%)'
+  root.style.whiteSpace = 'nowrap'
+  host.appendChild(root)
+
+  const originalRender = renderer.render.bind(renderer)
+  const patchedRender: typeof renderer.render = (layout, tree) => {
+    originalRender(layout, tree)
+    const a11y = renderer.getAccessibilityTree()
+    root.replaceChildren()
+    if (a11y) {
+      root.appendChild(createAccessibilityElement(a11y, doc))
+    }
+  }
+
+  renderer.render = patchedRender
+
+  return () => {
+    renderer.render = originalRender
+    root.remove()
   }
 }

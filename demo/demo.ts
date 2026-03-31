@@ -1,6 +1,16 @@
-import { signal, box, text, createApp, toSemanticHTML } from '@geometra/core'
-import type { App, UIElement } from '@geometra/core'
-import { CanvasRenderer, enableSelection } from '@geometra/renderer-canvas'
+import {
+  signal,
+  box,
+  text,
+  createApp,
+  toSemanticHTML,
+  insertInputText,
+  backspaceInput,
+  deleteInput,
+  moveInputCaret,
+} from '@geometra/core'
+import type { App, UIElement, TextInputState, KeyboardHitEvent } from '@geometra/core'
+import { CanvasRenderer, enableSelection, enableAccessibilityMirror } from '@geometra/renderer-canvas'
 
 // ─── Design Tokens ───────────────────────────────────────────────────────────
 const BG = '#09090b'
@@ -25,6 +35,11 @@ const rootWidth = signal(600)
 const direction = signal<'row' | 'column'>('row')
 const codeTab = signal('basic')
 const copied = signal(false)
+const inputState = signal<TextInputState>({
+  nodes: ['Geometra text input prototype'],
+  selection: { anchorNode: 0, anchorOffset: 29, focusNode: 0, focusOffset: 29 },
+})
+const inputFocused = signal(false)
 let lastPerfTime = '-'
 let lastPerfNodes = '-'
 
@@ -202,6 +217,110 @@ function selectableText(): UIElement {
   ])
 }
 
+function handleInputKeyDown(e: KeyboardHitEvent): void {
+  const state = inputState.peek()
+
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+    const last = state.nodes.length - 1
+    inputState.set({
+      nodes: state.nodes,
+      selection: {
+        anchorNode: 0,
+        anchorOffset: 0,
+        focusNode: last,
+        focusOffset: state.nodes[last]?.length ?? 0,
+      },
+    })
+    return
+  }
+
+  if (e.key === 'Backspace') {
+    inputState.set(backspaceInput(state))
+    return
+  }
+  if (e.key === 'Delete') {
+    inputState.set(deleteInput(state))
+    return
+  }
+  if (e.key === 'ArrowLeft') {
+    inputState.set(moveInputCaret(state, 'left', e.shiftKey))
+    return
+  }
+  if (e.key === 'ArrowRight') {
+    inputState.set(moveInputCaret(state, 'right', e.shiftKey))
+    return
+  }
+  if (e.key === 'Enter') {
+    inputState.set(insertInputText(state, '\n'))
+    return
+  }
+  if (e.key === 'Escape') {
+    inputFocused.set(false)
+    return
+  }
+
+  if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    inputState.set(insertInputText(state, e.key))
+  }
+}
+
+function textInputDemo(): UIElement {
+  const w = rootWidth.value
+  const state = inputState.value
+  const active = inputFocused.value
+  const selected = state.selection
+  const collapsed =
+    selected.anchorNode === selected.focusNode &&
+    selected.anchorOffset === selected.focusOffset
+  const line = state.nodes.join('\n')
+  const caretOffset = collapsed ? selected.focusOffset : -1
+  const display = collapsed && active
+    ? `${line.slice(0, caretOffset)}|${line.slice(caretOffset)}`
+    : line
+
+  return box({ flexDirection: 'column', padding: 24, gap: 14, width: w, minHeight: 380 }, [
+    text({ text: 'Text Input (foundation)', font: 'bold 18px Inter', lineHeight: 24, color: '#ffffff' }),
+    text({ text: 'Keyboard editing on Canvas: type, arrows, backspace/delete, enter, Cmd/Ctrl+A.', font: '14px Inter', lineHeight: 22, color: '#e2e8f0' }),
+    box({
+      backgroundColor: active ? '#111827' : SURFACE,
+      borderColor: active ? ACCENT2 : BORDER,
+      borderWidth: 1,
+      borderRadius: 10,
+      padding: 14,
+      minHeight: 100,
+      cursor: 'text',
+      onClick: () => {
+        const endNode = state.nodes.length - 1
+        const endOffset = state.nodes[endNode]?.length ?? 0
+        inputFocused.set(true)
+        inputState.set({
+          nodes: state.nodes,
+          selection: { anchorNode: endNode, anchorOffset: endOffset, focusNode: endNode, focusOffset: endOffset },
+        })
+      },
+      onKeyDown: handleInputKeyDown,
+    }, [
+      text({
+        text: display.length > 0 ? display : (active ? '|' : 'Click to focus and type...'),
+        font: '14px JetBrains Mono',
+        lineHeight: 20,
+        color: display.length > 0 ? '#d1d5db' : DIM,
+        whiteSpace: 'pre-wrap',
+      }),
+    ]),
+    box({ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }, [
+      box({ backgroundColor: '#0f3460', borderRadius: 10, padding: 14, flexGrow: 1, flexDirection: 'column', gap: 4 }, [
+        text({ text: 'Current nodes', font: 'bold 13px Inter', lineHeight: 18, color: '#60a5fa' }),
+        text({ text: JSON.stringify(state.nodes), font: '12px JetBrains Mono', lineHeight: 17, color: '#93c5fd' }),
+      ]),
+      box({ backgroundColor: '#1e3a2f', borderRadius: 10, padding: 14, flexGrow: 1, flexDirection: 'column', gap: 4 }, [
+        text({ text: 'Selection', font: 'bold 13px Inter', lineHeight: 18, color: '#4ade80' }),
+        text({ text: JSON.stringify(state.selection), font: '12px JetBrains Mono', lineHeight: 17, color: '#86efac' }),
+      ]),
+    ]),
+  ])
+}
+
 function seoDemo(): UIElement {
   const w = rootWidth.value
   return box({ flexDirection: 'column', padding: 24, gap: 16, width: w, minHeight: 380, semantic: { tag: 'main' } }, [
@@ -224,7 +343,15 @@ function seoDemo(): UIElement {
   ])
 }
 
-const SCENARIOS: Record<string, () => UIElement> = { cards: cardGrid, chat: chatMessages, dashboard, nested: nestedLayout, selection: selectableText, seo: seoDemo }
+const SCENARIOS: Record<string, () => UIElement> = {
+  cards: cardGrid,
+  chat: chatMessages,
+  dashboard,
+  nested: nestedLayout,
+  selection: selectableText,
+  input: textInputDemo,
+  seo: seoDemo,
+}
 
 // ─── Code Examples ───────────────────────────────────────────────────────────
 const CODE: Record<string, string> = {
@@ -416,7 +543,7 @@ function demoSection(): UIElement {
   const names = [
     { key: 'cards', label: 'Cards' }, { key: 'chat', label: 'Chat' },
     { key: 'dashboard', label: 'Dashboard' }, { key: 'nested', label: 'Nested' },
-    { key: 'selection', label: 'Selection' }, { key: 'seo', label: 'SEO' },
+    { key: 'selection', label: 'Selection' }, { key: 'input', label: 'Input' }, { key: 'seo', label: 'SEO' },
   ]
   const scenarioFn = SCENARIOS[scenario.value] ?? cardGrid
 
@@ -434,7 +561,11 @@ function demoSection(): UIElement {
       padding: 12,
     }, [
       text({ text: 'Scenario', font: '600 12px Inter', lineHeight: 18, color: DIM }),
-      ...names.map(s => btn(s.label, scenario.value === s.key, () => { scenario.set(s.key); renderer.selection = null })),
+      ...names.map(s => btn(s.label, scenario.value === s.key, () => {
+        scenario.set(s.key)
+        renderer.selection = null
+        if (s.key !== 'input') inputFocused.set(false)
+      })),
       box({ width: 12, height: 1 }, []),
       text({ text: 'Width', font: '600 12px Inter', lineHeight: 18, color: DIM }),
       btn('\u2212', false, () => rootWidth.set(Math.max(300, rootWidth.peek() - 50))),
@@ -609,6 +740,7 @@ const renderer = new CanvasRenderer({
 let app: App | null = null
 let cleanupSelection: (() => void) | null = null
 let cleanupKeydown: (() => void) | null = null
+let cleanupA11yMirror: (() => void) | null = null
 
 function onDocumentKeyDown(e: KeyboardEvent) {
   if (!app) return
@@ -620,13 +752,14 @@ function onDocumentKeyDown(e: KeyboardEvent) {
     metaKey: e.metaKey,
     altKey: e.altKey,
   })
-  if (handled && e.key === 'Tab') {
+  if (handled && (e.key === 'Tab' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Enter')) {
     e.preventDefault()
   }
 }
 
 async function mount() {
   if (cleanupSelection) { cleanupSelection(); cleanupSelection = null }
+  if (cleanupA11yMirror) { cleanupA11yMirror(); cleanupA11yMirror = null }
   if (cleanupKeydown) {
     document.removeEventListener('keydown', cleanupKeydown)
     cleanupKeydown = null
@@ -643,6 +776,10 @@ async function mount() {
   lastPerfTime = '<1ms'
 
   cleanupSelection = enableSelection(canvas, renderer, () => { if (app) app.update() })
+  cleanupA11yMirror = enableAccessibilityMirror(document.body, renderer, {
+    rootLabel: 'Geometra canvas accessibility mirror',
+  })
+  app.update()
 }
 
 // ─── Resize ──────────────────────────────────────────────────────────────────

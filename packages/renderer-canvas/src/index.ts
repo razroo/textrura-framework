@@ -1,2 +1,2 @@
-export { CanvasRenderer, enableSelection } from './renderer.js'
-export type { CanvasRendererOptions } from './renderer.js'
+export { CanvasRenderer, enableSelection, enableAccessibilityMirror } from './renderer.js'
+export type { CanvasRendererOptions, AccessibilityMirrorOptions } from './renderer.js'
