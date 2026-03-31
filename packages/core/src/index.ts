@@ -42,6 +42,18 @@ export type { SemanticHTMLOptions } from './seo.js'
 export { toAccessibilityTree } from './a11y.js'
 export type { AccessibilityNode, AccessibilityBounds } from './a11y.js'
 
+// Text input foundation
+export {
+  isCollapsedSelection,
+  getInputSelectionText,
+  replaceInputSelection,
+  insertInputText,
+  backspaceInput,
+  deleteInput,
+  moveInputCaret,
+} from './text-input.js'
+export type { TextInputState, TextInputEditResult } from './text-input.js'
+
 // Types
 export type {
   UIElement,

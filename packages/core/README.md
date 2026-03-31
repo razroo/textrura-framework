@@ -15,6 +15,7 @@ npm install @geometra/core
 - `createApp` -- application entry point
 - `toSemanticHTML` -- SEO-friendly HTML generation
 - `toAccessibilityTree` -- runtime accessibility tree from geometry
+- `insertInputText`, `backspaceInput`, `deleteInput` -- text-input editing primitives
 - `transition`, `spring` -- animation utilities
 
 ## Usage
