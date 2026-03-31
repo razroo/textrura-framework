@@ -45,11 +45,11 @@ Record:
 - [x] `npm run test`
 - [x] `npm run build`
 - [x] `npm run demo:build`
-- [ ] CI quality and performance workflows are green on `main` (as of 2026-03-31: `Performance checks` pass; `Quality checks` previously failed, local lint errors are fixed and awaiting CI rerun)
+- [x] CI quality and performance workflows are green on `main` (verified on 2026-03-31: `Quality checks` run `23785233743` and `Performance checks` run `23785233710` both passed)
 
 If any gate fails, log the issue link here and block release until resolved:
 
-- Blocking issues: `CI rerun required` to confirm `Quality checks` is green after local lint fixes (`npm run lint` now passes with warnings only)
+- Blocking issues: `none from current local/CI verification`
 
 ## 4) Docs and migration readiness
 
