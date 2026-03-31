@@ -41,6 +41,10 @@ export interface TexturaClientOptions {
   forwardKeyboard?: boolean
   /** Keyboard event target. Default: canvas, else document. */
   keyboardTarget?: HTMLElement | Document
+  /** Forward resize events to server. Default: true when canvas provided. */
+  forwardResize?: boolean
+  /** Resize event target. Default: window. */
+  resizeTarget?: Window
   /** Called on WebSocket or message parsing errors. */
   onError?: (error: unknown) => void
   /** Enable automatic reconnection on disconnect. Default: true. */
@@ -105,6 +109,14 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
 
     ws.addEventListener('open', () => {
       retryCount = 0
+      if (canvas && (options.forwardResize ?? true)) {
+        ws.send(JSON.stringify({
+          type: 'resize',
+          width: Math.max(1, Math.round(canvas.clientWidth || canvas.width)),
+          height: Math.max(1, Math.round(canvas.clientHeight || canvas.height)),
+          protocolVersion: PROTOCOL_VERSION,
+        }))
+      }
     })
 
     ws.addEventListener('message', (event) => {
@@ -169,6 +181,16 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
     }))
   }
 
+  const sendResize = () => {
+    if (!canvas || ws.readyState !== WebSocket.OPEN) return
+    ws.send(JSON.stringify({
+      type: 'resize',
+      width: Math.max(1, Math.round(canvas.clientWidth || canvas.width)),
+      height: Math.max(1, Math.round(canvas.clientHeight || canvas.height)),
+      protocolVersion: PROTOCOL_VERSION,
+    }))
+  }
+
   if (canvas) {
     const onClick = (e: MouseEvent) => sendEvent('onClick', e)
     const onPointerDown = (e: MouseEvent) => sendEvent('onPointerDown', e)
@@ -202,6 +224,14 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
       [target, 'keydown', onKeyDown as EventListener],
       [target, 'keyup', onKeyUp as EventListener],
     )
+  }
+
+  const forwardResize = options.forwardResize ?? !!canvas
+  if (forwardResize && canvas) {
+    const target = options.resizeTarget ?? window
+    const onResize = () => sendResize()
+    target.addEventListener('resize', onResize as EventListener)
+    handlers.push([target, 'resize', onResize as EventListener])
   }
 
   function cleanup() {

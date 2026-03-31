@@ -38,8 +38,8 @@ export async function createServer(
   await init()
 
   const port = options.port ?? 3100
-  const width = options.width ?? 800
-  const height = options.height ?? 600
+  let width = options.width ?? 800
+  let height = options.height ?? 600
 
   const clients = new Set<WebSocket>()
   let prevLayout: ComputedLayout | null = null
@@ -138,6 +138,11 @@ export async function createServer(
             metaKey: msg.metaKey,
             altKey: msg.altKey,
           })
+          computeAndBroadcast()
+        } else if (msg.type === 'resize') {
+          width = Math.max(1, msg.width)
+          height = Math.max(1, msg.height)
+          prevLayout = null
           computeAndBroadcast()
         }
       } catch {
