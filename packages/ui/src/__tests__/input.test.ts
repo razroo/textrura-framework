@@ -375,4 +375,177 @@ describe('@geometra/ui input', () => {
     expect(seenOffset).toBeGreaterThanOrEqual(2)
     expect(seenOffset).toBeLessThanOrEqual(5)
   })
+
+  it('calls onSelectAll instead of onKeyDown when Cmd+A is pressed', () => {
+    let selectAllCalled = false
+    let keyDownCalled = false
+
+    const el = input('Hello', 'Name', {
+      focused: true,
+      onSelectAll: () => { selectAllCalled = true },
+      onKeyDown: () => { keyDownCalled = true },
+    })
+
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+
+    el.handlers?.onKeyDown?.({
+      key: 'a',
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: true,
+      altKey: false,
+      target: {} as KeyboardHitEvent['target'],
+    })
+
+    expect(selectAllCalled).toBe(true)
+    expect(keyDownCalled).toBe(false)
+  })
+
+  it('calls onSelectAll for Ctrl+A as well (Linux/Windows)', () => {
+    let selectAllCalled = false
+
+    const el = input('Hello', 'Name', {
+      focused: true,
+      onSelectAll: () => { selectAllCalled = true },
+    })
+
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+
+    el.handlers?.onKeyDown?.({
+      key: 'a',
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: true,
+      metaKey: false,
+      altKey: false,
+      target: {} as KeyboardHitEvent['target'],
+    })
+
+    expect(selectAllCalled).toBe(true)
+  })
+
+  it('falls through to onKeyDown for Cmd+A when onSelectAll is not provided', () => {
+    let keyDownKey = ''
+
+    const el = input('Hello', 'Name', {
+      focused: true,
+      onKeyDown: (e) => { keyDownKey = e.key },
+    })
+
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+
+    el.handlers?.onKeyDown?.({
+      key: 'a',
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: true,
+      altKey: false,
+      target: {} as KeyboardHitEvent['target'],
+    })
+
+    expect(keyDownKey).toBe('a')
+  })
+
+  it('renders selection highlight instead of caret when selection range is provided', () => {
+    const el = input('Hello World', '', {
+      focused: true,
+      caretOffset: 11,
+      selectionStart: 0,
+      selectionEnd: 11,
+    })
+
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+
+    const hasCaret = el.children.some(
+      (child) => child.kind === 'box' && child.props.backgroundColor === '#38bdf8' && child.props.width === 1.5,
+    )
+    expect(hasCaret).toBe(false)
+
+    const hasHighlight = el.children.some(
+      (child) => child.kind === 'box' && child.props.backgroundColor === 'rgba(56, 189, 248, 0.3)',
+    )
+    expect(hasHighlight).toBe(true)
+  })
+
+  it('renders partial selection with text segments on either side', () => {
+    const el = input('Hello World', '', {
+      focused: true,
+      caretOffset: 8,
+      selectionStart: 2,
+      selectionEnd: 8,
+    })
+
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+
+    // Before selection: "He"
+    const beforeText = el.children.find(
+      (child) => child.kind === 'text' && child.props.text === 'He',
+    )
+    expect(beforeText).toBeDefined()
+
+    // Selection highlight containing "llo\u00A0Wo" (spaces → NBSP)
+    const highlight = el.children.find(
+      (child) => child.kind === 'box' && child.props.backgroundColor === 'rgba(56, 189, 248, 0.3)',
+    )
+    expect(highlight).toBeDefined()
+    if (highlight && highlight.kind === 'box') {
+      const inner = highlight.children[0]
+      expect(inner?.kind).toBe('text')
+      if (inner?.kind === 'text') {
+        expect(inner.props.text).toBe('llo\u00A0Wo')
+      }
+    }
+
+    // After selection: "rld"
+    const afterText = el.children.find(
+      (child) => child.kind === 'text' && child.props.text === 'rld',
+    )
+    expect(afterText).toBeDefined()
+  })
+
+  it('shows caret (not selection) when selectionStart equals selectionEnd', () => {
+    const el = input('Hello', '', {
+      focused: true,
+      caretOffset: 3,
+      selectionStart: 3,
+      selectionEnd: 3,
+    })
+
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+
+    const hasCaret = el.children.some(
+      (child) => child.kind === 'box' && child.props.backgroundColor === '#38bdf8' && child.props.width === 1.5,
+    )
+    expect(hasCaret).toBe(true)
+
+    const hasHighlight = el.children.some(
+      (child) => child.kind === 'box' && child.props.backgroundColor === 'rgba(56, 189, 248, 0.3)',
+    )
+    expect(hasHighlight).toBe(false)
+  })
+
+  it('does not render selection highlight when not focused', () => {
+    const el = input('Hello World', '', {
+      focused: false,
+      caretOffset: 11,
+      selectionStart: 0,
+      selectionEnd: 11,
+    })
+
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+
+    const hasHighlight = el.children.some(
+      (child) => child.kind === 'box' && child.props.backgroundColor === 'rgba(56, 189, 248, 0.3)',
+    )
+    expect(hasHighlight).toBe(false)
+  })
 })

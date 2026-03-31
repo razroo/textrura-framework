@@ -47,7 +47,7 @@ const rootWidth = signal(600)
 const direction = signal<'row' | 'column'>('row')
 const codeTab = signal('basic')
 const copied = signal(false)
-type DemoInputField = { value: string; caretOffset: number }
+type DemoInputField = { value: string; caretOffset: number; selectionStart?: number; selectionEnd?: number }
 const inputName = signal<DemoInputField>({ value: '', caretOffset: 0 })
 const inputEmail = signal<DemoInputField>({ value: '', caretOffset: 0 })
 const inputSearch = signal<DemoInputField>({ value: '', caretOffset: 0 })
@@ -614,6 +614,28 @@ function textInputDemo(): UIElement {
     return current
   }
 
+  function applySelectionAwareKey(state: DemoInputField, e: { key: string; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean }): DemoInputField {
+    const hasSel = state.selectionStart !== undefined && state.selectionEnd !== undefined && state.selectionStart !== state.selectionEnd
+    if (hasSel) {
+      const ss = state.selectionStart!
+      const se = state.selectionEnd!
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        return { value: state.value.slice(0, ss) + state.value.slice(se), caretOffset: ss }
+      }
+      if (e.key === 'ArrowLeft' || e.key === 'Home') {
+        return { value: state.value, caretOffset: ss }
+      }
+      if (e.key === 'ArrowRight' || e.key === 'End') {
+        return { value: state.value, caretOffset: se }
+      }
+      if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        return { value: state.value.slice(0, ss) + e.key + state.value.slice(se), caretOffset: ss + 1 }
+      }
+      return state
+    }
+    return applyInputKey(state, e.key)
+  }
+
   function inputNode(
     field: 'name' | 'email' | 'search',
     state: DemoInputField,
@@ -623,21 +645,30 @@ function textInputDemo(): UIElement {
     return uiInput(state.value, placeholder, {
       focused: activeDemoInput.value === field,
       caretOffset: state.caretOffset,
+      selectionStart: state.selectionStart,
+      selectionEnd: state.selectionEnd,
       onClick: () => activeDemoInput.set(field),
       onCaretOffsetChange: (offset) => {
         setState({ value: state.value, caretOffset: offset })
       },
+      onSelectAll: () => {
+        if (state.value.length === 0) return
+        setState({ value: state.value, caretOffset: state.value.length, selectionStart: 0, selectionEnd: state.value.length })
+      },
       onKeyDown: (e) => {
-        const next = applyInputKey(state, e.key)
+        const next = applySelectionAwareKey(state, e)
         if (next !== state) setState(next)
       },
       onCompositionEnd: (e) => {
         if (!e.data) return
-        const left = state.value.slice(0, state.caretOffset)
-        const right = state.value.slice(state.caretOffset)
+        const hasSel = state.selectionStart !== undefined && state.selectionEnd !== undefined && state.selectionStart !== state.selectionEnd
+        const insertAt = hasSel ? state.selectionStart! : state.caretOffset
+        const afterAt = hasSel ? state.selectionEnd! : state.caretOffset
+        const left = state.value.slice(0, insertAt)
+        const right = state.value.slice(afterAt)
         setState({
           value: left + e.data + right,
-          caretOffset: state.caretOffset + e.data.length,
+          caretOffset: insertAt + e.data.length,
         })
       },
     })
@@ -1852,12 +1883,34 @@ function archSection(): UIElement {
       uiInput(primitivesSearch.value.value, 'Search components\u2026', {
         focused: primitivesSearchFocused.value,
         caretOffset: primitivesSearch.value.caretOffset,
+        selectionStart: primitivesSearch.value.selectionStart,
+        selectionEnd: primitivesSearch.value.selectionEnd,
         onClick: () => primitivesSearchFocused.set(true),
         onCaretOffsetChange: (offset) => {
           primitivesSearch.set({ value: primitivesSearch.peek().value, caretOffset: offset })
         },
+        onSelectAll: () => {
+          const curr = primitivesSearch.peek()
+          if (curr.value.length === 0) return
+          primitivesSearch.set({ value: curr.value, caretOffset: curr.value.length, selectionStart: 0, selectionEnd: curr.value.length })
+        },
         onKeyDown: (e) => {
           const curr = primitivesSearch.peek()
+          const hasSel = curr.selectionStart !== undefined && curr.selectionEnd !== undefined && curr.selectionStart !== curr.selectionEnd
+          if (hasSel) {
+            const ss = curr.selectionStart!
+            const se = curr.selectionEnd!
+            if (e.key === 'Backspace' || e.key === 'Delete') {
+              primitivesSearch.set({ value: curr.value.slice(0, ss) + curr.value.slice(se), caretOffset: ss })
+            } else if (e.key === 'ArrowLeft') {
+              primitivesSearch.set({ value: curr.value, caretOffset: ss })
+            } else if (e.key === 'ArrowRight') {
+              primitivesSearch.set({ value: curr.value, caretOffset: se })
+            } else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+              primitivesSearch.set({ value: curr.value.slice(0, ss) + e.key + curr.value.slice(se), caretOffset: ss + 1 })
+            }
+            return
+          }
           if (e.key === 'Backspace') {
             if (curr.caretOffset <= 0) return
             const left = curr.value.slice(0, curr.caretOffset - 1)
@@ -1867,7 +1920,7 @@ function archSection(): UIElement {
             primitivesSearch.set({ value: curr.value, caretOffset: Math.max(0, curr.caretOffset - 1) })
           } else if (e.key === 'ArrowRight') {
             primitivesSearch.set({ value: curr.value, caretOffset: Math.min(curr.value.length, curr.caretOffset + 1) })
-          } else if (e.key.length === 1) {
+          } else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
             const left = curr.value.slice(0, curr.caretOffset)
             const right = curr.value.slice(curr.caretOffset)
             primitivesSearch.set({ value: left + e.key + right, caretOffset: curr.caretOffset + 1 })

@@ -49,7 +49,10 @@ export function button(label: string, onClick?: EventHandlers['onClick']): UIEle
 export interface InputOptions {
   focused?: boolean
   caretOffset?: number
+  selectionStart?: number
+  selectionEnd?: number
   onCaretOffsetChange?: (offset: number) => void
+  onSelectAll?: () => void
   onClick?: EventHandlers['onClick']
   onKeyDown?: EventHandlers['onKeyDown']
   onCompositionStart?: EventHandlers['onCompositionStart']
@@ -62,12 +65,13 @@ export function input(value: string, placeholder = '', options: InputOptions = {
   const maxOffset = value.length
   const requestedOffset = options.caretOffset ?? maxOffset
   const caretOffset = Math.max(0, Math.min(requestedOffset, maxOffset))
-  const leftText = value.slice(0, caretOffset)
-  const rightText = value.slice(caretOffset)
   const showPlaceholder = value.length === 0
 
-  const displayLeft = leftText.replace(/ /g, '\u00A0')
-  const displayRight = rightText.replace(/ /g, '\u00A0')
+  const rawSelStart = options.selectionStart ?? caretOffset
+  const rawSelEnd = options.selectionEnd ?? caretOffset
+  const selStart = Math.max(0, Math.min(Math.min(rawSelStart, rawSelEnd), maxOffset))
+  const selEnd = Math.max(0, Math.min(Math.max(rawSelStart, rawSelEnd), maxOffset))
+  const hasSelection = focused && selStart !== selEnd
 
   const children: UIElement[] = []
   if (showPlaceholder) {
@@ -75,7 +79,27 @@ export function input(value: string, placeholder = '', options: InputOptions = {
       children.push(box({ width: 1.5, minHeight: 14, backgroundColor: '#38bdf8' }, []))
     }
     children.push(text({ text: placeholder, font: '13px Inter', lineHeight: 18, color: '#64748b' }))
+  } else if (hasSelection) {
+    const beforeSel = value.slice(0, selStart).replace(/ /g, '\u00A0')
+    const selectedText = value.slice(selStart, selEnd).replace(/ /g, '\u00A0')
+    const afterSel = value.slice(selEnd).replace(/ /g, '\u00A0')
+    if (beforeSel.length > 0) {
+      children.push(text({ text: beforeSel, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }))
+    }
+    children.push(
+      box(
+        { backgroundColor: 'rgba(56, 189, 248, 0.3)', borderRadius: 2 },
+        [text({ text: selectedText, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' })],
+      ),
+    )
+    if (afterSel.length > 0) {
+      children.push(text({ text: afterSel, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }))
+    }
   } else {
+    const leftText = value.slice(0, caretOffset)
+    const rightText = value.slice(caretOffset)
+    const displayLeft = leftText.replace(/ /g, '\u00A0')
+    const displayRight = rightText.replace(/ /g, '\u00A0')
     if (displayLeft.length > 0) {
       children.push(text({ text: displayLeft, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }))
     }
@@ -100,6 +124,17 @@ export function input(value: string, placeholder = '', options: InputOptions = {
     options.onCaretOffsetChange(nextOffset)
   }
 
+  const wrappedKeyDown: EventHandlers['onKeyDown'] | undefined =
+    (options.onKeyDown || options.onSelectAll)
+      ? (e) => {
+          if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a' && options.onSelectAll) {
+            options.onSelectAll()
+            return
+          }
+          options.onKeyDown?.(e)
+        }
+      : undefined
+
   return box(
     {
       flexDirection: 'row',
@@ -116,7 +151,7 @@ export function input(value: string, placeholder = '', options: InputOptions = {
       backgroundColor: focused ? '#111827' : undefined,
       semantic: { tag: 'input' },
       onClick: handleClick,
-      onKeyDown: options.onKeyDown,
+      onKeyDown: wrappedKeyDown,
       onCompositionStart: options.onCompositionStart,
       onCompositionUpdate: options.onCompositionUpdate,
       onCompositionEnd: options.onCompositionEnd,

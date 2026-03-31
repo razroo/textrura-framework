@@ -1072,6 +1072,7 @@ export function enableSelection(
 
   function onKeyDown(e: KeyboardEvent) {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+      if (focusedElement.peek()) return
       if (renderer.textNodes.length > 0) {
         const first = renderer.textNodes[0]!
         const last = renderer.textNodes[renderer.textNodes.length - 1]!
