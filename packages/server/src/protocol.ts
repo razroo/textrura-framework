@@ -4,6 +4,20 @@ import type { UIElement } from '@geometra/core'
 /** Increment when the wire message shape changes in a non-backward-compatible way. */
 export const PROTOCOL_VERSION = 1
 
+/**
+ * Protocol compatibility rule:
+ * - undefined means legacy v1 and is accepted.
+ * - newer peer versions are rejected explicitly.
+ * - equal/older versions are accepted for backward compatibility.
+ */
+export function isProtocolCompatible(
+  peerVersion: number | undefined,
+  currentVersion = PROTOCOL_VERSION,
+): boolean {
+  if (peerVersion === undefined) return true
+  return peerVersion <= currentVersion
+}
+
 interface VersionedMessage {
   protocolVersion?: number
 }

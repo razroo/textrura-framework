@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { diffLayout } from '../protocol.js'
+import { diffLayout, isProtocolCompatible } from '../protocol.js'
 
 interface TestLayout {
   x: number
@@ -79,5 +79,12 @@ describe('diffLayout', () => {
     const same = cloneLayout(base)
     const patches = diffLayout(base as any, same as any)
     expect(patches).toEqual([])
+  })
+
+  it('treats undefined/older protocol versions as compatible and newer as incompatible', () => {
+    expect(isProtocolCompatible(undefined, 1)).toBe(true)
+    expect(isProtocolCompatible(1, 1)).toBe(true)
+    expect(isProtocolCompatible(0, 1)).toBe(true)
+    expect(isProtocolCompatible(2, 1)).toBe(false)
   })
 })

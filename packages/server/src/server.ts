@@ -4,7 +4,7 @@ import { init, computeLayout } from 'textura'
 import type { ComputedLayout } from 'textura'
 import { toLayoutTree, dispatchHit, dispatchKeyboardEvent, dispatchCompositionEvent } from '@geometra/core'
 import type { UIElement, EventHandlers } from '@geometra/core'
-import { diffLayout, PROTOCOL_VERSION } from './protocol.js'
+import { diffLayout, PROTOCOL_VERSION, isProtocolCompatible } from './protocol.js'
 import type { ServerMessage, ClientMessage } from './protocol.js'
 
 export interface TexturaServerOptions {
@@ -110,7 +110,7 @@ export async function createServer(
     ws.on('message', (raw) => {
       try {
         const msg = JSON.parse(String(raw)) as ClientMessage
-        if (msg.protocolVersion && msg.protocolVersion > PROTOCOL_VERSION) {
+        if (!isProtocolCompatible(msg.protocolVersion, PROTOCOL_VERSION)) {
           const errorMsg: ServerMessage = {
             type: 'error',
             message: `Client protocol ${msg.protocolVersion} is newer than server protocol ${PROTOCOL_VERSION}`,

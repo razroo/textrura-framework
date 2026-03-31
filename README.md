@@ -265,6 +265,8 @@ Compatibility notes:
 - If one side receives a **newer** protocol version than it supports, it returns/raises an error instead of silently misbehaving.
 - Server layout dimensions can be updated live via `resize`, allowing true server-computed responsive layouts.
 
+See `PROTOCOL_COMPATIBILITY.md` for the explicit compatibility policy and change process.
+
 ## Running the Demos
 
 ```bash
