@@ -35,6 +35,10 @@ Round or strip volatile fields if WASM/layout micro-differences appear across pl
 - **Font stack** — `visual-regression.test.ts` records `ctx.font` at each `fillText` for mixed-family trees.
 - **Draw ops** — the same file snapshots the fake 2D **operation sequence** for selection, focus ring, gradients, and clipping.
 
+## CI
+
+- **`npm run test:geometry`** — runs `packages/core/src/__tests__/geometry-snapshot-ci.test.ts` (rounded `ComputedLayout` snapshot). Included in **`npm run release:gate`** so CI quality workflows exercise it.
+
 ## Related
 
 - `PERF_BASELINES.md` — wall-time smoke thresholds.

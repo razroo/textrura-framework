@@ -143,10 +143,21 @@ export interface CompositionHitEvent {
 /** A component function receives props and returns a UIElement tree. */
 export type Component<P = Record<string, never>> = (props: P) => UIElement
 
+/** Optional per-frame timings supplied by the host (e.g. `createApp` after Yoga). */
+export interface FrameTimings {
+  /** Wall time for `computeLayout` (or equivalent) in milliseconds. */
+  layoutMs: number
+}
+
 /** Interface that all render backends implement. */
 export interface Renderer {
   /** Render a computed layout frame. */
   render(layout: ComputedLayout, tree: UIElement): void
   /** Clean up renderer resources. */
   destroy(): void
+  /**
+   * When present, called by `createApp` after layout and before `render`
+   * so backends (e.g. canvas inspector) can show layout vs paint split.
+   */
+  setFrameTimings?(timings: FrameTimings): void
 }

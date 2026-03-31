@@ -1,6 +1,7 @@
 import type { ComputedLayout } from 'textura'
 import type {
   App,
+  FrameTimings,
   Renderer,
   UIElement,
   BoxElement,
@@ -228,6 +229,9 @@ export class CanvasRenderer implements Renderer {
   /** Wall time (ms) for the last completed `render()` call, including paint and overlays. */
   lastRenderWallMs = 0
 
+  /** Last `computeLayout` wall time (ms) reported by `createApp` via `setFrameTimings`. */
+  lastLayoutWallMs = 0
+
   private textNodeIndex = 0
 
   constructor(options: CanvasRendererOptions) {
@@ -261,6 +265,10 @@ export class CanvasRenderer implements Renderer {
     const ctx = this.canvas.getContext('2d')
     if (!ctx) throw new Error('Could not get 2d context')
     this.ctx = ctx
+  }
+
+  setFrameTimings(timings: FrameTimings): void {
+    this.lastLayoutWallMs = timings.layoutMs
   }
 
   render(layout: ComputedLayout, tree: UIElement): void {
@@ -938,6 +946,7 @@ export class CanvasRenderer implements Renderer {
     }
     const lines = [
       `frame ${this.renderFrame}`,
+      `layout ${this.lastLayoutWallMs.toFixed(2)}ms`,
       `render ${renderMsBeforeHud.toFixed(2)}ms`,
       `nodes ${nodes}  depth ${depth}`,
       `root ${Math.round(layout.width)}×${Math.round(layout.height)}`,

@@ -1,0 +1,11 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`geometry snapshot CI > stable box-only layout (rounded) 1`] = `
+{
+  "children": [],
+  "height": 64,
+  "width": 120,
+  "x": 0,
+  "y": 0,
+}
+`;

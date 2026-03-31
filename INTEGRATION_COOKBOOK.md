@@ -7,7 +7,7 @@ Short recipes for common stacks. All paths assume a Geometra workspace install.
 1. Build layout with `@geometra/core` (`box`, `text`, signals) and optional `@geometra/ui` primitives.
 2. Run Yoga via `textura` (`computeLayout`) or use `createApp` from core for local loop.
 3. Paint with `CanvasRenderer` from `@geometra/renderer-canvas`.
-4. **Inspector**: `new CanvasRenderer({ canvas, layoutInspector: true })`. Optionally set `renderer.inspectorProbe = { x, y }` in layout coordinates on pointer move to show `hitPathAtPoint` in the HUD. `renderer.renderFrame` increments each paint.
+4. **Inspector**: `new CanvasRenderer({ canvas, layoutInspector: true })`. With **`createApp`**, the HUD shows **`layout`** ms (Yoga) and **`render`** ms (canvas). Optionally set `renderer.inspectorProbe = { x, y }` on pointer move for `hitPathAtPoint`. Custom hosts can implement **`Renderer.setFrameTimings`** themselves before calling `render`.
 
 ## Thin client + server
 

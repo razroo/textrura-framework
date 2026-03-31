@@ -69,10 +69,14 @@ export async function createApp(
       try {
         app.tree = view()
         const layoutTree = toLayoutTree(app.tree)
+        const layoutStart = typeof performance !== 'undefined' ? performance.now() : 0
         app.layout = computeLayout(layoutTree, {
           width: options.width,
           height: options.height,
         })
+        const layoutMs =
+          typeof performance !== 'undefined' ? performance.now() - layoutStart : 0
+        renderer.setFrameTimings?.({ layoutMs })
         renderer.render(app.layout, app.tree)
       } catch (err) {
         if (options.onError) {

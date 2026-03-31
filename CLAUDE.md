@@ -11,7 +11,7 @@ See **`GEOMETRY_SNAPSHOT_TESTING.md`** for layout JSON / geometry regression pat
 
 ## Architecture
 
-- **`packages/core`** — Signals reactivity, `box()`/`text()` element constructors, hit-testing, text selection, SEO, `createApp()`, optional `waitForFonts`, font helpers
+- **`packages/core`** — Signals reactivity, `box()`/`text()` element constructors, hit-testing, text selection, SEO, `createApp()` (optional `Renderer.setFrameTimings` for layout ms), `waitForFonts`, font helpers
 - **`packages/renderer-canvas`** — Canvas2D paint backend with text selection highlight rendering, optional layout debug overlay and focus ring
 - **`packages/renderer-terminal`** — ANSI terminal renderer
 - **`packages/server`** — WebSocket server, layout computation, geometry diffing

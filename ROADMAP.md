@@ -163,6 +163,22 @@ Definition of done:
 - [x] Inspector remains zero overhead when `layoutInspector` is disabled.
 - [x] Developer entry docs link geometry snapshot guidance. (`CLAUDE.md`, `INTEGRATION_COOKBOOK.md`)
 
+### 1.8.0 — Layout vs paint observability and geometry CI
+
+Goal: split **Yoga/layout** wall time from **canvas paint** in the inspector, and lock a minimal geometry snapshot into the release gate.
+
+**Status: `done`**
+
+Acceptance criteria:
+
+- [x] Status: `done` | Owner: `@codex` | Optional `Renderer.setFrameTimings({ layoutMs })` called from `createApp` after `computeLayout`; `CanvasRenderer` stores `lastLayoutWallMs` and shows **layout** ms in the inspector HUD.
+- [x] Status: `done` | Owner: `@codex` | Dedicated geometry snapshot test + `npm run test:geometry`; wired into `release:gate`. (`geometry-snapshot-ci.test.ts`, `__snapshots__/`)
+
+Definition of done:
+
+- [x] Backends without `setFrameTimings` unchanged (method optional on `Renderer`).
+- [x] Docs updated (`GEOMETRY_SNAPSHOT_TESTING.md`, canvas README, `RELEASE_NOTES_1_8.md`).
+
 ## Release polish checklist
 
 Tracking fields:

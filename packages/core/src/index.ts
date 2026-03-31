@@ -104,5 +104,6 @@ export type {
   KeyboardHitEvent,
   CompositionHitEvent,
   Component,
+  FrameTimings,
   Renderer,
 } from './types.js'
