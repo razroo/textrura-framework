@@ -21,7 +21,9 @@ describe('collectTextNodes', () => {
     collectTextNodes(el, layout, 0, 0, results)
     expect(results).toHaveLength(2)
     expect(results[0].element.props.text).toBe('Hello')
+    expect(results[0].direction).toBe('ltr')
     expect(results[1].element.props.text).toBe('World')
+    expect(results[1].direction).toBe('ltr')
   })
 
   it('skips selectable:false', () => {
@@ -41,13 +43,44 @@ describe('collectTextNodes', () => {
     collectTextNodes(el, layout, 0, 0, results)
     expect(results).toHaveLength(1)
     expect(results[0].element.props.text).toBe('Selectable')
+    expect(results[0].direction).toBe('ltr')
+  })
+
+  it('inherits resolved direction through nested boxes', () => {
+    const el = box({ width: 220, height: 80, dir: 'rtl' }, [
+      box({ width: 200, height: 40 }, [
+        text({ text: 'RTL child', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
+      ]),
+      box({ width: 200, height: 40, dir: 'ltr' }, [
+        text({ text: 'LTR override', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
+      ]),
+    ])
+    const layout = {
+      x: 0, y: 0, width: 220, height: 80,
+      children: [
+        {
+          x: 0, y: 0, width: 200, height: 40,
+          children: [{ x: 0, y: 0, width: 100, height: 18, children: [] }],
+        },
+        {
+          x: 0, y: 40, width: 200, height: 40,
+          children: [{ x: 0, y: 0, width: 100, height: 18, children: [] }],
+        },
+      ],
+    }
+
+    const results: any[] = []
+    collectTextNodes(el, layout as any, 0, 0, results)
+    expect(results).toHaveLength(2)
+    expect(results[0].direction).toBe('rtl')
+    expect(results[1].direction).toBe('ltr')
   })
 })
 
 describe('getSelectedText', () => {
   const makeNodes = () => [
-    { element: { kind: 'text' as const, props: { text: 'Hello World', font: '14px sans-serif', lineHeight: 18 } }, x: 0, y: 0, width: 100, height: 18, lines: [], index: 0 },
-    { element: { kind: 'text' as const, props: { text: 'Second line', font: '14px sans-serif', lineHeight: 18 } }, x: 0, y: 18, width: 100, height: 18, lines: [], index: 1 },
+    { element: { kind: 'text' as const, props: { text: 'Hello World', font: '14px sans-serif', lineHeight: 18 } }, direction: 'ltr' as const, x: 0, y: 0, width: 100, height: 18, lines: [], index: 0 },
+    { element: { kind: 'text' as const, props: { text: 'Second line', font: '14px sans-serif', lineHeight: 18 } }, direction: 'ltr' as const, x: 0, y: 18, width: 100, height: 18, lines: [], index: 1 },
   ]
 
   it('extracts from single node', () => {

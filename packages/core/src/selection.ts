@@ -1,9 +1,12 @@
 import type { ComputedLayout } from 'textura'
 import type { UIElement, TextElement } from './types.js'
+import { resolveElementDirection, type ResolvedDirection } from './direction.js'
 
 /** Info about a rendered text node's position and content. */
 export interface TextNodeInfo {
   element: TextElement
+  /** Resolved runtime direction for this node. */
+  direction: ResolvedDirection
   /** Absolute x position. */
   x: number
   /** Absolute y position. */
@@ -45,14 +48,17 @@ export function collectTextNodes(
   offsetX: number,
   offsetY: number,
   results: TextNodeInfo[],
+  parentDirection: ResolvedDirection = 'ltr',
 ): void {
   const x = offsetX + layout.x
   const y = offsetY + layout.y
+  const direction = resolveElementDirection(element, parentDirection)
 
   if (element.kind === 'text') {
     if (element.props.selectable !== false) {
       results.push({
         element,
+        direction,
         x,
         y,
         width: layout.width,
@@ -69,7 +75,7 @@ export function collectTextNodes(
   for (let i = 0; i < element.children.length; i++) {
     const childLayout = layout.children[i]
     if (childLayout) {
-      collectTextNodes(element.children[i]!, childLayout, x, y, results)
+      collectTextNodes(element.children[i]!, childLayout, x, y, results, direction)
     }
   }
 }
