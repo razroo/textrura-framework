@@ -31,6 +31,7 @@
     "vitest": "^4.1.2"
   },
   "optionalDependencies": {
-    "@rolldown/binding-linux-x64-gnu": "1.0.0-rc.12"
+    "@rolldown/binding-linux-x64-gnu": "1.0.0-rc.12",
+    "@napi-rs/canvas-linux-x64-gnu": "^0.1.97"
   }
 }

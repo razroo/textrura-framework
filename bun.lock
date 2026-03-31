@@ -15,6 +15,7 @@
         "vitest": "^4.1.2",
       },
       "optionalDependencies": {
+        "@napi-rs/canvas-linux-x64-gnu": "^0.1.97",
         "@rolldown/binding-linux-x64-gnu": "1.0.0-rc.12",
       },
     },
@@ -189,6 +190,8 @@
     "@napi-rs/canvas": ["@napi-rs/canvas@0.1.97", "", { "optionalDependencies": { "@napi-rs/canvas-darwin-x64": "0.1.97" } }, ""],
 
     "@napi-rs/canvas-darwin-x64": ["@napi-rs/canvas-darwin-x64@0.1.97", "", { "os": "darwin", "cpu": "x64" }, ""],
+
+    "@napi-rs/canvas-linux-x64-gnu": ["@napi-rs/canvas-linux-x64-gnu@0.1.97", "", { "os": "linux", "cpu": "x64" }, "sha512-iDUBe7AilfuBSRbSa8/IGX38Mf+iCSBqoVKLSQ5XaY2JLOaqz1TVyPFEyIck7wT6mRQhQt5sN6ogfjIDfi74tg=="],
 
     "@oxc-project/types": ["@oxc-project/types@0.122.0", "", {}, ""],
 
@@ -445,12 +448,6 @@
     "@eslint-community/eslint-utils/eslint-visitor-keys": ["eslint-visitor-keys@3.4.3", "", {}, "sha512-wpc+LXeiyiisxPlEkUzU6svyS1frIO3Mgxj1fdy7Pm8Ygzguax2N3Fa/D/ag1WqbOprdI+uY6wMUl8/a2G+iag=="],
 
     "@geometra/client/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.1" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
-    "@geometra/demo-text-input-canvas/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.1" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
-    "@geometra/demo-virtualized-canvas/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.1" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
-    "@geometra/renderer-canvas/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.1" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
 
     "@geometra/renderer-terminal/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.1" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
 
