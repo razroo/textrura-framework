@@ -146,6 +146,63 @@ function runAgent() {
   }
 }
 
+// ─── Auth Demo State ──────────────────────────────────────────────────────────
+type AuthRole = 'admin' | 'viewer' | 'invalid'
+const authRole = signal<AuthRole>('admin')
+const authConnected = signal(false)
+const authRejected = signal(false)
+const authClicks = signal(0)
+const authLog = signal<AgentLogEntry[]>([])
+
+function resetAuthDemo() {
+  authRole.set('admin')
+  authConnected.set(false)
+  authRejected.set(false)
+  authClicks.set(0)
+  authLog.set([])
+}
+
+function connectAuthRole(role: AuthRole) {
+  authRole.set(role)
+  authClicks.set(0)
+  authLog.set([])
+  authRejected.set(false)
+  authConnected.set(false)
+
+  if (role === 'invalid') {
+    authRejected.set(true)
+    authLog.set([
+      { dir: '→', msg: 'connect ?token=this-token-does-not-exist', color: ACCENT4 },
+      { dir: '←', msg: 'close code=4001 Authentication failed', color: ACCENT },
+    ])
+    return
+  }
+
+  authConnected.set(true)
+  authLog.set([
+    { dir: '→', msg: `connect ?token=${role}-token-demo`, color: ACCENT2 },
+    { dir: '←', msg: `onConnection accepted { role: "${role}" }`, color: ACCENT3 },
+  ])
+}
+
+function attemptAuthAction() {
+  if (!authConnected.value) return
+  if (authRole.value === 'viewer') {
+    authLog.set([
+      ...authLog.peek(),
+      { dir: '→', msg: 'event { type:"onClick", x:120, y:210 }', color: ACCENT2 },
+      { dir: '←', msg: 'error { code:4003, message:"Forbidden" }', color: ACCENT },
+    ])
+    return
+  }
+  authClicks.set(authClicks.peek() + 1)
+  authLog.set([
+    ...authLog.peek(),
+    { dir: '→', msg: 'event { type:"onClick", x:120, y:210 }', color: ACCENT2 },
+    { dir: '←', msg: `patch { path:[3], count:${authClicks.peek()} }`, color: ACCENT3 },
+  ])
+}
+
 // ─── Page-Level Ambient Effects ───────────────────────────────────────────────
 const mouseX = signal(-9999)
 const mouseY = signal(-9999)
@@ -1071,6 +1128,110 @@ function agentDemo(): UIElement {
   ])
 }
 
+function authDemo(): UIElement {
+  const w = rootWidth.value
+  const role = authRole.value
+  const connected = authConnected.value
+  const rejected = authRejected.value
+  const clicks = authClicks.value
+  const logs = authLog.value
+
+  const roleChip = (label: string, value: AuthRole, color: string): UIElement =>
+    box({
+      backgroundColor: role === value ? `${color}22` : SURFACE,
+      borderColor: role === value ? color : BORDER,
+      borderWidth: 1,
+      borderRadius: 8,
+      paddingTop: 6, paddingBottom: 6, paddingLeft: 12, paddingRight: 12,
+      cursor: 'pointer',
+      onClick: () => connectAuthRole(value),
+    }, [text({
+      text: label,
+      font: role === value ? '600 12px Inter' : '12px Inter',
+      lineHeight: 16,
+      color: role === value ? color : MUTED,
+    })])
+
+  return box({ flexDirection: 'column', padding: 20, gap: 12, width: w, minHeight: 380 }, [
+    box({ flexDirection: 'column', gap: 4 }, [
+      text({ text: 'Auth Hooks Demo', font: 'bold 18px Inter', lineHeight: 24, color: TEXT_COLOR }),
+      text({
+        text: 'onConnection gates token, onMessage gates events by role, onDisconnect cleans up.',
+        font: '12px Inter', lineHeight: 16, color: DIM,
+      }),
+    ]),
+    box({ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }, [
+      roleChip('Admin Token', 'admin', ACCENT3),
+      roleChip('Viewer Token', 'viewer', ACCENT2),
+      roleChip('Invalid Token', 'invalid', ACCENT),
+      box({
+        backgroundColor: SURFACE,
+        borderColor: BORDER,
+        borderWidth: 1,
+        borderRadius: 8,
+        paddingTop: 6, paddingBottom: 6, paddingLeft: 12, paddingRight: 12,
+        cursor: 'pointer',
+        onClick: () => resetAuthDemo(),
+      }, [text({ text: 'Reset', font: '12px Inter', lineHeight: 16, color: MUTED })]),
+    ]),
+    box({
+      backgroundColor: SURFACE,
+      borderColor: BORDER,
+      borderWidth: 1,
+      borderRadius: 10,
+      padding: 14,
+      flexDirection: 'column',
+      gap: 8,
+    }, [
+      text({
+        text: rejected ? 'Connection refused (4001)' : connected ? `Connected as ${role}` : 'Choose a token above',
+        font: '600 13px Inter',
+        lineHeight: 18,
+        color: rejected ? ACCENT : connected ? ACCENT3 : DIM,
+      }),
+      box({
+        backgroundColor: connected && role === 'admin' ? 'rgba(34,197,94,0.15)' : 'rgba(233,69,96,0.15)',
+        borderColor: connected && role === 'admin' ? ACCENT3 : ACCENT,
+        borderWidth: 1,
+        borderRadius: 8,
+        paddingTop: 8, paddingBottom: 8, paddingLeft: 12, paddingRight: 12,
+        cursor: connected ? 'pointer' : 'default',
+        opacity: connected ? 1 : 0.5,
+        onClick: connected ? () => attemptAuthAction() : undefined,
+      }, [text({
+        text: 'Try Protected Action (increment counter)',
+        font: '600 12px Inter',
+        lineHeight: 16,
+        color: connected && role === 'admin' ? ACCENT3 : ACCENT,
+      })]),
+      text({
+        text: `Counter value: ${clicks}`,
+        font: 'bold 20px JetBrains Mono',
+        lineHeight: 24,
+        color: TEXT_COLOR,
+      }),
+    ]),
+    box({
+      backgroundColor: CODE_BG,
+      borderColor: BORDER,
+      borderWidth: 1,
+      borderRadius: 10,
+      padding: 10,
+      flexDirection: 'column',
+      gap: 2,
+      minHeight: 120,
+    }, [
+      text({ text: 'Protocol + Hook Log', font: 'bold 11px JetBrains Mono', lineHeight: 14, color: DIM }),
+      ...(logs.length === 0 ? [
+        text({ text: 'No events yet. Select a token.', font: '11px JetBrains Mono', lineHeight: 16, color: BORDER }),
+      ] : logs.map(entry => box({ flexDirection: 'row', gap: 6 }, [
+        text({ text: entry.dir, font: '11px JetBrains Mono', lineHeight: 15, color: entry.color }),
+        text({ text: entry.msg, font: '11px JetBrains Mono', lineHeight: 15, color: entry.color }),
+      ]))),
+    ]),
+  ])
+}
+
 const SCENARIOS: Record<string, () => UIElement> = {
   cards: cardGrid,
   chat: chatMessages,
@@ -1082,6 +1243,7 @@ const SCENARIOS: Record<string, () => UIElement> = {
   design: designShowcase,
   seo: seoDemo,
   agent: agentDemo,
+  auth: authDemo,
 }
 
 // ─── Code Examples ───────────────────────────────────────────────────────────
@@ -1208,6 +1370,28 @@ ws.on('message', (raw) => {
 })
 
 // 10 ops in 4.7ms. No browser launched.`,
+
+  auth: `import { createServer } from '@geometra/server'
+
+const TOKENS = {
+  'admin-token-demo': { role: 'admin' },
+  'viewer-token-demo': { role: 'viewer' },
+}
+
+await createServer(view, {
+  onConnection: (request) => {
+    const token = new URL(request.url ?? '/', 'http://localhost')
+      .searchParams.get('token')
+    return token && TOKENS[token] ? TOKENS[token] : null // null => close 4001
+  },
+  onMessage: (msg, ctx) => {
+    if (ctx.role === 'viewer' && msg.type !== 'resize') return false // 4003
+    return true
+  },
+  onDisconnect: (ctx) => {
+    console.log('session closed for role:', ctx.role)
+  },
+})`,
 }
 
 // ─── Page Sections ───────────────────────────────────────────────────────────
@@ -1350,7 +1534,7 @@ function demoSection(): UIElement {
     { key: 'dashboard', label: 'Dashboard' }, { key: 'nested', label: 'Nested' },
     { key: 'selection', label: 'Selection' }, { key: 'input', label: 'Input' },
     { key: 'animation', label: 'Animation' }, { key: 'design', label: 'Design' },
-    { key: 'seo', label: 'SEO' }, { key: 'agent', label: 'AI Agent' },
+    { key: 'seo', label: 'SEO' }, { key: 'agent', label: 'AI Agent' }, { key: 'auth', label: 'Auth' },
   ]
   const scenarioFn = SCENARIOS[scenario.value] ?? cardGrid
 
@@ -1371,6 +1555,7 @@ function demoSection(): UIElement {
       ...names.map(s => btn(s.label, scenario.value === s.key, () => {
         if (scenario.peek() === 'animation' && s.key !== 'animation') stopAnimLoop()
         if (scenario.peek() === 'agent' && s.key !== 'agent') resetAgent()
+        if (scenario.peek() === 'auth' && s.key !== 'auth') resetAuthDemo()
         scenario.set(s.key)
         renderer.selection = null
         if (s.key !== 'input') activeDemoInput.set(null)
@@ -1600,8 +1785,8 @@ function archSection(): UIElement {
 }
 
 function codeSection(): UIElement {
-  const tabs = ['basic', 'reactive', 'server', 'selection', 'seo', 'agent']
-  const labels: Record<string, string> = { basic: 'Basic', reactive: 'Reactive', server: 'Server', selection: 'Selection', seo: 'SEO', agent: 'AI Agent' }
+  const tabs = ['basic', 'reactive', 'server', 'selection', 'seo', 'agent', 'auth']
+  const labels: Record<string, string> = { basic: 'Basic', reactive: 'Reactive', server: 'Server', selection: 'Selection', seo: 'SEO', agent: 'AI Agent', auth: 'Auth' }
   return section([
     ...heading('One protocol, every target', 'The same element tree powers Canvas, Terminal, and AI agents.'),
     // Tabs + code in a single card
