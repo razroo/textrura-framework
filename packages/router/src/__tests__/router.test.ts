@@ -234,4 +234,48 @@ describe('createRouter lifecycle', () => {
       q: 'new',
     })
   })
+
+  it('runs route actions for mutation workflows', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/users/1'] })
+    const writes: Array<{ id: string; value: string }> = []
+    const actionRoutes: RouteNode[] = [
+      {
+        id: 'root',
+        path: '/',
+        children: [
+          {
+            id: 'users',
+            path: 'users/:id',
+            action: ({ params, submission }) => {
+              writes.push({
+                id: params.id ?? '',
+                value: String((submission.data as { value?: string })?.value ?? ''),
+              })
+              return { ok: true, id: params.id ?? '' }
+            },
+          },
+        ],
+      },
+    ]
+    const router = createRouter({ routes: actionRoutes, history })
+    router.start()
+
+    const success = await router.submitAction('users', {
+      method: 'POST',
+      data: { value: 'updated' },
+    })
+
+    expect(success).toBe(true)
+    expect(writes).toEqual([{ id: '1', value: 'updated' }])
+    expect(router.getState().actionData.users).toEqual({ ok: true, id: '1' })
+  })
+
+  it('returns false when submitting action for unknown route', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/users/1'] })
+    const router = createRouter({ routes, history })
+    router.start()
+
+    const success = await router.submitAction('missing', { method: 'POST', data: { x: 1 } })
+    expect(success).toBe(false)
+  })
 })

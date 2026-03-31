@@ -1,6 +1,7 @@
 import { createMemoryHistory, type HistoryAdapter, type RouterLocation, type Unsubscribe } from './history.js'
 import { matchRouteTree, type RouteBranchMatch, type RouteNode } from './tree.js'
 import { parseQuery, type ParsedQuery } from './query.js'
+import type { RouteActionSubmission } from './tree.js'
 
 export type RouterNavigationState = 'idle' | 'navigating'
 export type NavigationOptions = {
@@ -14,6 +15,7 @@ export type RouterState<T = unknown, TRequestContext = unknown> = {
   matches: RouteBranchMatch<T, TRequestContext> | null
   navigation: RouterNavigationState
   loaderData: Record<string, unknown>
+  actionData: Record<string, unknown>
 }
 
 export type RouterSubscriber<T = unknown, TRequestContext = unknown> = (
@@ -40,6 +42,7 @@ export type RouterRestorationPolicy<T = unknown, TRequestContext = unknown> = {
 export interface Router<T = unknown, TRequestContext = unknown> {
   start(): void
   navigate(to: string, options?: NavigationOptions): Promise<boolean>
+  submitAction(routeId: string, submission?: RouteActionSubmission): Promise<boolean>
   subscribe(listener: RouterSubscriber<T, TRequestContext>): Unsubscribe
   dispose(): void
   getState(): RouterState<T, TRequestContext>
@@ -115,6 +118,7 @@ export function createRouter<T, TRequestContext = unknown>(
     matches: matchRouteTree(routes, history.location.pathname),
     navigation: 'idle',
     loaderData: {},
+    actionData: {},
   }
   let pendingTo: string | null = null
   let pendingNavigation:
@@ -130,6 +134,12 @@ export function createRouter<T, TRequestContext = unknown>(
 
   const emit = (): void => {
     for (const listener of listeners) listener(state)
+  }
+
+  const getRequestContext = async (): Promise<TRequestContext> => {
+    return typeof options.requestContext === 'function'
+      ? await (options.requestContext as () => TRequestContext | Promise<TRequestContext>)()
+      : (options.requestContext as TRequestContext)
   }
 
   const applyResolvedLocation = async (
@@ -148,6 +158,7 @@ export function createRouter<T, TRequestContext = unknown>(
       location: resolved.location,
       matches: resolved.matches,
       loaderData: resolved.loaderData,
+      actionData: state.actionData,
       navigation: 'idle',
     }
 
@@ -212,6 +223,36 @@ export function createRouter<T, TRequestContext = unknown>(
         history.push(to)
       }
       return completion
+    },
+    async submitAction(routeId: string, submission: RouteActionSubmission = {}) {
+      if (disposed) return false
+      const branch = state.matches
+      if (!branch) return false
+
+      const route = branch.matches.find((item) => item.id === routeId)
+      if (!route?.action) return false
+
+      const requestContext = await getRequestContext()
+      const query = parseQuery(state.location.search)
+      const result = await route.action({
+        params: branch.params,
+        query,
+        location: state.location,
+        requestContext,
+        route,
+        submission,
+      })
+
+      state = {
+        ...state,
+        actionData: {
+          ...state.actionData,
+          [routeId]: result,
+        },
+      }
+      emit()
+      await applyResolvedLocation(state.location, null)
+      return true
     },
     subscribe(listener: RouterSubscriber<T, TRequestContext>) {
       listeners.add(listener)

@@ -20,6 +20,8 @@ npm install @geometra/router
 - `createRouter` -- router lifecycle (`start`, `navigate`, `subscribe`, `dispose`)
 - route `loader` support -- params/query/requestContext-aware data loading for matched routes
 - `state.loaderData` -- per-route loader results keyed by route `id`
+- route `action` support -- write/mutation handlers with submission payloads
+- `router.submitAction(routeId, submission)` + `state.actionData` -- mutation workflow primitives
 - `router.isActive(to)` / `router.isPending(to)` -- route state helpers for active and transition states
 - `router.addBlocker(fn)` -- guards transitions for unsaved-state and confirmation flows
 - `restoration` policy + per-navigation options -- scroll/focus restoration control on transitions

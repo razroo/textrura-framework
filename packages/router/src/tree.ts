@@ -11,6 +11,20 @@ export type RouteLoaderContext<T = unknown, TRequestContext = unknown> = {
   route: RouteNode<T, TRequestContext>
 }
 
+export type RouteActionSubmission = {
+  method?: string
+  data?: unknown
+}
+
+export type RouteActionContext<T = unknown, TRequestContext = unknown> = {
+  params: Record<string, string>
+  query: ParsedQuery
+  location: RouterLocation
+  requestContext: TRequestContext
+  route: RouteNode<T, TRequestContext>
+  submission: RouteActionSubmission
+}
+
 export type RouteNode<T = unknown, TRequestContext = unknown> = {
   id?: string
   path?: string
@@ -22,6 +36,7 @@ export type RouteNode<T = unknown, TRequestContext = unknown> = {
     route: RouteNode<T, TRequestContext>
   }) => T
   loader?: (context: RouteLoaderContext<T, TRequestContext>) => unknown | Promise<unknown>
+  action?: (context: RouteActionContext<T, TRequestContext>) => unknown | Promise<unknown>
 }
 
 export type RouteBranchMatch<T = unknown, TRequestContext = unknown> = {

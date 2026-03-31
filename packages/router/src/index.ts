@@ -24,4 +24,4 @@ export type {
 } from './router.js'
 export { matchRouteTree, renderMatchedOutlet } from './tree.js'
 export type { RouteNode, RouteBranchMatch } from './tree.js'
-export type { RouteLoaderContext } from './tree.js'
+export type { RouteLoaderContext, RouteActionContext, RouteActionSubmission } from './tree.js'
