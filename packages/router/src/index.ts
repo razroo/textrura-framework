@@ -23,6 +23,8 @@ export type {
   NavigationBlocker,
   RouterRestorationPolicy,
   NavigationRestorationContext,
+  OptimisticMutation,
+  SubmitActionOptions,
 } from './router.js'
 export { matchRouteTree, renderMatchedOutlet } from './tree.js'
 export type { RouteNode, RouteBranchMatch } from './tree.js'

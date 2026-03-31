@@ -43,10 +43,27 @@ export type RouterRestorationPolicy<T = unknown, TRequestContext = unknown> = {
   restoreFocus?: (context: NavigationRestorationContext<T, TRequestContext>) => void
 }
 
+export type OptimisticMutation<T = unknown, TRequestContext = unknown> = {
+  apply: (state: RouterState<T, TRequestContext>) => RouterState<T, TRequestContext>
+  rollback?: (
+    state: RouterState<T, TRequestContext>,
+    error: unknown,
+    previousState: RouterState<T, TRequestContext>,
+  ) => RouterState<T, TRequestContext>
+}
+
+export type SubmitActionOptions<T = unknown, TRequestContext = unknown> = {
+  optimistic?: OptimisticMutation<T, TRequestContext>
+}
+
 export interface Router<T = unknown, TRequestContext = unknown> {
   start(): void
   navigate(to: string, options?: NavigationOptions): Promise<boolean>
-  submitAction(routeId: string, submission?: RouteActionSubmission): Promise<boolean>
+  submitAction(
+    routeId: string,
+    submission?: RouteActionSubmission,
+    options?: SubmitActionOptions<T, TRequestContext>,
+  ): Promise<boolean>
   revalidate(): Promise<boolean>
   subscribe(listener: RouterSubscriber<T, TRequestContext>): Unsubscribe
   dispose(): void
@@ -299,7 +316,11 @@ export function createRouter<T, TRequestContext = unknown>(
     async navigate(to: string, navigationOptions?: NavigationOptions) {
       return navigateInternal(to, navigationOptions)
     },
-    async submitAction(routeId: string, submission: RouteActionSubmission = {}) {
+    async submitAction(
+      routeId: string,
+      submission: RouteActionSubmission = {},
+      actionOptions?: SubmitActionOptions<T, TRequestContext>,
+    ) {
       if (disposed) return false
       const branch = state.matches
       if (!branch) return false
@@ -307,35 +328,51 @@ export function createRouter<T, TRequestContext = unknown>(
       const route = branch.matches.find((item) => item.id === routeId)
       if (!route?.action) return false
 
+      const optimisticBaseState = state
+      if (actionOptions?.optimistic) {
+        state = actionOptions.optimistic.apply(state)
+        emit()
+      }
       state = withNavigationState(state, 'submitting')
       emit()
-      const requestContext = await getRequestContext()
-      const query = parseQuery(state.location.search)
-      const controller = new AbortController()
-      const result = await route.action({
-        params: branch.params,
-        query,
-        location: state.location,
-        requestContext,
-        signal: controller.signal,
-        route,
-        submission,
-      })
+      try {
+        const requestContext = await getRequestContext()
+        const query = parseQuery(state.location.search)
+        const controller = new AbortController()
+        const result = await route.action({
+          params: branch.params,
+          query,
+          location: state.location,
+          requestContext,
+          signal: controller.signal,
+          route,
+          submission,
+        })
 
-      if (isRedirectResult(result)) {
-        return navigateInternal(result.to, { replace: result.replace })
-      }
+        if (isRedirectResult(result)) {
+          return navigateInternal(result.to, { replace: result.replace })
+        }
 
-      state = {
-        ...state,
-        actionData: {
-          ...state.actionData,
-          [routeId]: result,
-        },
+        state = {
+          ...state,
+          actionData: {
+            ...state.actionData,
+            [routeId]: result,
+          },
+        }
+        emit()
+        await applyResolvedLocation(state.location, null)
+        return true
+      } catch (error) {
+        if (actionOptions?.optimistic?.rollback) {
+          state = actionOptions.optimistic.rollback(state, error, optimisticBaseState)
+        } else if (actionOptions?.optimistic) {
+          state = optimisticBaseState
+        }
+        state = withNavigationState(state, 'idle')
+        emit()
+        return false
       }
-      emit()
-      await applyResolvedLocation(state.location, null)
-      return true
     },
     async revalidate() {
       if (disposed) return false

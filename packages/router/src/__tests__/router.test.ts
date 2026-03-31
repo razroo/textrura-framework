@@ -271,6 +271,61 @@ describe('createRouter lifecycle', () => {
     expect(router.getState().actionData.users).toEqual({ ok: true, id: '1' })
   })
 
+  it('supports optimistic action updates and rollback on failure', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/users/1'] })
+    const optimisticRoutes: RouteNode[] = [
+      {
+        id: 'root',
+        path: '/',
+        children: [
+          {
+            id: 'users',
+            path: 'users/:id',
+            action: ({ submission }) => {
+              if ((submission.data as { fail?: boolean })?.fail) {
+                throw new Error('mutation failed')
+              }
+              return { ok: true }
+            },
+          },
+        ],
+      },
+    ]
+    const router = createRouter({ routes: optimisticRoutes, history })
+    router.start()
+    await router.revalidate()
+
+    const ok = await router.submitAction(
+      'users',
+      { method: 'POST', data: { fail: false } },
+      {
+        optimistic: {
+          apply: (state) => ({
+            ...state,
+            actionData: { ...state.actionData, users: { optimistic: true } },
+          }),
+        },
+      },
+    )
+    expect(ok).toBe(true)
+    expect(router.getState().actionData.users).toEqual({ ok: true })
+
+    const failed = await router.submitAction(
+      'users',
+      { method: 'POST', data: { fail: true } },
+      {
+        optimistic: {
+          apply: (state) => ({
+            ...state,
+            actionData: { ...state.actionData, users: { optimistic: 'temp' } },
+          }),
+        },
+      },
+    )
+    expect(failed).toBe(false)
+    expect(router.getState().actionData.users).toEqual({ ok: true })
+  })
+
   it('returns false when submitting action for unknown route', async () => {
     const history = createMemoryHistory({ initialEntries: ['/users/1'] })
     const router = createRouter({ routes, history })
