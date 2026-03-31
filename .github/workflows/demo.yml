@@ -30,11 +30,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          bun install || npm install
+          bun install || (rm -rf node_modules && npm install)
 
       - name: Build demo
         run: |
-          bun run demo:build || npm run demo:build
+          bun run demo:build || (rm -rf node_modules && npm install && npm run demo:build)
 
       - uses: actions/upload-pages-artifact@v3
         with:
