@@ -317,6 +317,116 @@ function textInputDemo(): UIElement {
   ])
 }
 
+function designShowcase(): UIElement {
+  const w = rootWidth.value
+
+  const orbs: UIElement[] = []
+  const orbData = [
+    { size: 90, color1: '#e94560', color2: '#ff6b8a', x: 0.08, y: 0.05 },
+    { size: 70, color1: '#0ea5e9', color2: '#38bdf8', x: 0.65, y: 0.02 },
+    { size: 50, color1: '#22c55e', color2: '#4ade80', x: 0.35, y: 0.55 },
+    { size: 60, color1: '#f59e0b', color2: '#fbbf24', x: 0.78, y: 0.48 },
+    { size: 40, color1: '#a855f7', color2: '#c084fc', x: 0.15, y: 0.65 },
+  ]
+  for (const orb of orbData) {
+    orbs.push(box({
+      position: 'absolute',
+      left: Math.round((w - 48) * orb.x),
+      top: Math.round(300 * orb.y),
+      width: orb.size,
+      height: orb.size,
+      borderRadius: orb.size / 2,
+      gradient: { type: 'linear', angle: 135, stops: [
+        { offset: 0, color: orb.color1 },
+        { offset: 1, color: orb.color2 },
+      ]},
+      opacity: 0.6,
+      boxShadow: { offsetX: 0, offsetY: 8, blur: orb.size * 0.6, color: `${orb.color1}66` },
+    }, []))
+  }
+
+  const glassCard = (title: string, body: string, accent: string, iconChar: string): UIElement =>
+    box({
+      backgroundColor: 'rgba(255,255,255,0.06)',
+      borderColor: 'rgba(255,255,255,0.1)',
+      borderWidth: 1,
+      borderRadius: 16,
+      padding: 20,
+      flexDirection: 'column',
+      gap: 10,
+      flexGrow: 1,
+      minWidth: 140,
+      boxShadow: { offsetX: 0, offsetY: 4, blur: 24, color: 'rgba(0,0,0,0.2)' },
+    }, [
+      box({ flexDirection: 'row', gap: 10, alignItems: 'center' }, [
+        box({
+          width: 36, height: 36, borderRadius: 10,
+          gradient: { type: 'linear', angle: 135, stops: [
+            { offset: 0, color: accent },
+            { offset: 1, color: `${accent}88` },
+          ]},
+          justifyContent: 'center', alignItems: 'center',
+        }, [text({ text: iconChar, font: 'bold 16px Inter', lineHeight: 36, color: '#fff' })]),
+        text({ text: title, font: '600 14px Inter', lineHeight: 18, color: '#ffffff' }),
+      ]),
+      text({ text: body, font: '13px Inter', lineHeight: 19, color: 'rgba(255,255,255,0.65)' }),
+    ])
+
+  const barWidth = Math.max(w - 96, 200)
+  const meter = (label: string, pct: number, color: string): UIElement =>
+    box({ flexDirection: 'column', gap: 4 }, [
+      box({ flexDirection: 'row', justifyContent: 'space-between' }, [
+        text({ text: label, font: '11px Inter', lineHeight: 14, color: 'rgba(255,255,255,0.5)' }),
+        text({ text: `${pct}%`, font: '600 11px JetBrains Mono', lineHeight: 14, color }),
+      ]),
+      box({ height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.08)', width: barWidth }, [
+        box({
+          width: Math.round(barWidth * pct / 100),
+          height: 6,
+          borderRadius: 3,
+          gradient: { type: 'linear', angle: 90, stops: [
+            { offset: 0, color },
+            { offset: 1, color: `${color}88` },
+          ]},
+        }, []),
+      ]),
+    ])
+
+  return box({ flexDirection: 'column', padding: 24, gap: 20, width: w, minHeight: 380 }, [
+    text({ text: 'Design Showcase', font: 'bold 20px Inter', lineHeight: 26, color: '#ffffff' }),
+    text({ text: 'Gradients, layered shadows, glassmorphism, and floating orbs \u2014 all from the same element tree. No CSS, no DOM.', font: '14px Inter', lineHeight: 22, color: 'rgba(255,255,255,0.6)' }),
+
+    box({
+      borderRadius: 16,
+      minHeight: 300,
+      overflow: 'hidden',
+      gradient: { type: 'linear', angle: 160, stops: [
+        { offset: 0, color: '#0c0c1d' },
+        { offset: 0.5, color: '#111133' },
+        { offset: 1, color: '#0a0a18' },
+      ]},
+      padding: 24,
+      flexDirection: 'column',
+      justifyContent: 'flex-end',
+      gap: 16,
+    }, [
+      ...orbs,
+
+      box({ flexDirection: direction.value, gap: 12, flexWrap: 'wrap' }, [
+        glassCard('Gradients', 'Linear gradients on any element. Angle, stops, opacity \u2014 all declarative.', '#e94560', '\u25B2'),
+        glassCard('Shadows', 'Layered box shadows with blur. Per-element, no CSS cascade surprises.', '#0ea5e9', '\u25CF'),
+        glassCard('Opacity', 'True alpha compositing. No stacking-context gotchas.', '#22c55e', '\u25C6'),
+      ]),
+
+      box({ flexDirection: 'column', gap: 8, paddingTop: 4 }, [
+        meter('Render throughput', 97, '#22c55e'),
+        meter('Layout accuracy', 100, '#0ea5e9'),
+        meter('DOM dependency', 0, '#e94560'),
+      ]),
+    ]),
+  ])
+}
+
 function seoDemo(): UIElement {
   const w = rootWidth.value
   return box({ flexDirection: 'column', padding: 24, gap: 16, width: w, minHeight: 380, semantic: { tag: 'main' } }, [
@@ -346,6 +456,7 @@ const SCENARIOS: Record<string, () => UIElement> = {
   nested: nestedLayout,
   selection: selectableText,
   input: textInputDemo,
+  design: designShowcase,
   seo: seoDemo,
 }
 
@@ -539,7 +650,8 @@ function demoSection(): UIElement {
   const names = [
     { key: 'cards', label: 'Cards' }, { key: 'chat', label: 'Chat' },
     { key: 'dashboard', label: 'Dashboard' }, { key: 'nested', label: 'Nested' },
-    { key: 'selection', label: 'Selection' }, { key: 'input', label: 'Input' }, { key: 'seo', label: 'SEO' },
+    { key: 'selection', label: 'Selection' }, { key: 'input', label: 'Input' },
+    { key: 'design', label: 'Design' }, { key: 'seo', label: 'SEO' },
   ]
   const scenarioFn = SCENARIOS[scenario.value] ?? cardGrid
 
