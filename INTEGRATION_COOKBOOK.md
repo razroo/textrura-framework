@@ -23,6 +23,7 @@ Short recipes for common stacks. All paths assume a Geometra workspace install.
 
 ## Related docs
 
+- `FONTS_AND_METRICS.md` — `font` strings, `waitForFonts`, server/client metric parity.
 - `PROTOCOL_COMPATIBILITY.md` — wire format and optional binary frames.
 - `TRANSPORT_1_4.md` — backpressure and CI transport baselines.
 - `FRAMEWORK_NORTH_STAR.md` — invariants and quality bar.

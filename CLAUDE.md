@@ -4,6 +4,8 @@ DOM-free UI framework. Replaces the browser rendering pipeline with: `Tree → Y
 
 See **`ROADMAP.md`** for phased framework goals (a11y, text input, protocol, etc.).
 See **`FRAMEWORK_NORTH_STAR.md`** for the always-on coding priorities and quality bar.
+See **`FONTS_AND_METRICS.md`** for `font` strings, `waitForFonts`, and server/client text metric parity.
+See **`INTEGRATION_COOKBOOK.md`** for canvas, server/client, and DOM-free migration notes.
 
 ## Architecture
 

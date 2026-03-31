@@ -130,6 +130,21 @@ Definition of done:
 - [x] Inspector tooling is usable in demos with negligible hot-path overhead when disabled.
 - [x] Starter templates demonstrate at least two advanced primitives and inspector workflow. (`demos/local-canvas` — `toast`, `dataTable`, `layoutInspector` + `inspectorProbe`)
 
+### 1.6.0 — Fonts, metrics, and adoption depth
+
+Goal: close Phase B font/metrics documentation gaps and deepen ecosystem guidance without changing the core pipeline contract.
+
+Acceptance criteria:
+
+- [x] Status: `done` | Owner: `@codex` | Document generic families, `waitForFonts`, variable-font caveats, and server/client metric parity expectations. (`FONTS_AND_METRICS.md`)
+- [ ] Status: `todo` | Owner: `@unassigned` | Optional: expand visual-regression / geometry snapshot coverage in CI for font-sensitive fixtures.
+- [ ] Status: `todo` | Owner: `@unassigned` | Optional: formalize post-v1 protocol evolution (beyond GEOM v1) when schema work is ready.
+
+Definition of done:
+
+- [x] README or north-star docs link the font/metrics policy from developer entry points. (`CLAUDE.md`)
+- [ ] Release notes call out any future font or measurement contract changes.
+
 ## Release polish checklist
 
 Tracking fields:
