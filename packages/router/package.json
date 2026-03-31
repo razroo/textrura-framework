@@ -32,5 +32,8 @@
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@geometra/core": "file:../core"
   }
 }

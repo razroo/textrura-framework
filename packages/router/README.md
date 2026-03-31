@@ -18,6 +18,7 @@ npm install @geometra/router
 - `createMemoryHistory` -- history adapter for non-browser runtimes and tests
 - `createBrowserHistory` -- browser adapter using pushState/replaceState/popstate
 - `createRouter` -- router lifecycle (`start`, `navigate`, `subscribe`, `dispose`)
+- `link` -- declarative link element with click + keyboard activation semantics
 - `scorePathPattern` -- computes route specificity score for deterministic ranking
 - `comparePatternSpecificity` -- compares two patterns by ranking
 - `matchRouteTree` -- matches nested route trees with layout routes
