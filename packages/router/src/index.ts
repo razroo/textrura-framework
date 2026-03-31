@@ -1,5 +1,7 @@
 export { matchPath } from './matcher.js'
 export type { RouteMatch } from './matcher.js'
+export { buildPath } from './path.js'
+export type { PathParams } from './path.js'
 export { scorePathPattern, comparePatternSpecificity } from './ranking.js'
 export { matchRouteTree, renderMatchedOutlet } from './tree.js'
 export type { RouteNode, RouteBranchMatch } from './tree.js'

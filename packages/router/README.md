@@ -13,6 +13,7 @@ npm install @geometra/router
 ## Key Exports
 
 - `matchPath` -- matches path patterns with static, dynamic, optional, and splat segments
+- `buildPath` -- reverse routing helper with typed params
 - `scorePathPattern` -- computes route specificity score for deterministic ranking
 - `comparePatternSpecificity` -- compares two patterns by ranking
 - `matchRouteTree` -- matches nested route trees with layout routes
