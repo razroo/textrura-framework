@@ -14,9 +14,12 @@ import type { App, UIElement } from '@geometra/core'
 import { CanvasRenderer, enableSelection, enableAccessibilityMirror, enableInputForwarding } from '@geometra/renderer-canvas'
 import {
   button as uiButton,
+  checkbox as uiCheckbox,
+  radio as uiRadio,
   input as uiInput,
   list as uiList,
   dialog as uiDialog,
+  tabs as uiTabs,
 } from '@geometra/ui'
 
 // ─── Design Tokens ───────────────────────────────────────────────────────────
@@ -54,7 +57,10 @@ let lastPerfNodes = '-'
 const primitivesDialogOpen = signal(true)
 const primitivesSearch = signal<DemoInputField>({ value: '', caretOffset: 0 })
 const primitivesSearchFocused = signal(false)
-const ALL_PRIMITIVES = ['button()', 'input()', 'list()', 'dialog()', 'text()', 'box()', 'image()']
+const primitivesCheckbox = signal(false)
+const primitivesRadio = signal(0)
+const primitivesTab = signal(0)
+const ALL_PRIMITIVES = ['button()', 'checkbox()', 'radio()', 'tabs()', 'input()', 'list()', 'dialog()', 'text()', 'box()', 'image()']
 
 // ─── Page-Level Ambient Effects ───────────────────────────────────────────────
 const mouseX = signal(-9999)
@@ -1201,6 +1207,52 @@ function archSection(): UIElement {
           lineHeight: 17,
           color: DIM,
         }),
+      ]),
+      box({ flexDirection: 'column', gap: 8 }, [
+        text({ text: 'Selection primitives', font: '600 13px Inter', lineHeight: 18, color: TEXT_COLOR }),
+        box({ flexDirection: 'column', gap: 6, backgroundColor: '#0b1220', borderRadius: 10, padding: 10 }, [
+          uiCheckbox('Enable telemetry', {
+            checked: primitivesCheckbox.value,
+            onChange: (next) => primitivesCheckbox.set(next),
+          }),
+          uiRadio('Rendering mode: Canvas', {
+            checked: primitivesRadio.value === 0,
+            onSelect: () => primitivesRadio.set(0),
+          }),
+          uiRadio('Rendering mode: WebGPU', {
+            checked: primitivesRadio.value === 1,
+            onSelect: () => primitivesRadio.set(1),
+          }),
+        ]),
+      ]),
+      box({ flexDirection: 'column', gap: 8 }, [
+        text({ text: 'Tabs primitive', font: '600 13px Inter', lineHeight: 18, color: TEXT_COLOR }),
+        uiTabs(
+          [
+            {
+              label: 'Overview',
+              content: text({
+                text: 'Tabs are built from pure Geometra primitives and keep renderer-agnostic semantics.',
+                font: '12px Inter',
+                lineHeight: 17,
+                color: '#cbd5e1',
+              }),
+            },
+            {
+              label: 'State',
+              content: text({
+                text: `checkbox=${primitivesCheckbox.value ? 'on' : 'off'}, mode=${primitivesRadio.value === 0 ? 'canvas' : 'webgpu'}`,
+                font: '12px JetBrains Mono',
+                lineHeight: 17,
+                color: '#93c5fd',
+              }),
+            },
+          ],
+          {
+            activeIndex: primitivesTab.value,
+            onTabChange: (idx) => primitivesTab.set(idx),
+          },
+        ),
       ]),
       // Interactive search input
       uiInput(primitivesSearch.value.value, 'Search components\u2026', {

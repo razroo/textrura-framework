@@ -155,3 +155,171 @@ export function dialog(title: string, body: string, actions: UIElement[] = []): 
     ],
   )
 }
+
+export interface CheckboxOptions {
+  checked?: boolean
+  disabled?: boolean
+  onChange?: (checked: boolean) => void
+}
+
+export function checkbox(label: string, options: CheckboxOptions = {}): UIElement {
+  const checked = options.checked === true
+  const disabled = options.disabled === true
+  const borderColor = disabled ? '#475569' : checked ? '#22c55e' : '#64748b'
+  const bg = disabled ? '#0f172a' : checked ? '#14532d' : '#111827'
+
+  const toggle = () => {
+    if (disabled) return
+    options.onChange?.(!checked)
+  }
+
+  return box(
+    {
+      flexDirection: 'row',
+      gap: 10,
+      alignItems: 'center',
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      semantic: { role: 'checkbox', ariaLabel: label, ariaSelected: checked, ariaDisabled: disabled },
+      onClick: toggle,
+      onKeyDown: (e) => {
+        if (e.key === ' ' || e.key === 'Enter') toggle()
+      },
+    },
+    [
+      box(
+        {
+          width: 16,
+          height: 16,
+          borderRadius: 4,
+          borderColor,
+          borderWidth: 1,
+          backgroundColor: bg,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        checked
+          ? [text({ text: '✓', font: 'bold 11px Inter', lineHeight: 12, color: disabled ? '#94a3b8' : '#86efac' })]
+          : [],
+      ),
+      text({
+        text: label,
+        font: '13px Inter',
+        lineHeight: 18,
+        color: disabled ? '#64748b' : '#e2e8f0',
+      }),
+    ],
+  )
+}
+
+export interface RadioOptions {
+  checked?: boolean
+  disabled?: boolean
+  onSelect?: () => void
+}
+
+export function radio(label: string, options: RadioOptions = {}): UIElement {
+  const checked = options.checked === true
+  const disabled = options.disabled === true
+  const borderColor = disabled ? '#475569' : checked ? '#38bdf8' : '#64748b'
+
+  const select = () => {
+    if (disabled || checked) return
+    options.onSelect?.()
+  }
+
+  return box(
+    {
+      flexDirection: 'row',
+      gap: 10,
+      alignItems: 'center',
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      semantic: { role: 'radio', ariaLabel: label, ariaSelected: checked, ariaDisabled: disabled },
+      onClick: select,
+      onKeyDown: (e) => {
+        if (e.key === ' ' || e.key === 'Enter') select()
+      },
+    },
+    [
+      box(
+        {
+          width: 16,
+          height: 16,
+          borderRadius: 8,
+          borderColor,
+          borderWidth: 1,
+          backgroundColor: '#111827',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        checked
+          ? [box({ width: 8, height: 8, borderRadius: 4, backgroundColor: disabled ? '#64748b' : '#38bdf8' }, [])]
+          : [],
+      ),
+      text({
+        text: label,
+        font: '13px Inter',
+        lineHeight: 18,
+        color: disabled ? '#64748b' : '#e2e8f0',
+      }),
+    ],
+  )
+}
+
+export interface TabItem {
+  label: string
+  content: UIElement
+}
+
+export interface TabsOptions {
+  activeIndex?: number
+  onTabChange?: (index: number) => void
+}
+
+export function tabs(items: TabItem[], options: TabsOptions = {}): UIElement {
+  const activeIndex = Math.max(0, Math.min(options.activeIndex ?? 0, Math.max(0, items.length - 1)))
+  const active = items[activeIndex]
+  return box(
+    {
+      flexDirection: 'column',
+      gap: 10,
+      semantic: { role: 'tablist' },
+    },
+    [
+      box(
+        {
+          flexDirection: 'row',
+          gap: 6,
+          flexWrap: 'wrap',
+        },
+        items.map((item, idx) =>
+          box(
+            {
+              paddingLeft: 10,
+              paddingRight: 10,
+              paddingTop: 6,
+              paddingBottom: 6,
+              borderRadius: 8,
+              borderColor: idx === activeIndex ? '#38bdf8' : '#334155',
+              borderWidth: 1,
+              backgroundColor: idx === activeIndex ? '#082f49' : '#111827',
+              cursor: 'pointer',
+              semantic: { role: 'tab', ariaLabel: item.label, ariaSelected: idx === activeIndex },
+              onClick: () => options.onTabChange?.(idx),
+            },
+            [text({ text: item.label, font: '13px Inter', lineHeight: 18, color: idx === activeIndex ? '#bae6fd' : '#cbd5e1' })],
+          ),
+        ),
+      ),
+      box(
+        {
+          borderColor: '#334155',
+          borderWidth: 1,
+          borderRadius: 10,
+          padding: 12,
+          semantic: { role: 'tabpanel' },
+        },
+        active ? [active.content] : [],
+      ),
+    ],
+  )
+}
