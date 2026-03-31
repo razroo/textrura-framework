@@ -11,6 +11,7 @@
     "check": "bun run --workspaces --if-present check",
     "test": "vitest run",
     "test:terminal-input": "npm run -w @geometra/demo-terminal test:input",
+    "test:perf": "vitest run packages/core/src/__tests__/perf-smoke.test.ts packages/server/src/__tests__/protocol-perf-smoke.test.ts",
     "lint": "eslint packages/*/src",
     "format": "prettier --write 'packages/*/src/**/*.ts'",
     "demo:dev": "vite --config demo/vite.config.ts",

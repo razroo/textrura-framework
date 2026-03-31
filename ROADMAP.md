@@ -68,7 +68,7 @@ Tracking fields:
 
 - [x] Status: `done` | Owner: `@codex` | Add microbenchmarks for hit-testing, text measurement, and geometry diffing.
 - [x] Status: `done` | Owner: `@codex` | Establish baseline metrics and acceptable regression thresholds.
-- [ ] Status: `todo` | Owner: `@unassigned` | Wire benchmark/performance checks into CI reporting.
+- [x] Status: `done` | Owner: `@codex` | Wire benchmark/performance checks into CI reporting.
 - [ ] Status: `todo` | Owner: `@unassigned` | Add smoke perf test for large tree updates (worst-case UI churn).
 - [ ] Status: `todo` | Owner: `@unassigned` | Track perf notes in release checklist before each tag.
 
