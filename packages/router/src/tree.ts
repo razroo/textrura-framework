@@ -1,4 +1,5 @@
 import { matchPath } from './matcher.js'
+import { comparePatternSpecificity } from './ranking.js'
 
 export type RouteNode<T = unknown> = {
   id?: string
@@ -24,6 +25,15 @@ function joinPaths(base: string, next: string): string {
   return combined === '' ? '/' : combined
 }
 
+function branchPattern<T>(matches: RouteNode<T>[]): string {
+  let current = '/'
+  for (const route of matches) {
+    if (!route.path) continue
+    current = joinPaths(current, route.path)
+  }
+  return current
+}
+
 export function matchRouteTree<T>(routes: RouteNode<T>[], pathname: string): RouteBranchMatch<T> | null {
   let bestMatch: RouteBranchMatch<T> | null = null
 
@@ -35,8 +45,15 @@ export function matchRouteTree<T>(routes: RouteNode<T>[], pathname: string): Rou
     const nodeMatch = matchPath(absolutePath, pathname)
     if (nodeMatch) {
       const candidate: RouteBranchMatch<T> = { params: nodeMatch.params, matches: nextStack }
-      if (!bestMatch || candidate.matches.length > bestMatch.matches.length) {
+      if (!bestMatch) {
         bestMatch = candidate
+      } else {
+        const candidatePattern = branchPattern(candidate.matches)
+        const bestPattern = branchPattern(bestMatch.matches)
+        const compare = comparePatternSpecificity(candidatePattern, bestPattern)
+        if (compare < 0 || (compare === 0 && candidate.matches.length > bestMatch.matches.length)) {
+          bestMatch = candidate
+        }
       }
     }
 
