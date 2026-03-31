@@ -4,7 +4,6 @@ import {
   text,
   createApp,
   focusNext,
-  effect,
   focusedElement,
 } from '@geometra/core/node'
 import type { App, KeyboardHitEvent } from '@geometra/core/node'
@@ -26,15 +25,6 @@ let appInstance: App | null = null
 function logTest(event: string): void {
   if (!testMode) return
   process.stderr.write(`[test-event] ${event}\n`)
-}
-
-if (testMode) {
-  effect(() => {
-    const f = focusedElement.value
-    if (!f) return
-    const idx = f.focusIndex ?? 0
-    logTest(`focus-slot-${idx}`)
-  })
 }
 
 function listItem(label: string, _index: number, isSelected: boolean) {
@@ -281,5 +271,11 @@ process.stdin.on('data', (chunk: string) => {
       process.exit(0)
     }
     app.dispatchKey('onKeyDown', ev)
+    if (testMode && ev.key === 'Tab') {
+      const idx = focusedElement.peek()?.focusIndex
+      if (idx !== undefined) {
+        logTest(`focus-slot-${idx}`)
+      }
+    }
   }
 })
