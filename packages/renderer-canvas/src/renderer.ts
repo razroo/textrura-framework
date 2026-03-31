@@ -792,11 +792,17 @@ export function enableSelection(
   let rafId: number | null = null
 
   function scheduleSelectionChange(): void {
-    if (!onSelectionChange) return
     if (rafId !== null) return
     rafId = requestAnimationFrame(() => {
       rafId = null
-      onSelectionChange()
+      if (onSelectionChange) {
+        onSelectionChange()
+        return
+      }
+      // Fast path: selection-only repaint from cached frame.
+      if (renderer.lastLayout && renderer.lastTree) {
+        renderer.render(renderer.lastLayout, renderer.lastTree)
+      }
     })
   }
 

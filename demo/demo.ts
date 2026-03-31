@@ -819,7 +819,11 @@ async function mount() {
   lastPerfNodes = `${countNodes(tree)}`
   lastPerfTime = '<1ms'
 
-  cleanupSelection = enableSelection(canvas, renderer, () => { if (app) app.update() })
+  cleanupSelection = enableSelection(canvas, renderer, () => {
+    if (app?.layout && app.tree) {
+      renderer.render(app.layout, app.tree)
+    }
+  })
   cleanupA11yMirror = enableAccessibilityMirror(document.body, renderer, {
     rootLabel: 'Geometra canvas accessibility mirror',
   })
