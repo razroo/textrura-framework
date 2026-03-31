@@ -151,20 +151,25 @@ type AuthRole = 'admin' | 'viewer' | 'invalid'
 const authRole = signal<AuthRole>('admin')
 const authConnected = signal(false)
 const authRejected = signal(false)
-const authClicks = signal(0)
+type AuthAction = 'safe' | 'billing' | 'admin'
+const authActionCounts = signal<Record<AuthAction, number>>({
+  safe: 0,
+  billing: 0,
+  admin: 0,
+})
 const authLog = signal<AgentLogEntry[]>([])
 
 function resetAuthDemo() {
   authRole.set('admin')
   authConnected.set(false)
   authRejected.set(false)
-  authClicks.set(0)
+  authActionCounts.set({ safe: 0, billing: 0, admin: 0 })
   authLog.set([])
 }
 
 function connectAuthRole(role: AuthRole) {
   authRole.set(role)
-  authClicks.set(0)
+  authActionCounts.set({ safe: 0, billing: 0, admin: 0 })
   authLog.set([])
   authRejected.set(false)
   authConnected.set(false)
@@ -185,21 +190,28 @@ function connectAuthRole(role: AuthRole) {
   ])
 }
 
-function attemptAuthAction() {
+function attemptAuthAction(action: AuthAction, label: string) {
   if (!authConnected.value) return
-  if (authRole.value === 'viewer') {
+  const allowed =
+    authRole.value === 'admin' ||
+    (authRole.value === 'viewer' && action === 'safe')
+
+  if (!allowed) {
     authLog.set([
       ...authLog.peek(),
-      { dir: '→', msg: 'event { type:"onClick", x:120, y:210 }', color: ACCENT2 },
-      { dir: '←', msg: 'error { code:4003, message:"Forbidden" }', color: ACCENT },
+      { dir: '→', msg: `event { target:"${action}", type:"onClick" }`, color: ACCENT2 },
+      { dir: '←', msg: `error { code:4003, message:"Forbidden", target:"${action}" }`, color: ACCENT },
     ])
     return
   }
-  authClicks.set(authClicks.peek() + 1)
+
+  const next = { ...authActionCounts.peek() }
+  next[action] += 1
+  authActionCounts.set(next)
   authLog.set([
     ...authLog.peek(),
-    { dir: '→', msg: 'event { type:"onClick", x:120, y:210 }', color: ACCENT2 },
-    { dir: '←', msg: `patch { path:[3], count:${authClicks.peek()} }`, color: ACCENT3 },
+    { dir: '→', msg: `event { target:"${action}", type:"onClick" }`, color: ACCENT2 },
+    { dir: '←', msg: `patch { target:"${action}", applied:true }  // ${label}`, color: ACCENT3 },
   ])
 }
 
@@ -1133,7 +1145,7 @@ function authDemo(): UIElement {
   const role = authRole.value
   const connected = authConnected.value
   const rejected = authRejected.value
-  const clicks = authClicks.value
+  const counts = authActionCounts.value
   const logs = authLog.value
 
   const roleChip = (label: string, value: AuthRole, color: string): UIElement =>
@@ -1189,27 +1201,53 @@ function authDemo(): UIElement {
         lineHeight: 18,
         color: rejected ? ACCENT : connected ? ACCENT3 : DIM,
       }),
-      box({
-        backgroundColor: connected && role === 'admin' ? 'rgba(34,197,94,0.15)' : 'rgba(233,69,96,0.15)',
-        borderColor: connected && role === 'admin' ? ACCENT3 : ACCENT,
-        borderWidth: 1,
-        borderRadius: 8,
-        paddingTop: 8, paddingBottom: 8, paddingLeft: 12, paddingRight: 12,
-        cursor: connected ? 'pointer' : 'default',
-        opacity: connected ? 1 : 0.5,
-        onClick: connected ? () => attemptAuthAction() : undefined,
-      }, [text({
-        text: 'Try Protected Action (increment counter)',
-        font: '600 12px Inter',
-        lineHeight: 16,
-        color: connected && role === 'admin' ? ACCENT3 : ACCENT,
-      })]),
-      text({
-        text: `Counter value: ${clicks}`,
-        font: 'bold 20px JetBrains Mono',
-        lineHeight: 24,
-        color: TEXT_COLOR,
-      }),
+      box({ flexDirection: 'column', gap: 6 }, [
+        box({
+          backgroundColor: 'rgba(34,197,94,0.15)',
+          borderColor: ACCENT3,
+          borderWidth: 1,
+          borderRadius: 8,
+          paddingTop: 8, paddingBottom: 8, paddingLeft: 12, paddingRight: 12,
+          cursor: connected ? 'pointer' : 'default',
+          opacity: connected ? 1 : 0.5,
+          onClick: connected ? () => attemptAuthAction('safe', 'Read analytics') : undefined,
+        }, [text({
+          text: `Safe Action (viewer+admin)  ·  ${counts.safe}`,
+          font: '600 12px Inter',
+          lineHeight: 16,
+          color: ACCENT3,
+        })]),
+        box({
+          backgroundColor: role === 'admin' ? 'rgba(14,165,233,0.15)' : 'rgba(233,69,96,0.15)',
+          borderColor: role === 'admin' ? ACCENT2 : ACCENT,
+          borderWidth: 1,
+          borderRadius: 8,
+          paddingTop: 8, paddingBottom: 8, paddingLeft: 12, paddingRight: 12,
+          cursor: connected ? 'pointer' : 'default',
+          opacity: connected ? 1 : 0.5,
+          onClick: connected ? () => attemptAuthAction('billing', 'Export billing') : undefined,
+        }, [text({
+          text: `Billing Action (admin only)  ·  ${counts.billing}`,
+          font: '600 12px Inter',
+          lineHeight: 16,
+          color: role === 'admin' ? ACCENT2 : ACCENT,
+        })]),
+        box({
+          backgroundColor: role === 'admin' ? 'rgba(168,85,247,0.18)' : 'rgba(233,69,96,0.15)',
+          borderColor: role === 'admin' ? '#a855f7' : ACCENT,
+          borderWidth: 1,
+          borderRadius: 8,
+          paddingTop: 8, paddingBottom: 8, paddingLeft: 12, paddingRight: 12,
+          cursor: connected ? 'pointer' : 'default',
+          opacity: connected ? 1 : 0.5,
+          onClick: connected ? () => attemptAuthAction('admin', 'Delete workspace') : undefined,
+        }, [text({
+          text: `Admin Action (admin only)  ·  ${counts.admin}`,
+          font: '600 12px Inter',
+          lineHeight: 16,
+          color: role === 'admin' ? '#d8b4fe' : ACCENT,
+        })]),
+      ]),
     ]),
     box({
       backgroundColor: CODE_BG,
