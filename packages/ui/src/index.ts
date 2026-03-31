@@ -358,3 +358,138 @@ export function tabs(items: TabItem[], options: TabsOptions = {}): UIElement {
     ],
   )
 }
+
+const toastVariantStyle: Record<
+  'info' | 'success' | 'warning' | 'error',
+  { border: string; background: string; color: string }
+> = {
+  info: { border: '#334155', background: '#0f172a', color: '#e2e8f0' },
+  success: { border: '#166534', background: '#052e16', color: '#bbf7d0' },
+  warning: { border: '#a16207', background: '#422006', color: '#fef08a' },
+  error: { border: '#991b1b', background: '#450a0a', color: '#fecaca' },
+}
+
+export interface ToastOptions {
+  /** Visual tone. Default `info`. */
+  variant?: keyof typeof toastVariantStyle
+  /** Optional title above the message. */
+  title?: string
+  onDismiss?: () => void
+}
+
+/**
+ * Inline toast / status region (app controls visibility by swapping the tree).
+ * Uses `role="status"` for assistive tech.
+ */
+export function toast(message: string, options: ToastOptions = {}): UIElement {
+  const variant = options.variant ?? 'info'
+  const s = toastVariantStyle[variant]
+  const children: UIElement[] = []
+  if (options.title) {
+    children.push(
+      text({
+        text: options.title,
+        font: 'bold 13px Inter',
+        lineHeight: 18,
+        color: s.color,
+      }),
+    )
+  }
+  children.push(
+    text({
+      text: message,
+      font: '13px Inter',
+      lineHeight: 18,
+      color: s.color,
+    }),
+  )
+  const row: UIElement[] = [
+    box({ flexDirection: 'column', gap: 4, flexGrow: 1 }, children),
+  ]
+  if (options.onDismiss) {
+    row.push(
+      box(
+        {
+          paddingLeft: 8,
+          paddingRight: 8,
+          paddingTop: 4,
+          paddingBottom: 4,
+          borderRadius: 6,
+          cursor: 'pointer',
+          semantic: { role: 'button', ariaLabel: 'Dismiss' },
+          onClick: options.onDismiss,
+        },
+        [text({ text: '✕', font: '12px Inter', lineHeight: 14, color: s.color })],
+      ),
+    )
+  }
+  return box(
+    {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 8,
+      padding: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: s.border,
+      backgroundColor: s.background,
+      maxWidth: 360,
+      semantic: { role: 'status', ariaLabel: options.title ? `${options.title}: ${message}` : message },
+    },
+    row,
+  )
+}
+
+export interface CommandItem {
+  id: string
+  label: string
+  shortcut?: string
+}
+
+export interface CommandPaletteOptions {
+  onSelect?: (id: string) => void
+}
+
+/**
+ * Command list surface (⌘K-style palette body). Selection is driven by the app
+ * (filtering, keyboard) — this renders rows with optional shortcuts.
+ */
+export function commandPalette(commands: CommandItem[], options: CommandPaletteOptions = {}): UIElement {
+  const muted = '#64748b'
+  return box(
+    {
+      flexDirection: 'column',
+      gap: 2,
+      padding: 6,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: '#334155',
+      backgroundColor: '#020617',
+      semantic: { role: 'listbox', ariaLabel: 'Commands' },
+    },
+    commands.map((cmd) =>
+      box(
+        {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 12,
+          paddingLeft: 10,
+          paddingRight: 10,
+          paddingTop: 8,
+          paddingBottom: 8,
+          borderRadius: 8,
+          cursor: 'pointer',
+          semantic: { role: 'option', ariaLabel: cmd.label },
+          onClick: () => options.onSelect?.(cmd.id),
+        },
+        [
+          text({ text: cmd.label, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }),
+          cmd.shortcut
+            ? text({ text: cmd.shortcut, font: '12px Inter', lineHeight: 16, color: muted })
+            : box({ width: 1, height: 1 }, []),
+        ],
+      ),
+    ),
+  )
+}

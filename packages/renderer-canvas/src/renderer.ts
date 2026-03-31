@@ -66,6 +66,11 @@ export interface CanvasRendererOptions {
   focusRingPadding?: number
   /** Skip debug/focus overlays during active drag interactions. Default true. */
   optimizeOverlaysDuringInteraction?: boolean
+  /**
+   * Draw a lightweight inspector HUD (node count, tree depth, root size, focus summary).
+   * Negligible cost when disabled. Default false.
+   */
+  layoutInspector?: boolean
 }
 
 export interface AccessibilityMirrorOptions {
@@ -186,6 +191,7 @@ export class CanvasRenderer implements Renderer {
   private focusRingColor: string
   private focusRingPadding: number
   private optimizeOverlaysDuringInteraction: boolean
+  private layoutInspector: boolean
   private interactionActive = false
   /** Cache text wrapping + per-char metrics to avoid recomputing every frame. */
   private textLineCache = new Map<string, CachedTextLineMetrics[]>()
@@ -229,6 +235,7 @@ export class CanvasRenderer implements Renderer {
     this.focusRingColor = options.focusRingColor ?? 'rgba(59, 130, 246, 0.95)'
     this.focusRingPadding = options.focusRingPadding ?? 2
     this.optimizeOverlaysDuringInteraction = options.optimizeOverlaysDuringInteraction ?? true
+    this.layoutInspector = options.layoutInspector ?? false
 
     if (options.selectedTextColor) {
       this.selectedTextColor = options.selectedTextColor
@@ -276,6 +283,9 @@ export class CanvasRenderer implements Renderer {
       if (f) {
         this.paintFocusRingForTarget(tree, layout, 0, 0, f.element)
       }
+    }
+    if (this.layoutInspector && !skipOverlays) {
+      this.paintLayoutInspectorHud(layout, tree)
     }
 
     ctx.setTransform(1, 0, 0, 1, 0, 0)
@@ -870,6 +880,54 @@ export class CanvasRenderer implements Renderer {
     if (shouldClip) {
       this.ctx.restore()
     }
+  }
+
+  private countInspectorNodes(element: UIElement): number {
+    if (element.kind !== 'box') return 1
+    let n = 1
+    for (const c of element.children) n += this.countInspectorNodes(c)
+    return n
+  }
+
+  private maxInspectorDepth(element: UIElement): number {
+    if (element.kind !== 'box' || element.children.length === 0) return 1
+    let m = 0
+    for (const c of element.children) m = Math.max(m, this.maxInspectorDepth(c))
+    return 1 + m
+  }
+
+  private paintLayoutInspectorHud(layout: ComputedLayout, tree: UIElement): void {
+    const { ctx } = this
+    const nodes = this.countInspectorNodes(tree)
+    const depth = this.maxInspectorDepth(tree)
+    const ft = focusedElement.peek()
+    const focusHint = ft
+      ? (ft.element.semantic?.role ?? ft.element.semantic?.tag ?? 'box')
+      : 'none'
+    const lines = [
+      `nodes ${nodes}  depth ${depth}`,
+      `root ${Math.round(layout.width)}×${Math.round(layout.height)}`,
+      `focus ${focusHint}`,
+    ]
+    ctx.save()
+    ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
+    const pad = 8
+    const lineH = 14
+    let maxW = 0
+    for (const line of lines) {
+      maxW = Math.max(maxW, ctx.measureText(line).width)
+    }
+    const boxW = maxW + pad * 2
+    const boxH = pad * 2 + lines.length * lineH
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.82)'
+    ctx.fillRect(pad, pad, boxW, boxH)
+    ctx.fillStyle = '#e2e8f0'
+    let y = pad * 2 + 10
+    for (const line of lines) {
+      ctx.fillText(line, pad * 2, y)
+      y += lineH
+    }
+    ctx.restore()
   }
 
   private paintFocusRingForTarget(

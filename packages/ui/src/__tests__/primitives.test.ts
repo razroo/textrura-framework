@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { HitEvent, KeyboardHitEvent } from '../../../core/src/types.js'
 import { box, text } from '../../../core/src/index.js'
-import { checkbox, radio, tabs } from '../index.js'
+import { checkbox, commandPalette, radio, tabs, toast } from '../index.js'
 
 describe('@geometra/ui primitives', () => {
   it('checkbox toggles on click and keyboard', () => {
@@ -71,5 +71,37 @@ describe('@geometra/ui primitives', () => {
     if (!panel || panel.kind !== 'box') return
     expect(panel.children).toHaveLength(1)
     expect(panel.children[0]?.kind).toBe('text')
+  })
+
+  it('toast exposes status semantics and optional dismiss', () => {
+    let dismissed = false
+    const el = toast('Saved.', { title: 'Done', variant: 'success', onDismiss: () => { dismissed = true } })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.semantic?.role).toBe('status')
+    expect(el.children.length).toBe(2)
+    const dismiss = el.children[1]
+    expect(dismiss?.kind).toBe('box')
+    if (!dismiss || dismiss.kind !== 'box') return
+    dismiss.handlers?.onClick?.({ x: 0, y: 0, target: {} as HitEvent['target'] })
+    expect(dismissed).toBe(true)
+  })
+
+  it('commandPalette invokes onSelect with command id', () => {
+    let id = ''
+    const el = commandPalette(
+      [
+        { id: 'a', label: 'Alpha', shortcut: '⌘A' },
+        { id: 'b', label: 'Beta' },
+      ],
+      { onSelect: (x) => { id = x } },
+    )
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    const first = el.children[0]
+    expect(first?.kind).toBe('box')
+    if (!first || first.kind !== 'box') return
+    first.handlers?.onClick?.({ x: 0, y: 0, target: {} as HitEvent['target'] })
+    expect(id).toBe('a')
   })
 })

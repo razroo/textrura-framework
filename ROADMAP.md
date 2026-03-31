@@ -117,9 +117,9 @@ Goal: reduce adoption friction with high-quality primitives and better introspec
 
 Acceptance criteria:
 
-- [ ] Status: `todo` | Owner: `@unassigned` | Expand `@geometra/ui` with advanced primitives (combobox/menu/tree/data-table/command-palette/toast).
-- [ ] Status: `todo` | Owner: `@unassigned` | Add behavior contracts + interaction/a11y fixtures for each new primitive.
-- [ ] Status: `todo` | Owner: `@unassigned` | Extend dev overlay into inspector view (node tree, computed layout, hit-test path, focus chain, repaint reasons).
+- [ ] Status: `in_progress` | Owner: `@codex` | Expand `@geometra/ui` with advanced primitives (`toast`, `commandPalette` shipped; combobox/menu/tree/data-table remaining).
+- [ ] Status: `in_progress` | Owner: `@codex` | Add behavior contracts + interaction/a11y fixtures for each new primitive. (`primitives.test.ts` covers toast + command palette handlers)
+- [ ] Status: `in_progress` | Owner: `@codex` | Extend dev overlay into inspector view (canvas `layoutInspector` HUD: nodes, depth, root size, focus; full tree/path + repaint reasons TBD).
 - [ ] Status: `todo` | Owner: `@unassigned` | Publish integration cookbooks for common app stacks and DOM-assumption migration patterns.
 
 Definition of done:

@@ -8,11 +8,12 @@ Canvas2D renderer for Geometra. Renders UI element trees to an HTML `<canvas>` e
 npm install @geometra/renderer-canvas
 ```
 
-## Key Exports
+## Key exports
 
-- `CanvasRenderer` -- renders Geometra element trees to a canvas context
-- `enableSelection` -- enables text selection on the canvas
-- `enableAccessibilityMirror` -- syncs a hidden accessibility DOM mirror from geometry
+- `CanvasRenderer` — renders Geometra element trees to a canvas context
+- `layoutInspector` option — optional HUD overlay (node count, depth, root size, focus hint); off by default
+- `enableSelection` — text selection on the canvas
+- `enableAccessibilityMirror` — hidden accessibility DOM mirror from geometry
 
 ## Usage
 
