@@ -44,7 +44,7 @@ Tracking fields:
 - [x] Status: `done` | Owner: `@codex` | Add integration tests for composition lifecycle (`start/update/end`) and mixed key/composition flows.
 - [x] Status: `done` | Owner: `@codex` | Validate caret geometry across multiline and edge positions.
 - [x] Status: `done` | Owner: `@codex` | Verify selection replacement plus backspace/delete boundary behavior.
-- [ ] Status: `todo` | Owner: `@unassigned` | Add regression tests for focus switching during active composition.
+- [x] Status: `done` | Owner: `@codex` | Add regression tests for focus switching during active composition.
 - [ ] Status: `todo` | Owner: `@unassigned` | Document text-input semantics in README/API docs.
 
 ### 0.3.3 — Keyboard/focus contract and a11y

@@ -265,5 +265,53 @@ describe('dispatchKeyboardEvent', () => {
     expect(state.nodes[0]).toBe('abに')
     expect(state.selection.focusOffset).toBe(3)
   })
+
+  it('does not leak composition events after focus switches', () => {
+    let firstUpdates = 0
+    let secondUpdates = 0
+
+    const tree = box({}, [
+      box({
+        onCompositionUpdate: () => {
+          firstUpdates++
+        },
+      }, []),
+      box({
+        onCompositionUpdate: () => {
+          secondUpdates++
+        },
+      }, []),
+    ])
+    const layout = {
+      x: 0, y: 0, width: 300, height: 80,
+      children: [
+        { x: 0, y: 0, width: 140, height: 80, children: [] },
+        { x: 160, y: 0, width: 140, height: 80, children: [] },
+      ],
+    }
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    dispatchCompositionEvent(tree, layout, 'onCompositionUpdate', { data: 'に' })
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    dispatchCompositionEvent(tree, layout, 'onCompositionUpdate', { data: 'ほ' })
+
+    expect(firstUpdates).toBe(1)
+    expect(secondUpdates).toBe(1)
+  })
 })
 
