@@ -776,6 +776,8 @@ export function enableSelection(
 ): () => void {
   let isSelecting = false
   let rafId: number | null = null
+  let hoverRafId: number | null = null
+  let pendingHoverPos: { x: number; y: number } | null = null
 
   function scheduleSelectionChange(): void {
     if (rafId !== null) return
@@ -846,9 +848,11 @@ export function enableSelection(
     }
   }
 
-  function onMouseMove(e: MouseEvent) {
-    if (isSelecting) return
-    const pos = getCanvasPos(e)
+  function flushHoverCursor(): void {
+    hoverRafId = null
+    if (isSelecting || !pendingHoverPos) return
+    const pos = pendingHoverPos
+    pendingHoverPos = null
 
     // Check for element cursor prop first
     if (renderer.lastTree && renderer.lastLayout) {
@@ -869,6 +873,12 @@ export function enableSelection(
     }
   }
 
+  function onMouseMove(e: MouseEvent) {
+    pendingHoverPos = getCanvasPos(e)
+    if (hoverRafId !== null) return
+    hoverRafId = requestAnimationFrame(flushHoverCursor)
+  }
+
   canvas.addEventListener('pointerdown', onPointerDown)
   canvas.addEventListener('pointermove', onPointerMove)
   canvas.addEventListener('pointerup', onPointerUp)
@@ -884,6 +894,11 @@ export function enableSelection(
       cancelAnimationFrame(rafId)
       rafId = null
     }
+    if (hoverRafId !== null) {
+      cancelAnimationFrame(hoverRafId)
+      hoverRafId = null
+    }
+    pendingHoverPos = null
     canvas.removeEventListener('pointerdown', onPointerDown)
     canvas.removeEventListener('pointermove', onPointerMove)
     canvas.removeEventListener('pointerup', onPointerUp)
