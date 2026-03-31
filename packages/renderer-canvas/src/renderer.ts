@@ -225,6 +225,9 @@ export class CanvasRenderer implements Renderer {
   /** Increments every `render()`; shown in the layout inspector HUD. */
   renderFrame = 0
 
+  /** Wall time (ms) for the last completed `render()` call, including paint and overlays. */
+  lastRenderWallMs = 0
+
   private textNodeIndex = 0
 
   constructor(options: CanvasRendererOptions) {
@@ -262,6 +265,7 @@ export class CanvasRenderer implements Renderer {
 
   render(layout: ComputedLayout, tree: UIElement): void {
     const { ctx, canvas, dpr } = this
+    const frameStart = typeof performance !== 'undefined' ? performance.now() : 0
 
     canvas.width = layout.width * dpr
     canvas.height = layout.height * dpr
@@ -297,7 +301,13 @@ export class CanvasRenderer implements Renderer {
       }
     }
     if (this.layoutInspector && !skipOverlays) {
-      this.paintLayoutInspectorHud(layout, tree)
+      const msBeforeHud =
+        typeof performance !== 'undefined' ? performance.now() - frameStart : 0
+      this.paintLayoutInspectorHud(layout, tree, msBeforeHud)
+    }
+
+    if (typeof performance !== 'undefined') {
+      this.lastRenderWallMs = performance.now() - frameStart
     }
 
     ctx.setTransform(1, 0, 0, 1, 0, 0)
@@ -908,7 +918,11 @@ export class CanvasRenderer implements Renderer {
     return 1 + m
   }
 
-  private paintLayoutInspectorHud(layout: ComputedLayout, tree: UIElement): void {
+  private paintLayoutInspectorHud(
+    layout: ComputedLayout,
+    tree: UIElement,
+    renderMsBeforeHud: number,
+  ): void {
     const { ctx } = this
     const nodes = this.countInspectorNodes(tree)
     const depth = this.maxInspectorDepth(tree)
@@ -924,6 +938,7 @@ export class CanvasRenderer implements Renderer {
     }
     const lines = [
       `frame ${this.renderFrame}`,
+      `render ${renderMsBeforeHud.toFixed(2)}ms`,
       `nodes ${nodes}  depth ${depth}`,
       `root ${Math.round(layout.width)}×${Math.round(layout.height)}`,
       `focus ${focusHint}  (${focusOrdinal})`,

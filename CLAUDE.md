@@ -7,6 +7,7 @@ See **`FRAMEWORK_NORTH_STAR.md`** for the always-on coding priorities and qualit
 See **`FONTS_AND_METRICS.md`** for `font` strings, `waitForFonts`, and server/client text metric parity.
 See **`INTEGRATION_COOKBOOK.md`** for canvas, server/client, and DOM-free migration notes.
 See **`PROTOCOL_EVOLUTION.md`** for server/client protocol versioning beyond GEOM v1.
+See **`GEOMETRY_SNAPSHOT_TESTING.md`** for layout JSON / geometry regression patterns in CI.
 
 ## Architecture
 

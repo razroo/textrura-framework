@@ -147,6 +147,22 @@ Definition of done:
 - [x] README or north-star docs link the font/metrics policy from developer entry points. (`CLAUDE.md`)
 - [x] Release notes call out font/measurement and protocol guidance. (`RELEASE_NOTES_1_6.md`)
 
+### 1.7.0 — Developer observability and geometry CI
+
+Goal: make frame-level debugging and layout-level regression testing easier without expanding the core pipeline surface.
+
+**Status: `done`**
+
+Acceptance criteria:
+
+- [x] Status: `done` | Owner: `@codex` | Expose per-frame canvas **render wall time** in the layout inspector HUD and as `CanvasRenderer.lastRenderWallMs` for external telemetry.
+- [x] Status: `done` | Owner: `@codex` | Document geometry snapshot / layout JSON testing patterns for CI. (`GEOMETRY_SNAPSHOT_TESTING.md`)
+
+Definition of done:
+
+- [x] Inspector remains zero overhead when `layoutInspector` is disabled.
+- [x] Developer entry docs link geometry snapshot guidance. (`CLAUDE.md`, `INTEGRATION_COOKBOOK.md`)
+
 ## Release polish checklist
 
 Tracking fields:
