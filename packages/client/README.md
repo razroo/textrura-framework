@@ -16,11 +16,15 @@ npm install @geometra/client
 
 ```ts
 import { createClient } from '@geometra/client'
+import { CanvasRenderer } from '@geometra/renderer-canvas'
 
 const canvas = document.getElementById('app') as HTMLCanvasElement
 const client = createClient({
   url: 'ws://localhost:3000',
+  renderer: new CanvasRenderer({ canvas }),
   canvas,
+  // forwards pointer + keyboard events to server
+  forwardKeyboard: true,
 })
 ```
 

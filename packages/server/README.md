@@ -15,13 +15,22 @@ npm install @geometra/server
 ## Usage
 
 ```ts
+import { signal, box, text } from '@geometra/core/node'
 import { createServer } from '@geometra/server'
 
-const server = createServer({ port: 3000 })
+const messages = signal(['Hello from server'])
 
-server.onConnection((client) => {
-  client.render(tree)
-})
+function view() {
+  return box({ flexDirection: 'column', padding: 16, gap: 8 },
+    messages.value.map((m) =>
+      box({ backgroundColor: '#16213e', padding: 10, borderRadius: 8 }, [
+        text({ text: m, font: '14px Inter', lineHeight: 20, color: '#fff' }),
+      ]),
+    ),
+  )
+}
+
+const server = await createServer(view, { port: 3100, width: 800, height: 500 })
 ```
 
 ## Links
