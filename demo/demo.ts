@@ -21,6 +21,8 @@ import {
   dialog as uiDialog,
   tabs as uiTabs,
 } from '@geometra/ui'
+import { createRouter } from '@geometra/router'
+import type { HistoryAdapter, HistoryUpdate, RouteNode } from '@geometra/router'
 
 // ─── Design Tokens ───────────────────────────────────────────────────────────
 const BG = '#09090b'
@@ -1284,6 +1286,68 @@ const SCENARIOS: Record<string, () => UIElement> = {
   auth: authDemo,
 }
 
+// ─── Hash History (GitHub Pages compatible) ──────────────────────────────────
+function createHashHistory(): HistoryAdapter {
+  function getLocation() {
+    const raw = location.hash.replace(/^#/, '') || '/'
+    const url = new URL(raw, 'https://x.local')
+    return {
+      pathname: url.pathname || '/',
+      search: url.search || '',
+      hash: url.hash || '',
+    }
+  }
+
+  const listeners = new Set<(u: HistoryUpdate) => void>()
+  const notify = (action: HistoryUpdate['action']) => {
+    const u: HistoryUpdate = { location: getLocation(), action }
+    for (const fn of listeners) fn(u)
+  }
+  const onPop = () => notify('pop')
+
+  return {
+    get location() { return getLocation() },
+    push(to) { history.pushState(null, '', '#' + to); notify('push') },
+    replace(to) { history.replaceState(null, '', '#' + to); notify('replace') },
+    go(delta) { history.go(delta) },
+    listen(listener) {
+      if (listeners.size === 0) addEventListener('popstate', onPop)
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+        if (listeners.size === 0) removeEventListener('popstate', onPop)
+      }
+    },
+  }
+}
+
+// ─── Router ──────────────────────────────────────────────────────────────────
+const SCENARIO_KEYS = Object.keys(SCENARIOS)
+const scenarioRoutes: RouteNode[] = [
+  { path: '/', id: 'cards' },
+  ...SCENARIO_KEYS.map(key => ({ path: `/${key}`, id: key })),
+]
+
+const hashHistory = createHashHistory()
+const router = createRouter({ routes: scenarioRoutes, history: hashHistory })
+
+function navigateScenario(key: string) {
+  void router.navigate(key === 'cards' ? '/' : `/${key}`)
+}
+
+function syncScenarioFromRouter() {
+  const state = router.getState()
+  const key = state.matches?.matches[0]?.id ?? 'cards'
+  if (key === scenario.peek()) return
+  const prev = scenario.peek()
+  if (prev === 'animation' && key !== 'animation') stopAnimLoop()
+  if (prev === 'agent' && key !== 'agent') resetAgent()
+  if (prev === 'auth' && key !== 'auth') resetAuthDemo()
+  scenario.set(key)
+}
+
+router.subscribe(syncScenarioFromRouter)
+
 // ─── Code Examples ───────────────────────────────────────────────────────────
 const CODE: Record<string, string> = {
   basic: `import { box, text, createApp } from '@geometra/core'
@@ -1591,10 +1655,7 @@ function demoSection(): UIElement {
     }, [
       text({ text: 'Scenario', font: '600 12px Inter', lineHeight: 18, color: DIM }),
       ...names.map(s => btn(s.label, scenario.value === s.key, () => {
-        if (scenario.peek() === 'animation' && s.key !== 'animation') stopAnimLoop()
-        if (scenario.peek() === 'agent' && s.key !== 'agent') resetAgent()
-        if (scenario.peek() === 'auth' && s.key !== 'auth') resetAuthDemo()
-        scenario.set(s.key)
+        navigateScenario(s.key)
         renderer.selection = null
         if (s.key !== 'input') activeDemoInput.set(null)
       })),
@@ -1991,5 +2052,6 @@ canvas.addEventListener('mousemove', (e) => {
 })
 
 // ─── Init ────────────────────────────────────────────────────────────────────
+router.start()
 startAmbientLoop()
 mount()
