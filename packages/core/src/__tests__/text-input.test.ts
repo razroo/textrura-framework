@@ -7,6 +7,7 @@ import {
   backspaceInput,
   deleteInput,
   moveInputCaret,
+  getInputCaretGeometry,
   type TextInputState,
 } from '../text-input.js'
 
@@ -96,6 +97,32 @@ describe('text-input foundation', () => {
 
     const extend = moveInputCaret(right, 'right', true)
     expect(extend.selection).toEqual({ anchorNode: 1, anchorOffset: 0, focusNode: 1, focusOffset: 1 })
+  })
+
+  it('computes caret geometry from measured lines', () => {
+    const caret = getInputCaretGeometry([
+      {
+        element: { kind: 'text', props: { text: 'hello', font: '14px Inter', lineHeight: 20 } },
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 20,
+        index: 0,
+        lines: [
+          { text: 'hello', x: 10, y: 30, charOffsets: [0, 5, 10, 15, 20], charWidths: [5, 5, 5, 5, 5] },
+        ],
+      },
+    ] as any, {
+      anchorNode: 0,
+      anchorOffset: 3,
+      focusNode: 0,
+      focusOffset: 3,
+    })
+
+    expect(caret).not.toBeNull()
+    expect(caret?.x).toBe(25)
+    expect(caret?.y).toBe(30)
+    expect(caret?.height).toBe(20)
   })
 })
 

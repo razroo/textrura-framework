@@ -16,6 +16,7 @@ npm install @geometra/core
 - `toSemanticHTML` -- SEO-friendly HTML generation
 - `toAccessibilityTree` -- runtime accessibility tree from geometry
 - `insertInputText`, `backspaceInput`, `deleteInput` -- text-input editing primitives
+- `getInputCaretGeometry` -- caret x/y/height from measured text lines
 - `transition`, `spring` -- animation utilities
 
 ## Usage

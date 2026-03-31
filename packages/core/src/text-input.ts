@@ -1,4 +1,5 @@
 import type { SelectionRange } from './selection.js'
+import type { TextNodeInfo } from './selection.js'
 
 export interface TextInputState {
   /** Editable text split into logical nodes/runs. */
@@ -10,6 +11,14 @@ export interface TextInputState {
 export interface TextInputEditResult {
   nodes: string[]
   selection: SelectionRange
+}
+
+export interface CaretGeometry {
+  x: number
+  y: number
+  height: number
+  nodeIndex: number
+  offset: number
 }
 
 function clamp(n: number, min: number, max: number): number {
@@ -260,5 +269,49 @@ export function moveInputCaret(
       }
 
   return { nodes: [...nodes], selection: nextSelection }
+}
+
+/**
+ * Compute caret geometry from measured text lines for a collapsed selection.
+ * Returns null when selection is expanded or text metrics are unavailable.
+ */
+export function getInputCaretGeometry(
+  textNodes: TextNodeInfo[],
+  selection: SelectionRange,
+): CaretGeometry | null {
+  if (!isCollapsedSelection(selection)) return null
+  const node = textNodes[selection.focusNode]
+  if (!node || node.lines.length === 0) return null
+
+  const maxOffset = node.element.props.text.length
+  const targetOffset = clamp(selection.focusOffset, 0, maxOffset)
+  let traversed = 0
+
+  for (const line of node.lines) {
+    const lineEnd = traversed + line.text.length
+    const isLastLine = line === node.lines[node.lines.length - 1]
+    if (targetOffset <= lineEnd || isLastLine) {
+      const local = Math.max(0, Math.min(targetOffset - traversed, line.text.length))
+      let x = line.x
+      if (local > 0 && line.charOffsets.length > 0) {
+        if (local < line.charOffsets.length) {
+          x += line.charOffsets[local] ?? 0
+        } else {
+          const lastIndex = line.charOffsets.length - 1
+          x += (line.charOffsets[lastIndex] ?? 0) + (line.charWidths[lastIndex] ?? 0)
+        }
+      }
+      return {
+        x,
+        y: line.y,
+        height: node.element.props.lineHeight,
+        nodeIndex: node.index,
+        offset: targetOffset,
+      }
+    }
+    traversed = lineEnd
+  }
+
+  return null
 }
 
