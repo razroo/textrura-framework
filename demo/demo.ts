@@ -169,7 +169,7 @@ function spawnParticles(cx: number, cy: number) {
 
 // ─── Layout Helpers ──────────────────────────────────────────────────────────
 function countNodes(el: UIElement): number {
-  if (el.kind === 'text') return 1
+  if (el.kind === 'text' || el.kind === 'image') return 1
   return 1 + el.children.reduce((sum, c) => sum + countNodes(c), 0)
 }
 
