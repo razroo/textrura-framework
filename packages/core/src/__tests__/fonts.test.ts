@@ -78,6 +78,22 @@ describe('extractFontFamiliesFromCSSFont', () => {
   it('returns empty when shorthand has size but no family token', () => {
     expect(extractFontFamiliesFromCSSFont('14px')).toEqual([])
   })
+
+  it('parses unitless line-height before family', () => {
+    expect(extractFontFamiliesFromCSSFont('14px / 1.5 Inter, sans-serif')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('14px/1.5 "Custom, Name"')).toEqual(['Custom, Name'])
+  })
+
+  it('parses font-variant keyword stacks before size and family', () => {
+    expect(extractFontFamiliesFromCSSFont('small-caps 600 14px Inter')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('all-small-caps italic 12px Source Serif 4, serif')).toEqual([
+      'Source Serif 4',
+    ])
+  })
+
+  it('drops ui-prefixed generic families', () => {
+    expect(extractFontFamiliesFromCSSFont('14px Inter, ui-rounded')).toEqual(['Inter'])
+  })
 })
 
 describe('collectFontFamiliesFromTree', () => {

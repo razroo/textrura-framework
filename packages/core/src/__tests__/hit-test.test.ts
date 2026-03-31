@@ -476,4 +476,14 @@ describe('hasInteractiveHitAtPoint', () => {
     }
     expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(false)
   })
+
+  it('ignores composition-only handlers for hover hit-test', () => {
+    const inner = box({ width: 40, height: 40, onCompositionStart: () => undefined })
+    const root = box({ width: 100, height: 100 }, [inner])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+    expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(false)
+  })
 })

@@ -10,6 +10,7 @@ const GENERIC_FAMILIES = new Set([
   'ui-sans-serif',
   'ui-serif',
   'ui-monospace',
+  'ui-rounded',
   'emoji',
 ])
 
