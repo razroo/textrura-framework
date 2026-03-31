@@ -13,7 +13,7 @@ function observedTestEvents(output: string): string[] {
 
 interface RunOptions {
   name: string
-  /** Wait before sending keys (ms). Default 1200. */
+  /** Wait before sending keys (ms). Default 1600. */
   bootDelayMs?: number
   /** Key sequences with optional per-step delay (ms). */
   steps: Array<{ keys: string; delayMs?: number }>
@@ -21,11 +21,15 @@ interface RunOptions {
 }
 
 function spawnDemo(): ReturnType<typeof spawn> {
-  return spawn('npx', ['tsx', 'app.ts'], {
+  return spawn('bunx', ['tsx', 'app.ts'], {
     cwd: process.cwd(),
     env: { ...process.env, TERM: 'xterm-256color', GEOMETRA_TERMINAL_TEST: '1' },
     stdio: ['pipe', 'pipe', 'pipe'],
   })
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 async function runScenario(options: RunOptions): Promise<void> {
@@ -55,7 +59,10 @@ async function runScenario(options: RunOptions): Promise<void> {
     child.on('exit', (code) => resolve(code ?? 1))
   })
 
-  await send('', options.bootDelayMs ?? 1200)
+  await sleep(options.bootDelayMs ?? 1600)
+  if (child.killed || child.exitCode !== null) {
+    throw new Error(`${options.name}: process exited during boot\n${stripAnsi(output)}`)
+  }
   for (const step of options.steps) {
     await send(step.keys, step.delayMs ?? 300)
   }
