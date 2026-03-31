@@ -11,7 +11,7 @@ Goal: deliver a Geometra routing stack that is competitive with modern data rout
 
 ## 1) Core routing primitives (must have)
 
-- [ ] Add route matcher supporting static, dynamic (`:id`), optional, and splat segments.
+- [x] Add route matcher supporting static, dynamic (`:id`), optional, and splat segments.
 - [ ] Add nested route tree with layout routes and child outlet rendering.
 - [ ] Add route ranking and deterministic conflict resolution.
 - [ ] Add path generation utilities (reverse routing) with typed params.

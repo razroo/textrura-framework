@@ -31,6 +31,7 @@ The framework replaces the entire browser rendering pipeline. Layout is computed
 | `@geometra/renderer-terminal` | ANSI terminal/TUI paint backend |
 | `@geometra/server` | Server-side layout engine with WebSocket geometry streaming (versioned protocol) |
 | `@geometra/client` | Thin client that receives pre-computed geometry and paints it (versioned protocol checks) |
+| `@geometra/router` | Routing foundation package (pattern matching today; navigation/data APIs in progress) |
 
 ## Quick Start
 

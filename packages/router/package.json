@@ -1,0 +1,36 @@
+{
+  "name": "@geometra/router",
+  "version": "0.1.0",
+  "description": "Routing primitives for Geometra",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/razroo/geometra",
+    "directory": "packages/router"
+  },
+  "homepage": "https://razroo.github.io/geometra",
+  "keywords": [
+    "router",
+    "routing",
+    "geometra",
+    "dom-free",
+    "canvas",
+    "terminal"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit"
+  }
+}
