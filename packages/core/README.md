@@ -45,6 +45,7 @@ const app = createApp(() =>
 - `backspaceInput`/`deleteInput` delete active selections first, then apply boundary merge behavior across nodes.
 - `moveInputCaret` supports range extension via `extendSelection=true`.
 - `moveInputCaret` and `moveInputCaretByWord` accept an optional reading direction (`ltr` default, `rtl` supported) for horizontal key semantics.
+- `moveInputCaretToLineBoundary` also accepts optional reading direction so Home/End semantics can follow visual direction in RTL contexts.
 - `getInputCaretGeometry` is defined for collapsed selections with measured line metrics; expanded ranges return `null`.
 
 ## Direction model baseline

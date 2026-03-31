@@ -381,17 +381,22 @@ export function moveInputCaretToLineBoundary(
   state: TextInputState,
   boundary: 'start' | 'end',
   extendSelection = false,
+  readingDirection: ReadingDirection = 'ltr',
 ): TextInputEditResult {
   const nodes = state.nodes.length > 0 ? state.nodes : ['']
   const selection = clampSelection(nodes, state.selection)
   const collapsed = isCollapsedSelection(selection)
   let nodeIndex = extendSelection ? selection.focusNode : selection.anchorNode
 
+  const resolvedBoundary = readingDirection === 'rtl'
+    ? (boundary === 'start' ? 'end' : 'start')
+    : boundary
+
   if (!collapsed && !extendSelection) {
     const s = normalizeSelection(selection)
-    nodeIndex = boundary === 'start' ? s.anchorNode : s.focusNode
+    nodeIndex = resolvedBoundary === 'start' ? s.anchorNode : s.focusNode
   }
-  const offset = boundary === 'start' ? 0 : nodes[nodeIndex]!.length
+  const offset = resolvedBoundary === 'start' ? 0 : nodes[nodeIndex]!.length
 
   const nextSelection = extendSelection
     ? {

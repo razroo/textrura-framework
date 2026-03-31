@@ -190,6 +190,18 @@ describe('text-input foundation', () => {
     expect(end.selection).toEqual({ anchorNode: 1, anchorOffset: 6, focusNode: 1, focusOffset: 6 })
   })
 
+  it('maps Home/End semantics for rtl reading direction', () => {
+    const base: TextInputState = {
+      nodes: ['abcdef'],
+      selection: { anchorNode: 0, anchorOffset: 3, focusNode: 0, focusOffset: 3 },
+    }
+    const rtlHome = moveInputCaretToLineBoundary(base, 'start', false, 'rtl')
+    const rtlEnd = moveInputCaretToLineBoundary(base, 'end', false, 'rtl')
+
+    expect(rtlHome.selection).toEqual({ anchorNode: 0, anchorOffset: 6, focusNode: 0, focusOffset: 6 })
+    expect(rtlEnd.selection).toEqual({ anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 0 })
+  })
+
   it('moves caret vertically with stable column intent across uneven lines', () => {
     const base: TextInputState = {
       nodes: ['abcdefghij', 'xy', 'abcdefghijkl'],
