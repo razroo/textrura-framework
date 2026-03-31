@@ -282,6 +282,48 @@ describe('scroll and overflow clipping', () => {
   })
 })
 
+describe('overflow hidden clipping', () => {
+  it('overflow hidden: pointer outside parent bounds hits nothing', () => {
+    let childFired = false
+    let parentFired = false
+    const child = box({ width: 50, height: 50, onClick: () => { childFired = true } })
+    const parent = box(
+      { width: 100, height: 100, overflow: 'hidden', onClick: () => { parentFired = true } },
+      [child],
+    )
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 50, height: 50, children: [] }],
+    }
+
+    dispatchHit(parent, layout, 'onClick', 150, 50)
+    expect(childFired).toBe(false)
+    expect(parentFired).toBe(false)
+    expect(hitPathAtPoint(parent, layout, 150, 50)).toBe(null)
+    expect(hasInteractiveHitAtPoint(parent, layout, 150, 50)).toBe(false)
+  })
+
+  it('overflow hidden: pointer inside parent still hits children', () => {
+    let childFired = false
+    const child = box({ width: 50, height: 50, onClick: () => { childFired = true } })
+    const parent = box({ width: 100, height: 100, overflow: 'hidden' }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 50, height: 50, children: [] }],
+    }
+
+    dispatchHit(parent, layout, 'onClick', 25, 25)
+    expect(childFired).toBe(true)
+    expect(hitPathAtPoint(parent, layout, 25, 25)).toEqual([0])
+  })
+})
+
 describe('hasInteractiveHitAtPoint', () => {
   it('detects interactive containers at pointer position', () => {
     const interactive = box({ width: 120, height: 40, onClick: () => undefined })

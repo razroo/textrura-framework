@@ -44,6 +44,19 @@ describe('extractFontFamiliesFromCSSFont', () => {
   it('parses unquoted multi-word family as single name', () => {
     expect(extractFontFamiliesFromCSSFont('12px Times New Roman, serif')).toEqual(['Times New Roman'])
   })
+
+  it('parses rem-sized shorthand', () => {
+    expect(extractFontFamiliesFromCSSFont('1rem Inter')).toEqual(['Inter'])
+  })
+
+  it('drops generic fallbacks case-insensitively', () => {
+    expect(extractFontFamiliesFromCSSFont('14px Inter, SANS-SERIF, Monospace')).toEqual(['Inter'])
+  })
+
+  it('returns empty for whitespace-only input', () => {
+    expect(extractFontFamiliesFromCSSFont('')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('   ')).toEqual([])
+  })
 })
 
 describe('collectFontFamiliesFromTree', () => {
@@ -60,5 +73,12 @@ describe('collectFontFamiliesFromTree', () => {
     ])
     const fam = collectFontFamiliesFromTree(tree).sort()
     expect(fam).toEqual(['Inter', 'JetBrains Mono'])
+  })
+
+  it('collects families from nested text under boxes', () => {
+    const tree = box({}, [
+      box({}, [text({ text: 'inner', font: '16px Source Sans 3', lineHeight: 22 })]),
+    ])
+    expect(collectFontFamiliesFromTree(tree)).toEqual(['Source Sans 3'])
   })
 })
