@@ -11,6 +11,15 @@ export type NavigationOptions = {
   restoreFocus?: boolean
 }
 
+export type RouterErrorPhase = 'loader' | 'action' | 'navigation'
+export type RouterErrorPayload = {
+  phase: RouterErrorPhase
+  routeId?: string
+  location: RouterLocation
+  message: string
+  cause?: unknown
+}
+
 export type RouterState<T = unknown, TRequestContext = unknown> = {
   location: RouterLocation
   matches: RouteBranchMatch<T, TRequestContext> | null
@@ -20,6 +29,7 @@ export type RouterState<T = unknown, TRequestContext = unknown> = {
   loading: boolean
   loaderData: Record<string, unknown>
   actionData: Record<string, unknown>
+  error: RouterErrorPayload | null
 }
 
 export type RouterSubscriber<T = unknown, TRequestContext = unknown> = (
@@ -85,6 +95,7 @@ type ResolvedState<T = unknown, TRequestContext = unknown> = {
   matches: RouteBranchMatch<T, TRequestContext> | null
   loaderData: Record<string, unknown>
   redirect: { to: string; replace: boolean } | null
+  error: RouterErrorPayload | null
 }
 
 function withNavigationState<T, TRequestContext>(
@@ -124,6 +135,7 @@ async function resolveState<T, TRequestContext>(
   const matches = matchRouteTree(routes, location.pathname)
   const loaderData: Record<string, unknown> = {}
   let redirect: { to: string; replace: boolean } | null = null
+  let error: RouterErrorPayload | null = null
 
   if (matches) {
     const query: ParsedQuery = parseQuery(location.search)
@@ -136,14 +148,27 @@ async function resolveState<T, TRequestContext>(
       const route = matches.matches[i]
       if (!route?.loader) continue
       const key = createRouteDataKey(route, i)
-      const result = await route.loader({
-        params: matches.params,
-        query,
-        location,
-        requestContext,
-        signal,
-        route,
-      })
+      let result: unknown
+      try {
+        result = await route.loader({
+          params: matches.params,
+          query,
+          location,
+          requestContext,
+          signal,
+          route,
+        })
+      } catch (cause) {
+        if (isAbortError(cause)) throw cause
+        error = {
+          phase: 'loader',
+          routeId: route.id,
+          location,
+          message: cause instanceof Error ? cause.message : 'Route loader failed',
+          cause,
+        }
+        break
+      }
       if (signal.aborted) throw createAbortError()
       if (isRedirectResult(result)) {
         redirect = { to: result.to, replace: result.replace ?? false }
@@ -158,6 +183,7 @@ async function resolveState<T, TRequestContext>(
     matches,
     loaderData,
     redirect,
+    error,
   }
 }
 
@@ -179,6 +205,7 @@ export function createRouter<T, TRequestContext = unknown>(
     loading: false,
     loaderData: {},
     actionData: {},
+    error: null,
   }
   let pendingTo: string | null = null
   let pendingNavigation:
@@ -216,7 +243,21 @@ export function createRouter<T, TRequestContext = unknown>(
       resolved = await resolveState(routes, location, controller.signal, options.requestContext)
     } catch (error) {
       if (isAbortError(error)) return
-      throw error
+      state = withNavigationState(
+        {
+          ...state,
+          error: {
+            phase: 'navigation',
+            location,
+            message: error instanceof Error ? error.message : 'Navigation failed',
+            cause: error,
+          },
+        },
+        'idle',
+      )
+      previousNavigation?.resolve(false)
+      emit()
+      return
     }
     if (disposed || version !== resolutionVersion || controller !== inFlightController) {
       previousNavigation?.resolve(false)
@@ -240,6 +281,7 @@ export function createRouter<T, TRequestContext = unknown>(
       matches: resolved.matches,
       loaderData: resolved.loaderData,
       actionData: state.actionData,
+      error: resolved.error,
       navigation: state.navigation,
       pending: state.pending,
       submitting: state.submitting,
@@ -355,6 +397,7 @@ export function createRouter<T, TRequestContext = unknown>(
 
         state = {
           ...state,
+          error: null,
           actionData: {
             ...state.actionData,
             [routeId]: result,
@@ -366,11 +409,19 @@ export function createRouter<T, TRequestContext = unknown>(
         await applyResolvedLocation(state.location, null)
         return true
       } catch (error) {
+        const failure: RouterErrorPayload = {
+          phase: 'action',
+          routeId: route.id,
+          location: state.location,
+          message: error instanceof Error ? error.message : 'Route action failed',
+          cause: error,
+        }
         if (actionOptions?.optimistic?.rollback) {
           state = actionOptions.optimistic.rollback(state, error, optimisticBaseState)
         } else if (actionOptions?.optimistic) {
           state = optimisticBaseState
         }
+        state = { ...state, error: failure }
         state = withNavigationState(state, 'idle')
         emit()
         return false

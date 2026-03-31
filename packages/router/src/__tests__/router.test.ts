@@ -495,6 +495,68 @@ describe('createRouter lifecycle', () => {
     expect(router.getState().location.pathname).toBe('/login')
   })
 
+  it('captures loader failures in structured router error state', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/users/1'] })
+    const failingRoutes: RouteNode[] = [
+      {
+        id: 'root',
+        path: '/',
+        children: [
+          {
+            id: 'users',
+            path: 'users/:id',
+            loader: () => {
+              throw new Error('loader boom')
+            },
+          },
+        ],
+      },
+    ]
+    const router = createRouter({ routes: failingRoutes, history })
+    router.start()
+    await router.revalidate()
+
+    expect(router.getState().error).toMatchObject({
+      phase: 'loader',
+      routeId: 'users',
+      message: 'loader boom',
+      location: { pathname: '/users/1', search: '', hash: '' },
+    })
+    expect(router.getState().navigation).toBe('idle')
+  })
+
+  it('captures action failures in structured router error state', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/users/1'] })
+    const failingRoutes: RouteNode[] = [
+      {
+        id: 'root',
+        path: '/',
+        children: [
+          {
+            id: 'users',
+            path: 'users/:id',
+            action: () => {
+              throw new Error('action boom')
+            },
+          },
+        ],
+      },
+    ]
+    const router = createRouter({ routes: failingRoutes, history })
+    router.start()
+    await router.revalidate()
+
+    const ok = await router.submitAction('users', { method: 'POST' })
+    expect(ok).toBe(false)
+    expect(router.getState().error).toMatchObject({
+      phase: 'action',
+      routeId: 'users',
+      message: 'action boom',
+      location: { pathname: '/users/1', search: '', hash: '' },
+    })
+    expect(router.getState().navigation).toBe('idle')
+  })
+
   it('cancels in-flight loader work on interrupted transitions', async () => {
     const history = createMemoryHistory({ initialEntries: ['/'] })
     const abortedIds: string[] = []
