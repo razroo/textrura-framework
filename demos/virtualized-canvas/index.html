@@ -8,10 +8,23 @@
       body { margin: 0; background: #0b1020; color: #fff; font-family: Inter, system-ui, sans-serif; }
       canvas { display: block; margin: 16px auto; border: 1px solid #334155; border-radius: 8px; }
       .hint { text-align: center; color: #94a3b8; font-size: 13px; margin-top: -4px; }
+      #overlay {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        background: rgba(2, 6, 23, 0.92);
+        border: 1px solid #334155;
+        border-radius: 8px;
+        padding: 10px 12px;
+        color: #cbd5e1;
+        font: 12px/1.4 "JetBrains Mono", monospace;
+        white-space: pre;
+      }
     </style>
   </head>
   <body>
     <canvas id="app" width="800" height="520"></canvas>
+    <div id="overlay">render_ms: -\nnode_count: -\nhot_paths: -</div>
     <div class="hint">Use j/k or ArrowUp/ArrowDown. Selection stays stable while list window virtualizes.</div>
     <script type="module" src="./app.ts"></script>
   </body>

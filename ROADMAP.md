@@ -109,7 +109,7 @@ Tracking fields:
 - [x] Status: `done` | Owner: `@codex` | Add scroll-container keyboard behavior contract (focus retention, key routing, wheel/scroll sync).
 - [x] Status: `done` | Owner: `@codex` | Implement virtualized list primitive example with stable focus and selection behavior.
 - [x] Status: `done` | Owner: `@codex` | Add integration tests for large scroll regions with rapid update bursts.
-- [ ] Status: `todo` | Owner: `@unassigned` | Add dev overlay panel with node count, layout time, and repaint hot spots.
+- [x] Status: `done` | Owner: `@codex` | Add dev overlay panel with node count, layout time, and repaint hot spots.
 
 ### 0.4.2 — Accessibility and semantics depth
 
