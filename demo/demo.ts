@@ -265,6 +265,9 @@ function textInputDemo(): UIElement {
       focused: activeDemoInput.value === field,
       caretOffset: state.caretOffset,
       onClick: () => activeDemoInput.set(field),
+      onCaretOffsetChange: (offset) => {
+        setState({ value: state.value, caretOffset: offset })
+      },
       onKeyDown: (e) => {
         const next = applyInputKey(state, e.key)
         if (next !== state) setState(next)

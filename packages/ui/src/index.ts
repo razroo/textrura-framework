@@ -20,6 +20,7 @@ export function button(label: string, onClick?: EventHandlers['onClick']): UIEle
 export interface InputOptions {
   focused?: boolean
   caretOffset?: number
+  onCaretOffsetChange?: (offset: number) => void
   onClick?: EventHandlers['onClick']
   onKeyDown?: EventHandlers['onKeyDown']
   onCompositionStart?: EventHandlers['onCompositionStart']
@@ -54,6 +55,20 @@ export function input(value: string, placeholder = '', options: InputOptions = {
     children.push(box({ width: 1.5, minHeight: 14, backgroundColor: '#38bdf8' }, []))
   }
 
+  const handleClick: EventHandlers['onClick'] = (e) => {
+    options.onClick?.(e)
+    if (!options.onCaretOffsetChange) return
+    if (value.length === 0) {
+      options.onCaretOffsetChange(0)
+      return
+    }
+    const horizontalPadding = 20 // paddingLeft + paddingRight
+    const usableWidth = Math.max(1, e.target.width - horizontalPadding)
+    const localX = Math.max(0, Math.min(usableWidth, e.x - e.target.x - 10))
+    const nextOffset = Math.max(0, Math.min(value.length, Math.round((localX / usableWidth) * value.length)))
+    options.onCaretOffsetChange(nextOffset)
+  }
+
   return box(
     {
       flexDirection: 'row',
@@ -69,7 +84,7 @@ export function input(value: string, placeholder = '', options: InputOptions = {
       cursor: 'text',
       backgroundColor: focused ? '#111827' : undefined,
       semantic: { tag: 'input' },
-      onClick: options.onClick,
+      onClick: handleClick,
       onKeyDown: options.onKeyDown,
       onCompositionStart: options.onCompositionStart,
       onCompositionUpdate: options.onCompositionUpdate,
