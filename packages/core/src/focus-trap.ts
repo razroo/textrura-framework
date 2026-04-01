@@ -46,7 +46,18 @@ function resolveSubtree(
 }
 
 /**
- * Move focus within a scoped subtree (focus trap).
+ * Move focus to the next or previous focusable box inside a subtree (modal / overlay trap).
+ *
+ * Focusables are boxes with any of `onClick`, `onKeyDown`, `onKeyUp`, or composition handlers,
+ * in tree order (same rule as {@link collectFocusOrder}).
+ *
+ * When the current {@link focusedElement} is missing or not inside the trap list, `'next'`
+ * jumps to the first focusable and `'prev'` to the last — so focus can enter the trap from
+ * outside without clearing focus first.
+ *
+ * @param scopePath — Indices from the tree root to the trap root box (inclusive). Invalid
+ *   paths (out-of-range index, non-box node, or empty focusable list under the subtree) yield `false`.
+ * @returns `true` if focus was moved, `false` if the scope is invalid or contains no focusables.
  */
 export function trapFocusStep(
   tree: UIElement,
