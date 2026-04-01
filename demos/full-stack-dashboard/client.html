@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Geometra — Full-Stack Dashboard</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, #0f172a 0%, #020617 52%, #01040b 100%);
+      color: #e2e8f0;
+      font-family: Inter, system-ui, sans-serif;
+      min-height: 100vh;
+    }
+    main {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 28px 24px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.1;
+      letter-spacing: -0.04em;
+    }
+    header p {
+      margin: 8px 0 0;
+      color: #94a3b8;
+      max-width: 760px;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+    .badge-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      border: 1px solid rgba(56, 189, 248, 0.32);
+      background: rgba(8, 47, 73, 0.62);
+      color: #7dd3fc;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 280px;
+      gap: 18px;
+      align-items: start;
+    }
+    .canvas-shell {
+      background: rgba(2, 6, 23, 0.7);
+      border: 1px solid rgba(51, 65, 85, 0.85);
+      border-radius: 18px;
+      padding: 16px;
+      backdrop-filter: blur(18px);
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 14px;
+      border: 1px solid rgba(30, 41, 59, 0.9);
+      box-shadow: 0 20px 40px rgba(2, 6, 23, 0.5);
+      outline: none;
+    }
+    .aside {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .panel {
+      background: rgba(2, 6, 23, 0.78);
+      border: 1px solid rgba(51, 65, 85, 0.84);
+      border-radius: 16px;
+      padding: 14px;
+    }
+    .panel h2 {
+      margin: 0 0 10px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #7dd3fc;
+    }
+    .metric {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 0;
+      border-top: 1px solid rgba(30, 41, 59, 0.8);
+      font-size: 13px;
+    }
+    .metric:first-of-type {
+      border-top: 0;
+      padding-top: 0;
+    }
+    .metric .label {
+      color: #94a3b8;
+    }
+    .metric .value {
+      color: #f8fafc;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+      text-align: right;
+    }
+    .hint {
+      margin: 0;
+      color: #94a3b8;
+      line-height: 1.55;
+      font-size: 13px;
+    }
+    .hint code {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+      color: #f8fafc;
+    }
+    @media (max-width: 1080px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Geometra Full-Stack Dashboard</h1>
+        <p>
+          One app shell, three routes, server-side loaders/actions, thin-client canvas rendering.
+          Click inside the canvas to focus keyboard forwarding, then drive the routed UI entirely over WebSocket geometry.
+        </p>
+      </div>
+      <div class="badge-row">
+        <span class="badge">@geometra/ui</span>
+        <span class="badge">@geometra/router</span>
+        <span class="badge">@geometra/server</span>
+        <span class="badge">@geometra/client</span>
+      </div>
+    </header>
+
+    <section class="layout">
+      <div class="canvas-shell">
+        <canvas id="app" width="980" height="640"></canvas>
+      </div>
+
+      <aside class="aside">
+        <section class="panel">
+          <h2>Transport</h2>
+          <div class="metric"><span class="label">Status</span><span class="value" id="status">Connecting...</span></div>
+          <div class="metric"><span class="label">Encoding</span><span class="value" id="encoding">-</span></div>
+          <div class="metric"><span class="label">Message</span><span class="value" id="message-type">-</span></div>
+          <div class="metric"><span class="label">Bytes</span><span class="value" id="bytes">-</span></div>
+        </section>
+
+        <section class="panel">
+          <h2>Frame Budget</h2>
+          <div class="metric"><span class="label">Decode</span><span class="value" id="decode-ms">-</span></div>
+          <div class="metric"><span class="label">Apply</span><span class="value" id="apply-ms">-</span></div>
+          <div class="metric"><span class="label">Render</span><span class="value" id="render-ms">-</span></div>
+          <div class="metric"><span class="label">Patches</span><span class="value" id="patch-count">-</span></div>
+        </section>
+
+        <section class="panel">
+          <h2>How To Use</h2>
+          <p class="hint">Navigate between Overview, Queue, and Settings inside the canvas.</p>
+          <p class="hint">Queue commands mutate server state and revalidate route data.</p>
+          <p class="hint">Settings uses a route <code>action</code> to save theme and compact mode.</p>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <script type="module" src="./client.ts"></script>
+</body>
+</html>

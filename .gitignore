@@ -1,6 +1,7 @@
 node_modules
 dist
 dist-demo
+demos/*/dist
 *.tsbuildinfo
 
 # Accidental tsc emit beside sources (build output belongs in dist/)

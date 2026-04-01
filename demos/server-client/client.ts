@@ -4,7 +4,7 @@ import { createClient } from '@geometra/client'
 const canvas = document.getElementById('app') as HTMLCanvasElement
 const renderer = new CanvasRenderer({ canvas, background: '#1a1a2e' })
 
-const client = createClient({
+createClient({
   url: 'ws://localhost:3100',
   renderer,
   canvas,

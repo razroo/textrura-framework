@@ -27,5 +27,8 @@ jobs:
       - name: Build
         run: bun run build
 
+      - name: Examples smoke
+        run: bun run examples:smoke
+
       - name: Release readiness gate
         run: bun run release:gate

@@ -13,7 +13,6 @@ const statusEl = document.getElementById('status') as HTMLDivElement
 
 let renderer: CanvasRenderer | null = null
 let client: TexturaClient | null = null
-let currentRole: string | null = null
 
 function log(msg: string) {
   statusEl.textContent = (statusEl.textContent ?? '') + msg + '\n'
@@ -34,7 +33,6 @@ function connectAs(role: string) {
     renderer = null
   }
 
-  currentRole = role
   clearStatus()
 
   const token = TOKENS[role] ?? role

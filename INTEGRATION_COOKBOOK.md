@@ -14,6 +14,7 @@ Short recipes for common stacks. All paths assume a Geometra workspace install.
 1. Server: `createServer` from `@geometra/server` — layout and diffs stay on the server.
 2. Client: `createClient` from `@geometra/client` with a `CanvasRenderer`; forward resize for correct viewport.
 3. Optional: negotiate `binaryFraming` and watch `onFrameMetrics` / server `onTransportMetrics` (see `TRANSPORT_1_4.md`).
+4. For a fuller app shell that also uses `@geometra/ui` and `@geometra/router`, start from `demos/full-stack-dashboard` or `starters/full-stack-dashboard`.
 
 ## DOM-free migration
 

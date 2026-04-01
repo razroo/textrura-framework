@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
+    "types": ["node"],
+    "paths": {
+      "@geometra/core": ["packages/core/src/index.ts"],
+      "@geometra/core/node": ["packages/core/src/node.ts"],
+      "@geometra/renderer-canvas": ["packages/renderer-canvas/src/index.ts"],
+      "@geometra/renderer-terminal": ["packages/renderer-terminal/src/index.ts"],
+      "@geometra/renderer-webgpu": ["packages/renderer-webgpu/src/index.ts"],
+      "@geometra/server": ["packages/server/src/index.ts"],
+      "@geometra/client": ["packages/client/src/index.ts"],
+      "@geometra/ui": ["packages/ui/src/index.ts"],
+      "@geometra/router": ["packages/router/src/index.ts"]
+    }
+  },
+  "include": ["demos/**/*.ts", "starters/**/*.ts"]
+}
