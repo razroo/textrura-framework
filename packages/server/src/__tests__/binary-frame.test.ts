@@ -1,6 +1,28 @@
 import { describe, it, expect } from 'vitest'
 import { decodeBinaryFrameJson, encodeBinaryFrameJson, isBinaryFrameBuffer } from '../binary-frame.js'
 
+describe('isBinaryFrameBuffer', () => {
+  it('returns false when buffer is shorter than the v1 header', () => {
+    expect(isBinaryFrameBuffer(Buffer.alloc(0))).toBe(false)
+    expect(isBinaryFrameBuffer(Buffer.alloc(8))).toBe(false)
+    expect(isBinaryFrameBuffer(new Uint8Array(0))).toBe(false)
+  })
+
+  it('returns false when magic or version does not match v1', () => {
+    const badMagic = Buffer.from([0x00, 0x45, 0x4f, 0x4d, 1, 0, 0, 0, 0])
+    expect(isBinaryFrameBuffer(badMagic)).toBe(false)
+
+    const badVersion = Buffer.from([0x47, 0x45, 0x4f, 0x4d, 2, 0, 0, 0, 0])
+    expect(isBinaryFrameBuffer(badVersion)).toBe(false)
+  })
+
+  it('returns true for a minimal valid v1 header (payload may still be truncated)', () => {
+    const headerOnly = Buffer.from([0x47, 0x45, 0x4f, 0x4d, 1, 0, 0, 0, 0])
+    expect(isBinaryFrameBuffer(headerOnly)).toBe(true)
+    expect(isBinaryFrameBuffer(new Uint8Array(headerOnly))).toBe(true)
+  })
+})
+
 describe('binary frame envelope', () => {
   it('roundtrips JSON through GEOM v1 envelope', () => {
     const json = JSON.stringify({ type: 'frame', protocolVersion: 1, layout: { x: 0, y: 0, width: 1, height: 1, children: [] } })
@@ -15,5 +37,20 @@ describe('binary frame envelope', () => {
     const extended = Buffer.alloc(buf.length + 8, 0xfe)
     buf.copy(extended, 0)
     expect(decodeBinaryFrameJson(extended)).toBe(json)
+  })
+
+  it('throws when the buffer is not a GEOM binary frame', () => {
+    expect(() => decodeBinaryFrameJson(Buffer.alloc(0))).toThrow('Not a GEOM binary frame')
+    expect(() => decodeBinaryFrameJson(Buffer.from('not binary', 'utf8'))).toThrow('Not a GEOM binary frame')
+  })
+
+  it('throws when declared payload length exceeds available bytes', () => {
+    const headerOnly = Buffer.from([0x47, 0x45, 0x4f, 0x4d, 1, 4, 0, 0, 0])
+    expect(() => decodeBinaryFrameJson(headerOnly)).toThrow('Truncated binary frame payload')
+  })
+
+  it('decodes zero-length JSON payload when length field is zero', () => {
+    const emptyPayload = Buffer.from([0x47, 0x45, 0x4f, 0x4d, 1, 0, 0, 0, 0])
+    expect(decodeBinaryFrameJson(emptyPayload)).toBe('')
   })
 })
