@@ -432,6 +432,11 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('600 16px Inter, url(font.ttf), monospace')).toEqual(['Inter'])
   })
 
+  it('keeps quoted family names that look like url() or format() (literal CSS family tokens)', () => {
+    expect(extractFontFamiliesFromCSSFont('14px "url(Brand Face)", serif')).toEqual(['url(Brand Face)'])
+    expect(extractFontFamiliesFromCSSFont("12px 'format(Legacy)', monospace")).toEqual(['format(Legacy)'])
+  })
+
   it('drops format() segments from mistaken @font-face src paste', () => {
     expect(extractFontFamiliesFromCSSFont('14px Inter, format("woff2"), sans-serif')).toEqual(['Inter'])
     expect(extractFontFamiliesFromCSSFont('16px FORMAT( "opentype" ) , serif')).toEqual([])
