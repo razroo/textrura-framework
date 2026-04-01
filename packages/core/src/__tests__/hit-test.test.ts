@@ -248,6 +248,60 @@ describe('dispatchHit', () => {
     expect(log).toEqual(['second'])
   })
 
+  it('overlapping siblings: non-finite z-index is treated as 0 for hit order', () => {
+    const log: string[] = []
+    const invalid = box({
+      width: 50,
+      height: 50,
+      zIndex: Number.NaN,
+      onClick: () => { log.push('invalid') },
+    })
+    const top = box({
+      width: 50,
+      height: 50,
+      zIndex: 5,
+      onClick: () => { log.push('top') },
+    })
+    const root = box({ width: 100, height: 100 }, [invalid, top])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['top'])
+  })
+
+  it('overlapping siblings: two non-finite z-index values tie-break to later sibling', () => {
+    const log: string[] = []
+    const first = box({
+      width: 50,
+      height: 50,
+      zIndex: Number.POSITIVE_INFINITY,
+      onClick: () => { log.push('first') },
+    })
+    const second = box({
+      width: 50,
+      height: 50,
+      zIndex: Number.NaN,
+      onClick: () => { log.push('second') },
+    })
+    const root = box({ width: 100, height: 100 }, [first, second])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['second'])
+  })
+
   it('nested boxes: deepest onPointerDown fires first', () => {
     const log: string[] = []
     const child = box(
