@@ -257,6 +257,8 @@ export function collectFontFamiliesFromTree(root: UIElement): string[] {
  * Wait for web fonts used by the app. Browser only; no-op on server.
  * Uses `document.fonts.load` per family; timeouts are swallowed so startup never hard-fails.
  * Empty and whitespace-only family strings are ignored; names are trimmed before load and deduped.
+ * `timeoutMs` must be a finite non-negative number; otherwise the default `10_000` is used (avoids
+ * relying on `setTimeout` coercion for `NaN`, `±Infinity`, or negative values).
  */
 export async function waitForFonts(families: string[], timeoutMs = 10_000): Promise<void> {
   if (typeof document === 'undefined' || families.length === 0) return
@@ -265,6 +267,8 @@ export async function waitForFonts(families: string[], timeoutMs = 10_000): Prom
 
   const unique = [...new Set(families.map(f => f.trim()).filter(f => f.length > 0))]
   if (unique.length === 0) return
+  const safeTimeoutMs =
+    typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs >= 0 ? timeoutMs : 10_000
   const work = Promise.all(unique.map(f => api.load(`16px ${f}`).catch(() => undefined))).then(() =>
     Promise.resolve(api.ready).catch(() => undefined),
   )
@@ -273,7 +277,7 @@ export async function waitForFonts(families: string[], timeoutMs = 10_000): Prom
     await Promise.race([
       work,
       new Promise<void>((_, reject) => {
-        setTimeout(() => reject(new Error('Font load timeout')), timeoutMs)
+        setTimeout(() => reject(new Error('Font load timeout')), safeTimeoutMs)
       }),
     ])
   } catch {
