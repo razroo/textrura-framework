@@ -514,6 +514,46 @@ describe('dispatchHit', () => {
     expect(log).toEqual(['child'])
   })
 
+  it('nested boxes: deepest onPointerUp fires first', () => {
+    const log: string[] = []
+    const child = box(
+      { width: 40, height: 40, onPointerUp: () => { log.push('child') } },
+    )
+    const parent = box(
+      { width: 100, height: 100, onPointerUp: () => { log.push('parent') } },
+      [child],
+    )
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+      ],
+    }
+
+    dispatchHit(parent, layout, 'onPointerUp', 20, 20)
+    expect(log).toEqual(['child'])
+  })
+
+  it('nested boxes: deepest onPointerMove fires first', () => {
+    const log: string[] = []
+    const child = box(
+      { width: 40, height: 40, onPointerMove: () => { log.push('child') } },
+    )
+    const parent = box(
+      { width: 100, height: 100, onPointerMove: () => { log.push('parent') } },
+      [child],
+    )
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+      ],
+    }
+
+    dispatchHit(parent, layout, 'onPointerMove', 20, 20)
+    expect(log).toEqual(['child'])
+  })
+
   it('overlapping siblings: higher z-index wins for onWheel dispatch', () => {
     const log: string[] = []
     const back = box({ width: 50, height: 50, zIndex: 0, onWheel: () => { log.push('back') } })
@@ -528,6 +568,40 @@ describe('dispatchHit', () => {
     }
 
     dispatchHit(root, layout, 'onWheel', 10, 10)
+    expect(log).toEqual(['front'])
+  })
+
+  it('overlapping siblings: higher z-index wins for onPointerUp dispatch', () => {
+    const log: string[] = []
+    const back = box({ width: 50, height: 50, zIndex: 0, onPointerUp: () => { log.push('back') } })
+    const front = box({ width: 50, height: 50, zIndex: 10, onPointerUp: () => { log.push('front') } })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onPointerUp', 10, 10)
+    expect(log).toEqual(['front'])
+  })
+
+  it('overlapping siblings: higher z-index wins for onPointerMove dispatch', () => {
+    const log: string[] = []
+    const back = box({ width: 50, height: 50, zIndex: 0, onPointerMove: () => { log.push('back') } })
+    const front = box({ width: 50, height: 50, zIndex: 10, onPointerMove: () => { log.push('front') } })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onPointerMove', 10, 10)
     expect(log).toEqual(['front'])
   })
 
