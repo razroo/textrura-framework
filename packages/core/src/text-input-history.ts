@@ -30,13 +30,25 @@ export function createTextInputHistory(initial: TextInputState): TextInputHistor
  * If `next` matches `present` (same joined text and identical selection anchors), returns `history` unchanged.
  *
  * @param maxPast — Maximum prior states kept in `past` after this push; older entries are dropped from the front.
- *   Use `0` to disable undo (each push yields an empty `past`).
+ *   Use `0` to disable undo (each push yields an empty `past`). `NaN` falls back to `100`; `+Infinity`
+ *   keeps history unbounded; other non-finite values fall back to `100`. Negative finite values clamp to `0`.
  */
 export function pushTextInputHistory(
   history: TextInputHistoryState,
   next: TextInputState | TextInputEditResult,
   maxPast = 100,
 ): TextInputHistoryState {
+  let maxPastCap: number
+  if (typeof maxPast !== 'number' || Number.isNaN(maxPast)) {
+    maxPastCap = 100
+  } else if (Number.isFinite(maxPast)) {
+    maxPastCap = Math.max(0, Math.floor(maxPast))
+  } else if (maxPast === Number.POSITIVE_INFINITY) {
+    maxPastCap = Number.MAX_SAFE_INTEGER
+  } else {
+    maxPastCap = 100
+  }
+
   const present = cloneState(history.present)
   const incoming = cloneState({
     nodes: [...next.nodes],
@@ -53,8 +65,8 @@ export function pushTextInputHistory(
   }
 
   const past = [...history.past, present]
-  if (past.length > maxPast) {
-    past.splice(0, past.length - maxPast)
+  if (past.length > maxPastCap) {
+    past.splice(0, past.length - maxPastCap)
   }
   return {
     past,

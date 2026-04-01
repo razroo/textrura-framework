@@ -55,10 +55,59 @@ describe('text input history', () => {
     expect(undoTextInputHistory(h)).toBe(h)
   })
 
+  it('clamps negative maxPast to 0 (same as disabling undo stack)', () => {
+    let h = createTextInputHistory({ nodes: ['a'], selection: sel(0, 1) })
+    h = pushTextInputHistory(h, { nodes: ['ab'], selection: sel(0, 2) }, -5)
+    expect(h.past).toHaveLength(0)
+    expect(h.present.nodes).toEqual(['ab'])
+    expect(undoTextInputHistory(h)).toBe(h)
+  })
+
+  it('with maxPast +Infinity, past is not trimmed', () => {
+    let h = createTextInputHistory({ nodes: ['0'], selection: sel(0, 1) })
+    for (let i = 1; i <= 120; i++) {
+      h = pushTextInputHistory(
+        h,
+        { nodes: [String(i)], selection: sel(0, 1) },
+        Number.POSITIVE_INFINITY,
+      )
+    }
+    expect(h.past).toHaveLength(120)
+    expect(h.present.nodes).toEqual(['120'])
+  })
+
+  it('treats non-finite maxPast as default 100', () => {
+    let h = createTextInputHistory({ nodes: ['0'], selection: sel(0, 1) })
+    for (let i = 1; i <= 5; i++) {
+      h = pushTextInputHistory(
+        h,
+        { nodes: [String(i)], selection: sel(0, 1) },
+        Number.NaN,
+      )
+    }
+    expect(h.past).toHaveLength(5)
+    expect(h.past.map(p => p.nodes.join('\n'))).toEqual(['0', '1', '2', '3', '4'])
+    expect(h.present.nodes).toEqual(['5'])
+  })
+
   it('treats equivalent multi-line text as unchanged when selection fields match (node split only)', () => {
     let h = createTextInputHistory({ nodes: ['x', 'y'], selection: sel(0, 1) })
     const sameJoin = pushTextInputHistory(h, { nodes: ['x\ny'], selection: sel(0, 1) })
     expect(sameJoin).toBe(h)
+  })
+
+  it('floors fractional maxPast when trimming past', () => {
+    let h = createTextInputHistory({ nodes: ['0'], selection: sel(0, 1) })
+    for (let i = 1; i <= 4; i++) {
+      h = pushTextInputHistory(
+        h,
+        { nodes: [String(i)], selection: sel(0, 1) },
+        2.9,
+      )
+    }
+    expect(h.past).toHaveLength(2)
+    expect(h.past.map(p => p.nodes.join('\n'))).toEqual(['2', '3'])
+    expect(h.present.nodes).toEqual(['4'])
   })
 
   it('trims past entries beyond maxPast, keeping the most recent states', () => {
