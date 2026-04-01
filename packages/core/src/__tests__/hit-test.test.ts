@@ -905,6 +905,49 @@ describe('hasInteractiveHitAtPoint', () => {
       expect(hasInteractiveHitAtPoint(root, layoutBase, 10, 10)).toBe(false)
     }
   })
+
+  it('walks up the hit stack: key-only overlay does not hide pointer handler on ancestor', () => {
+    const parent = box(
+      { width: 100, height: 100, onClick: () => undefined },
+      [box({ width: 80, height: 80, onKeyDown: () => undefined })],
+    )
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 80, height: 80, children: [] }],
+    }
+    expect(hasInteractiveHitAtPoint(parent, layout, 40, 40)).toBe(true)
+  })
+
+  it('returns false when every hit in the stack is key- or composition-only', () => {
+    const grand = box(
+      { width: 100, height: 100, onKeyDown: () => undefined },
+      [
+        box(
+          { width: 80, height: 80, onCompositionStart: () => undefined },
+          [box({ width: 60, height: 60, onKeyUp: () => undefined })],
+        ),
+      ],
+    )
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        {
+          x: 0,
+          y: 0,
+          width: 80,
+          height: 80,
+          children: [{ x: 0, y: 0, width: 60, height: 60, children: [] }],
+        },
+      ],
+    }
+    expect(hasInteractiveHitAtPoint(grand, layout, 30, 30)).toBe(false)
+  })
 })
 
 describe('pointerEvents', () => {
