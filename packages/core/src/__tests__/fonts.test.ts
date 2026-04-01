@@ -303,6 +303,13 @@ describe('waitForFonts', () => {
     await waitForFonts(['Inter'])
   })
 
+  it('resolves when fonts.ready is absent after load succeeds', async () => {
+    const load = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('document', { fonts: { load } })
+    await expect(waitForFonts(['Inter'])).resolves.toBeUndefined()
+    expect(load).toHaveBeenCalledWith('16px Inter')
+  })
+
   it('dedupes families and calls load once per unique name', async () => {
     const load = vi.fn().mockResolvedValue(undefined)
     const ready = Promise.resolve()

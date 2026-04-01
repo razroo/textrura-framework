@@ -47,6 +47,23 @@ describe('dispatchHit', () => {
     expect(fired).toBe(false)
   })
 
+  it('non-finite pointer coordinates miss dispatch and hit queries', () => {
+    let fired = false
+    const el = box({ width: 100, height: 50, onClick: () => { fired = true }, cursor: 'pointer' })
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
+
+    expect(dispatchHit(el, layout, 'onClick', NaN, 25).handled).toBe(false)
+    expect(dispatchHit(el, layout, 'onClick', 50, NaN).handled).toBe(false)
+    expect(dispatchHit(el, layout, 'onClick', Number.POSITIVE_INFINITY, 25).handled).toBe(false)
+    expect(dispatchHit(el, layout, 'onClick', 50, Number.POSITIVE_INFINITY).handled).toBe(false)
+    expect(dispatchHit(el, layout, 'onClick', Number.NEGATIVE_INFINITY, 25).handled).toBe(false)
+    expect(fired).toBe(false)
+
+    expect(hitPathAtPoint(el, layout, NaN, 25)).toBeNull()
+    expect(hasInteractiveHitAtPoint(el, layout, NaN, 25)).toBe(false)
+    expect(getCursorAtPoint(el, layout, NaN, 25)).toBeNull()
+  })
+
   it('nested boxes: deepest handler fires first', () => {
     const log: string[] = []
     const child = box(
