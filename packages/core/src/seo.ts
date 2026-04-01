@@ -25,8 +25,12 @@ export interface SemanticHTMLOptions {
   headExtra?: string
 }
 
-/** First `font-size` dimension in `px` (supports scientific notation), aligned with `fonts.ts` parsing. */
-const FONT_SIZE_PX = /(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)px/
+/**
+ * First explicit `font-size` length in the shorthand (supports scientific notation).
+ * Used only for heading-level heuristics in static HTML; non-px units map to approximate px.
+ */
+const FONT_SIZE_LENGTH =
+  /(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*(px|rem|em|pt)\b/i
 
 /** True when `font` shorthand indicates bold weight (keyword or numeric 700–900). */
 function isFontBoldShorthand(fontLower: string): boolean {
@@ -40,15 +44,32 @@ function isFontBoldShorthand(fontLower: string): boolean {
   return false
 }
 
+/** Approximate CSS px used for heading inference when the first size token is not `px`. */
+function fontLengthToApproxPx(value: number, unit: string): number {
+  switch (unit.toLowerCase()) {
+    case 'px':
+      return value
+    case 'rem':
+      return value * 16
+    case 'em':
+      return value * 14
+    case 'pt':
+      return value * (96 / 72)
+    default:
+      return value
+  }
+}
+
 /** Infer an HTML tag from a text element's font property. */
 function inferTag(element: TextElement): string {
   const font = element.props.font.toLowerCase()
-  // Detect heading-like fonts by size
-  const sizeMatch = font.match(FONT_SIZE_PX)
+  // Detect heading-like fonts by size (first length token in shorthand)
+  const sizeMatch = font.match(FONT_SIZE_LENGTH)
   let size = 14
   if (sizeMatch) {
     const n = parseFloat(sizeMatch[1]!)
-    if (Number.isFinite(n)) size = n
+    const unit = sizeMatch[2]!
+    if (Number.isFinite(n)) size = fontLengthToApproxPx(n, unit)
   }
   const isBold = isFontBoldShorthand(font)
 

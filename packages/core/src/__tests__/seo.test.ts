@@ -125,6 +125,20 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<h2>Section</h2>')
   })
 
+  it('infers headings from rem, em, and pt using stable px approximations', () => {
+    const el = box({ width: 400, height: 200 }, [
+      text({ text: 'Rem hero', font: 'bold 2rem sans-serif', lineHeight: 40 }),
+      text({ text: 'Em section', font: 'bold 1.6em sans-serif', lineHeight: 32 }),
+      text({ text: 'Pt sub', font: 'bold 18pt sans-serif', lineHeight: 24 }),
+      text({ text: 'Small pt', font: '10pt sans-serif', lineHeight: 14 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<h1>Rem hero</h1>')
+    expect(html).toContain('<h2>Em section</h2>')
+    expect(html).toContain('<h2>Pt sub</h2>')
+    expect(html).toContain('<p>Small pt</p>')
+  })
+
   it('infers p from small regular font', () => {
     const el = box({ width: 200, height: 50 }, [
       text({ text: 'Body text', font: '14px sans-serif', lineHeight: 18 }),
