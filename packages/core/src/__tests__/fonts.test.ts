@@ -200,6 +200,16 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont(`${pre} 14px Inter, sans-serif`)).toEqual(['Inter'])
   })
 
+  it('parses family when stretch-percent count exceeds the former 128-strip cap', () => {
+    const pre = Array(129).fill('75%').join(' ')
+    expect(extractFontFamiliesFromCSSFont(`${pre} 14px Inter, sans-serif`)).toEqual(['Inter'])
+  })
+
+  it('parses family through a very long leading stretch-percent stack within the strip budget', () => {
+    const pre = Array(1024).fill('75%').join(' ')
+    expect(extractFontFamiliesFromCSSFont(`${pre} 14px Inter, sans-serif`)).toEqual(['Inter'])
+  })
+
   it('still treats a single percentage as font-size when it is followed only by family', () => {
     expect(extractFontFamiliesFromCSSFont('112% Georgia, serif')).toEqual(['Georgia'])
   })

@@ -49,8 +49,11 @@ const TAIL_LEADS_WITH_SIZE_TOKEN = new RegExp(
   'i',
 )
 
-/** Enough for long font-stretch / leading-percent stacks before the real size + family (each token can consume one strip). */
-const MAX_SHORTHAND_STRIP_ITERATIONS = 128
+/**
+ * Enough for long font-stretch / leading-percent stacks before the real size + family
+ * (each token can consume one strip). Bounded to keep pathological `font` strings safe.
+ */
+const MAX_SHORTHAND_STRIP_ITERATIONS = 1024
 
 /** Split a CSS font-family list on commas not inside single or double quotes. */
 function splitFontFamilyList(tail: string): string[] {
@@ -97,6 +100,7 @@ function splitFontFamilyList(tail: string): string[] {
  * Recognizes common font-size units (px, em, rem, cap/ic/lh/rlh, root-relative r* units, pt, %, viewport, dynamic-viewport, container query, Q, and math units).
  * When a percentage is used as `font-stretch` before the real font size (e.g. `75% 14px Inter`),
  * skips that leading dimension so the size + family tail is parsed correctly.
+ * Very long chains of leading size tokens are peeled with a bounded iteration budget; beyond that, results are best-effort.
  * Line-height after `/` may be numeric (with optional unit) or the `normal` keyword.
  */
 export function extractFontFamiliesFromCSSFont(font: string): string[] {
