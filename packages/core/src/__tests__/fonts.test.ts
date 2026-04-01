@@ -210,6 +210,11 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont(`${pre} 14px Inter, sans-serif`)).toEqual(['Inter'])
   })
 
+  it('parses family when stretch-percent count exceeds the shorthand strip iteration budget', () => {
+    const pre = Array(1025).fill('75%').join(' ')
+    expect(extractFontFamiliesFromCSSFont(`${pre} 14px Inter, sans-serif`)).toEqual(['Inter'])
+  })
+
   it('still treats a single percentage as font-size when it is followed only by family', () => {
     expect(extractFontFamiliesFromCSSFont('112% Georgia, serif')).toEqual(['Georgia'])
   })

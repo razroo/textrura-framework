@@ -53,7 +53,8 @@ const TAIL_LEADS_WITH_SIZE_TOKEN = new RegExp(
  * Enough for long font-stretch / leading-percent stacks before the real size + family
  * (each token can consume one strip). Bounded to keep pathological `font` strings safe.
  */
-const MAX_SHORTHAND_STRIP_ITERATIONS = 1024
+/** Upper bound on leading token strips for `font` shorthand parsing (pathological inputs stay finite). */
+const MAX_SHORTHAND_STRIP_ITERATIONS = 4096
 
 /** Split a CSS font-family list on commas not inside single or double quotes. */
 function splitFontFamilyList(tail: string): string[] {
