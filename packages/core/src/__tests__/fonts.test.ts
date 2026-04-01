@@ -91,6 +91,17 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('0px Inter, sans-serif')).toEqual(['Inter'])
   })
 
+  it('parses scientific-notation font size before family', () => {
+    expect(extractFontFamiliesFromCSSFont('1e2px Inter, sans-serif')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('2.5e+1px Inter')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('16e0px JetBrains Mono, monospace')).toEqual(['JetBrains Mono'])
+    expect(extractFontFamiliesFromCSSFont('600 3e0rem Literata, serif')).toEqual(['Literata'])
+  })
+
+  it('does not treat scientific-notation size token as a family name', () => {
+    expect(extractFontFamiliesFromCSSFont('1e2px')).toEqual([])
+  })
+
   it('parses unclosed double-quoted family with trailing backslash (escape at EOF)', () => {
     expect(extractFontFamiliesFromCSSFont('14px "Trail\\')).toEqual(['Trail\\'])
   })

@@ -46,19 +46,23 @@ const FONT_SIZE_UNIT =
   'rlh|rcap|rch|rex|ric|' +
   'rem|cap|px|em|pt|pc|in|cm|math|mm|Q|%|ch|ex|ic|lh)'
 
+/** Magnitude in a `font-size` dimension token (allows scientific notation, e.g. `1e2px`). */
+const FONT_SIZE_NUMBER = String.raw`\d+(?:\.\d+)?(?:[eE][+-]?\d+)?`
+
 /** Optional `/ line-height` after font-size in shorthand (numeric length or keyword `normal`). */
-const FONT_SHORTHAND_LINE_HEIGHT = String.raw`(?:\/\s*(?:[\d.]+` + FONT_SIZE_UNIT + String.raw`?|normal))?`
+const FONT_SHORTHAND_LINE_HEIGHT =
+  String.raw`(?:\/\s*(?:` + FONT_SIZE_NUMBER + FONT_SIZE_UNIT + String.raw`?|normal))?`
 
 const FONT_SHORTHAND_FAMILY_TAIL = new RegExp(
-  String.raw`\b(\d+(?:\.\d+)?` + FONT_SIZE_UNIT + String.raw`)\s*` + FONT_SHORTHAND_LINE_HEIGHT + String.raw`\s+(.+)$`,
+  String.raw`\b(` + FONT_SIZE_NUMBER + FONT_SIZE_UNIT + String.raw`)\s*` + FONT_SHORTHAND_LINE_HEIGHT + String.raw`\s+(.+)$`,
   'i',
 )
 
-const FONT_SIZE_ONLY = new RegExp(String.raw`^\d+(?:\.\d+)?` + FONT_SIZE_UNIT + String.raw`$`, 'i')
+const FONT_SIZE_ONLY = new RegExp(String.raw`^` + FONT_SIZE_NUMBER + FONT_SIZE_UNIT + String.raw`$`, 'i')
 
 /** True when the family tail begins with a dimension token + space (another size before the real family). */
 const TAIL_LEADS_WITH_SIZE_TOKEN = new RegExp(
-  String.raw`^\d+(?:\.\d+)?` + FONT_SIZE_UNIT + String.raw`\s+`,
+  String.raw`^` + FONT_SIZE_NUMBER + FONT_SIZE_UNIT + String.raw`\s+`,
   'i',
 )
 
@@ -120,7 +124,7 @@ function splitFontFamilyList(tail: string): string[] {
  * to the first spelling (comparison is case-insensitive, e.g. `Inter, inter` → one entry).
  * Best-effort parsing for common patterns.
  * Commas inside quoted family names are ignored; `\\` escapes the next character inside quotes (e.g. `\"` for a literal `"`).
- * Recognizes common font-size units (px, em, rem, cap/ic/lh/rlh, root-relative r* units, pt, %, viewport, dynamic-viewport, container query, Q, and math units).
+ * Recognizes common font-size units (px, em, rem, cap/ic/lh/rlh, root-relative r* units, pt, %, viewport, dynamic-viewport, container query, Q, and math units), including scientific notation on the numeric part (e.g. `1e2px`).
  * When a percentage is used as `font-stretch` before the real font size (e.g. `75% 14px Inter`),
  * skips that leading dimension so the size + family tail is parsed correctly.
  * Very long chains of leading size tokens are peeled with a bounded primary budget, then a secondary pass on modest remainders.
