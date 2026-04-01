@@ -1550,6 +1550,26 @@ describe('non-box leaves (text and image)', () => {
     }
     expect(getCursorAtPoint(root, layout, 12, 14)).toBe('pointer')
   })
+
+  it('text as tree root: no pointer hit targets (only box nodes participate in collectHits)', () => {
+    const root = text({ text: 'Hi', font: '14px Inter', lineHeight: 20 })
+    const layout = { x: 0, y: 0, width: 50, height: 20, children: [] }
+
+    expect(dispatchHit(root, layout, 'onClick', 10, 10).handled).toBe(false)
+    expect(hitPathAtPoint(root, layout, 10, 10)).toBeNull()
+    expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(false)
+    expect(getCursorAtPoint(root, layout, 10, 10)).toBeNull()
+  })
+
+  it('image as tree root: no pointer hit targets', () => {
+    const root = image({ src: '/x.png', width: 32, height: 32 })
+    const layout = { x: 0, y: 0, width: 32, height: 32, children: [] }
+
+    expect(dispatchHit(root, layout, 'onClick', 16, 16).handled).toBe(false)
+    expect(hitPathAtPoint(root, layout, 16, 16)).toBeNull()
+    expect(hasInteractiveHitAtPoint(root, layout, 16, 16)).toBe(false)
+    expect(getCursorAtPoint(root, layout, 16, 16)).toBeNull()
+  })
 })
 
 describe('overflow hidden clipping', () => {
