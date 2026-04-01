@@ -186,4 +186,34 @@ describe('trapFocusStep', () => {
     expect(trapFocusStep(tree, layout as any, [0], 'next')).toBe(true)
     expect(focusedElement.peek()?.element).toBe(clickOnly)
   })
+
+  it('includes composition-only boxes in trap order (same rule as collectFocusOrder)', () => {
+    const compOnly = box({ onCompositionStart: () => undefined }, [])
+    const keyOnly = box({ onKeyDown: () => undefined }, [])
+    const tree = box({}, [box({}, [compOnly, keyOnly])])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: [
+        {
+          x: 0,
+          y: 0,
+          width: 200,
+          height: 100,
+          children: [
+            { x: 0, y: 0, width: 100, height: 40, children: [] },
+            { x: 0, y: 50, width: 100, height: 40, children: [] },
+          ],
+        },
+      ],
+    }
+
+    expect(trapFocusStep(tree, layout as any, [0], 'next')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(compOnly)
+
+    expect(trapFocusStep(tree, layout as any, [0], 'next')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(keyOnly)
+  })
 })
