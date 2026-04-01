@@ -74,6 +74,42 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('property="og:image" content="https://example.com/img.png"')
   })
 
+  it('includes Twitter / X Card meta tags when provided', () => {
+    const el = box({ width: 100, height: 100 })
+    const html = toSemanticHTML(el, {
+      twitter: {
+        card: 'summary_large_image',
+        site: '@geometra',
+        title: 'TW Title',
+        description: 'TW Desc',
+        image: 'https://example.com/tw.png',
+      },
+    })
+    expect(html).toContain('name="twitter:card" content="summary_large_image"')
+    expect(html).toContain('name="twitter:site" content="@geometra"')
+    expect(html).toContain('name="twitter:title" content="TW Title"')
+    expect(html).toContain('name="twitter:description" content="TW Desc"')
+    expect(html).toContain('name="twitter:image" content="https://example.com/tw.png"')
+  })
+
+  it('escapes HTML special characters in Twitter Card meta values', () => {
+    const el = box({ width: 100, height: 100 })
+    const html = toSemanticHTML(el, {
+      twitter: {
+        card: 'summary&evil',
+        site: '@app"><xss',
+        title: 'A & B',
+        description: 'Say "hi"',
+        image: 'https://example.com/i?a=1&b=2"',
+      },
+    })
+    expect(html).toContain('name="twitter:card" content="summary&amp;evil"')
+    expect(html).toContain('name="twitter:site" content="@app&quot;&gt;&lt;xss"')
+    expect(html).toContain('name="twitter:title" content="A &amp; B"')
+    expect(html).toContain('name="twitter:description" content="Say &quot;hi&quot;"')
+    expect(html).toContain('name="twitter:image" content="https://example.com/i?a=1&amp;b=2&quot;"')
+  })
+
   it('appends headExtra as trusted raw head markup after built-in meta', () => {
     const el = box({ width: 100, height: 100 })
     const html = toSemanticHTML(el, {

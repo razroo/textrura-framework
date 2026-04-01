@@ -21,6 +21,19 @@ export interface SemanticHTMLOptions {
     url?: string
     type?: string
   }
+  /**
+   * Twitter / X Card metadata (`name="twitter:..."`).
+   * Values are HTML-escaped; URLs and handles should be passed as plain strings.
+   */
+  twitter?: {
+    /** e.g. `summary`, `summary_large_image`. */
+    card?: string
+    /** Site handle, e.g. `@myapp`. */
+    site?: string
+    title?: string
+    description?: string
+    image?: string
+  }
   /** Additional <head> content (raw HTML string). */
   headExtra?: string
 }
@@ -183,6 +196,24 @@ export function toSemanticHTML(
     if (options.og.image) meta.push(`<meta property="og:image" content="${escapeHTML(options.og.image)}">`)
     if (options.og.url) meta.push(`<meta property="og:url" content="${escapeHTML(options.og.url)}">`)
     if (options.og.type) meta.push(`<meta property="og:type" content="${escapeHTML(options.og.type)}">`)
+  }
+
+  if (options.twitter) {
+    if (options.twitter.card) {
+      meta.push(`<meta name="twitter:card" content="${escapeHTML(options.twitter.card)}">`)
+    }
+    if (options.twitter.site) {
+      meta.push(`<meta name="twitter:site" content="${escapeHTML(options.twitter.site)}">`)
+    }
+    if (options.twitter.title) {
+      meta.push(`<meta name="twitter:title" content="${escapeHTML(options.twitter.title)}">`)
+    }
+    if (options.twitter.description) {
+      meta.push(`<meta name="twitter:description" content="${escapeHTML(options.twitter.description)}">`)
+    }
+    if (options.twitter.image) {
+      meta.push(`<meta name="twitter:image" content="${escapeHTML(options.twitter.image)}">`)
+    }
   }
 
   if (options.headExtra) meta.push(options.headExtra)
