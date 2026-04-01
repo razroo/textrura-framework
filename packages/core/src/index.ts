@@ -1,3 +1,15 @@
+/**
+ * @packageDocumentation
+ * Public entry for `@geometra/core`: reactive primitives, element constructors, app mount, layout-tree
+ * conversion, hit-testing, focus and keyboard/composition dispatch, text selection and input, web font
+ * helpers, animation and virtual-scroll utilities, SEO and accessibility snapshots, and shared element
+ * types (`UIElement`, `Renderer`, `FrameTimings`, …).
+ *
+ * Geometra keeps a single declarative tree across canvas, terminal, and server-driven clients; this file
+ * is the supported import surface. Optional `Renderer.setFrameTimings` receives layout wall time after
+ * Yoga so inspectors and telemetry can split layout from paint.
+ */
+
 // Reactivity
 export { signal, computed, effect, batch } from './signals.js'
 export type { Signal, Computed } from './signals.js'
@@ -29,8 +41,7 @@ export {
 export { focusedElement, setFocus, clearFocus, focusNext, focusPrev, collectFocusOrder } from './focus.js'
 export type { FocusTarget } from './focus.js'
 export { trapFocusStep } from './focus-trap.js'
-export { dispatchKeyboardEvent } from './keyboard.js'
-export { dispatchCompositionEvent } from './keyboard.js'
+export { dispatchCompositionEvent, dispatchKeyboardEvent } from './keyboard.js'
 
 // Text selection
 export { collectTextNodes, getSelectedText, hitTestText } from './selection.js'
