@@ -207,6 +207,54 @@ describe('dispatchHit', () => {
     dispatchHit(parent, layout, 'onPointerDown', 20, 20)
     expect(log).toEqual(['child'])
   })
+
+  it('nested boxes: both onClick — focus target is the deepest handler', () => {
+    const child = box({ width: 40, height: 40, onClick: () => undefined })
+    const parent = box({ width: 100, height: 100, onClick: () => undefined }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+
+    const result = dispatchHit(parent, layout, 'onClick', 20, 20)
+    expect(result.handled).toBe(true)
+    expect(result.focusTarget?.element).toBe(child)
+  })
+
+  it('nested boxes: child is key-only focusable, parent onClick — parent handler runs and receives focus target', () => {
+    const child = box({ width: 40, height: 40, onKeyDown: () => undefined })
+    const parent = box({ width: 100, height: 100, onClick: () => undefined }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+
+    const result = dispatchHit(parent, layout, 'onClick', 20, 20)
+    expect(result.handled).toBe(true)
+    expect(result.focusTarget?.element).toBe(parent)
+  })
+
+  it('nested boxes: child onClick only — click-to-focus targets child even without key handlers', () => {
+    const child = box({ width: 40, height: 40, onClick: () => undefined })
+    const parent = box({ width: 100, height: 100 }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+
+    const result = dispatchHit(parent, layout, 'onClick', 20, 20)
+    expect(result.handled).toBe(true)
+    expect(result.focusTarget?.element).toBe(child)
+  })
 })
 
 describe('hitPathAtPoint', () => {
