@@ -10,6 +10,28 @@ describe('path generation', () => {
     expect(buildPath('/users/:id?', {})).toBe('/users')
   })
 
+  it('includes optional params when provided', () => {
+    expect(buildPath('/users/:id?', { id: 7 })).toBe('/users/7')
+  })
+
+  it('builds paths with optional static segment markers (matches matcher optional static)', () => {
+    expect(buildPath('/project/archive?/:id', { id: 1 })).toBe('/project/archive/1')
+  })
+
+  it('normalizes a sole slash to root', () => {
+    expect(buildPath('/', {})).toBe('/')
+  })
+
+  it('builds path with multiple dynamic segments', () => {
+    expect(buildPath('/users/:userId/posts/:postId', { userId: 'a', postId: 2 })).toBe(
+      '/users/a/posts/2',
+    )
+  })
+
+  it('throws when splat param is empty string', () => {
+    expect(() => buildPath('/docs/*rest', { rest: '' })).toThrow('Missing required splat param: rest')
+  })
+
   it('supports splat params', () => {
     expect(buildPath('/docs/*rest', { rest: 'guides/routing/intro' })).toBe('/docs/guides/routing/intro')
   })
