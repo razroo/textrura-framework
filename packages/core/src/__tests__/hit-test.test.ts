@@ -298,6 +298,22 @@ describe('dispatchHit', () => {
     expect(result.handled).toBe(true)
     expect(result.focusTarget?.element).toBe(child)
   })
+
+  it('onClick: pointer-only handlers do not enable click-to-focus', () => {
+    const el = box({ width: 100, height: 50, onPointerDown: () => undefined })
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
+    const result = dispatchHit(el, layout, 'onClick', 50, 25)
+    expect(result.handled).toBe(false)
+    expect(result.focusTarget).toBeUndefined()
+  })
+
+  it('onClick: wheel-only handlers do not enable click-to-focus', () => {
+    const el = box({ width: 100, height: 50, onWheel: () => undefined })
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
+    const result = dispatchHit(el, layout, 'onClick', 50, 25)
+    expect(result.handled).toBe(false)
+    expect(result.focusTarget).toBeUndefined()
+  })
 })
 
 describe('hitPathAtPoint', () => {
