@@ -166,6 +166,58 @@ describe('createApp waitForFonts', () => {
     expect(load).toHaveBeenCalledWith('16px CustomFace')
   })
 
+  it('invokes onError and rejects when the view throws during waitForFonts preflight', async () => {
+    const onError = vi.fn()
+    const load = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('document', { fonts: { load, ready: Promise.resolve() } })
+    const renderer: Renderer = {
+      render: vi.fn(),
+      destroy: vi.fn(),
+    }
+    const err = new Error('preflight view failed')
+    await expect(
+      createApp(
+        () => {
+          throw err
+        },
+        renderer,
+        { width: 100, height: 50, waitForFonts: true, onError },
+      ),
+    ).rejects.toThrow('preflight view failed')
+
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(onError).toHaveBeenCalledWith(err)
+    expect(load).not.toHaveBeenCalled()
+    expect(renderer.render).not.toHaveBeenCalled()
+  })
+
+  it('logs with console.error when the view throws during waitForFonts preflight and onError is omitted', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const load = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('document', { fonts: { load, ready: Promise.resolve() } })
+    const renderer: Renderer = {
+      render: vi.fn(),
+      destroy: vi.fn(),
+    }
+    await expect(
+      createApp(
+        () => {
+          throw new Error('preflight boom')
+        },
+        renderer,
+        { width: 100, height: 50, waitForFonts: true },
+      ),
+    ).rejects.toThrow('preflight boom')
+
+    expect(spy).toHaveBeenCalled()
+    expect(spy.mock.calls[0]![0]).toBe('Geometra render error:')
+    expect(spy.mock.calls[0]![1]).toBeInstanceOf(Error)
+    expect((spy.mock.calls[0]![1] as Error).message).toBe('preflight boom')
+    expect(load).not.toHaveBeenCalled()
+    expect(renderer.render).not.toHaveBeenCalled()
+    spy.mockRestore()
+  })
+
   it('forwards fontLoadTimeoutMs to waitForFonts before the first render', async () => {
     vi.useFakeTimers()
     const load = vi.fn(() => new Promise<void>(() => {}))

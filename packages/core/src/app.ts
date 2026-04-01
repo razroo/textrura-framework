@@ -58,8 +58,17 @@ export async function createApp(
   await init()
 
   if (options.waitForFonts && typeof document !== 'undefined') {
-    const initialTree = view()
-    await waitForFonts(collectFontFamiliesFromTree(initialTree), options.fontLoadTimeoutMs ?? 10_000)
+    try {
+      const initialTree = view()
+      await waitForFonts(collectFontFamiliesFromTree(initialTree), options.fontLoadTimeoutMs ?? 10_000)
+    } catch (err) {
+      if (options.onError) {
+        options.onError(err)
+      } else {
+        console.error('Geometra render error:', err)
+      }
+      throw err
+    }
   }
 
   const app: App = {
