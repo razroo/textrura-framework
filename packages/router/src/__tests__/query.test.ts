@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseQuery, stringifyQuery } from '../query.js'
+import { parseQuery, stringifyQuery, type QueryInput } from '../query.js'
 
 describe('query helpers', () => {
   it('parses empty search string', () => {
@@ -100,6 +100,12 @@ describe('query helpers', () => {
 
   it('stringifies empty object as empty string', () => {
     expect(stringifyQuery({})).toBe('')
+  })
+
+  it('stringifies only own enumerable keys (ignores inherited properties on the prototype chain)', () => {
+    const proto = { inherited: 'ignored' }
+    const query = Object.assign(Object.create(proto), { visible: 'yes' }) as QueryInput
+    expect(stringifyQuery(query)).toBe('?visible=yes')
   })
 
   it('parses single query values', () => {
