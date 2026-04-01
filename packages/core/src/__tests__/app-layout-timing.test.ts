@@ -39,4 +39,19 @@ describe('createApp layout timing', () => {
     expect(seen.length).toBeGreaterThanOrEqual(1)
     expect(seen.every(ms => ms >= 0)).toBe(true)
   })
+
+  it('does not require setFrameTimings; render still runs', async () => {
+    const render = vi.fn()
+    const renderer: Renderer = {
+      render,
+      destroy: vi.fn(),
+    }
+
+    await createApp(() => box({ width: 40, height: 20 }, []), renderer, {
+      width: 100,
+      height: 50,
+    })
+
+    expect(render).toHaveBeenCalled()
+  })
 })
