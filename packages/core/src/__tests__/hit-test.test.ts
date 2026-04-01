@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { dispatchHit, getCursorAtPoint, hasInteractiveHitAtPoint, hitPathAtPoint } from '../hit-test.js'
 import { box } from '../elements.js'
-import type { HitEvent } from '../types.js'
+import type { HitEvent, KeyboardHitEvent } from '../types.js'
 
 describe('dispatchHit', () => {
   it('hit inside a box fires handler', () => {
@@ -373,6 +373,89 @@ describe('dispatchHit', () => {
     const result = dispatchHit(el, layout, 'onClick', 50, 25)
     expect(result.handled).toBe(false)
     expect(result.focusTarget).toBeUndefined()
+  })
+
+  it('onKeyDown: deepest handler runs first; no focusTarget', () => {
+    const log: string[] = []
+    const child = box({ width: 40, height: 40, onKeyDown: () => { log.push('child') } })
+    const parent = box({ width: 100, height: 100, onKeyDown: () => { log.push('parent') } }, [child])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+    const result = dispatchHit(parent, layout, 'onKeyDown', 20, 20, {
+      key: 'a',
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    expect(result.handled).toBe(true)
+    expect(result.focusTarget).toBeUndefined()
+    expect(log).toEqual(['child'])
+  })
+
+  it('onKeyDown: merges keyboard fields onto the event for the hit target', () => {
+    let received: (KeyboardHitEvent & Pick<HitEvent, 'localX' | 'localY'>) | null = null
+    const el = box({
+      width: 100,
+      height: 50,
+      onKeyDown: (e) => {
+        received = e as KeyboardHitEvent & Pick<HitEvent, 'localX' | 'localY'>
+      },
+    })
+    const layout = { x: 10, y: 20, width: 100, height: 50, children: [] }
+    dispatchHit(el, layout, 'onKeyDown', 50, 35, {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: true,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    expect(received?.key).toBe('Tab')
+    expect(received?.target).toBe(layout)
+    expect(received?.localX).toBe(40)
+  })
+
+  it('onKeyUp: deepest handler runs when only onKeyUp is registered', () => {
+    let fired = false
+    const child = box({ width: 40, height: 40, onKeyUp: () => { fired = true } })
+    const parent = box({ width: 100, height: 100 }, [child])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+    const result = dispatchHit(parent, layout, 'onKeyUp', 10, 10, {
+      key: 'b',
+      code: 'KeyB',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    expect(result.handled).toBe(true)
+    expect(result.focusTarget).toBeUndefined()
+    expect(fired).toBe(true)
+  })
+
+  it('onCompositionUpdate: deepest handler runs; merges data; no focusTarget', () => {
+    let data = ''
+    const child = box({
+      width: 40,
+      height: 40,
+      onCompositionUpdate: (e) => { data = e.data },
+    })
+    const parent = box({ width: 100, height: 100 }, [child])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+    const result = dispatchHit(parent, layout, 'onCompositionUpdate', 20, 20, { data: 'かな' })
+    expect(result.handled).toBe(true)
+    expect(result.focusTarget).toBeUndefined()
+    expect(data).toBe('かな')
   })
 })
 

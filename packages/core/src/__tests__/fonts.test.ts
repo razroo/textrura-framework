@@ -86,6 +86,10 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('oblique 14deg 16px Inter')).toEqual(['Inter'])
   })
 
+  it('parses oblique keyword without angle before size and family', () => {
+    expect(extractFontFamiliesFromCSSFont('oblique 14px Inter, sans-serif')).toEqual(['Inter'])
+  })
+
   it('treats bare family list when no size token is present', () => {
     expect(extractFontFamiliesFromCSSFont('Inter, system-ui')).toEqual(['Inter'])
   })
