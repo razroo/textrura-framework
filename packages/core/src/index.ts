@@ -34,6 +34,7 @@ export type { HitDispatchResult } from './hit-test.js'
 export {
   extractFontFamiliesFromCSSFont,
   collectFontFamiliesFromTree,
+  resolveFontLoadTimeoutMs,
   waitForFonts,
 } from './fonts.js'
 
