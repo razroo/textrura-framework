@@ -20,6 +20,11 @@ export interface StyleProps {
   cursor?: 'default' | 'pointer' | 'grab' | 'grabbing' | 'text' | 'not-allowed' | 'crosshair' | 'move'
   /** Z-index for paint ordering among siblings. Higher values paint on top. */
   zIndex?: number
+  /**
+   * Pointer hit targeting. `'none'` skips this box for pointer handlers and cursor resolution;
+   * hits pass through to geometry behind it. Descendants still receive hits unless they also set `'none'`.
+   */
+  pointerEvents?: 'auto' | 'none'
   /** Overflow behavior for children. */
   overflow?: 'visible' | 'hidden' | 'scroll'
   /** Horizontal scroll offset (used with overflow: 'scroll'). */

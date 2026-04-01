@@ -649,3 +649,69 @@ describe('hasInteractiveHitAtPoint', () => {
     expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(false)
   })
 })
+
+describe('pointerEvents', () => {
+  it('pointerEvents none: overlay onClick does not fire; sibling behind receives hit', () => {
+    const log: string[] = []
+    const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } })
+    const front = box({
+      width: 50,
+      height: 50,
+      zIndex: 1,
+      pointerEvents: 'none',
+      onClick: () => { log.push('front') },
+    })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['back'])
+  })
+
+  it('pointerEvents none on parent: child with onClick still receives dispatch', () => {
+    let childFired = false
+    const inner = box({ width: 40, height: 40, onClick: () => { childFired = true } })
+    const parent = box({ width: 100, height: 100, pointerEvents: 'none' }, [inner])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [{ x: 10, y: 10, width: 40, height: 40, children: [] }],
+    }
+
+    expect(dispatchHit(parent, layout, 'onClick', 20, 20).handled).toBe(true)
+    expect(childFired).toBe(true)
+  })
+
+  it('pointerEvents none: hasInteractiveHitAtPoint sees interactive sibling behind overlay', () => {
+    const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => undefined })
+    const front = box({ width: 50, height: 50, zIndex: 2, pointerEvents: 'none' })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+    expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(true)
+  })
+
+  it('pointerEvents none: getCursorAtPoint resolves cursor from geometry behind overlay', () => {
+    const back = box({ width: 50, height: 50, zIndex: 0, cursor: 'pointer' })
+    const front = box({ width: 50, height: 50, zIndex: 3, pointerEvents: 'none', cursor: 'text' })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+    expect(getCursorAtPoint(root, layout, 10, 10)).toBe('pointer')
+  })
+})

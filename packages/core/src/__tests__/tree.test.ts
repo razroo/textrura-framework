@@ -79,11 +79,12 @@ describe('toLayoutTree', () => {
     expect(layout.children[0]).toHaveProperty('width', 100)
   })
 
-  it('strips cursor, zIndex, overflow, scrollX, scrollY, boxShadow, gradient', () => {
+  it('strips cursor, pointerEvents, zIndex, overflow, scrollX, scrollY, boxShadow, gradient', () => {
     const el = box({
       width: 100,
       height: 100,
       cursor: 'pointer',
+      pointerEvents: 'none',
       zIndex: 5,
       overflow: 'hidden',
       scrollX: 10,
@@ -94,6 +95,7 @@ describe('toLayoutTree', () => {
     const layout = toLayoutTree(el)
     expect(layout).toHaveProperty('width', 100)
     expect(layout).not.toHaveProperty('cursor')
+    expect(layout).not.toHaveProperty('pointerEvents')
     expect(layout).not.toHaveProperty('zIndex')
     expect(layout).not.toHaveProperty('overflow')
     expect(layout).not.toHaveProperty('scrollX')

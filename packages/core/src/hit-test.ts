@@ -82,7 +82,8 @@ function collectHits(
 
   if (element.kind === 'box') {
     const boxEl = element as BoxElement
-    if (boxEl.handlers) {
+    const passThrough = boxEl.props.pointerEvents === 'none'
+    if (boxEl.handlers && !passThrough) {
       results.push({ layout, handlers: boxEl.handlers, element: boxEl, absX, absY })
     }
 
@@ -266,6 +267,8 @@ export function getCursorAtPoint(
       }
     }
   }
+
+  if (element.props.pointerEvents === 'none') return null
 
   // Return this element's cursor
   const cursor = (element.props as Record<string, unknown>).cursor as string | undefined

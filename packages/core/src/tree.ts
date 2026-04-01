@@ -11,6 +11,7 @@ function stripStyleProps(props: Record<string, unknown>): Record<string, unknown
   delete layoutProps.borderWidth
   delete layoutProps.opacity
   delete layoutProps.cursor
+  delete layoutProps.pointerEvents
   delete layoutProps.zIndex
   delete layoutProps.overflow
   delete layoutProps.scrollX
