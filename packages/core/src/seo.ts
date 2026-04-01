@@ -41,10 +41,11 @@ export interface SemanticHTMLOptions {
 /**
  * First explicit `font-size` length in the shorthand (supports scientific notation).
  * Used only for heading-level heuristics in static HTML; non-px units map to approximate px.
- * Covers `%` and viewport units often seen in `font` shorthands alongside `fonts.ts` extraction.
+ * Covers `%`, viewport units, and common font-relative units (`ch`, `cap`) aligned with typical
+ * `fonts.ts` shorthand shapes.
  */
 const FONT_SIZE_LENGTH =
-  /(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*(%|px|rem|em|pt|vmin|vmax|vh|vw)(?=[\s,;/]|$)/i
+  /(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*(%|px|rem|em|pt|vmin|vmax|vh|vw|cap|ch)(?=[\s,;/]|$)/i
 
 /** True when `font` shorthand indicates bold weight (keyword or numeric 700–900). */
 function isFontBoldShorthand(fontLower: string): boolean {
@@ -81,6 +82,12 @@ function fontLengthToApproxPx(value: number, unit: string): number {
     case 'vh':
     case 'vw':
       return value * 3
+    // Cap-height unit: approximate vs a 16px root for heading-tier heuristics only.
+    case 'cap':
+      return value * 12
+    // `ch` advance width: coarse ~half-em on a 16px body for static HTML inference.
+    case 'ch':
+      return value * 8
     default:
       return value
   }

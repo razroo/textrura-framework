@@ -225,6 +225,18 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<h1>Hero</h1>')
   })
 
+  it('infers headings from ch and cap units using approximate px', () => {
+    const el = box({ width: 400, height: 200 }, [
+      text({ text: 'Ch hero', font: 'bold 4ch sans-serif', lineHeight: 40 }),
+      text({ text: 'Cap section', font: 'bold 2cap sans-serif', lineHeight: 32 }),
+      text({ text: 'Ch minor', font: 'bold 2ch sans-serif', lineHeight: 22 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<h1>Ch hero</h1>')
+    expect(html).toContain('<h2>Cap section</h2>')
+    expect(html).toContain('<h4>Ch minor</h4>')
+  })
+
   it('infers p from small regular font', () => {
     const el = box({ width: 200, height: 50 }, [
       text({ text: 'Body text', font: '14px sans-serif', lineHeight: 18 }),
