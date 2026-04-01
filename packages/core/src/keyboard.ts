@@ -34,7 +34,10 @@ export function dispatchKeyboardEvent(
   return false
 }
 
-/** Dispatch IME composition events to the focused element. */
+/**
+ * Dispatch IME composition events to the focused element.
+ * Returns `false` when there is no resolved focus target or the target has no handler for `eventType`.
+ */
 export function dispatchCompositionEvent(
   tree: UIElement,
   layout: ComputedLayout,

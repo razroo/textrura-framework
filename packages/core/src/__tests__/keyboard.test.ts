@@ -249,6 +249,32 @@ describe('dispatchKeyboardEvent', () => {
     expect(value).toBe('に')
   })
 
+  it('returns false for composition dispatch when nothing is focused', () => {
+    clearFocus()
+    const tree = box({ onCompositionUpdate: () => undefined }, [])
+    const layout = { x: 0, y: 0, width: 200, height: 100, children: [] }
+    expect(
+      dispatchCompositionEvent(tree, layout, 'onCompositionUpdate', { data: 'に' }),
+    ).toBe(false)
+  })
+
+  it('returns false when focused element has no handler for that composition phase', () => {
+    const tree = box({ onKeyDown: () => undefined }, [])
+    const layout = { x: 0, y: 0, width: 200, height: 100, children: [] }
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    expect(focusedElement.peek()).not.toBeNull()
+    expect(
+      dispatchCompositionEvent(tree, layout, 'onCompositionUpdate', { data: 'に' }),
+    ).toBe(false)
+  })
+
   it('routes composition start/update/end lifecycle and commits draft', () => {
     let state: TextInputState = {
       nodes: ['ab'],
