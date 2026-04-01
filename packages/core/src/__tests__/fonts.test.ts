@@ -455,6 +455,14 @@ describe('extractFontFamiliesFromCSSFont', () => {
       'Literata',
     ])
   })
+
+  it('skips unquoted url() and format() with case and internal whitespace (src paste hardening)', () => {
+    expect(extractFontFamiliesFromCSSFont('14px Inter, Url ( "./a.woff2" ), serif')).toEqual(['Inter'])
+    expect(
+      extractFontFamiliesFromCSSFont('14px Body,\tFoRmAt ( "woff2" ), sans-serif'),
+    ).toEqual(['Body'])
+    expect(extractFontFamiliesFromCSSFont('16px Mono, uRl\t( font.ttf ), monospace')).toEqual(['Mono'])
+  })
 })
 
 describe('collectFontFamiliesFromTree', () => {
