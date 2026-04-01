@@ -8,6 +8,11 @@ export interface AccessibilityBounds {
   height: number
 }
 
+/** Ignore non-finite and non-number scroll props so child offsets stay finite (same rule as pointer hit-testing). */
+function finiteScrollOffset(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
 export interface AccessibilityNode {
   role: string
   name?: string
@@ -95,8 +100,8 @@ function walk(
   const children: AccessibilityNode[] = []
 
   if (element.kind === 'box') {
-    const childOffsetX = x - (element.props.scrollX ?? 0)
-    const childOffsetY = y - (element.props.scrollY ?? 0)
+    const childOffsetX = x - finiteScrollOffset(element.props.scrollX)
+    const childOffsetY = y - finiteScrollOffset(element.props.scrollY)
     for (let i = 0; i < element.children.length; i++) {
       const childLayout = layout.children[i]
       if (childLayout) {

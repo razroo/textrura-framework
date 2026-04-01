@@ -59,6 +59,24 @@ describe('toAccessibilityTree', () => {
     expect(a11y.children[0]?.bounds.y).toBe(48)
   })
 
+  it('ignores non-finite scroll offsets so child bounds stay finite (matches zero scroll)', () => {
+    const tree = box(
+      { scrollX: Number.NaN, scrollY: Number.POSITIVE_INFINITY },
+      [text({ text: 'Item', font: '14px Inter', lineHeight: 18 })],
+    )
+    const layout = {
+      x: 50,
+      y: 60,
+      width: 200,
+      height: 100,
+      children: [{ x: 15, y: 8, width: 40, height: 18, children: [] }],
+    }
+
+    const a11y = toAccessibilityTree(tree, layout)
+    expect(a11y.children[0]?.bounds.x).toBe(65)
+    expect(a11y.children[0]?.bounds.y).toBe(68)
+  })
+
   it('maps common semantic tags for nav/list/form patterns', () => {
     const tree = box({ semantic: { tag: 'main' } }, [
       box({ semantic: { tag: 'nav' } }, [
