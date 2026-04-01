@@ -194,6 +194,11 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('40Q Mincho, serif')).toEqual(['Mincho'])
   })
 
+  it('parses math unit size before family', () => {
+    expect(extractFontFamiliesFromCSSFont('1.2math Inter, sans-serif')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('600 14math "Math Face", serif')).toEqual(['Math Face'])
+  })
+
   it('parses absolute length units (cm, mm, in, pc) before family', () => {
     expect(extractFontFamiliesFromCSSFont('1.2cm Literata, serif')).toEqual(['Literata'])
     expect(extractFontFamiliesFromCSSFont('3mm Micro, monospace')).toEqual(['Micro'])
