@@ -177,6 +177,8 @@ function splitFontFamilyList(tail: string): string[] {
  * Leading absolute size keywords (`medium`, `xx-small`, `large`, …) are stripped the same way.
  * A comma-list segment that is exactly an absolute size keyword is dropped when unquoted; the same word
  * inside quotes is kept (CSS requires quoting when a family name matches a keyword).
+ * `url(...)` segments (e.g. mistaken `@font-face` `src` paste) are not concrete family names and are skipped so
+ * {@link waitForFonts} does not call `load` with them.
  */
 export function extractFontFamiliesFromCSSFont(font: string): string[] {
   function filterFamilies(tail: string): string[] {
@@ -190,6 +192,7 @@ export function extractFontFamiliesFromCSSFont(font: string): string[] {
       const quoted = doubleQuoted || singleQuoted
       const inner = t.replace(/^["']|["']$/g, '')
       if (inner.length === 0) continue
+      if (/^url\s*\(/i.test(inner.trimStart())) continue
       if (!quoted && ABSOLUTE_FONT_SIZE_KEYWORDS.has(inner.toLowerCase())) continue
       if (
         GENERIC_FAMILIES.has(inner.toLowerCase()) ||

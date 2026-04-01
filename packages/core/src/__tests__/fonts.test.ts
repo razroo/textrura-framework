@@ -425,6 +425,12 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('14px local("Brand"), serif')).toEqual(['local("Brand")'])
     expect(extractFontFamiliesFromCSSFont("600 16px local('Acme UI'), monospace")).toEqual(["local('Acme UI')"])
   })
+
+  it('drops url() segments so @font-face src paste does not become a load target', () => {
+    expect(extractFontFamiliesFromCSSFont('14px Inter, url("./font.woff2"), sans-serif')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('14px URL( "./font.woff2" ) format("woff2"), serif')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('600 16px Inter, url(font.ttf), monospace')).toEqual(['Inter'])
+  })
 })
 
 describe('collectFontFamiliesFromTree', () => {
