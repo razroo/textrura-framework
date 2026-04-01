@@ -378,6 +378,14 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('14px Segoe UI Variable, ui-sans-serif')).toEqual(['Segoe UI Variable'])
     expect(extractFontFamiliesFromCSSFont('13px --custom-font-fallback, serif')).toEqual(['--custom-font-fallback'])
   })
+
+  it('strips relative font-size keywords smaller and larger before family or explicit size', () => {
+    expect(extractFontFamiliesFromCSSFont('smaller Inter, sans-serif')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('larger Georgia, serif')).toEqual(['Georgia'])
+    expect(extractFontFamiliesFromCSSFont('SMALLER  JetBrains Mono , monospace')).toEqual(['JetBrains Mono'])
+    expect(extractFontFamiliesFromCSSFont('LaRgEr 14px Literata, serif')).toEqual(['Literata'])
+    expect(extractFontFamiliesFromCSSFont('smaller larger 12px Mono, monospace')).toEqual(['Mono'])
+  })
 })
 
 describe('collectFontFamiliesFromTree', () => {

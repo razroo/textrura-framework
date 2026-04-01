@@ -82,6 +82,9 @@ const MAX_REMAINDER_AFTER_PRIMARY_STRIP = 16_384
 /** Extra peels allowed on modest remainders once the primary budget is exhausted. */
 const EXTRA_SHORTHAND_STRIP_ITERATIONS = 8192
 
+/** Max leading `smaller` / `larger` peels (relative font-size keywords before family or explicit size). */
+const MAX_RELATIVE_SIZE_PREFIX_STRIPS = 8
+
 /** Split a CSS font-family list on commas not inside single or double quotes. */
 function splitFontFamilyList(tail: string): string[] {
   const parts: string[] = []
@@ -131,6 +134,8 @@ function splitFontFamilyList(tail: string): string[] {
  * Very long chains of leading size tokens are peeled with a bounded primary budget, then a secondary pass on modest remainders.
  * If an oversized tail still looks like stacked size tokens, returns [] rather than inventing a family name or doing pathological work.
  * Line-height after `/` may be numeric (with optional unit) or the `normal` keyword.
+ * Leading relative size keywords `smaller` and `larger` (CSS Fonts) are stripped so
+ * values like `smaller Inter, serif` resolve to concrete families for {@link waitForFonts}.
  */
 export function extractFontFamiliesFromCSSFont(font: string): string[] {
   function filterFamilies(tail: string): string[] {
@@ -173,6 +178,11 @@ export function extractFontFamiliesFromCSSFont(font: string): string[] {
   }
 
   let trimmed = font.trim()
+  for (let p = 0; p < MAX_RELATIVE_SIZE_PREFIX_STRIPS; p++) {
+    const withoutRel = trimmed.replace(/^(smaller|larger)\s+/i, '')
+    if (withoutRel === trimmed) break
+    trimmed = withoutRel
+  }
   for (let i = 0; i < MAX_SHORTHAND_STRIP_ITERATIONS; i++) {
     const r = peelFontShorthand(trimmed)
     if (r.kind === 'none') break
