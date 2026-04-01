@@ -111,6 +111,59 @@ describe('getSelectedText', () => {
   })
 })
 
+describe('hitTestText', () => {
+  it('returns null for non-finite pointer coordinates', () => {
+    const textNodes = [
+      {
+        element: { kind: 'text' as const, props: { text: 'ab', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 18,
+        index: 0,
+        lines: [{ text: 'ab', x: 0, y: 0, charOffsets: [0, 8], charWidths: [8, 8] }],
+      },
+    ]
+    expect(hitTestText(textNodes as any, Number.NaN, 5)).toBeNull()
+    expect(hitTestText(textNodes as any, 5, Number.NaN)).toBeNull()
+    expect(hitTestText(textNodes as any, Number.POSITIVE_INFINITY, 5)).toBeNull()
+    expect(hitTestText(textNodes as any, 5, Number.NEGATIVE_INFINITY)).toBeNull()
+  })
+
+  it('returns null when no node bounds match', () => {
+    const textNodes = [
+      {
+        element: { kind: 'text' as const, props: { text: 'x', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 10,
+        y: 10,
+        width: 20,
+        height: 18,
+        index: 0,
+        lines: [{ text: 'x', x: 10, y: 10, charOffsets: [0], charWidths: [10] }],
+      },
+    ]
+    expect(hitTestText(textNodes as any, 0, 15)).toBeNull()
+  })
+
+  it('snaps to charOffset 0 when inside node box but lines are empty', () => {
+    const textNodes = [
+      {
+        element: { kind: 'text' as const, props: { text: 'pending', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 24,
+        index: 0,
+        lines: [],
+      },
+    ]
+    expect(hitTestText(textNodes as any, 5, 5)).toEqual({ nodeIndex: 0, charOffset: 0 })
+  })
+})
+
 describe('hitTestText direction mapping', () => {
   it('maps x positions to logical offsets in rtl text nodes', () => {
     const textNodes = [
