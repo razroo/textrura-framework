@@ -141,7 +141,7 @@ export async function waitForFonts(families: string[], timeoutMs = 10_000): Prom
 
   const unique = [...new Set(families)]
   const work = Promise.all(unique.map(f => api.load(`16px ${f}`).catch(() => undefined))).then(() =>
-    api.ready,
+    Promise.resolve(api.ready).catch(() => undefined),
   )
 
   try {

@@ -290,4 +290,12 @@ describe('waitForFonts', () => {
     await vi.advanceTimersByTimeAsync(50)
     await expect(p).resolves.toBeUndefined()
   })
+
+  it('swallows rejection from fonts.ready after loads settle', async () => {
+    const load = vi.fn().mockResolvedValue(undefined)
+    const ready = Promise.reject(new Error('ready failed'))
+    vi.stubGlobal('document', { fonts: { load, ready } })
+    await expect(waitForFonts(['Inter'])).resolves.toBeUndefined()
+    expect(load).toHaveBeenCalledWith('16px Inter')
+  })
 })
