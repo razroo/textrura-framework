@@ -65,7 +65,7 @@ describe('dispatchHit', () => {
   })
 
   it('non-finite layout bounds are a miss for dispatch and hit queries', () => {
-    let fired = false
+    let fired: boolean
     const el = box({
       width: 100,
       height: 50,
@@ -97,7 +97,7 @@ describe('dispatchHit', () => {
   })
 
   it('negative finite layout dimensions are a miss for dispatch and hit queries', () => {
-    let fired = false
+    let fired: boolean
     const el = box({
       width: 100,
       height: 50,
