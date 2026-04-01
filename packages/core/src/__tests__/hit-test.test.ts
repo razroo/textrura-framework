@@ -382,6 +382,41 @@ describe('hitPathAtPoint', () => {
     }
     expect(hitPathAtPoint(root, layout, 5, 5)).toEqual([1])
   })
+
+  it('pointerEvents none on top sibling: path falls through to box behind', () => {
+    const back = box({ width: 50, height: 50, zIndex: 0 })
+    const front = box({ width: 50, height: 50, zIndex: 2, pointerEvents: 'none' })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+    expect(hitPathAtPoint(root, layout, 5, 5)).toEqual([0])
+  })
+
+  it('pointerEvents none on top sibling: still reports path when overlay wraps a deeper box', () => {
+    const inner = box({ width: 30, height: 30 })
+    const overlay = box({ width: 50, height: 50, zIndex: 2, pointerEvents: 'none' }, [inner])
+    const back = box({ width: 50, height: 50, zIndex: 0 })
+    const root = box({ width: 100, height: 100 }, [back, overlay])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        {
+          x: 0,
+          y: 0,
+          width: 50,
+          height: 50,
+          children: [{ x: 10, y: 10, width: 30, height: 30, children: [] }],
+        },
+      ],
+    }
+    expect(hitPathAtPoint(root, layout, 15, 15)).toEqual([1, 0])
+  })
 })
 
 describe('getCursorAtPoint', () => {

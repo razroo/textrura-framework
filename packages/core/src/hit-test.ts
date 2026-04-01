@@ -188,6 +188,7 @@ export function hasInteractiveHitAtPoint(
 
 /**
  * Child indices from root to the deepest box under (x, y). Among overlapping siblings, prefers higher z-index (topmost).
+ * Boxes with `pointerEvents: 'none'` do not terminate the path when they have no deeper hit (same idea as `getCursorAtPoint` and `collectHits`).
  * Returns `null` when the point misses the tree. Returns `[]` when the point hits the
  * root (or a leaf box) with no deeper box hit.
  */
@@ -233,6 +234,7 @@ export function hitPathAtPoint(
     const sub = hitPathAtPoint(boxEl.children[i]!, childLayout, x, y, childOffsetX, childOffsetY)
     if (sub !== null) return [i, ...sub]
   }
+  if (boxEl.props.pointerEvents === 'none') return null
   return []
 }
 
