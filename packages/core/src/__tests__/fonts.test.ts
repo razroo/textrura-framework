@@ -188,6 +188,17 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('condensed 75% 14px "Custom Face"')).toEqual(['Custom Face'])
   })
 
+  it('parses named font-stretch keywords before size and family', () => {
+    expect(extractFontFamiliesFromCSSFont('ultra-condensed 14px Inter')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('expanded 500 16px "Custom Face"')).toEqual(['Custom Face'])
+    expect(extractFontFamiliesFromCSSFont('semi-expanded 12px Source Serif 4, serif')).toEqual([
+      'Source Serif 4',
+    ])
+    expect(extractFontFamiliesFromCSSFont('extra-expanded 1rem JetBrains Mono, monospace')).toEqual([
+      'JetBrains Mono',
+    ])
+  })
+
   it('skips multiple leading percentage tokens before size and family', () => {
     expect(extractFontFamiliesFromCSSFont('75% 50% 14px Inter')).toEqual(['Inter'])
     expect(extractFontFamiliesFromCSSFont('500 75% 62.5% 16px "Display", sans-serif')).toEqual(['Display'])
