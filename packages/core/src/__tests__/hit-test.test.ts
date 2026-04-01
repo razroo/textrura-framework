@@ -1505,6 +1505,69 @@ describe('scroll and overflow clipping', () => {
     expect(childFired).toBe(true)
   })
 
+  it('NaN scroll offsets are treated as zero (distinct from a finite scroll that would shift hits)', () => {
+    const layoutY = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 80, width: 100, height: 50, children: [] as const }],
+    }
+    let localY = -1
+    let fired = false
+    const childY = box({
+      width: 100,
+      height: 50,
+      cursor: 'crosshair',
+      onClick: e => {
+        fired = true
+        localY = e.localY ?? -999
+      },
+    })
+    const parentNaNY = box(
+      { width: 100, height: 100, overflow: 'scroll', scrollY: Number.NaN },
+      [childY],
+    )
+    // With scrollY 40, child absY would be 40 and (50, 45) would hit. NaN => 0, absY 80 — same point misses.
+    expect(dispatchHit(parentNaNY, layoutY, 'onClick', 50, 45).handled).toBe(false)
+    expect(fired).toBe(false)
+    dispatchHit(parentNaNY, layoutY, 'onClick', 50, 85)
+    expect(fired).toBe(true)
+    expect(localY).toBe(5)
+    expect(hitPathAtPoint(parentNaNY, layoutY, 50, 85)).toEqual([0])
+    expect(getCursorAtPoint(parentNaNY, layoutY, 50, 85)).toBe('crosshair')
+
+    const layoutX = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 80, y: 0, width: 50, height: 100, children: [] as const }],
+    }
+    let localX = -1
+    fired = false
+    const childX = box({
+      width: 50,
+      height: 100,
+      cursor: 'grab',
+      onClick: e => {
+        fired = true
+        localX = e.localX ?? -999
+      },
+    })
+    const parentNaNX = box(
+      { width: 100, height: 100, overflow: 'scroll', scrollX: Number.NaN },
+      [childX],
+    )
+    expect(dispatchHit(parentNaNX, layoutX, 'onClick', 45, 50).handled).toBe(false)
+    expect(fired).toBe(false)
+    dispatchHit(parentNaNX, layoutX, 'onClick', 85, 50)
+    expect(fired).toBe(true)
+    expect(localX).toBe(5)
+    expect(hitPathAtPoint(parentNaNX, layoutX, 85, 50)).toEqual([0])
+    expect(getCursorAtPoint(parentNaNX, layoutX, 85, 50)).toBe('grab')
+  })
+
   it('overflow scroll: pointer outside parent bounds hits nothing', () => {
     let childFired = false
     let parentFired = false
