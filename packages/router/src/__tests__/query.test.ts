@@ -212,6 +212,20 @@ describe('query helpers', () => {
     expect(parsed.constructor).toBe('also-safe')
   })
 
+  it('stringifies __proto__ from null-prototype input and round-trips without prototype pollution', () => {
+    const input = Object.assign(Object.create(null), {
+      ['__proto__']: 'payload',
+      z: '2',
+    }) as QueryInput
+    const serialized = stringifyQuery(input)
+    expect(serialized).toMatch(/\b__proto__=/)
+    const parsed = parseQuery(serialized)
+    expect(Object.getPrototypeOf(parsed)).toBeNull()
+    expect(Object.hasOwn(parsed, '__proto__')).toBe(true)
+    expect(parsed['__proto__']).toBe('payload')
+    expect(parsed.z).toBe('2')
+  })
+
   it('decodes UTF-8 percent-encoded values including non-BMP code points', () => {
     expect(parseQuery('emoji=%F0%9F%9A%80')).toEqual({ emoji: '🚀' })
     expect(parseQuery('check=%E2%9C%93')).toEqual({ check: '✓' })
