@@ -109,6 +109,37 @@ describe('getSelectedText', () => {
     )
     expect(result).toBe('World\nSecond')
   })
+
+  it('returns empty string when there are no text nodes', () => {
+    expect(
+      getSelectedText({ anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 5 }, []),
+    ).toBe('')
+  })
+
+  it('returns empty string for a collapsed selection', () => {
+    const nodes = makeNodes()
+    expect(
+      getSelectedText({ anchorNode: 0, anchorOffset: 5, focusNode: 0, focusOffset: 5 }, nodes as any),
+    ).toBe('')
+  })
+
+  it('returns empty string when offsets are past the node text (slice semantics)', () => {
+    const nodes = [
+      {
+        element: { kind: 'text' as const, props: { text: 'hi', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 18,
+        lines: [],
+        index: 0,
+      },
+    ]
+    expect(
+      getSelectedText({ anchorNode: 0, anchorOffset: 2, focusNode: 0, focusOffset: 10 }, nodes as any),
+    ).toBe('')
+  })
 })
 
 describe('hitTestText', () => {
