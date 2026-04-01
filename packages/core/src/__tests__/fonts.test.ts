@@ -348,6 +348,16 @@ describe('collectFontFamiliesFromTree', () => {
     expect(collectFontFamiliesFromTree(tree)).toEqual([])
   })
 
+  it('collects from a text node used as the tree root', () => {
+    const root = text({ text: 'hi', font: '16px Literata, serif', lineHeight: 22 })
+    expect(collectFontFamiliesFromTree(root)).toEqual(['Literata'])
+  })
+
+  it('returns empty when the root is an image (images carry no font shorthand)', () => {
+    const root = image({ src: '/x.png', width: 1, height: 1 })
+    expect(collectFontFamiliesFromTree(root)).toEqual([])
+  })
+
   it('dedupes families from text nodes', () => {
     const tree = box({}, [
       text({ text: 'a', font: '14px Inter', lineHeight: 20 }),
