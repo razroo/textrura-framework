@@ -277,6 +277,22 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<h4>Ch minor</h4>')
   })
 
+  it('infers headings from lh, rlh, ex, and ic units using approximate px', () => {
+    const el = box({ width: 400, height: 220 }, [
+      text({ text: 'RlH hero', font: 'bold 1.5rlh sans-serif', lineHeight: 40 }),
+      text({ text: 'Lh section', font: 'bold 1.4lh sans-serif', lineHeight: 32 }),
+      text({ text: 'Ex sub', font: 'bold 3ex sans-serif', lineHeight: 28 }),
+      text({ text: 'Ic minor', font: 'bold 1.2ic sans-serif', lineHeight: 22 }),
+      text({ text: 'RlH before lh', font: 'bold 2rlh sans-serif', lineHeight: 52 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<h1>RlH hero</h1>')
+    expect(html).toContain('<h2>Lh section</h2>')
+    expect(html).toContain('<h2>Ex sub</h2>')
+    expect(html).toContain('<h3>Ic minor</h3>')
+    expect(html).toContain('<h1>RlH before lh</h1>')
+  })
+
   it('infers p from small regular font', () => {
     const el = box({ width: 200, height: 50 }, [
       text({ text: 'Body text', font: '14px sans-serif', lineHeight: 18 }),
