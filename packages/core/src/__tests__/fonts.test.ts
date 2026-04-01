@@ -4,7 +4,7 @@ import {
   extractFontFamiliesFromCSSFont,
   waitForFonts,
 } from '../fonts.js'
-import { box, text } from '../elements.js'
+import { box, image, text } from '../elements.js'
 
 describe('extractFontFamiliesFromCSSFont', () => {
   it('parses weight + size + family', () => {
@@ -343,6 +343,14 @@ describe('collectFontFamiliesFromTree', () => {
   it('dedupes repeated names within one shorthand when collecting from tree', () => {
     const tree = box({}, [text({ text: 'x', font: '14px Inter, Inter, Mono', lineHeight: 20 })])
     expect(collectFontFamiliesFromTree(tree)).toEqual(['Inter', 'Mono'])
+  })
+
+  it('ignores image nodes and still collects fonts from text in the same subtree', () => {
+    const tree = box({}, [
+      image({ src: '/a.png', width: 40, height: 40 }),
+      text({ text: 'hi', font: '14px Inter', lineHeight: 20 }),
+    ])
+    expect(collectFontFamiliesFromTree(tree)).toEqual(['Inter'])
   })
 })
 

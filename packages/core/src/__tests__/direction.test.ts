@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { box } from '../elements.js'
+import { box, image, text } from '../elements.js'
 import { resolveDirectionValue, resolveElementDirection } from '../direction.js'
 
 describe('direction model', () => {
@@ -25,5 +25,12 @@ describe('direction model', () => {
     expect(resolveElementDirection(explicitRtl, 'ltr')).toBe('rtl')
     expect(resolveElementDirection(explicitLtr, 'rtl')).toBe('ltr')
     expect(resolveElementDirection(auto, 'rtl')).toBe('rtl')
+  })
+
+  it('resolves direction for text and image nodes the same as boxes', () => {
+    const rtlText = text({ text: 'x', font: '14px Inter', lineHeight: 20, dir: 'rtl' })
+    const rtlImage = image({ src: '/x.png', width: 1, height: 1, dir: 'rtl' })
+    expect(resolveElementDirection(rtlText, 'ltr')).toBe('rtl')
+    expect(resolveElementDirection(rtlImage, 'ltr')).toBe('rtl')
   })
 })
