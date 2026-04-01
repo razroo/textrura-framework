@@ -56,6 +56,83 @@ describe('createApp layout timing', () => {
   })
 })
 
+describe('createApp onError', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('invokes onError and skips render and setFrameTimings when the view throws during initial update', async () => {
+    const onError = vi.fn()
+    const render = vi.fn()
+    const setFrameTimings = vi.fn()
+    const renderer: Renderer = {
+      setFrameTimings,
+      render,
+      destroy: vi.fn(),
+    }
+    const err = new Error('view failed')
+    await createApp(
+      () => {
+        throw err
+      },
+      renderer,
+      { width: 100, height: 50, onError },
+    )
+
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(onError).toHaveBeenCalledWith(err)
+    expect(render).not.toHaveBeenCalled()
+    expect(setFrameTimings).not.toHaveBeenCalled()
+  })
+
+  it('allows a later manual update after the view first throws', async () => {
+    const onError = vi.fn()
+    const render = vi.fn()
+    const renderer: Renderer = {
+      render,
+      destroy: vi.fn(),
+    }
+    let pass = false
+    const app = await createApp(
+      () => {
+        if (!pass) throw new Error('not yet')
+        return box({ width: 10, height: 10 }, [])
+      },
+      renderer,
+      { width: 100, height: 50, onError },
+    )
+
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(render).not.toHaveBeenCalled()
+
+    pass = true
+    app.update()
+
+    expect(render).toHaveBeenCalledTimes(1)
+    expect(onError).toHaveBeenCalledTimes(1)
+  })
+
+  it('logs with console.error when the view throws and onError is omitted', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const renderer: Renderer = {
+      render: vi.fn(),
+      destroy: vi.fn(),
+    }
+    await createApp(
+      () => {
+        throw new Error('boom')
+      },
+      renderer,
+      { width: 100, height: 50 },
+    )
+
+    expect(spy).toHaveBeenCalled()
+    expect(spy.mock.calls[0]![0]).toBe('Geometra render error:')
+    expect(spy.mock.calls[0]![1]).toBeInstanceOf(Error)
+    expect((spy.mock.calls[0]![1] as Error).message).toBe('boom')
+  })
+})
+
 describe('createApp waitForFonts', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
