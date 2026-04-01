@@ -1639,7 +1639,9 @@ describe('non-box leaves (text and image)', () => {
 
     dispatchHit(root, layout, 'onClick', 20, 20)
     expect(parentFired).toBe(true)
+    expect(hasInteractiveHitAtPoint(root, layout, 20, 20)).toBe(true)
     expect(hitPathAtPoint(root, layout, 20, 20)).toEqual([])
+    expect(getCursorAtPoint(root, layout, 20, 20)).toBeNull()
   })
 
   it('higher z-index text sibling does not block onClick on box behind', () => {
@@ -1660,6 +1662,19 @@ describe('non-box leaves (text and image)', () => {
 
     dispatchHit(root, layout, 'onClick', 25, 25)
     expect(log).toEqual(['btn'])
+  })
+
+  it('getCursorAtPoint falls back to parent cursor when point is over image only', () => {
+    const pic = image({ src: '/x.png', width: 32, height: 32 })
+    const root = box({ width: 80, height: 80, cursor: 'pointer' }, [pic])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 80,
+      height: 80,
+      children: [{ x: 8, y: 8, width: 32, height: 32, children: [] }],
+    }
+    expect(getCursorAtPoint(root, layout, 20, 20)).toBe('pointer')
   })
 
   it('getCursorAtPoint falls back to parent cursor when point is over text only', () => {
