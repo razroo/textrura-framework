@@ -539,6 +539,48 @@ describe('dispatchHit', () => {
     expect(log).toEqual(['second'])
   })
 
+  it('overlapping siblings: equal z-index top hit updates when child order mutates (cache invalidation)', () => {
+    const log: string[] = []
+    const first = box(
+      { width: 50, height: 50, zIndex: 1, onClick: () => { log.push('first') } },
+    )
+    const second = box(
+      { width: 50, height: 50, zIndex: 1, onClick: () => { log.push('second') } },
+    )
+    const root = box({ width: 100, height: 100 }, [first, second])
+    const layoutBefore = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layoutBefore, 'onClick', 10, 10)
+    expect(log).toEqual(['second'])
+
+    log.length = 0
+    root.children = [second, first]
+    const layoutAfter = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layoutAfter, 'onClick', 10, 10)
+    expect(log).toEqual(['first'])
+
+    expect(hitPathAtPoint(root, layoutAfter, 10, 10)).toEqual([1])
+  })
+
   it('overlapping siblings: fractional z-index sorts numerically for dispatch', () => {
     const log: string[] = []
     const low = box({ width: 50, height: 50, zIndex: 1, onClick: () => { log.push('low') } })
