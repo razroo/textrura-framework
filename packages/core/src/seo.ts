@@ -28,6 +28,18 @@ export interface SemanticHTMLOptions {
 /** First `font-size` dimension in `px` (supports scientific notation), aligned with `fonts.ts` parsing. */
 const FONT_SIZE_PX = /(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)px/
 
+/** True when `font` shorthand indicates bold weight (keyword or numeric 700–900). */
+function isFontBoldShorthand(fontLower: string): boolean {
+  if (fontLower.includes('bold') || fontLower.includes('bolder')) return true
+  const tokens = fontLower.match(/\b([1-9]\d{2,3})\b/g)
+  if (!tokens) return false
+  for (const token of tokens) {
+    const n = Number.parseInt(token, 10)
+    if (n >= 700 && n <= 900) return true
+  }
+  return false
+}
+
 /** Infer an HTML tag from a text element's font property. */
 function inferTag(element: TextElement): string {
   const font = element.props.font.toLowerCase()
@@ -38,7 +50,7 @@ function inferTag(element: TextElement): string {
     const n = parseFloat(sizeMatch[1]!)
     if (Number.isFinite(n)) size = n
   }
-  const isBold = font.includes('bold')
+  const isBold = isFontBoldShorthand(font)
 
   if (isBold && size >= 28) return 'h1'
   if (isBold && size >= 22) return 'h2'

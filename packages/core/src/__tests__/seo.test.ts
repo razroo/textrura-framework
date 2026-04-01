@@ -91,6 +91,22 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<h1>Big Title</h1>')
   })
 
+  it('infers h1 from numeric font-weight 700 without the bold keyword', () => {
+    const el = box({ width: 200, height: 50 }, [
+      text({ text: 'Hero', font: 'italic 700 32px/40px Inter, sans-serif', lineHeight: 40 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<h1>Hero</h1>')
+  })
+
+  it('does not treat semibold numeric weight (600) as bold for heading inference', () => {
+    const el = box({ width: 200, height: 50 }, [
+      text({ text: 'Subheading', font: '600 32px sans-serif', lineHeight: 40 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<p>Subheading</p>')
+  })
+
   it('infers heading level from scientific-notation px sizes (not the trailing digit before px)', () => {
     const el = box({ width: 200, height: 120 }, [
       text({ text: 'Hero', font: 'bold 1e2px sans-serif', lineHeight: 120 }),
