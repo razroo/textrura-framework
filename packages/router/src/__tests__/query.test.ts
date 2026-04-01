@@ -72,6 +72,16 @@ describe('query helpers', () => {
     expect(parseQuery('foo%=bar')).toEqual({ 'foo%': 'bar' })
   })
 
+  it('keeps raw value when decoding throws on incomplete UTF-8 percent sequence', () => {
+    // Two UTF-8 continuation bytes missing after leading byte U+0098 (e.g. truncated copy-paste).
+    expect(parseQuery('a=%E2%98')).toEqual({ a: '%E2%98' })
+    expect(parseQuery('x=%F0%9F')).toEqual({ x: '%F0%9F' })
+  })
+
+  it('keeps raw key when decoding throws on incomplete UTF-8 in the key', () => {
+    expect(parseQuery('%E2%98=1')).toEqual({ '%E2%98': '1' })
+  })
+
   it('ignores empty segments from leading, trailing, or repeated ampersands', () => {
     expect(parseQuery('&a=1&')).toEqual({ a: '1' })
     expect(parseQuery('a=1&&b=2')).toEqual({ a: '1', b: '2' })
