@@ -47,9 +47,12 @@ export interface SemanticHTMLOptions {
 const FONT_SIZE_LENGTH =
   /(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*(%|px|rem|em|pt|vmin|vmax|vh|vw|cap|ch)(?=[\s,;/]|$)/i
 
-/** True when `font` shorthand indicates bold weight (keyword or numeric 700–900). */
+/**
+ * True when `font` shorthand indicates bold weight (the `bold` / `bolder` keywords as whole tokens,
+ * or numeric 700–900). Substrings such as `semibold` must not match.
+ */
 function isFontBoldShorthand(fontLower: string): boolean {
-  if (fontLower.includes('bold') || fontLower.includes('bolder')) return true
+  if (/\bbold\b/.test(fontLower) || /\bbolder\b/.test(fontLower)) return true
   const tokens = fontLower.match(/\b([1-9]\d{2,3})\b/g)
   if (!tokens) return false
   for (const token of tokens) {

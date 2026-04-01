@@ -195,10 +195,24 @@ describe('toSemanticHTML', () => {
 
   it('does not treat semibold numeric weight (600) as bold for heading inference', () => {
     const el = box({ width: 200, height: 50 }, [
-      text({ text: 'Subheading', font: '600 32px sans-serif', lineHeight: 40 }),
+      text({ text: 'Subheading', font: '600 32px sans-serif', lineHeight: 18 }),
     ])
     const html = toSemanticHTML(el)
     expect(html).toContain('<p>Subheading</p>')
+  })
+
+  it('does not treat the semibold keyword as bold for heading inference', () => {
+    const el = box({ width: 200, height: 50 }, [
+      text({ text: 'UI label', font: 'semibold 32px sans-serif', lineHeight: 40 }),
+    ])
+    expect(toSemanticHTML(el)).toContain('<p>UI label</p>')
+  })
+
+  it('does not treat lighter weight as bold for heading inference at large sizes', () => {
+    const el = box({ width: 200, height: 50 }, [
+      text({ text: 'De-emphasized', font: 'lighter 32px sans-serif', lineHeight: 40 }),
+    ])
+    expect(toSemanticHTML(el)).toContain('<p>De-emphasized</p>')
   })
 
   it('infers heading level from scientific-notation px sizes (not the trailing digit before px)', () => {
