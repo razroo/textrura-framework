@@ -328,6 +328,49 @@ describe('dispatchHit', () => {
     expect(log).toEqual(['second'])
   })
 
+  it('overlapping siblings: non-number z-index at runtime is treated as 0 for hit order', () => {
+    const log: string[] = []
+    const stringZ = box({
+      width: 50,
+      height: 50,
+      zIndex: '99' as unknown as number,
+      onClick: () => { log.push('stringZ') },
+    })
+    const numeric = box({
+      width: 50,
+      height: 50,
+      zIndex: 1,
+      onClick: () => { log.push('numeric') },
+    })
+    const root = box({ width: 100, height: 100 }, [stringZ, numeric])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['numeric'])
+  })
+
+  it('overlapping siblings: non-number z-index matches path and cursor order (treated as 0)', () => {
+    const bad = box({ width: 40, height: 40, zIndex: '5' as unknown as number, cursor: 'text' })
+    const good = box({ width: 40, height: 40, zIndex: 2, cursor: 'pointer' })
+    const root = box({ width: 100, height: 100 }, [bad, good])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+      ],
+    }
+
+    expect(hitPathAtPoint(root, layout, 10, 10)).toEqual([1])
+    expect(getCursorAtPoint(root, layout, 10, 10)).toBe('pointer')
+  })
+
   it('nested boxes: deepest onPointerDown fires first', () => {
     const log: string[] = []
     const child = box(
