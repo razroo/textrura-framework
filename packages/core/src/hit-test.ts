@@ -33,11 +33,6 @@ function getChildrenByZAsc(boxEl: BoxElement): number[] {
   return asc
 }
 
-/** Topmost-first sibling order for picking a single path or cursor (reverse of paint order). */
-function getChildrenByZDesc(boxEl: BoxElement): number[] {
-  return getChildrenByZAsc(boxEl).slice().reverse()
-}
-
 /**
  * Result of routing a hit to {@link EventHandlers} on the deepest matching target.
  * `focusTarget` is only populated for `onClick` (see {@link dispatchHit}).
@@ -251,7 +246,9 @@ export function hitPathAtPoint(
   if (boxEl.props.scrollX) childOffsetX -= boxEl.props.scrollX
   if (boxEl.props.scrollY) childOffsetY -= boxEl.props.scrollY
 
-  for (const i of getChildrenByZDesc(boxEl)) {
+  const asc = getChildrenByZAsc(boxEl)
+  for (let k = asc.length - 1; k >= 0; k--) {
+    const i = asc[k]!
     const childLayout = layout.children[i]
     if (!childLayout) continue
     const sub = hitPathAtPoint(boxEl.children[i]!, childLayout, x, y, childOffsetX, childOffsetY)
@@ -288,9 +285,9 @@ export function getCursorAtPoint(
     if (element.props.scrollX) childOffX -= element.props.scrollX
     if (element.props.scrollY) childOffY -= element.props.scrollY
 
-    const indices = getChildrenByZDesc(element)
-    for (let ii = 0; ii < indices.length; ii++) {
-      const i = indices[ii]!
+    const asc = getChildrenByZAsc(element)
+    for (let k = asc.length - 1; k >= 0; k--) {
+      const i = asc[k]!
       const childLayout = layout.children[i]
       if (childLayout) {
         const childCursor = getCursorAtPoint(element.children[i]!, childLayout, x, y, childOffX, childOffY)
