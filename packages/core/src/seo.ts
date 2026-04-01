@@ -87,6 +87,27 @@ function inferBoxTag(element: BoxElement): string {
   return 'div'
 }
 
+/**
+ * HTML void elements: no closing tag in HTML5.
+ * Used when `semantic.tag` names a void element and the node has no children.
+ */
+const VOID_HTML_TAGS = new Set([
+  'area',
+  'base',
+  'br',
+  'col',
+  'embed',
+  'hr',
+  'img',
+  'input',
+  'link',
+  'meta',
+  'param',
+  'source',
+  'track',
+  'wbr',
+])
+
 /** Escape HTML special characters. */
 function escapeHTML(str: string): string {
   return str
@@ -126,6 +147,9 @@ function elementToHTML(element: UIElement, indent: number): string {
   const attrStr = attrs.length ? ' ' + attrs.join(' ') : ''
 
   if (element.children.length === 0) {
+    if (VOID_HTML_TAGS.has(tag.toLowerCase())) {
+      return `${pad}<${tag}${attrStr}>`
+    }
     return `${pad}<${tag}${attrStr}></${tag}>`
   }
 

@@ -299,7 +299,7 @@ describe('toSemanticHTML', () => {
             <label>
               <p>Email</p>
             </label>
-            <input aria-label="Email input"></input>
+            <input aria-label="Email input">
             <button>
               <p>Submit</p>
             </button>
@@ -307,5 +307,17 @@ describe('toSemanticHTML', () => {
       </body>
       </html>"
     `)
+  })
+
+  it('emits HTML5 void elements without a closing tag when empty', () => {
+    const el = box({ width: 200, height: 80 }, [
+      box({ semantic: { tag: 'input', ariaLabel: 'q', role: 'searchbox' } }, []),
+      box({ semantic: { tag: 'br' } }, []),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<input role="searchbox" aria-label="q">')
+    expect(html).not.toContain('</input>')
+    expect(html).toContain('<br>')
+    expect(html).not.toContain('</br>')
   })
 })
