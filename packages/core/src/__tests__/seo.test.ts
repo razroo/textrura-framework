@@ -74,6 +74,30 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('property="og:image" content="https://example.com/img.png"')
   })
 
+  it('appends headExtra as trusted raw head markup after built-in meta', () => {
+    const el = box({ width: 100, height: 100 })
+    const html = toSemanticHTML(el, {
+      headExtra: '<link rel="alternate" hreflang="fr" href="https://example.com/fr">',
+    })
+    expect(html).toContain('<meta name="viewport"')
+    expect(html).toContain(
+      '<link rel="alternate" hreflang="fr" href="https://example.com/fr">',
+    )
+    const viewportIdx = html.indexOf('initial-scale=1.0">')
+    const extraIdx = html.indexOf('hreflang="fr"')
+    expect(extraIdx).toBeGreaterThan(viewportIdx)
+  })
+
+  it('infers h1 from numeric font-weight 800 and 900 without the bold keyword', () => {
+    const heavy = box({ width: 200, height: 50 }, [
+      text({ text: 'ExtraBold', font: '800 32px Inter, sans-serif', lineHeight: 40 }),
+      text({ text: 'Black', font: '900 32px Inter, sans-serif', lineHeight: 40 }),
+    ])
+    const html = toSemanticHTML(heavy)
+    expect(html).toContain('<h1>ExtraBold</h1>')
+    expect(html).toContain('<h1>Black</h1>')
+  })
+
   it('escapes HTML special characters in text', () => {
     const el = box({ width: 200, height: 50 }, [
       text({ text: '<script>alert("xss")</script>', font: '14px sans-serif', lineHeight: 18 }),
