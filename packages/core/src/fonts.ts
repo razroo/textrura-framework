@@ -100,6 +100,28 @@ const EXTRA_SHORTHAND_STRIP_ITERATIONS = 8192
 /** Max leading `smaller` / `larger` peels (relative font-size keywords before family or explicit size). */
 const MAX_RELATIVE_SIZE_PREFIX_STRIPS = 8
 
+/**
+ * CSS absolute font-size keywords (CSS Fonts). When they lead the shorthand they must be peeled before
+ * size+family parsing; when a comma-separated segment is exactly one of these (unquoted), it is not a
+ * family name (quoted names still pass through).
+ */
+const ABSOLUTE_FONT_SIZE_KEYWORDS = new Set([
+  'xx-small',
+  'x-small',
+  'small',
+  'medium',
+  'large',
+  'x-large',
+  'xx-large',
+  'xxx-large',
+])
+
+/** Longest-match alternation so `xx-large` does not match as `x-large` + `large`. */
+const ABSOLUTE_FONT_SIZE_PREFIX = /^(xxx-large|xx-large|xx-small|x-large|x-small|small|medium|large)\s+/i
+
+/** Max leading absolute keyword strips (pathological stacks stay bounded). */
+const MAX_ABSOLUTE_SIZE_PREFIX_STRIPS = 16
+
 /** Split a CSS font-family list on commas not inside single or double quotes. */
 function splitFontFamilyList(tail: string): string[] {
   const parts: string[] = []
@@ -152,26 +174,35 @@ function splitFontFamilyList(tail: string): string[] {
  * with no following family list yields no families (e.g. `14px / normal` alone).
  * Leading relative size keywords `smaller` and `larger` (CSS Fonts) are stripped so
  * values like `smaller Inter, serif` resolve to concrete families for {@link waitForFonts}.
+ * Leading absolute size keywords (`medium`, `xx-small`, `large`, …) are stripped the same way.
+ * A comma-list segment that is exactly an absolute size keyword is dropped when unquoted; the same word
+ * inside quotes is kept (CSS requires quoting when a family name matches a keyword).
  */
 export function extractFontFamiliesFromCSSFont(font: string): string[] {
   function filterFamilies(tail: string): string[] {
-    const raw = splitFontFamilyList(tail)
-      .map(s => s.trim().replace(/^["']|["']$/g, ''))
-      .filter(
-        f =>
-          f.length > 0 &&
-          !GENERIC_FAMILIES.has(f.toLowerCase()) &&
-          !CSS_WIDE_FONT_KEYWORDS.has(f.toLowerCase()) &&
-          !SYSTEM_FONT_KEYWORDS.has(f.toLowerCase()) &&
-          !FONT_SIZE_ONLY.test(f),
-      )
-    const seen = new Set<string>()
     const out: string[] = []
-    for (const f of raw) {
-      const key = f.toLowerCase()
+    const seen = new Set<string>()
+    for (const seg of splitFontFamilyList(tail)) {
+      const t = seg.trim()
+      if (t.length === 0) continue
+      const doubleQuoted = t.length >= 2 && t.startsWith('"') && t.endsWith('"')
+      const singleQuoted = t.length >= 2 && t.startsWith("'") && t.endsWith("'")
+      const quoted = doubleQuoted || singleQuoted
+      const inner = t.replace(/^["']|["']$/g, '')
+      if (inner.length === 0) continue
+      if (!quoted && ABSOLUTE_FONT_SIZE_KEYWORDS.has(inner.toLowerCase())) continue
+      if (
+        GENERIC_FAMILIES.has(inner.toLowerCase()) ||
+        CSS_WIDE_FONT_KEYWORDS.has(inner.toLowerCase()) ||
+        SYSTEM_FONT_KEYWORDS.has(inner.toLowerCase()) ||
+        FONT_SIZE_ONLY.test(inner)
+      ) {
+        continue
+      }
+      const key = inner.toLowerCase()
       if (seen.has(key)) continue
       seen.add(key)
-      out.push(f)
+      out.push(inner)
     }
     return out
   }
@@ -208,6 +239,11 @@ export function extractFontFamiliesFromCSSFont(font: string): string[] {
     const withoutRel = trimmed.replace(/^(smaller|larger)\s+/i, '')
     if (withoutRel === trimmed) break
     trimmed = withoutRel
+  }
+  for (let p = 0; p < MAX_ABSOLUTE_SIZE_PREFIX_STRIPS; p++) {
+    const m = trimmed.match(ABSOLUTE_FONT_SIZE_PREFIX)
+    if (!m) break
+    trimmed = trimmed.slice(m[0].length).trimStart()
   }
   for (let i = 0; i < MAX_SHORTHAND_STRIP_ITERATIONS; i++) {
     const r = peelFontShorthand(trimmed)

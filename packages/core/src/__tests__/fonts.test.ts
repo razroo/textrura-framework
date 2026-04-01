@@ -406,6 +406,21 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont(`${'smaller '.repeat(9)}Inter, serif`)).toEqual(['smaller Inter'])
   })
 
+  it('strips leading absolute font-size keywords before bare family or explicit size', () => {
+    expect(extractFontFamiliesFromCSSFont('medium Georgia, serif')).toEqual(['Georgia'])
+    expect(extractFontFamiliesFromCSSFont('XX-SMALL Literata, serif')).toEqual(['Literata'])
+    expect(extractFontFamiliesFromCSSFont('xxx-large Source Serif 4, serif')).toEqual(['Source Serif 4'])
+    expect(extractFontFamiliesFromCSSFont('large 14px Inter, sans-serif')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('small larger 12px Mono, monospace')).toEqual(['Mono'])
+  })
+
+  it('drops unquoted absolute size keywords as sole or fallback segments; keeps quoted keyword as family name', () => {
+    expect(extractFontFamiliesFromCSSFont('medium')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('14px medium, serif')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('14px "medium", serif')).toEqual(['medium'])
+    expect(extractFontFamiliesFromCSSFont("16px 'large', sans-serif")).toEqual(['large'])
+  })
+
   it('preserves CSS local() family tokens for callers that forward strings to document.fonts.load', () => {
     expect(extractFontFamiliesFromCSSFont('14px local("Brand"), serif')).toEqual(['local("Brand")'])
     expect(extractFontFamiliesFromCSSFont("600 16px local('Acme UI'), monospace")).toEqual(["local('Acme UI')"])
