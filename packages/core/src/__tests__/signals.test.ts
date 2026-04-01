@@ -152,4 +152,50 @@ describe('batch', () => {
 
     expect(sums).toEqual([3, 30])
   })
+
+  it('flushes deferred subscribers when the batch callback throws', () => {
+    const a = signal(1)
+    let runs = 0
+    effect(() => {
+      void a.value
+      runs++
+    })
+    expect(runs).toBe(1)
+
+    expect(() =>
+      batch(() => {
+        a.set(99)
+        throw new Error('fail')
+      }),
+    ).toThrow('fail')
+
+    expect(a.peek()).toBe(99)
+    expect(runs).toBe(2)
+  })
+
+  it('nested batch: throw from inner still flushes once the outer batch unwinds', () => {
+    const a = signal(1)
+    const b = signal(2)
+    const sums: number[] = []
+
+    effect(() => {
+      sums.push(a.value + b.value)
+    })
+    expect(sums).toEqual([3])
+
+    expect(() =>
+      batch(() => {
+        a.set(10)
+        batch(() => {
+          b.set(20)
+          throw new Error('inner')
+        })
+      }),
+    ).toThrow('inner')
+
+    expect(sums).toEqual([3, 30])
+
+    b.set(21)
+    expect(sums).toEqual([3, 30, 31])
+  })
 })
