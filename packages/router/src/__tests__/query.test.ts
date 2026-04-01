@@ -112,4 +112,27 @@ describe('query helpers', () => {
   it('stringifies arrays skipping nullish entries while preserving order of remaining values', () => {
     expect(stringifyQuery({ mix: [null, 'a', undefined, 'b'] })).toBe('?mix=a&mix=b')
   })
+
+  it('round-trips keys that require percent-encoding', () => {
+    const input = {
+      'a&b': '1',
+      'q=c': '2',
+      'spa ce': '3',
+      'café': '4',
+    }
+    const serialized = stringifyQuery(input)
+    expect(parseQuery(serialized)).toEqual(input)
+  })
+
+  it('round-trips through null-prototype query objects without prototype pollution', () => {
+    const input = Object.assign(Object.create(null), {
+      ['__proto__']: 'safe',
+      ['constructor']: 'also-safe',
+    }) as Record<string, string>
+    const serialized = stringifyQuery(input)
+    const parsed = parseQuery(serialized)
+    expect(Object.getPrototypeOf(parsed)).toBeNull()
+    expect(parsed['__proto__']).toBe('safe')
+    expect(parsed.constructor).toBe('also-safe')
+  })
 })
