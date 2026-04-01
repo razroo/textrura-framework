@@ -39,6 +39,58 @@ describe('toLayoutTree', () => {
     expect(layout).not.toHaveProperty('selectable')
   })
 
+  it('strips paint and hit-target style props from text leaves (same strip list as boxes)', () => {
+    const el = text({
+      text: 'Hi',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      width: 40,
+      height: 18,
+      color: '#333',
+      backgroundColor: '#eee',
+      borderColor: '#ccc',
+      borderRadius: 2,
+      borderWidth: 1,
+      opacity: 0.9,
+      cursor: 'text',
+      pointerEvents: 'none',
+      zIndex: 3,
+      overflow: 'hidden',
+      scrollX: 1,
+      scrollY: 2,
+      boxShadow: { offsetX: 0, offsetY: 1, blur: 2, color: '#000' },
+      gradient: { type: 'linear', stops: [{ offset: 0, color: '#fff' }] },
+      dir: 'rtl',
+    })
+    const layout = toLayoutTree(el)
+    expect(layout).toMatchObject({
+      text: 'Hi',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      width: 40,
+      height: 18,
+    })
+    for (const k of [
+      'color',
+      'backgroundColor',
+      'borderColor',
+      'borderRadius',
+      'borderWidth',
+      'opacity',
+      'cursor',
+      'pointerEvents',
+      'zIndex',
+      'overflow',
+      'scrollX',
+      'scrollY',
+      'boxShadow',
+      'gradient',
+      'dir',
+    ] as const) {
+      expect(layout).not.toHaveProperty(k)
+    }
+  })
+
   it('preserves flexDirection, padding, gap', () => {
     const el = box({
       width: 200,
