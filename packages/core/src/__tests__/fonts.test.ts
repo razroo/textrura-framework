@@ -64,6 +64,21 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('14px sans-serif, serif')).toEqual([])
   })
 
+  it('drops CSS system font keywords (single-token font values)', () => {
+    expect(extractFontFamiliesFromCSSFont('caption')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('icon')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('menu')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('message-box')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('small-caption')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('status-bar')).toEqual([])
+  })
+
+  it('drops system font keywords case-insensitively and after shorthand peel', () => {
+    expect(extractFontFamiliesFromCSSFont('CAPTION')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('14px caption')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('12px Inter, menu, serif')).toEqual(['Inter'])
+  })
+
   it('parses unquoted multi-word family as single name', () => {
     expect(extractFontFamiliesFromCSSFont('12px Times New Roman, serif')).toEqual(['Times New Roman'])
   })

@@ -24,6 +24,19 @@ const CSS_WIDE_FONT_KEYWORDS = new Set([
 ])
 
 /**
+ * Single-keyword `font` values that select the UA system font (CSS Fonts); not concrete families
+ * and must not be passed to `document.fonts.load`.
+ */
+const SYSTEM_FONT_KEYWORDS = new Set([
+  'caption',
+  'icon',
+  'menu',
+  'message-box',
+  'small-caption',
+  'status-bar',
+])
+
+/**
  * Font-size units we treat as the numeric token before the family list in `font` shorthand.
  * Longer tokens precede shorter prefixes (e.g. `dvmin` before `vmin`, `rlh` before `lh`, `rch` before `ch`).
  */
@@ -101,7 +114,8 @@ function splitFontFamilyList(tail: string): string[] {
 
 /**
  * Extract custom font family names from a CSS `font` shorthand (e.g. `600 14px Inter`).
- * Drops generic fallbacks like `sans-serif` and CSS-wide keywords (`inherit`, `initial`, …).
+ * Drops generic fallbacks like `sans-serif`, CSS-wide keywords (`inherit`, `initial`, …), and
+ * system font keywords (`caption`, `menu`, …).
  * Repeated custom names in the same list collapse
  * to the first spelling (comparison is case-insensitive, e.g. `Inter, inter` → one entry).
  * Best-effort parsing for common patterns.
@@ -122,6 +136,7 @@ export function extractFontFamiliesFromCSSFont(font: string): string[] {
           f.length > 0 &&
           !GENERIC_FAMILIES.has(f.toLowerCase()) &&
           !CSS_WIDE_FONT_KEYWORDS.has(f.toLowerCase()) &&
+          !SYSTEM_FONT_KEYWORDS.has(f.toLowerCase()) &&
           !FONT_SIZE_ONLY.test(f),
       )
     const seen = new Set<string>()
