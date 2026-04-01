@@ -122,6 +122,20 @@ const ABSOLUTE_FONT_SIZE_PREFIX = /^(xxx-large|xx-large|xx-small|x-large|x-small
 /** Max leading absolute keyword strips (pathological stacks stay bounded). */
 const MAX_ABSOLUTE_SIZE_PREFIX_STRIPS = 16
 
+/** Index after the closing `)` that matches `s[openParenIndex]` (which must be `(`). */
+function indexAfterMatchingParen(s: string, openParenIndex: number): number | null {
+  let depth = 0
+  for (let i = openParenIndex; i < s.length; i++) {
+    const c = s[i]!
+    if (c === '(') depth++
+    else if (c === ')') {
+      depth--
+      if (depth === 0) return i + 1
+    }
+  }
+  return null
+}
+
 /** Split a CSS font-family list on commas not inside single or double quotes. */
 function splitFontFamilyList(tail: string): string[] {
   const parts: string[] = []
@@ -166,6 +180,7 @@ function splitFontFamilyList(tail: string): string[] {
  * Best-effort parsing for common patterns.
  * Commas inside quoted family names are ignored; `\\` escapes the next character inside quotes (e.g. `\"` for a literal `"`).
  * Recognizes common font-size units (px, em, rem, cap/ic/lh/rlh, root-relative r* units, pt, %, viewport, viewport inline/block (`vi`/`vb` and `d*`/`s*`/`l*` variants), dynamic-viewport, container query, Q, and math units), including scientific notation on the numeric part (e.g. `1e2px`).
+ * CSS math functions `calc()`, `min()`, `max()`, and `clamp()` are treated as a single font-size token (balanced parentheses; commas inside are allowed).
  * When a percentage is used as `font-stretch` before the real font size (e.g. `75% 14px Inter`),
  * skips that leading dimension so the size + family tail is parsed correctly.
  * Very long chains of leading size tokens are peeled with a bounded primary budget, then a secondary pass on modest remainders.
@@ -218,26 +233,93 @@ export function extractFontFamiliesFromCSSFont(font: string): string[] {
     | { kind: 'peeled'; next: string }
     | { kind: 'none' }
 
+  function firstFamilyListSegment(tail: string): string {
+    return splitFontFamilyList(tail)[0]?.trim() ?? ''
+  }
+
+  /** True when the family tail still begins with another size token (dimension, stacked shorthand, or CSS math size). */
+  function tailLeadsWithStackedSize(tail: string): boolean {
+    const first = firstFamilyListSegment(tail)
+    return (
+      FONT_SIZE_ONLY.test(first) ||
+      TAIL_LEADS_WITH_SIZE_TOKEN.test(tail) ||
+      /^(calc|min|max|clamp)\s*\(/i.test(first)
+    )
+  }
+
+  const MATH_SIZE_OPEN = /\b(calc|min|max|clamp)\s*\(/gi
+
+  function tryPeelMathSlashLine(s: string): PeelResult | null {
+    const re = new RegExp(MATH_SIZE_OPEN.source, 'gi')
+    let ma: RegExpExecArray | null
+    while ((ma = re.exec(s)) !== null) {
+      const openIdx = ma.index + ma[0].length - 1
+      const afterClose = indexAfterMatchingParen(s, openIdx)
+      if (afterClose === null) continue
+      const restRaw = s.slice(afterClose)
+      if (!/^\s*\//.test(restRaw)) continue
+      const slashRestMatch = restRaw.match(
+        new RegExp(
+          String.raw`^\s*\/\s*(?:` + FONT_SIZE_NUMBER + FONT_SIZE_UNIT + String.raw`?|normal)\s*(.*)$`,
+          'i',
+        ),
+      )
+      if (!slashRestMatch) continue
+      const tail = slashRestMatch[1] ?? ''
+      if (tailLeadsWithStackedSize(tail)) {
+        return { kind: 'peeled', next: s.slice(afterClose).trimStart() }
+      }
+      if (tail.trim().length === 0) continue
+      return { kind: 'family', tail: tail.trimStart() }
+    }
+    return null
+  }
+
+  function tryPeelMathFamily(s: string): PeelResult | null {
+    const re = new RegExp(MATH_SIZE_OPEN.source, 'gi')
+    let ma: RegExpExecArray | null
+    while ((ma = re.exec(s)) !== null) {
+      const openIdx = ma.index + ma[0].length - 1
+      const afterClose = indexAfterMatchingParen(s, openIdx)
+      if (afterClose === null) continue
+      const restRaw = s.slice(afterClose)
+      if (/^\s*\//.test(restRaw)) continue
+      const famM = restRaw.match(/^\s+(.+)$/)
+      if (!famM) continue
+      const tail = famM[1]!
+      if (tailLeadsWithStackedSize(tail)) {
+        return { kind: 'peeled', next: s.slice(afterClose).trimStart() }
+      }
+      return { kind: 'family', tail }
+    }
+    return null
+  }
+
   function peelFontShorthand(s: string): PeelResult {
     const slashM = s.match(FONT_SHORTHAND_SLASH_LINE_TAIL)
     if (slashM) {
       const tail = slashM[2] ?? ''
-      const firstSegment = splitFontFamilyList(tail)[0]?.trim() ?? ''
-      const tailLeadsWithAnotherSize =
-        FONT_SIZE_ONLY.test(firstSegment) || TAIL_LEADS_WITH_SIZE_TOKEN.test(tail)
-      if (!tailLeadsWithAnotherSize) return { kind: 'family', tail }
+      if (!tailLeadsWithStackedSize(tail)) return { kind: 'family', tail }
       const matchIndex = slashM.index ?? 0
       return { kind: 'peeled', next: s.slice(matchIndex + slashM[1]!.length).trimStart() }
     }
+    const mathSlash = tryPeelMathSlashLine(s)
+    if (mathSlash) return mathSlash
+
+    // Before numeric size + family: math sizes can contain dimension tokens (e.g. `14px` inside
+    // `calc(14px + 1vmin)`) that would otherwise match {@link FONT_SHORTHAND_FAMILY_TAIL} early.
+    const mathFam = tryPeelMathFamily(s)
+    if (mathFam) return mathFam
+
     const m = s.match(FONT_SHORTHAND_FAMILY_TAIL)
-    if (!m) return { kind: 'none' }
-    const tail = m[2]!
-    const firstSegment = splitFontFamilyList(tail)[0]?.trim() ?? ''
-    const tailLeadsWithAnotherSize =
-      FONT_SIZE_ONLY.test(firstSegment) || TAIL_LEADS_WITH_SIZE_TOKEN.test(tail)
-    if (!tailLeadsWithAnotherSize) return { kind: 'family', tail }
-    const matchIndex = m.index ?? 0
-    return { kind: 'peeled', next: s.slice(matchIndex + m[1]!.length).trimStart() }
+    if (m) {
+      const tail = m[2]!
+      if (!tailLeadsWithStackedSize(tail)) return { kind: 'family', tail }
+      const matchIndex = m.index ?? 0
+      return { kind: 'peeled', next: s.slice(matchIndex + m[1]!.length).trimStart() }
+    }
+
+    return { kind: 'none' }
   }
 
   let trimmed = font.trim()

@@ -103,6 +103,35 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('1e2px')).toEqual([])
   })
 
+  it('parses calc() font-size before family', () => {
+    expect(extractFontFamiliesFromCSSFont('calc(14px + 1vmin) Inter, sans-serif')).toEqual(['Inter'])
+  })
+
+  it('parses min(), max(), and clamp() sizes before family', () => {
+    expect(extractFontFamiliesFromCSSFont('min(1rem, 10vw) Literata, serif')).toEqual(['Literata'])
+    expect(extractFontFamiliesFromCSSFont('max(12px, 1rem) JetBrains Mono, monospace')).toEqual([
+      'JetBrains Mono',
+    ])
+    expect(extractFontFamiliesFromCSSFont('clamp(1rem, 2.5vw, 2rem) Source Serif 4, serif')).toEqual([
+      'Source Serif 4',
+    ])
+  })
+
+  it('parses math font-size after font-stretch percent then resolves family', () => {
+    expect(extractFontFamiliesFromCSSFont('75% calc(14px) Inter, sans-serif')).toEqual(['Inter'])
+  })
+
+  it('parses math size with slash line-height before family', () => {
+    expect(extractFontFamiliesFromCSSFont('calc(16px) / 1.2 Literata, serif')).toEqual(['Literata'])
+    expect(extractFontFamiliesFromCSSFont('600 CALC(14px) / normal JetBrains Mono, monospace')).toEqual([
+      'JetBrains Mono',
+    ])
+  })
+
+  it('parses numeric size before a following math size then family', () => {
+    expect(extractFontFamiliesFromCSSFont('14px min(1vw, 12px) Inter, sans-serif')).toEqual(['Inter'])
+  })
+
   it('parses unclosed double-quoted family with trailing backslash (escape at EOF)', () => {
     expect(extractFontFamiliesFromCSSFont('14px "Trail\\')).toEqual(['Trail\\'])
   })
@@ -566,6 +595,13 @@ describe('collectFontFamiliesFromTree', () => {
   it('dedupes repeated names within one shorthand when collecting from tree', () => {
     const tree = box({}, [text({ text: 'x', font: '14px Inter, Inter, Mono', lineHeight: 20 })])
     expect(collectFontFamiliesFromTree(tree)).toEqual(['Inter', 'Mono'])
+  })
+
+  it('collects families when font shorthand uses calc() for size', () => {
+    const tree = box({}, [
+      text({ text: 'x', font: 'calc(1rem + 2px) Literata, serif', lineHeight: 22 }),
+    ])
+    expect(collectFontFamiliesFromTree(tree)).toEqual(['Literata'])
   })
 
   it('ignores image nodes and still collects fonts from text in the same subtree', () => {
