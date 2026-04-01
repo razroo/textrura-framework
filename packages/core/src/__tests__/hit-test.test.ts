@@ -1441,4 +1441,29 @@ describe('pointerEvents', () => {
     }
     expect(getCursorAtPoint(root, layout, 10, 10)).toBe('pointer')
   })
+
+  it('pointerEvents none: click-to-focus targets keyboard-only box behind overlay (overlay excluded from hit stack)', () => {
+    const back = box({ width: 50, height: 50, zIndex: 0, onKeyDown: () => undefined })
+    const front = box({
+      width: 50,
+      height: 50,
+      zIndex: 2,
+      pointerEvents: 'none',
+      onClick: () => undefined,
+    })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const backLayout = { x: 0, y: 0, width: 50, height: 50, children: [] as const }
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [backLayout, { x: 0, y: 0, width: 50, height: 50, children: [] }],
+    }
+
+    const result = dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(result.handled).toBe(false)
+    expect(result.focusTarget?.element).toBe(back)
+    expect(result.focusTarget?.layout).toBe(backLayout)
+  })
 })
