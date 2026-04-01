@@ -77,4 +77,18 @@ describe('path generation', () => {
   it('normalizes redundant slashes in the pattern before building', () => {
     expect(buildPath('//users/:id/', { id: 7 })).toBe('/users/7')
   })
+
+  it('trims leading and trailing slashes on splat values (single segment)', () => {
+    expect(buildPath('/docs/*rest', { rest: '/guides/routing/' })).toBe('/docs/guides/routing')
+  })
+
+  it('splat value that trims to empty string becomes an empty final segment (slashes-only remainder)', () => {
+    expect(buildPath('/docs/*rest', { rest: '/' })).toBe('/docs/')
+    expect(buildPath('/docs/*rest', { rest: '///' })).toBe('/docs/')
+  })
+
+  it('omits an optional param in the middle of the path without extra slashes', () => {
+    expect(buildPath('/a/:seg?/c', {})).toBe('/a/c')
+    expect(buildPath('/a/:seg?/c', { seg: 'b' })).toBe('/a/b/c')
+  })
 })
