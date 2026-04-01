@@ -1336,6 +1336,46 @@ describe('scroll and overflow clipping', () => {
     }
     expect(hitPathAtPoint(parent, layout, 5, 5)).toEqual([1])
   })
+
+  it('nested overflow scroll: both scrollY offsets compose for hit path, dispatch, and local coords', () => {
+    let localX = -1
+    let localY = -1
+    const btn = box({
+      width: 40,
+      height: 40,
+      onClick: (e) => {
+        localX = e.localX ?? -999
+        localY = e.localY ?? -999
+      },
+    })
+    const inner = box(
+      { width: 100, height: 150, overflow: 'scroll', scrollY: 15 },
+      [btn],
+    )
+    const outer = box({ width: 100, height: 100, overflow: 'scroll', scrollY: 10 }, [inner])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        {
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 150,
+          children: [{ x: 0, y: 60, width: 40, height: 40, children: [] as const }],
+        },
+      ],
+    }
+
+    // btn absY = outerY - outer.scrollY + inner.y - inner.scrollY + btn.y = 0 - 10 + 0 - 15 + 60 = 35
+    expect(dispatchHit(outer, layout, 'onClick', 20, 70).handled).toBe(true)
+    expect(localX).toBe(20)
+    expect(localY).toBe(35)
+    expect(hitPathAtPoint(outer, layout, 20, 70)).toEqual([0, 0])
+    expect(hasInteractiveHitAtPoint(outer, layout, 20, 70)).toBe(true)
+  })
 })
 
 describe('non-box leaves (text and image)', () => {
