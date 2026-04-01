@@ -511,6 +511,42 @@ describe('dispatchHit', () => {
     expect(log).toEqual(['second'])
   })
 
+  it('overlapping siblings: fractional z-index sorts numerically for dispatch', () => {
+    const log: string[] = []
+    const low = box({ width: 50, height: 50, zIndex: 1, onClick: () => { log.push('low') } })
+    const mid = box({ width: 50, height: 50, zIndex: 1.5, onClick: () => { log.push('mid') } })
+    const high = box({ width: 50, height: 50, zIndex: 2, onClick: () => { log.push('high') } })
+    const root = box({ width: 100, height: 100 }, [low, mid, high])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['high'])
+  })
+
+  it('overlapping siblings: fractional z-index sorts numerically for hitPathAtPoint', () => {
+    const low = box({ width: 40, height: 40, zIndex: 1 })
+    const mid = box({ width: 40, height: 40, zIndex: 1.5 })
+    const high = box({ width: 40, height: 40, zIndex: 2 })
+    const root = box({ width: 100, height: 100 }, [low, mid, high])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+      ],
+    }
+
+    expect(hitPathAtPoint(root, layout, 10, 10)).toEqual([2])
+  })
+
   it('overlapping siblings: non-finite z-index is treated as 0 for hit order', () => {
     const log: string[] = []
     const invalid = box({
