@@ -41,6 +41,21 @@ describe('extractFontFamiliesFromCSSFont', () => {
     ).toEqual(['First, Name', 'Second'])
   })
 
+  it('skips empty segments from repeated commas in the family list', () => {
+    expect(extractFontFamiliesFromCSSFont('14px Inter,, JetBrains Mono, sans-serif')).toEqual([
+      'Inter',
+      'JetBrains Mono',
+    ])
+  })
+
+  it('skips whitespace-only segments between commas', () => {
+    expect(extractFontFamiliesFromCSSFont('14px Inter,  \t  , Sans, serif')).toEqual(['Inter', 'Sans'])
+  })
+
+  it('returns empty when the only custom name is an empty quoted segment', () => {
+    expect(extractFontFamiliesFromCSSFont('14px "", serif')).toEqual([])
+  })
+
   it('parses numeric weight before size and family', () => {
     expect(extractFontFamiliesFromCSSFont('500 14px Inter')).toEqual(['Inter'])
   })
