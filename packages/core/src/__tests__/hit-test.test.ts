@@ -34,6 +34,34 @@ describe('dispatchHit', () => {
     expect(fired).toBe(true)
   })
 
+  it('merges extra metadata onto the HitEvent after base pointer fields', () => {
+    let received: HitEvent | undefined
+    const layout = { x: 10, y: 20, width: 100, height: 50, children: [] }
+    const el = box({
+      width: 100,
+      height: 50,
+      onPointerDown: e => {
+        received = e
+      },
+    })
+
+    dispatchHit(el, layout, 'onPointerDown', 50, 40, {
+      button: 2,
+      shiftKey: true,
+      buttons: 4,
+    })
+
+    expect(received).toBeDefined()
+    expect(received!.x).toBe(50)
+    expect(received!.y).toBe(40)
+    expect(received!.localX).toBe(40)
+    expect(received!.localY).toBe(20)
+    expect(received!.target).toBe(layout)
+    expect((received as HitEvent & { button: number }).button).toBe(2)
+    expect((received as HitEvent & { shiftKey: boolean }).shiftKey).toBe(true)
+    expect((received as HitEvent & { buttons: number }).buttons).toBe(4)
+  })
+
   it('zero-size box: only the origin corner is inside', () => {
     let fired = false
     const el = box({ width: 0, height: 0, onClick: () => { fired = true } })
