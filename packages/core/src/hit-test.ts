@@ -27,6 +27,11 @@ function layoutBoundsAreFinite(layout: ComputedLayout): boolean {
   )
 }
 
+/** Ignore non-finite and non-number scroll props so child offsets stay finite (±Infinity would poison abs coords). */
+function finiteScrollOffset(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
 function zIndexOf(el: UIElement): number {
   const z = (el.props as Record<string, unknown>).zIndex
   return typeof z === 'number' && Number.isFinite(z) ? z : 0
@@ -86,8 +91,8 @@ function collectHits(
         return
       }
     }
-    if (scrollX) childOffsetX -= scrollX
-    if (scrollY) childOffsetY -= scrollY
+    childOffsetX -= finiteScrollOffset(scrollX)
+    childOffsetY -= finiteScrollOffset(scrollY)
   }
 
   const inside =
@@ -256,8 +261,8 @@ export function hitPathAtPoint(
   const boxEl = element as BoxElement
   let childOffsetX = absX
   let childOffsetY = absY
-  if (boxEl.props.scrollX) childOffsetX -= boxEl.props.scrollX
-  if (boxEl.props.scrollY) childOffsetY -= boxEl.props.scrollY
+  childOffsetX -= finiteScrollOffset(boxEl.props.scrollX)
+  childOffsetY -= finiteScrollOffset(boxEl.props.scrollY)
 
   const asc = getChildrenByZAsc(boxEl)
   for (let k = asc.length - 1; k >= 0; k--) {
@@ -296,8 +301,8 @@ export function getCursorAtPoint(
   if (element.kind === 'box') {
     let childOffX = absX
     let childOffY = absY
-    if (element.props.scrollX) childOffX -= element.props.scrollX
-    if (element.props.scrollY) childOffY -= element.props.scrollY
+    childOffX -= finiteScrollOffset(element.props.scrollX)
+    childOffY -= finiteScrollOffset(element.props.scrollY)
 
     const asc = getChildrenByZAsc(element)
     for (let k = asc.length - 1; k >= 0; k--) {

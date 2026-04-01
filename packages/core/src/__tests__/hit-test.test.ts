@@ -1224,6 +1224,55 @@ describe('getCursorAtPoint', () => {
 })
 
 describe('scroll and overflow clipping', () => {
+  it('non-finite scroll offsets are ignored so hits match zero-scroll geometry', () => {
+    let childFired = false
+    const child = box({ width: 50, height: 50, onClick: () => { childFired = true } })
+    const parent = box(
+      {
+        width: 100,
+        height: 100,
+        overflow: 'scroll',
+        scrollX: Number.POSITIVE_INFINITY,
+        scrollY: Number.NEGATIVE_INFINITY,
+      },
+      [child],
+    )
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 10, y: 10, width: 50, height: 50, children: [] }],
+    }
+    expect(dispatchHit(parent, layout, 'onClick', 35, 35).handled).toBe(true)
+    expect(childFired).toBe(true)
+    expect(hitPathAtPoint(parent, layout, 35, 35)).toEqual([0])
+    expect(hasInteractiveHitAtPoint(parent, layout, 35, 35)).toBe(true)
+  })
+
+  it('non-number scroll props are ignored so child offsets stay finite', () => {
+    let childFired = false
+    const child = box({ width: 50, height: 50, onClick: () => { childFired = true } })
+    const parent = box(
+      {
+        width: 100,
+        height: 100,
+        overflow: 'scroll',
+        scrollX: 'oops' as unknown as number,
+      },
+      [child],
+    )
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 10, y: 10, width: 50, height: 50, children: [] }],
+    }
+    expect(dispatchHit(parent, layout, 'onClick', 35, 35).handled).toBe(true)
+    expect(childFired).toBe(true)
+  })
+
   it('overflow scroll: pointer outside parent bounds hits nothing', () => {
     let childFired = false
     let parentFired = false
