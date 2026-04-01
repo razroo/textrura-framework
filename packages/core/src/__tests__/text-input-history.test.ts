@@ -14,6 +14,25 @@ const sel = (node: number, offset: number) => ({
 })
 
 describe('text input history', () => {
+  it('does not alias the initial state: mutating the caller object after create leaves history unchanged', () => {
+    const initial = { nodes: ['a'], selection: sel(0, 1) }
+    const h = createTextInputHistory(initial)
+    initial.nodes[0] = 'mutated'
+    initial.selection.anchorOffset = 99
+    expect(h.present.nodes).toEqual(['a'])
+    expect(h.present.selection).toEqual(sel(0, 1))
+  })
+
+  it('does not alias pushed state: mutating the caller object after push leaves stored present unchanged', () => {
+    let h = createTextInputHistory({ nodes: ['a'], selection: sel(0, 1) })
+    const next = { nodes: ['ab'], selection: sel(0, 2) }
+    h = pushTextInputHistory(h, next)
+    next.nodes[0] = 'ZZZ'
+    next.selection.anchorOffset = 0
+    expect(h.present.nodes).toEqual(['ab'])
+    expect(h.present.selection).toEqual(sel(0, 2))
+  })
+
   it('returns the same history reference when push would not change content or selection', () => {
     const initial = createTextInputHistory({ nodes: ['a'], selection: sel(0, 1) })
     const again = pushTextInputHistory(initial, {
