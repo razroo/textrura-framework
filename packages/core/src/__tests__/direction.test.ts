@@ -10,6 +10,12 @@ describe('direction model', () => {
     expect(resolveDirectionValue('auto', 'rtl')).toBe('rtl')
   })
 
+  it('treats unknown dir strings like auto (inherit parent), for runtime or serialized trees', () => {
+    expect(resolveDirectionValue('' as never, 'rtl')).toBe('rtl')
+    expect(resolveDirectionValue('sideways-lr' as never, 'ltr')).toBe('ltr')
+    expect(resolveDirectionValue('bogus' as never, 'rtl')).toBe('rtl')
+  })
+
   it('respects explicit ltr/rtl values', () => {
     expect(resolveDirectionValue('ltr', 'rtl')).toBe('ltr')
     expect(resolveDirectionValue('rtl', 'ltr')).toBe('rtl')
@@ -32,5 +38,10 @@ describe('direction model', () => {
     const rtlImage = image({ src: '/x.png', width: 1, height: 1, dir: 'rtl' })
     expect(resolveElementDirection(rtlText, 'ltr')).toBe('rtl')
     expect(resolveElementDirection(rtlImage, 'ltr')).toBe('rtl')
+  })
+
+  it('resolveElementDirection inherits parent for unknown dir on element props', () => {
+    const weird = box({ width: 1, height: 1, dir: 'not-a-dir' as never })
+    expect(resolveElementDirection(weird, 'rtl')).toBe('rtl')
   })
 })

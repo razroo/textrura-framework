@@ -4,7 +4,8 @@ export type ResolvedDirection = 'ltr' | 'rtl'
 
 /**
  * Resolve an element direction value to a concrete runtime direction.
- * `auto` currently inherits parent direction until script-level detection lands.
+ * Only `ltr` and `rtl` are honored; `undefined`, `auto`, and any other value (e.g. malformed
+ * serialized props) inherit {@link parentDirection} until script-level `auto` detection lands.
  */
 export function resolveDirectionValue(
   dir: Direction | undefined,
