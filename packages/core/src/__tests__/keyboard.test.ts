@@ -123,6 +123,46 @@ describe('dispatchKeyboardEvent', () => {
     expect(back?.element).toBe(first?.element)
   })
 
+  it('tab on keyup does not traverse focus (only keydown moves)', () => {
+    const tree = box({}, [
+      box({ onClick: () => undefined }, []),
+      box({ onClick: () => undefined }, []),
+    ])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 100, height: 100, children: [] },
+        { x: 120, y: 0, width: 100, height: 100, children: [] },
+      ],
+    }
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    const afterKeyDown = focusedElement.peek()
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyUp', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    const afterKeyUp = focusedElement.peek()
+
+    expect(afterKeyDown).not.toBeNull()
+    expect(afterKeyUp?.element).toBe(afterKeyDown?.element)
+  })
+
   it('tab traversal works even when focused element has onKeyDown', () => {
     const tree = box({}, [
       box({ onKeyDown: () => undefined }, []),

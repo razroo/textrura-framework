@@ -4,7 +4,7 @@ import { focusNext, focusPrev, resolveFocusedTarget } from './focus.js'
 
 /**
  * Dispatch keyboard events to the focused element.
- * Also handles Tab/Shift+Tab focus traversal.
+ * Tab / Shift+Tab focus traversal runs only for `'onKeyDown'` (not `'onKeyUp'`).
  */
 export function dispatchKeyboardEvent(
   tree: UIElement,
