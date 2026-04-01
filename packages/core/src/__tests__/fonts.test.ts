@@ -117,6 +117,21 @@ describe('extractFontFamiliesFromCSSFont', () => {
     ])
   })
 
+  it('parses nested math and grouped parens inside calc/min/max/clamp before family', () => {
+    expect(
+      extractFontFamiliesFromCSSFont('calc(min(1rem, max(12px, 10vw))) Literata, serif'),
+    ).toEqual(['Literata'])
+    expect(extractFontFamiliesFromCSSFont('calc((14px + 1px)) Inter, sans-serif')).toEqual(['Inter'])
+    expect(
+      extractFontFamiliesFromCSSFont('min(max(12px, 1rem), 3rem) JetBrains Mono, monospace'),
+    ).toEqual(['JetBrains Mono'])
+    expect(
+      extractFontFamiliesFromCSSFont(
+        'clamp(min(1rem, 2rem), 12px, max(2rem, 3rem)) Source Serif 4, serif',
+      ),
+    ).toEqual(['Source Serif 4'])
+  })
+
   it('parses math font-size after font-stretch percent then resolves family', () => {
     expect(extractFontFamiliesFromCSSFont('75% calc(14px) Inter, sans-serif')).toEqual(['Inter'])
   })
