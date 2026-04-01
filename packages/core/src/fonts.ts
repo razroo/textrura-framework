@@ -14,6 +14,15 @@ const GENERIC_FAMILIES = new Set([
   'emoji',
 ])
 
+/** CSS-wide keywords that may appear in `font` / family lists but are not concrete family names. */
+const CSS_WIDE_FONT_KEYWORDS = new Set([
+  'inherit',
+  'initial',
+  'unset',
+  'revert',
+  'revert-layer',
+])
+
 /**
  * Font-size units we treat as the numeric token before the family list in `font` shorthand.
  * Longer tokens precede shorter prefixes (e.g. `dvmin` before `vmin`, `rlh` before `lh`, `rch` before `ch`).
@@ -80,7 +89,8 @@ function splitFontFamilyList(tail: string): string[] {
 
 /**
  * Extract custom font family names from a CSS `font` shorthand (e.g. `600 14px Inter`).
- * Drops generic fallbacks like `sans-serif`. Repeated custom names in the same list collapse
+ * Drops generic fallbacks like `sans-serif` and CSS-wide keywords (`inherit`, `initial`, …).
+ * Repeated custom names in the same list collapse
  * to the first spelling (comparison is case-insensitive, e.g. `Inter, inter` → one entry).
  * Best-effort parsing for common patterns.
  * Commas inside quoted family names are ignored; `\\` escapes the next character inside quotes (e.g. `\"` for a literal `"`).
@@ -93,7 +103,13 @@ export function extractFontFamiliesFromCSSFont(font: string): string[] {
   function filterFamilies(tail: string): string[] {
     const raw = splitFontFamilyList(tail)
       .map(s => s.trim().replace(/^["']|["']$/g, ''))
-      .filter(f => f.length > 0 && !GENERIC_FAMILIES.has(f.toLowerCase()) && !FONT_SIZE_ONLY.test(f))
+      .filter(
+        f =>
+          f.length > 0 &&
+          !GENERIC_FAMILIES.has(f.toLowerCase()) &&
+          !CSS_WIDE_FONT_KEYWORDS.has(f.toLowerCase()) &&
+          !FONT_SIZE_ONLY.test(f),
+      )
     const seen = new Set<string>()
     const out: string[] = []
     for (const f of raw) {

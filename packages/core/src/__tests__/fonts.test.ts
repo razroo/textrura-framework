@@ -159,6 +159,15 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('14px Inter, ui-rounded')).toEqual(['Inter'])
   })
 
+  it('drops CSS-wide font keywords from family lists', () => {
+    expect(extractFontFamiliesFromCSSFont('14px Inter, inherit')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('12px unset, serif')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('16px Brand, initial, sans-serif')).toEqual(['Brand'])
+    expect(extractFontFamiliesFromCSSFont('14px revert, monospace')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('14px Revert-Layer, serif')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('600 14px Custom, INHERIT')).toEqual(['Custom'])
+  })
+
   it('drops cursive, fantasy, and emoji generic fallbacks', () => {
     expect(extractFontFamiliesFromCSSFont('14px Display, cursive')).toEqual(['Display'])
     expect(extractFontFamiliesFromCSSFont('16px "Brand", fantasy')).toEqual(['Brand'])
