@@ -144,6 +144,22 @@ const VOID_HTML_TAGS = new Set([
   'wbr',
 ])
 
+/**
+ * HTML5 local name: starts with a-z, then letters/digits/hyphen. Rejects spaces, quotes, and
+ * attribute injection. Used so `semantic.tag` cannot break out of the tag token in `toSemanticHTML`.
+ */
+const SAFE_HTML_TAG_NAME = /^[a-z][a-z0-9-]{0,127}$/
+
+/**
+ * Return a safe tag name for static HTML, or `fallback` when `tag` is missing or malformed.
+ */
+function sanitizeHtmlTagName(tag: string | undefined, fallback: string): string {
+  if (tag === undefined || tag === '') return fallback
+  const t = tag.trim().toLowerCase()
+  if (!SAFE_HTML_TAG_NAME.test(t)) return fallback
+  return t
+}
+
 /** Escape HTML special characters. */
 function escapeHTML(str: string): string {
   return str
@@ -178,7 +194,7 @@ function elementToHTML(element: UIElement, indent: number): string {
   }
 
   if (element.kind === 'text') {
-    const tag = element.semantic?.tag ?? inferTag(element)
+    const tag = sanitizeHtmlTagName(element.semantic?.tag, inferTag(element))
     const attrs: string[] = []
     const dir = dirAttribute(element.props)
     if (dir) attrs.push(dir)
@@ -188,7 +204,7 @@ function elementToHTML(element: UIElement, indent: number): string {
     return `${pad}<${tag}${attrStr}>${escapeHTML(element.props.text)}</${tag}>`
   }
 
-  const tag = element.semantic?.tag ?? inferBoxTag(element)
+  const tag = sanitizeHtmlTagName(element.semantic?.tag, inferBoxTag(element))
   const attrs: string[] = []
   const dir = dirAttribute(element.props)
   if (dir) attrs.push(dir)
@@ -220,6 +236,9 @@ function elementToHTML(element: UIElement, indent: number): string {
  *
  * When `props.dir` is `ltr`, `rtl`, or `auto` on a box, text, or image node, the HTML `dir`
  * attribute is emitted on that element’s tag.
+ *
+ * `semantic.tag` is validated as a safe HTML local name (letter, then letters/digits/hyphen, ≤128
+ * chars); invalid values fall back to font/box inference so crawlers cannot receive broken markup.
  */
 export function toSemanticHTML(
   tree: UIElement,

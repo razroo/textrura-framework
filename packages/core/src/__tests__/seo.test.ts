@@ -298,6 +298,67 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<span>Nav item</span>')
   })
 
+  it('normalizes uppercase semantic tags to lowercase HTML names', () => {
+    const el = box({ width: 200, height: 50 }, [
+      text({
+        text: 'Hi',
+        font: '14px sans-serif',
+        lineHeight: 18,
+        semantic: { tag: 'SPAN' },
+      }),
+    ])
+    expect(toSemanticHTML(el)).toContain('<span>Hi</span>')
+  })
+
+  it('ignores malformed semantic.tag and falls back to inferred tags', () => {
+    const el = box({ width: 200, height: 120 }, [
+      text({
+        text: 'Inject',
+        font: 'bold 32px sans-serif',
+        lineHeight: 40,
+        semantic: { tag: 'h1><script' },
+      }),
+      text({
+        text: 'Body',
+        font: '14px sans-serif',
+        lineHeight: 18,
+        semantic: { tag: 'p onclick=alert(1)' },
+      }),
+      text({
+        text: 'Digits',
+        font: '14px sans-serif',
+        lineHeight: 18,
+        semantic: { tag: '1p' },
+      }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<h1>Inject</h1>')
+    expect(html).toContain('<p>Body</p>')
+    expect(html).toContain('<p>Digits</p>')
+    expect(html).not.toContain('<script')
+    expect(html).not.toContain('onclick=')
+  })
+
+  it('ignores overlong semantic.tag names', () => {
+    const longTag = `x${'a'.repeat(130)}`
+    const el = box({ width: 200, height: 50 }, [
+      text({
+        text: 'T',
+        font: 'bold 32px sans-serif',
+        lineHeight: 40,
+        semantic: { tag: longTag },
+      }),
+    ])
+    expect(toSemanticHTML(el)).toContain('<h1>T</h1>')
+  })
+
+  it('ignores malformed semantic.tag on boxes', () => {
+    const el = box({ width: 100, height: 40, semantic: { tag: 'div class=x"' } }, [])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<div></div>')
+    expect(html).not.toContain('class=x')
+  })
+
   it('handles image elements with <img> tag', () => {
     const el = box({ width: 200, height: 200 }, [
       image({ src: 'https://example.com/photo.jpg', alt: 'A photo', width: 100, height: 100 }),
