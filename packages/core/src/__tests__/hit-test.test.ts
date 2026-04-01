@@ -208,6 +208,49 @@ describe('dispatchHit', () => {
     expect(log).toEqual(['child'])
   })
 
+  it('nested boxes: deepest onWheel fires first', () => {
+    const log: string[] = []
+    const child = box({ width: 40, height: 40, onWheel: () => { log.push('child') } })
+    const parent = box({ width: 100, height: 100, onWheel: () => { log.push('parent') } }, [child])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+
+    dispatchHit(parent, layout, 'onWheel', 20, 20)
+    expect(log).toEqual(['child'])
+  })
+
+  it('overlapping siblings: higher z-index wins for onWheel dispatch', () => {
+    const log: string[] = []
+    const back = box({ width: 50, height: 50, zIndex: 0, onWheel: () => { log.push('back') } })
+    const front = box({ width: 50, height: 50, zIndex: 10, onWheel: () => { log.push('front') } })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onWheel', 10, 10)
+    expect(log).toEqual(['front'])
+  })
+
+  it('onPointerDown: no focusTarget even when target is focusable (click-only focus routing)', () => {
+    const child = box({ width: 40, height: 40, onPointerDown: () => undefined, onKeyDown: () => undefined })
+    const parent = box({ width: 100, height: 100 }, [child])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+
+    const result = dispatchHit(parent, layout, 'onPointerDown', 20, 20)
+    expect(result.handled).toBe(true)
+    expect(result.focusTarget).toBeUndefined()
+  })
+
   it('nested boxes: both onClick — focus target is the deepest handler', () => {
     const child = box({ width: 40, height: 40, onClick: () => undefined })
     const parent = box({ width: 100, height: 100, onClick: () => undefined }, [child])
