@@ -64,6 +64,61 @@ describe('dispatchHit', () => {
     expect(getCursorAtPoint(el, layout, NaN, 25)).toBeNull()
   })
 
+  it('non-finite layout bounds are a miss for dispatch and hit queries', () => {
+    let fired = false
+    const el = box({
+      width: 100,
+      height: 50,
+      onClick: () => {
+        fired = true
+      },
+      onPointerDown: () => {
+        fired = true
+      },
+      cursor: 'pointer',
+    })
+    const base = { x: 0, y: 0, width: 100, height: 50, children: [] as const }
+
+    for (const bad of [
+      { ...base, x: Number.NaN },
+      { ...base, y: Number.NaN },
+      { ...base, width: Number.NaN },
+      { ...base, height: Number.NaN },
+    ] as const) {
+      fired = false
+      expect(dispatchHit(el, bad, 'onClick', 50, 25).handled).toBe(false)
+      expect(fired).toBe(false)
+      expect(dispatchHit(el, bad, 'onPointerDown', 50, 25).handled).toBe(false)
+      expect(fired).toBe(false)
+      expect(hitPathAtPoint(el, bad, 50, 25)).toBeNull()
+      expect(hasInteractiveHitAtPoint(el, bad, 50, 25)).toBe(false)
+      expect(getCursorAtPoint(el, bad, 50, 25)).toBeNull()
+    }
+  })
+
+  it('does not visit children when parent layout has NaN width (corrupt geometry)', () => {
+    let childFired = false
+    const child = box({
+      width: 10,
+      height: 10,
+      onClick: () => {
+        childFired = true
+      },
+    })
+    const parent = box({ width: 100, height: 100 }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: Number.NaN,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 10, height: 10, children: [] as const }],
+    }
+
+    dispatchHit(parent, layout, 'onClick', 5, 5)
+    expect(childFired).toBe(false)
+    expect(hitPathAtPoint(parent, layout, 5, 5)).toBeNull()
+  })
+
   it('nested boxes: deepest handler fires first', () => {
     const log: string[] = []
     const child = box(
