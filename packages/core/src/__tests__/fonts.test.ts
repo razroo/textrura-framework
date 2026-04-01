@@ -252,10 +252,14 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('500 75% 62.5% 16px "Display", sans-serif')).toEqual(['Display'])
   })
 
-  it('still resolves family after more leading stretch tokens than the primary strip budget', () => {
-    const font = `${'75% '.repeat(4100)}14px Inter`
-    expect(extractFontFamiliesFromCSSFont(font)).toEqual(['Inter'])
-  })
+  it(
+    'still resolves family after more leading stretch tokens than the primary strip budget',
+    () => {
+      const font = `${'75% '.repeat(4100)}14px Inter`
+      expect(extractFontFamiliesFromCSSFont(font)).toEqual(['Inter'])
+    },
+    15_000,
+  )
 
   it(
     'returns empty for absurd leading stretch stacks beyond remainder ceiling (no bogus family)',

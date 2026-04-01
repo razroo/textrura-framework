@@ -1,6 +1,7 @@
 import { afterEach, describe, it, expect, vi } from 'vitest'
 import { createApp } from '../app.js'
 import { box, text } from '../elements.js'
+import { signal } from '../signals.js'
 import type { Renderer } from '../types.js'
 
 describe('createApp layout timing', () => {
@@ -53,6 +54,32 @@ describe('createApp layout timing', () => {
     })
 
     expect(render).toHaveBeenCalled()
+  })
+
+  it('invokes setFrameTimings on each reactive re-layout when the view depends on a signal', async () => {
+    const setFrameTimings = vi.fn()
+    const render = vi.fn()
+    const renderer: Renderer = {
+      setFrameTimings,
+      render,
+      destroy: vi.fn(),
+    }
+    const width = signal(40)
+    await createApp(() => box({ width: width.value, height: 20 }, []), renderer, {
+      width: 100,
+      height: 50,
+    })
+
+    expect(setFrameTimings).toHaveBeenCalledTimes(1)
+    expect(render).toHaveBeenCalledTimes(1)
+
+    width.set(44)
+    expect(setFrameTimings).toHaveBeenCalledTimes(2)
+    expect(render).toHaveBeenCalledTimes(2)
+    expect(setFrameTimings.mock.calls[1]![0]).toMatchObject({
+      layoutMs: expect.any(Number),
+    })
+    expect(setFrameTimings.mock.calls[1]![0].layoutMs).toBeGreaterThanOrEqual(0)
   })
 })
 
