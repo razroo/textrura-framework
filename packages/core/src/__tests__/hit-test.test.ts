@@ -732,6 +732,36 @@ describe('dispatchHit', () => {
     expect(log).toEqual(['child'])
   })
 
+  it('onWheel: merges wheel and modifier fields onto the event for the hit target', () => {
+    let received: HitEvent | undefined
+    const layout = { x: 5, y: 6, width: 100, height: 50, children: [] }
+    const el = box({
+      width: 100,
+      height: 50,
+      onWheel: e => {
+        received = e
+      },
+    })
+
+    dispatchHit(el, layout, 'onWheel', 50, 40, {
+      deltaX: -1.5,
+      deltaY: 42,
+      deltaMode: 1,
+      ctrlKey: true,
+    })
+
+    expect(received).toBeDefined()
+    expect(received!.x).toBe(50)
+    expect(received!.y).toBe(40)
+    expect(received!.localX).toBe(45)
+    expect(received!.localY).toBe(34)
+    expect(received!.target).toBe(layout)
+    expect((received as HitEvent & { deltaX: number }).deltaX).toBe(-1.5)
+    expect((received as HitEvent & { deltaY: number }).deltaY).toBe(42)
+    expect((received as HitEvent & { deltaMode: number }).deltaMode).toBe(1)
+    expect((received as HitEvent & { ctrlKey: boolean }).ctrlKey).toBe(true)
+  })
+
   it('nested boxes: deepest onPointerUp fires first', () => {
     const log: string[] = []
     const child = box(
