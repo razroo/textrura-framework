@@ -551,6 +551,20 @@ describe('waitForFonts', () => {
     await expect(p).resolves.toBeUndefined()
   })
 
+  it('defaults to a 10_000ms timeout when loads never settle', async () => {
+    vi.useFakeTimers()
+    const load = vi.fn(() => new Promise<void>(() => {}))
+    const ready = new Promise<void>(() => {})
+    vi.stubGlobal('document', { fonts: { load, ready } })
+    const p = waitForFonts(['Slow'])
+    await vi.advanceTimersByTimeAsync(9_999)
+    await expect(
+      Promise.race([p, new Promise<string>(resolve => queueMicrotask(() => resolve('not-yet')))]),
+    ).resolves.toBe('not-yet')
+    await vi.advanceTimersByTimeAsync(1)
+    await expect(p).resolves.toBeUndefined()
+  })
+
   it('swallows rejection from fonts.ready after loads settle', async () => {
     const load = vi.fn().mockResolvedValue(undefined)
     const ready = Promise.reject(new Error('ready failed'))
