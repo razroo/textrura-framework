@@ -995,6 +995,22 @@ describe('hitPathAtPoint', () => {
     expect(hitPathAtPoint(parent, layout, 20, 20)).toEqual([0])
   })
 
+  it('applies offsetX and offsetY for nested coordinate spaces', () => {
+    const child = box({ width: 40, height: 40 })
+    const parent = box({ width: 100, height: 100 }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 10, y: 20, width: 40, height: 40, children: [] }],
+    }
+    // Same pointer in outer space: without offset the point is outside the child box.
+    expect(hitPathAtPoint(parent, layout, 70, 30, 0, 0)).toEqual([])
+    // Root abs origin (50, 0): (70, 30) lands inside the child at layout (10, 20).
+    expect(hitPathAtPoint(parent, layout, 70, 30, 50, 0)).toEqual([0])
+  })
+
   it('returns null when point misses root', () => {
     const el = box({ width: 10, height: 10 })
     const layout = { x: 0, y: 0, width: 10, height: 10, children: [] }
@@ -1190,6 +1206,20 @@ describe('getCursorAtPoint', () => {
     }
     // Child absY = 0 - 25 + 40 = 15; point (35, 35) lies inside the child
     expect(getCursorAtPoint(parent, layout, 35, 35)).toBe('grab')
+  })
+
+  it('applies offsetX and offsetY when resolving the deepest cursor', () => {
+    const child = box({ width: 40, height: 40, cursor: 'pointer' })
+    const parent = box({ width: 100, height: 100 }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 10, y: 20, width: 40, height: 40, children: [] }],
+    }
+    expect(getCursorAtPoint(parent, layout, 70, 30, 0, 0)).toBeNull()
+    expect(getCursorAtPoint(parent, layout, 70, 30, 50, 0)).toBe('pointer')
   })
 })
 
