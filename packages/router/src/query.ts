@@ -51,6 +51,7 @@ export function parseQuery(search: string): ParsedQuery {
 /**
  * Serialize a shallow query object to `?a=1&b=2`. Keys are sorted lexicographically for stable output.
  * Skips `null` and `undefined`; array values become repeated keys. Booleans become `"true"` / `"false"`.
+ * Skips non-finite numbers (`NaN`, `±Infinity`) so accidental numeric garbage does not produce query pairs.
  * Returns `""` when there are no pairs to emit.
  */
 export function stringifyQuery(query: QueryInput): string {
@@ -64,6 +65,7 @@ export function stringifyQuery(query: QueryInput): string {
     const values = Array.isArray(raw) ? raw : [raw]
     for (const value of values) {
       if (value == null) continue
+      if (typeof value === 'number' && !Number.isFinite(value)) continue
       pairs.push(`${encode(key)}=${encode(String(value))}`)
     }
   }

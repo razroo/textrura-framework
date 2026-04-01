@@ -146,6 +146,17 @@ describe('query helpers', () => {
     expect(parseQuery('?n=0')).toEqual({ n: '0' })
   })
 
+  it('omits non-finite numbers (NaN and ±Infinity)', () => {
+    expect(stringifyQuery({ n: Number.NaN })).toBe('')
+    expect(stringifyQuery({ a: 1, n: Number.NaN })).toBe('?a=1')
+    expect(stringifyQuery({ x: Number.POSITIVE_INFINITY })).toBe('')
+    expect(stringifyQuery({ x: Number.NEGATIVE_INFINITY, y: 2 })).toBe('?y=2')
+  })
+
+  it('omits non-finite entries inside arrays while preserving finite values', () => {
+    expect(stringifyQuery({ mix: [Number.NaN, 'a', Number.POSITIVE_INFINITY, 3] })).toBe('?mix=a&mix=3')
+  })
+
   it('omits keys whose array value is empty (no pairs emitted for that key)', () => {
     expect(stringifyQuery({ tag: [], other: 'x' })).toBe('?other=x')
   })
