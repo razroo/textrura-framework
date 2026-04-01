@@ -51,7 +51,7 @@ export interface SemanticProps {
   tag?: string
   /** ARIA role for accessibility (e.g. 'heading', 'navigation', 'button'). */
   role?: string
-  /** Alt text for images or decorative elements. */
+  /** Alt text for images; on boxes, `toSemanticHTML` maps this to `aria-label` only when `ariaLabel` is unset. */
   alt?: string
   /** Aria-label for screen readers. */
   ariaLabel?: string

@@ -154,6 +154,30 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<img src="https://example.com/photo.jpg" alt="A photo">')
   })
 
+  it('uses only semantic aria-label on boxes when both ariaLabel and alt are set', () => {
+    const el = box(
+      {
+        width: 100,
+        height: 40,
+        semantic: { ariaLabel: 'Primary', alt: 'Ignored duplicate' },
+      },
+      [],
+    )
+    const html = toSemanticHTML(el)
+    expect(html).toContain('aria-label="Primary"')
+    expect(html).not.toContain('Ignored duplicate')
+    expect(html.match(/aria-label=/g)?.length).toBe(1)
+  })
+
+  it('falls back to semantic alt as aria-label on boxes when ariaLabel is absent', () => {
+    const el = box(
+      { width: 100, height: 40, semantic: { alt: 'Decorative region' } },
+      [],
+    )
+    const html = toSemanticHTML(el)
+    expect(html).toContain('aria-label="Decorative region"')
+  })
+
   it('escapes semantic role and aria-label on text and box nodes', () => {
     const el = box(
       {

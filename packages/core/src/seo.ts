@@ -97,8 +97,11 @@ function elementToHTML(element: UIElement, indent: number): string {
   const tag = element.semantic?.tag ?? inferBoxTag(element)
   const attrs: string[] = []
   if (element.semantic?.role) attrs.push(`role="${escapeHTML(element.semantic.role)}"`)
-  if (element.semantic?.ariaLabel) attrs.push(`aria-label="${escapeHTML(element.semantic.ariaLabel)}"`)
-  if (element.semantic?.alt) attrs.push(`aria-label="${escapeHTML(element.semantic.alt)}"`)
+  if (element.semantic?.ariaLabel) {
+    attrs.push(`aria-label="${escapeHTML(element.semantic.ariaLabel)}"`)
+  } else if (element.semantic?.alt) {
+    attrs.push(`aria-label="${escapeHTML(element.semantic.alt)}"`)
+  }
   const attrStr = attrs.length ? ' ' + attrs.join(' ') : ''
 
   if (element.children.length === 0) {
