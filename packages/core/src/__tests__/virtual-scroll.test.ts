@@ -106,6 +106,6 @@ describe('syncVirtualWindow', () => {
         }
       }
     },
-    15_000,
+    30_000,
   )
 })

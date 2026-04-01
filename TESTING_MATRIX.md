@@ -5,6 +5,8 @@ This matrix clarifies what each test layer validates and where to add new covera
 ## Unit tests (fast, deterministic)
 
 - Scope: pure logic in `packages/*/src`.
+- Default command: `npm run test`
+- Excludes the slow exhaustive suites in `fonts.test.ts` / `virtual-scroll.test.ts` and the perf smoke suites; run `npm run test:all` for the full Vitest coverage and `npm run test:perf` for perf-only validation.
 - Examples:
   - keyboard/focus dispatch (`packages/core/src/__tests__/keyboard.test.ts`)
   - text-input editing (`packages/core/src/__tests__/text-input.test.ts`)
@@ -32,6 +34,12 @@ This matrix clarifies what each test layer validates and where to add new covera
 - `npm run test:perf`
   - core hit-test and caret-geometry timing smoke
   - server geometry diff burst and worst-case churn smoke
+
+## Slow exhaustive checks
+
+- `npm run test:slow`
+  - pathological CSS font shorthand parsing cases
+  - exhaustive virtual window invariant sweep
 
 ## Recommended test placement
 

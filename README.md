@@ -303,7 +303,8 @@ Bun equivalents (faster install/startup in many environments):
 ```bash
 bun install
 bun run demo:build
-bun run test
+bun run test      # default fast suite
+bun run test:all  # full suite including slow exhaustive cases
 ```
 
 ## Why Singularity Tech?

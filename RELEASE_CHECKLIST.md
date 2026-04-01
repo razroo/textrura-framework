@@ -9,7 +9,7 @@ Use this checklist before creating a new `vX.Y.Z` GitHub release.
 npm version 0.3.2 --no-git-tag-version -w @geometra/core -w @geometra/renderer-canvas -w @geometra/renderer-terminal -w @geometra/server -w @geometra/client
 
 # 2) required checks
-npm run test
+npm run test:all
 npm run test:terminal-input
 npm run test:perf
 
@@ -28,7 +28,7 @@ gh release create vX.Y.Z --title "vX.Y.Z" --notes "..."
 - [ ] Update versions for publishable packages.
 - [ ] Verify public exports and README/API docs are aligned (`packages/*/README.md`, root `README.md`).
 - [ ] Run targeted suites:
-  - [ ] `npm run test`
+  - [ ] `npm run test:all`
   - [ ] `npm run test:terminal-input`
   - [ ] `npm run test:perf`
 
