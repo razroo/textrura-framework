@@ -5,7 +5,12 @@ export interface VirtualWindowState {
 }
 
 /**
- * Keep selected row visible within a fixed-size virtual window.
+ * Keep the selected row index visible inside a fixed-size virtual window.
+ *
+ * @param totalRows — Non-negative row count; negative values are treated as zero.
+ * @param windowSize — Visible row count; values below 1 are clamped to 1.
+ * @param selected — Desired selection index; clamped into `[0, totalRows - 1]`.
+ * @param currentStart — Current window start index; clamped into valid range before adjusting for selection.
  */
 export function syncVirtualWindow(
   totalRows: number,

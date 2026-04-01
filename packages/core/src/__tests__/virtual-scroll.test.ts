@@ -21,4 +21,33 @@ describe('syncVirtualWindow', () => {
       expect(next.selected >= next.start && next.selected <= next.end).toBe(true)
     }
   })
+
+  it('empty list: clamps selection and window to zero extent', () => {
+    expect(syncVirtualWindow(0, 10, 0, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+    expect(syncVirtualWindow(0, 10, 5, 99)).toEqual({ start: 0, end: 0, selected: 0 })
+  })
+
+  it('clamps negative totalRows to zero rows', () => {
+    expect(syncVirtualWindow(-3, 5, 0, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+  })
+
+  it('clamps windowSize below 1 to a single visible row', () => {
+    expect(syncVirtualWindow(5, 0, 2, 0)).toEqual({ start: 2, end: 2, selected: 2 })
+    expect(syncVirtualWindow(5, -2, 4, 0)).toEqual({ start: 4, end: 4, selected: 4 })
+  })
+
+  it('clamps selected below zero and above last index', () => {
+    expect(syncVirtualWindow(8, 3, -10, 0)).toEqual({ start: 0, end: 2, selected: 0 })
+    expect(syncVirtualWindow(8, 3, 999, 0)).toEqual({ start: 5, end: 7, selected: 7 })
+  })
+
+  it('clamps currentStart into valid range then aligns to selection', () => {
+    // total 10, window 4 → maxStart 6; bogus currentStart 100 becomes 6, then selection 1 pulls window up
+    expect(syncVirtualWindow(10, 4, 1, 100)).toEqual({ start: 1, end: 4, selected: 1 })
+    expect(syncVirtualWindow(10, 4, 8, -50)).toEqual({ start: 5, end: 8, selected: 8 })
+  })
+
+  it('single row list always spans index 0', () => {
+    expect(syncVirtualWindow(1, 5, 0, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+  })
 })
