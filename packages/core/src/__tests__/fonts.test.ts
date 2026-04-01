@@ -1,5 +1,9 @@
-import { describe, it, expect } from 'vitest'
-import { extractFontFamiliesFromCSSFont, collectFontFamiliesFromTree } from '../fonts.js'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  collectFontFamiliesFromTree,
+  extractFontFamiliesFromCSSFont,
+  waitForFonts,
+} from '../fonts.js'
 import { box, text } from '../elements.js'
 
 describe('extractFontFamiliesFromCSSFont', () => {
@@ -187,5 +191,56 @@ describe('collectFontFamiliesFromTree', () => {
       text({ text: 'c', font: '12px Inter', lineHeight: 16 }),
     ])
     expect(collectFontFamiliesFromTree(tree).sort()).toEqual(['Inter'])
+  })
+})
+
+describe('waitForFonts', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  })
+
+  it('no-ops when families is empty', async () => {
+    const load = vi.fn()
+    vi.stubGlobal('document', { fonts: { load, ready: Promise.resolve() } })
+    await waitForFonts([])
+    expect(load).not.toHaveBeenCalled()
+  })
+
+  it('no-ops when document.fonts.load is missing', async () => {
+    vi.stubGlobal('document', { fonts: { ready: Promise.resolve() } })
+    await waitForFonts(['Inter'])
+  })
+
+  it('dedupes families and calls load once per unique name', async () => {
+    const load = vi.fn().mockResolvedValue(undefined)
+    const ready = Promise.resolve()
+    vi.stubGlobal('document', { fonts: { load, ready } })
+    await waitForFonts(['Inter', 'Inter', 'JetBrains Mono'])
+    expect(load).toHaveBeenCalledTimes(2)
+    expect(load).toHaveBeenCalledWith('16px Inter')
+    expect(load).toHaveBeenCalledWith('16px JetBrains Mono')
+  })
+
+  it('continues when a single load rejects', async () => {
+    const load = vi
+      .fn()
+      .mockImplementation((spec: string) =>
+        spec.includes('Bad') ? Promise.reject(new Error('fail')) : Promise.resolve(),
+      )
+    const ready = Promise.resolve()
+    vi.stubGlobal('document', { fonts: { load, ready } })
+    await expect(waitForFonts(['Bad', 'Good'])).resolves.toBeUndefined()
+    expect(load).toHaveBeenCalledTimes(2)
+  })
+
+  it('stops waiting after timeout when loads never settle', async () => {
+    vi.useFakeTimers()
+    const load = vi.fn(() => new Promise<void>(() => {}))
+    const ready = new Promise<void>(() => {})
+    vi.stubGlobal('document', { fonts: { load, ready } })
+    const p = waitForFonts(['Slow'], 50)
+    await vi.advanceTimersByTimeAsync(50)
+    await expect(p).resolves.toBeUndefined()
   })
 })
