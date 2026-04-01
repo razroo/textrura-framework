@@ -761,6 +761,46 @@ describe('dispatchHit', () => {
     expect(log).toEqual(['child'])
   })
 
+  it('nested boxes: onPointerDown runs on parent when child has no pointer handlers', () => {
+    const log: string[] = []
+    const child = box({ width: 40, height: 40 })
+    const parent = box(
+      { width: 100, height: 100, onPointerDown: () => { log.push('parent') } },
+      [child],
+    )
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+
+    dispatchHit(parent, layout, 'onPointerDown', 20, 20)
+    expect(log).toEqual(['parent'])
+  })
+
+  it('nested boxes: onClick runs on parent when child is key-only (no onClick)', () => {
+    const log: string[] = []
+    const child = box({ width: 40, height: 40, onKeyDown: () => { log.push('child-key') } })
+    const parent = box(
+      { width: 100, height: 100, onClick: () => { log.push('parent') } },
+      [child],
+    )
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+
+    const result = dispatchHit(parent, layout, 'onClick', 20, 20)
+    expect(log).toEqual(['parent'])
+    expect(result.handled).toBe(true)
+    expect(result.focusTarget?.element).toBe(parent)
+  })
+
   it('nested boxes: deepest onWheel fires first', () => {
     const log: string[] = []
     const child = box({ width: 40, height: 40, onWheel: () => { log.push('child') } })
