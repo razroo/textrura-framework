@@ -55,6 +55,8 @@ function collectHits(
   offsetY: number,
   results: HitTarget[],
 ): void {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return
+
   const absX = offsetX + layout.x
   const absY = offsetY + layout.y
 
@@ -206,6 +208,8 @@ export function hitPathAtPoint(
   offsetX = 0,
   offsetY = 0,
 ): number[] | null {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+
   const absX = offsetX + layout.x
   const absY = offsetY + layout.y
 
@@ -253,6 +257,8 @@ export function getCursorAtPoint(
   offsetX = 0,
   offsetY = 0,
 ): string | null {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+
   const absX = offsetX + layout.x
   const absY = offsetY + layout.y
 
