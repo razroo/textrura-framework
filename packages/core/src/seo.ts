@@ -43,9 +43,9 @@ export interface SemanticHTMLOptions {
  * Used only for heading-level heuristics in static HTML; non-px units map to approximate px.
  * Covers `%`, viewport units (including dynamic `d*`, small `s*`, and large `l*` variants), common font-relative units (`ch`, `cap`, `math`), and absolute lengths
  * (`pt`, `pc`, `in`, `cm`, `mm`, `Q`) aligned with typical `fonts.ts` shorthand shapes (subset of units;
- * coarse px mapping for tier heuristics only).
+ * coarse px mapping for tier heuristics only). Longer viewport unit tokens precede shorter prefixes
+ * (e.g. `dvmin` before `vmin`), aligned with `fonts.ts`.
  */
-/** Longer viewport unit tokens precede shorter prefixes (e.g. `dvmin` before `vmin`), aligned with `fonts.ts`. */
 const FONT_SIZE_LENGTH =
   /(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*(%|px|rem|em|pt|pc|in|cm|mm|Q|math|dvmin|dvmax|svmin|svmax|lvmin|lvmax|dvh|dvw|dvi|dvb|svh|svw|svi|svb|lvh|lvw|lvi|lvb|vmin|vmax|vh|vw|vi|vb|rlh|lh|rcap|rch|rex|ric|cap|ch|ex|ic|cqmin|cqmax|cqw|cqh|cqi|cqb)(?=[\s,;/]|$)/i
 

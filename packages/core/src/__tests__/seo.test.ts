@@ -177,6 +177,16 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<h1>Big Title</h1>')
   })
 
+  it('infers heading level when font shorthand has leading whitespace', () => {
+    const el = box({ width: 200, height: 80 }, [
+      text({ text: 'Hero', font: '  \tbold 32px sans-serif', lineHeight: 40 }),
+      text({ text: 'Section', font: ' \nbold 24px Inter, sans-serif', lineHeight: 30 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<h1>Hero</h1>')
+    expect(html).toContain('<h2>Section</h2>')
+  })
+
   it('infers h1 from numeric font-weight 700 without the bold keyword', () => {
     const el = box({ width: 200, height: 50 }, [
       text({ text: 'Hero', font: 'italic 700 32px/40px Inter, sans-serif', lineHeight: 40 }),
