@@ -193,6 +193,21 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('500 75% 62.5% 16px "Display", sans-serif')).toEqual(['Display'])
   })
 
+  it('still resolves family after more leading stretch tokens than the primary strip budget', () => {
+    const font = `${'75% '.repeat(4100)}14px Inter`
+    expect(extractFontFamiliesFromCSSFont(font)).toEqual(['Inter'])
+  })
+
+  it(
+    'returns empty for absurd leading stretch stacks beyond remainder ceiling (no bogus family)',
+    () => {
+      // After the primary strip budget, remainder length still exceeds MAX_REMAINDER_AFTER_PRIMARY_STRIP.
+      const font = `${'75% '.repeat(8200)}14px Inter`
+      expect(extractFontFamiliesFromCSSFont(font)).toEqual([])
+    },
+    15_000,
+  )
+
   it('skips a long stack of leading stretch percentages before real size and family', () => {
     const pre = Array(12).fill('75%').join(' ')
     expect(extractFontFamiliesFromCSSFont(`${pre} 14px Inter, sans-serif`)).toEqual(['Inter'])

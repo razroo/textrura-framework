@@ -50,11 +50,19 @@ const TAIL_LEADS_WITH_SIZE_TOKEN = new RegExp(
 )
 
 /**
- * Enough for long font-stretch / leading-percent stacks before the real size + family
- * (each token can consume one strip). Bounded to keep pathological `font` strings safe.
+ * Upper bound on leading token strips for `font` shorthand parsing (pathological inputs stay finite).
+ * Long font-stretch / leading-percent stacks before the real size + family can consume one strip each.
  */
-/** Upper bound on leading token strips for `font` shorthand parsing (pathological inputs stay finite). */
 const MAX_SHORTHAND_STRIP_ITERATIONS = 4096
+
+/**
+ * After the primary strip budget, if this many characters remain and another peel is still required,
+ * return [] instead of continuing (avoids O(n²) regex work and bogus synthesized family names).
+ */
+const MAX_REMAINDER_AFTER_PRIMARY_STRIP = 16_384
+
+/** Extra peels allowed on modest remainders once the primary budget is exhausted. */
+const EXTRA_SHORTHAND_STRIP_ITERATIONS = 8192
 
 /** Split a CSS font-family list on commas not inside single or double quotes. */
 function splitFontFamilyList(tail: string): string[] {
@@ -101,7 +109,8 @@ function splitFontFamilyList(tail: string): string[] {
  * Recognizes common font-size units (px, em, rem, cap/ic/lh/rlh, root-relative r* units, pt, %, viewport, dynamic-viewport, container query, Q, and math units).
  * When a percentage is used as `font-stretch` before the real font size (e.g. `75% 14px Inter`),
  * skips that leading dimension so the size + family tail is parsed correctly.
- * Very long chains of leading size tokens are peeled with a bounded iteration budget; beyond that, results are best-effort.
+ * Very long chains of leading size tokens are peeled with a bounded primary budget, then a secondary pass on modest remainders.
+ * If an oversized tail still looks like stacked size tokens, returns [] rather than inventing a family name or doing pathological work.
  * Line-height after `/` may be numeric (with optional unit) or the `normal` keyword.
  */
 export function extractFontFamiliesFromCSSFont(font: string): string[] {
@@ -126,29 +135,46 @@ export function extractFontFamiliesFromCSSFont(font: string): string[] {
     return out
   }
 
-  let trimmed = font.trim()
-  for (let i = 0; i < MAX_SHORTHAND_STRIP_ITERATIONS; i++) {
-    const m = trimmed.match(FONT_SHORTHAND_FAMILY_TAIL)
-    if (!m) break
+  type PeelResult =
+    | { kind: 'family'; tail: string }
+    | { kind: 'peeled'; next: string }
+    | { kind: 'none' }
+
+  function peelFontShorthand(s: string): PeelResult {
+    const m = s.match(FONT_SHORTHAND_FAMILY_TAIL)
+    if (!m) return { kind: 'none' }
     const tail = m[2]!
     const firstSegment = splitFontFamilyList(tail)[0]?.trim() ?? ''
     const tailLeadsWithAnotherSize =
       FONT_SIZE_ONLY.test(firstSegment) || TAIL_LEADS_WITH_SIZE_TOKEN.test(tail)
-    if (tailLeadsWithAnotherSize) {
-      const matchIndex = m.index ?? 0
-      trimmed = trimmed.slice(matchIndex + m[1]!.length).trimStart()
-      continue
-    }
-    return filterFamilies(tail)
+    if (!tailLeadsWithAnotherSize) return { kind: 'family', tail }
+    const matchIndex = m.index ?? 0
+    return { kind: 'peeled', next: s.slice(matchIndex + m[1]!.length).trimStart() }
   }
-  const tailMatch = trimmed.match(FONT_SHORTHAND_FAMILY_TAIL)
-  if (tailMatch) {
-    const tail = tailMatch[2]!
-    const firstSegment = splitFontFamilyList(tail)[0]?.trim() ?? ''
-    const tailLeadsWithAnotherSize =
-      FONT_SIZE_ONLY.test(firstSegment) || TAIL_LEADS_WITH_SIZE_TOKEN.test(tail)
-    if (!tailLeadsWithAnotherSize) return filterFamilies(tail)
+
+  let trimmed = font.trim()
+  for (let i = 0; i < MAX_SHORTHAND_STRIP_ITERATIONS; i++) {
+    const r = peelFontShorthand(trimmed)
+    if (r.kind === 'none') break
+    if (r.kind === 'family') return filterFamilies(r.tail)
+    trimmed = r.next
   }
+
+  if (trimmed.length > MAX_REMAINDER_AFTER_PRIMARY_STRIP) {
+    const r = peelFontShorthand(trimmed)
+    if (r.kind === 'peeled') return []
+  }
+
+  for (let i = 0; i < EXTRA_SHORTHAND_STRIP_ITERATIONS; i++) {
+    const r = peelFontShorthand(trimmed)
+    if (r.kind === 'none') break
+    if (r.kind === 'family') return filterFamilies(r.tail)
+    trimmed = r.next
+  }
+
+  const last = peelFontShorthand(trimmed)
+  if (last.kind === 'family') return filterFamilies(last.tail)
+  if (last.kind === 'peeled') return []
   return filterFamilies(trimmed)
 }
 
