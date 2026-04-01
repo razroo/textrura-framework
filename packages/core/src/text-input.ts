@@ -6,14 +6,12 @@ export interface TextInputState {
   nodes: string[]
   /** Active selection/caret in node-local offsets. */
   selection: SelectionRange
-}
-
-export interface TextInputEditResult {
-  nodes: string[]
-  selection: SelectionRange
-  /** Preserved preferred column for vertical caret movement. */
+  /** Preferred column for vertical caret movement (arrow up/down); preserved by undo/redo when using history helpers. */
   caretColumnIntent?: number
 }
+
+/** Result shape returned by edit/caret helpers; same fields as {@link TextInputState}. */
+export type TextInputEditResult = TextInputState
 
 export interface CaretGeometry {
   x: number

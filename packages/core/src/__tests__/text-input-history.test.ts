@@ -30,6 +30,40 @@ describe('text input history', () => {
     expect(h.present.selection).toEqual(sel(0, 5))
   })
 
+  it('records a new step when nodes and selection match but caretColumnIntent differs', () => {
+    let h = createTextInputHistory({ nodes: ['ab', 'cdef'], selection: sel(1, 2) })
+    h = pushTextInputHistory(h, { nodes: ['ab', 'cdef'], selection: sel(1, 2), caretColumnIntent: 8 })
+    expect(h.past).toHaveLength(1)
+    expect(h.present.caretColumnIntent).toBe(8)
+  })
+
+  it('preserves caretColumnIntent on the stack and restores it on undo', () => {
+    let h = createTextInputHistory({
+      nodes: ['short', 'muchlongerline'],
+      selection: sel(0, 5),
+    })
+    h = pushTextInputHistory(h, {
+      nodes: ['short', 'muchlongerline'],
+      selection: { anchorNode: 1, anchorOffset: 5, focusNode: 1, focusOffset: 5 },
+      caretColumnIntent: 8,
+    })
+    expect(h.present.caretColumnIntent).toBe(8)
+    h = pushTextInputHistory(h, {
+      nodes: ['short', 'muchlongerlinex'],
+      selection: { anchorNode: 1, anchorOffset: 6, focusNode: 1, focusOffset: 6 },
+    })
+    expect(h.present.caretColumnIntent).toBeUndefined()
+    h = undoTextInputHistory(h)
+    expect(h.present.nodes).toEqual(['short', 'muchlongerline'])
+    expect(h.present.selection).toEqual({
+      anchorNode: 1,
+      anchorOffset: 5,
+      focusNode: 1,
+      focusOffset: 5,
+    })
+    expect(h.present.caretColumnIntent).toBe(8)
+  })
+
   it('records a new step when caret stays put but selection becomes a non-collapsed range', () => {
     let h = createTextInputHistory({ nodes: ['hello'], selection: sel(0, 1) })
     h = pushTextInputHistory(h, {

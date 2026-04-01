@@ -7,10 +7,14 @@ export interface TextInputHistoryState {
 }
 
 function cloneState(state: TextInputState): TextInputState {
-  return {
+  const out: TextInputState = {
     nodes: [...state.nodes],
     selection: { ...state.selection },
   }
+  if (state.caretColumnIntent !== undefined) {
+    out.caretColumnIntent = state.caretColumnIntent
+  }
+  return out
 }
 
 /**
@@ -27,7 +31,7 @@ export function createTextInputHistory(initial: TextInputState): TextInputHistor
 
 /**
  * Push a new edit state and clear the redo stack (`future`).
- * If `next` matches `present` (same joined text and identical selection anchors), returns `history` unchanged.
+ * If `next` matches `present` (same joined text, identical selection anchors, and same `caretColumnIntent`), returns `history` unchanged.
  *
  * @param maxPast — Maximum prior states kept in `past` after this push; older entries are dropped from the front.
  *   Use `0` to disable undo (each push yields an empty `past`). `NaN` falls back to `100`; `+Infinity`
@@ -53,13 +57,15 @@ export function pushTextInputHistory(
   const incoming = cloneState({
     nodes: [...next.nodes],
     selection: { ...next.selection },
+    caretColumnIntent: next.caretColumnIntent,
   })
   if (
     present.nodes.join('\n') === incoming.nodes.join('\n') &&
     present.selection.anchorNode === incoming.selection.anchorNode &&
     present.selection.anchorOffset === incoming.selection.anchorOffset &&
     present.selection.focusNode === incoming.selection.focusNode &&
-    present.selection.focusOffset === incoming.selection.focusOffset
+    present.selection.focusOffset === incoming.selection.focusOffset &&
+    present.caretColumnIntent === incoming.caretColumnIntent
   ) {
     return history
   }
