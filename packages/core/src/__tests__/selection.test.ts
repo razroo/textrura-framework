@@ -131,6 +131,62 @@ describe('hitTestText', () => {
     expect(hitTestText(textNodes as any, 5, Number.NEGATIVE_INFINITY)).toBeNull()
   })
 
+  it('skips nodes with non-finite layout bounds (matches pointer hit-test invariants)', () => {
+    const badWidth = [
+      {
+        element: { kind: 'text' as const, props: { text: 'x', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: Number.NaN,
+        height: 18,
+        index: 0,
+        lines: [{ text: 'x', x: 0, y: 0, charOffsets: [0], charWidths: [10] }],
+      },
+    ]
+    expect(hitTestText(badWidth as any, 5, 5)).toBeNull()
+
+    const badHeight = [
+      {
+        element: { kind: 'text' as const, props: { text: 'x', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 40,
+        height: Number.POSITIVE_INFINITY,
+        index: 0,
+        lines: [{ text: 'x', x: 0, y: 0, charOffsets: [0], charWidths: [10] }],
+      },
+    ]
+    expect(hitTestText(badHeight as any, 5, 5)).toBeNull()
+  })
+
+  it('skips a bad-bounds node and still hits a later node with finite geometry', () => {
+    const textNodes = [
+      {
+        element: { kind: 'text' as const, props: { text: 'bad', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: Number.NaN,
+        height: 18,
+        index: 0,
+        lines: [{ text: 'bad', x: 0, y: 0, charOffsets: [0], charWidths: [8] }],
+      },
+      {
+        element: { kind: 'text' as const, props: { text: 'ok', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 20,
+        width: 40,
+        height: 18,
+        index: 1,
+        lines: [{ text: 'ok', x: 0, y: 20, charOffsets: [0, 12], charWidths: [12, 12] }],
+      },
+    ]
+    expect(hitTestText(textNodes as any, 3, 26)).toEqual({ nodeIndex: 1, charOffset: 0 })
+  })
+
   it('returns null when no node bounds match', () => {
     const textNodes = [
       {

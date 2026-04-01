@@ -117,7 +117,16 @@ export function getSelectedText(
   return parts.join('\n')
 }
 
-/** Find which text node and character offset is at a given (x, y) point. Non-finite coordinates return `null`. */
+function textNodeBoundsAreFinite(node: TextNodeInfo): boolean {
+  return (
+    Number.isFinite(node.x) &&
+    Number.isFinite(node.y) &&
+    Number.isFinite(node.width) &&
+    Number.isFinite(node.height)
+  )
+}
+
+/** Find which text node and character offset is at a given (x, y) point. Non-finite pointer coordinates return `null`; nodes with non-finite bounds are skipped (same invariant as pointer hit-testing). */
 export function hitTestText(
   textNodes: TextNodeInfo[],
   px: number,
@@ -126,6 +135,7 @@ export function hitTestText(
   if (!Number.isFinite(px) || !Number.isFinite(py)) return null
 
   for (const node of textNodes) {
+    if (!textNodeBoundsAreFinite(node)) continue
     // Check if point is within the text node's bounding box
     if (px < node.x || px > node.x + node.width || py < node.y || py > node.y + node.height) {
       continue
