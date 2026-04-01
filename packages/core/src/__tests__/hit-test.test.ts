@@ -219,6 +219,43 @@ describe('dispatchHit', () => {
     expect(localY).toBe(11)
   })
 
+  it('fractional pointer coords and subpixel layout hit-test with precise localX/localY', () => {
+    let localX = -1
+    let localY = -1
+    const child = box({
+      width: 40,
+      height: 30,
+      onClick: e => {
+        localX = e.localX ?? -1
+        localY = e.localY ?? -1
+      },
+    })
+    const parent = box({ width: 120, height: 80 }, [child])
+    const layout = {
+      x: 5,
+      y: 10,
+      width: 120,
+      height: 80,
+      children: [{ x: 7.25, y: 9.5, width: 40, height: 30, children: [] as const }],
+    }
+
+    dispatchHit(parent, layout, 'onClick', 20.375, 30.125)
+    expect(localX).toBeCloseTo(8.125, 10)
+    expect(localY).toBeCloseTo(10.625, 10)
+
+    expect(hitPathAtPoint(parent, layout, 20.375, 30.125)).not.toBeNull()
+    expect(hasInteractiveHitAtPoint(parent, layout, 20.375, 30.125)).toBe(true)
+  })
+
+  it('inclusive edges accept fractional coordinates at exact width/height', () => {
+    let fired = false
+    const el = box({ width: 100, height: 50, onClick: () => { fired = true } })
+    const layout = { x: 0.25, y: 0.5, width: 100, height: 50, children: [] }
+
+    expect(dispatchHit(el, layout, 'onClick', 100.25, 50.5).handled).toBe(true)
+    expect(fired).toBe(true)
+  })
+
   it('merges extra fields onto the HitEvent for pointer handlers', () => {
     type PointerExtras = { button: number; shiftKey: boolean }
     let received: (HitEvent & PointerExtras) | null = null
