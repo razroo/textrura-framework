@@ -68,6 +68,19 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('10vh "Display Font"')).toEqual(['Display Font'])
   })
 
+  it('parses container query unit sizes before family', () => {
+    expect(extractFontFamiliesFromCSSFont('4cqw Inter, sans-serif')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('3cqh "CQ Font"')).toEqual(['CQ Font'])
+    expect(extractFontFamiliesFromCSSFont('2.5cqi Source Serif 4, serif')).toEqual(['Source Serif 4'])
+    expect(extractFontFamiliesFromCSSFont('1cqb JetBrains Mono, monospace')).toEqual(['JetBrains Mono'])
+    expect(extractFontFamiliesFromCSSFont('10cqmin Display, serif')).toEqual(['Display'])
+    expect(extractFontFamiliesFromCSSFont('12cqmax UI Sans, system-ui')).toEqual(['UI Sans'])
+  })
+
+  it('skips font-stretch percentage before container-query font size and family', () => {
+    expect(extractFontFamiliesFromCSSFont('75% 5cqw Inter')).toEqual(['Inter'])
+  })
+
   it('drops generic fallbacks case-insensitively', () => {
     expect(extractFontFamiliesFromCSSFont('14px Inter, SANS-SERIF, Monospace')).toEqual(['Inter'])
   })

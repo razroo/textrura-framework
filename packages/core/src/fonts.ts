@@ -20,6 +20,7 @@ const GENERIC_FAMILIES = new Set([
  */
 const FONT_SIZE_UNIT =
   '(?:dvmin|dvmax|svmin|svmax|lvmin|lvmax|dvh|dvw|svh|svw|lvh|lvw|vmin|vmax|vh|vw|' +
+  'cqmin|cqmax|cqi|cqb|cqw|cqh|' +
   'rlh|rcap|rch|rex|ric|' +
   'rem|cap|px|em|pt|pc|in|cm|mm|Q|%|ch|ex|ic|lh)'
 
@@ -82,7 +83,7 @@ function splitFontFamilyList(tail: string): string[] {
  * Extract custom font family names from a CSS `font` shorthand (e.g. `600 14px Inter`).
  * Drops generic fallbacks like `sans-serif`. Best-effort parsing for common patterns.
  * Commas inside quoted family names are ignored; `\\` escapes the next character inside quotes (e.g. `\"` for a literal `"`).
- * Recognizes common font-size units (px, em, rem, cap/ic/lh/rlh, root-relative r* units, pt, %, viewport and dynamic-viewport units, Q).
+ * Recognizes common font-size units (px, em, rem, cap/ic/lh/rlh, root-relative r* units, pt, %, viewport, dynamic-viewport, container query, and Q units).
  * When a percentage is used as `font-stretch` before the real font size (e.g. `75% 14px Inter`),
  * skips that leading dimension so the size + family tail is parsed correctly.
  */
