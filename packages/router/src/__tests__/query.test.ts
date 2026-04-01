@@ -58,8 +58,18 @@ describe('query helpers', () => {
     expect(parseQuery('a=%ZZ&b=ok')).toEqual({ a: '%ZZ', b: 'ok' })
   })
 
+  it('keeps raw value when decoding throws on a lone trailing percent', () => {
+    expect(parseQuery('a=%')).toEqual({ a: '%' })
+    expect(parseQuery('x=foo%')).toEqual({ x: 'foo%' })
+  })
+
   it('keeps raw key when percent-decoding the key throws', () => {
     expect(parseQuery('%ZZ=1&ok=2')).toEqual({ '%ZZ': '1', ok: '2' })
+  })
+
+  it('keeps raw key when decoding throws on a lone trailing percent in the key', () => {
+    expect(parseQuery('%=1')).toEqual({ '%': '1' })
+    expect(parseQuery('foo%=bar')).toEqual({ 'foo%': 'bar' })
   })
 
   it('ignores empty segments from leading, trailing, or repeated ampersands', () => {
