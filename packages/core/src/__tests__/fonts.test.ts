@@ -386,6 +386,24 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('LaRgEr 14px Literata, serif')).toEqual(['Literata'])
     expect(extractFontFamiliesFromCSSFont('smaller larger 12px Mono, monospace')).toEqual(['Mono'])
   })
+
+  it('still resolves family when more than eight leading smaller/larger keywords precede explicit size', () => {
+    expect(extractFontFamiliesFromCSSFont(`${'smaller '.repeat(9)}14px Inter, sans-serif`)).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont(`${'larger '.repeat(10)}16px Literata, serif`)).toEqual(['Literata'])
+    expect(extractFontFamiliesFromCSSFont(`${'smaller '.repeat(20)}12px JetBrains Mono, monospace`)).toEqual([
+      'JetBrains Mono',
+    ])
+  })
+
+  it('after eight strips, a remaining smaller/larger prefix merges into bare family list (best-effort limit)', () => {
+    // Only eight `smaller`/`larger` peels run; a ninth before a bare list is kept as part of the first segment.
+    expect(extractFontFamiliesFromCSSFont(`${'smaller '.repeat(9)}Inter, serif`)).toEqual(['smaller Inter'])
+  })
+
+  it('preserves CSS local() family tokens for callers that forward strings to document.fonts.load', () => {
+    expect(extractFontFamiliesFromCSSFont('14px local("Brand"), serif')).toEqual(['local("Brand")'])
+    expect(extractFontFamiliesFromCSSFont("600 16px local('Acme UI'), monospace")).toEqual(["local('Acme UI')"])
+  })
 })
 
 describe('collectFontFamiliesFromTree', () => {
