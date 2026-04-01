@@ -38,10 +38,19 @@ function getChildrenByZDesc(boxEl: BoxElement): number[] {
   return getChildrenByZAsc(boxEl).slice().reverse()
 }
 
-/** Result of routing a pointer/keyboard-style hit to handlers. */
+/**
+ * Result of routing a hit to {@link EventHandlers} on the deepest matching target.
+ * `focusTarget` is only populated for `onClick` (see {@link dispatchHit}).
+ */
 export interface HitDispatchResult {
   handled: boolean
-  /** Set when a focusable box handled `onClick` (for keyboard focus). */
+  /**
+   * Present only when `dispatchHit` was called with `'onClick'`: the deepest focusable box under the point
+   * (`onClick`, `onKeyDown` / `onKeyUp`, or composition handlers). Set after a successful
+   * `onClick` handler **or** via click-to-focus when the box has no `onClick` but should
+   * still receive keyboard/composition input (`handled` may be `false`). Omitted for all
+   * other event types.
+   */
   focusTarget?: { element: BoxElement; layout: ComputedLayout }
 }
 
@@ -100,10 +109,13 @@ function collectHits(
 }
 
 /**
- * Dispatch a pointer-style event at (x, y) against the element tree.
+ * Dispatch a hit at `(x, y)` against the element tree for the given handler key
+ * (e.g. `onClick`, `onPointerDown`, `onKeyDown`, composition events).
  * The deepest hit with a matching handler runs first; only one handler runs per call.
  * Optional `extra` is shallow-merged onto the `HitEvent` after base fields so callers
  * can pass modifier keys, `button`, wheel deltas, and other renderer-specific metadata.
+ * For `onClick` only, the return value may include `focusTarget` for focus routing
+ * (including click-to-focus when there is no `onClick` handler).
  */
 export function dispatchHit(
   element: UIElement,
