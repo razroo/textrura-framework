@@ -90,4 +90,12 @@ describe('query helpers', () => {
     expect(stringifyQuery({ n: 0 })).toBe('?n=0')
     expect(parseQuery('?n=0')).toEqual({ n: '0' })
   })
+
+  it('omits keys whose array value is empty (no pairs emitted for that key)', () => {
+    expect(stringifyQuery({ tag: [], other: 'x' })).toBe('?other=x')
+  })
+
+  it('stringifies arrays skipping nullish entries while preserving order of remaining values', () => {
+    expect(stringifyQuery({ mix: [null, 'a', undefined, 'b'] })).toBe('?mix=a&mix=b')
+  })
 })
