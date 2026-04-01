@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { dispatchHit, getCursorAtPoint, hasInteractiveHitAtPoint, hitPathAtPoint } from '../hit-test.js'
-import { box } from '../elements.js'
+import { box, image, text } from '../elements.js'
 import type { HitEvent, KeyboardHitEvent } from '../types.js'
 
 describe('dispatchHit', () => {
@@ -1305,6 +1305,77 @@ describe('scroll and overflow clipping', () => {
       ],
     }
     expect(hitPathAtPoint(parent, layout, 5, 5)).toEqual([1])
+  })
+})
+
+describe('non-box leaves (text and image)', () => {
+  it('click over text dispatches parent box onClick (leaves do not capture pointer hits)', () => {
+    let parentFired = false
+    const label = text({ text: 'Hi', font: '14px Inter', lineHeight: 20 })
+    const root = box({ width: 100, height: 40, onClick: () => { parentFired = true } }, [label])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 40,
+      children: [{ x: 10, y: 8, width: 24, height: 20, children: [] }],
+    }
+
+    dispatchHit(root, layout, 'onClick', 18, 18)
+    expect(parentFired).toBe(true)
+    expect(hasInteractiveHitAtPoint(root, layout, 18, 18)).toBe(true)
+    expect(hitPathAtPoint(root, layout, 18, 18)).toEqual([])
+    expect(getCursorAtPoint(root, layout, 18, 18)).toBeNull()
+  })
+
+  it('click over image dispatches parent box onClick', () => {
+    let parentFired = false
+    const pic = image({ src: '/x.png', width: 32, height: 32 })
+    const root = box({ width: 80, height: 80, onClick: () => { parentFired = true } }, [pic])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 80,
+      height: 80,
+      children: [{ x: 8, y: 8, width: 32, height: 32, children: [] }],
+    }
+
+    dispatchHit(root, layout, 'onClick', 20, 20)
+    expect(parentFired).toBe(true)
+    expect(hitPathAtPoint(root, layout, 20, 20)).toEqual([])
+  })
+
+  it('higher z-index text sibling does not block onClick on box behind', () => {
+    const log: string[] = []
+    const behind = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('btn') } })
+    const overlay = text({ text: 'x', font: '12px Inter', lineHeight: 16, zIndex: 1 })
+    const root = box({ width: 60, height: 60 }, [behind, overlay])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 60,
+      height: 60,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 25, 25)
+    expect(log).toEqual(['btn'])
+  })
+
+  it('getCursorAtPoint falls back to parent cursor when point is over text only', () => {
+    const label = text({ text: 'Go', font: '14px Inter', lineHeight: 20 })
+    const root = box({ width: 100, height: 40, cursor: 'pointer' }, [label])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 40,
+      children: [{ x: 4, y: 6, width: 28, height: 20, children: [] }],
+    }
+    expect(getCursorAtPoint(root, layout, 12, 14)).toBe('pointer')
   })
 })
 
