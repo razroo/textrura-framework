@@ -20,12 +20,19 @@ export interface SemanticHTMLOptions {
   headExtra?: string
 }
 
+/** First `font-size` dimension in `px` (supports scientific notation), aligned with `fonts.ts` parsing. */
+const FONT_SIZE_PX = /(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)px/
+
 /** Infer an HTML tag from a text element's font property. */
 function inferTag(element: TextElement): string {
   const font = element.props.font.toLowerCase()
   // Detect heading-like fonts by size
-  const sizeMatch = font.match(/(\d+)px/)
-  const size = sizeMatch ? parseInt(sizeMatch[1]!) : 14
+  const sizeMatch = font.match(FONT_SIZE_PX)
+  let size = 14
+  if (sizeMatch) {
+    const n = parseFloat(sizeMatch[1]!)
+    if (Number.isFinite(n)) size = n
+  }
   const isBold = font.includes('bold')
 
   if (isBold && size >= 28) return 'h1'

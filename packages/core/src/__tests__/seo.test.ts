@@ -54,6 +54,16 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<h1>Big Title</h1>')
   })
 
+  it('infers heading level from scientific-notation px sizes (not the trailing digit before px)', () => {
+    const el = box({ width: 200, height: 120 }, [
+      text({ text: 'Hero', font: 'bold 1e2px sans-serif', lineHeight: 120 }),
+      text({ text: 'Section', font: 'bold 2.5e+1px sans-serif', lineHeight: 32 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<h1>Hero</h1>')
+    expect(html).toContain('<h2>Section</h2>')
+  })
+
   it('infers p from small regular font', () => {
     const el = box({ width: 200, height: 50 }, [
       text({ text: 'Body text', font: '14px sans-serif', lineHeight: 18 }),

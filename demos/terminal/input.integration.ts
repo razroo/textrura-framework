@@ -13,8 +13,8 @@ function observedTestEvents(output: string): string[] {
 
 interface RunOptions {
   name: string
-  /** Wait before sending keys (ms). Default 1600. */
-  bootDelayMs?: number
+  /** Max time to wait for the `[test-event] boot` marker (ms). Default 5000. */
+  bootTimeoutMs?: number
   /** Key sequences with optional per-step delay (ms). */
   steps: Array<{ keys: string; delayMs?: number }>
   assert: (ctx: { events: string[]; exitCode: number; output: string }) => void
@@ -77,7 +77,7 @@ async function runScenario(options: RunOptions): Promise<void> {
   })
 
   // Prefer an explicit readiness marker over fixed delays to reduce CI flake.
-  await waitForOutput(() => output, '[test-event] boot', options.bootDelayMs ?? 5000, options.name)
+  await waitForOutput(() => output, '[test-event] boot', options.bootTimeoutMs ?? 5000, options.name)
   if (child.killed || child.exitCode !== null) {
     throw new Error(`${options.name}: process exited during boot\n${stripAnsi(output)}`)
   }
@@ -148,7 +148,6 @@ async function run(): Promise<void> {
 
   await runScenario({
     name: 'tab-focus-and-stats',
-    bootDelayMs: 1600,
     // One stdin chunk so Tab → x → Shift+Tab → q stay ordered (matches real TTY coalescing).
     steps: [{ keys: '\tx\x1b[Zq', delayMs: 400 }],
     assert: ({ events, exitCode }) => {
@@ -169,7 +168,6 @@ async function run(): Promise<void> {
 
   await runScenario({
     name: 'tab-wrap-focus-cycles',
-    bootDelayMs: 1600,
     steps: [{ keys: '\t\tq', delayMs: 400 }],
     assert: ({ events, exitCode }) => {
       const focusEvents = events.filter(e => e.startsWith('focus-slot-'))
