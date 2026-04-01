@@ -79,4 +79,29 @@ describe('syncVirtualWindow', () => {
     expect(syncVirtualWindow(8, Number.POSITIVE_INFINITY, 3, 0)).toEqual({ start: 3, end: 3, selected: 3 })
     expect(syncVirtualWindow(8, Number.NEGATIVE_INFINITY, 1, 0)).toEqual({ start: 1, end: 1, selected: 1 })
   })
+
+  it('keeps selection inside the visible window and bounds visible span for a grid of small inputs', () => {
+    for (let total = 0; total <= 12; total++) {
+      for (let windowSize = 1; windowSize <= 15; windowSize++) {
+        for (let selected = 0; selected <= 15; selected++) {
+          for (let currentStart = 0; currentStart <= 15; currentStart++) {
+            const r = syncVirtualWindow(total, windowSize, selected, currentStart)
+            if (total <= 0) {
+              expect(r).toEqual({ start: 0, end: 0, selected: 0 })
+              continue
+            }
+            const maxIndex = total - 1
+            const cap = Math.max(1, windowSize)
+            expect(r.selected).toBeGreaterThanOrEqual(0)
+            expect(r.selected).toBeLessThanOrEqual(maxIndex)
+            expect(r.start).toBeGreaterThanOrEqual(0)
+            expect(r.end).toBeLessThanOrEqual(maxIndex)
+            expect(r.selected).toBeGreaterThanOrEqual(r.start)
+            expect(r.selected).toBeLessThanOrEqual(r.end)
+            expect(r.end - r.start + 1).toBeLessThanOrEqual(Math.min(cap, total))
+          }
+        }
+      }
+    }
+  })
 })
