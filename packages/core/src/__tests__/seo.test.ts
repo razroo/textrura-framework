@@ -277,6 +277,34 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<h4>Ch minor</h4>')
   })
 
+  it('infers headings from vi/vb and container-query font units using approximate px', () => {
+    const el = box({ width: 400, height: 220 }, [
+      text({ text: 'Vi hero', font: 'bold 10vi sans-serif', lineHeight: 40 }),
+      text({ text: 'Cqw section', font: 'bold 8cqw sans-serif', lineHeight: 32 }),
+      text({ text: 'Cqmin sub', font: 'bold 2.5cqmin sans-serif', lineHeight: 28 }),
+      text({ text: 'Cqi minor', font: 'bold 2cqi sans-serif', lineHeight: 22 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<h1>Vi hero</h1>')
+    expect(html).toContain('<h2>Cqw section</h2>')
+    expect(html).toContain('<h2>Cqmin sub</h2>')
+    expect(html).toContain('<h4>Cqi minor</h4>')
+  })
+
+  it('infers headings from root-relative rch/rcap/rex/ric units', () => {
+    const el = box({ width: 400, height: 200 }, [
+      text({ text: 'Rch hero', font: 'bold 4rch sans-serif', lineHeight: 40 }),
+      text({ text: 'Rcap section', font: 'bold 2rcap sans-serif', lineHeight: 32 }),
+      text({ text: 'Rex sub', font: 'bold 3rex sans-serif', lineHeight: 28 }),
+      text({ text: 'Ric h4', font: 'bold 1.1ric sans-serif', lineHeight: 22 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<h1>Rch hero</h1>')
+    expect(html).toContain('<h2>Rcap section</h2>')
+    expect(html).toContain('<h2>Rex sub</h2>')
+    expect(html).toContain('<h4>Ric h4</h4>')
+  })
+
   it('infers headings from lh, rlh, ex, and ic units using approximate px', () => {
     const el = box({ width: 400, height: 220 }, [
       text({ text: 'RlH hero', font: 'bold 1.5rlh sans-serif', lineHeight: 40 }),

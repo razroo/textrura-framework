@@ -45,7 +45,7 @@ export interface SemanticHTMLOptions {
  * `fonts.ts` shorthand shapes (subset of units; coarse px mapping for tier heuristics only).
  */
 const FONT_SIZE_LENGTH =
-  /(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*(%|px|rem|em|pt|vmin|vmax|vh|vw|rlh|lh|cap|ch|ex|ic)(?=[\s,;/]|$)/i
+  /(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*(%|px|rem|em|pt|vmin|vmax|vh|vw|vi|vb|rlh|lh|rcap|rch|rex|ric|cap|ch|ex|ic|cqmin|cqmax|cqw|cqh|cqi|cqb)(?=[\s,;/]|$)/i
 
 /**
  * True when `font` shorthand indicates bold weight (the `bold` / `bolder` keywords as whole tokens,
@@ -84,7 +84,30 @@ function fontLengthToApproxPx(value: number, unit: string): number {
       return value * 9
     case 'vh':
     case 'vw':
+    case 'vi':
+    case 'vb':
       return value * 3
+    // Container query units: no real container in static HTML; coarse tiers only.
+    case 'cqmin':
+      return value * 9
+    case 'cqmax':
+      return value * 12
+    case 'cqw':
+    case 'cqh':
+      return value * 3
+    case 'cqi':
+      return value * 8
+    case 'cqb':
+      return value * 18
+    // Root-relative font metrics (aligned with `fonts.ts` unit set).
+    case 'rcap':
+      return value * 12
+    case 'rch':
+      return value * 8
+    case 'rex':
+      return value * 8
+    case 'ric':
+      return value * 16
     // Cap-height unit: approximate vs a 16px root for heading-tier heuristics only.
     case 'cap':
       return value * 12
