@@ -1,7 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createBrowserHistory, createMemoryHistory, type HistoryUpdate } from '../history.js'
 
 describe('history adapters', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('memory history supports push/replace/go', () => {
     const history = createMemoryHistory({ initialEntries: ['/a'] })
 
@@ -13,6 +17,63 @@ describe('history adapters', () => {
 
     history.go(-1)
     expect(history.location.pathname).toBe('/a')
+  })
+
+  it('memory history clamps initialIndex to stack bounds', () => {
+    const low = createMemoryHistory({ initialEntries: ['/a', '/b'], initialIndex: -99 })
+    expect(low.location.pathname).toBe('/a')
+
+    const high = createMemoryHistory({ initialEntries: ['/a', '/b'], initialIndex: 999 })
+    expect(high.location.pathname).toBe('/b')
+  })
+
+  it('memory history does not notify listeners when go(0) is a no-op', () => {
+    const history = createMemoryHistory({ initialEntries: ['/a'] })
+    const updates: HistoryUpdate[] = []
+    history.listen((u) => updates.push(u))
+    history.go(0)
+    expect(updates).toEqual([])
+  })
+
+  it('memory history notifies listeners with correct action for push, replace, and go', () => {
+    const history = createMemoryHistory({ initialEntries: ['/a'] })
+    const updates: HistoryUpdate[] = []
+    history.listen((u) => updates.push(u))
+
+    history.push('/b')
+    expect(updates.at(-1)).toMatchObject({ action: 'push', location: { pathname: '/b' } })
+
+    history.replace('/c')
+    expect(updates.at(-1)).toMatchObject({ action: 'replace', location: { pathname: '/c' } })
+
+    history.go(-1)
+    expect(updates.at(-1)).toMatchObject({ action: 'pop', location: { pathname: '/a' } })
+  })
+
+  it('memory history delivers updates to multiple listeners until each unsubscribes', () => {
+    const history = createMemoryHistory({ initialEntries: ['/a'] })
+    const first: HistoryUpdate[] = []
+    const second: HistoryUpdate[] = []
+    const off1 = history.listen((u) => first.push(u))
+    const off2 = history.listen((u) => second.push(u))
+
+    history.push('/b')
+    expect(first).toHaveLength(1)
+    expect(second).toHaveLength(1)
+
+    off1()
+    history.push('/c')
+    expect(first).toHaveLength(1)
+    expect(second).toHaveLength(2)
+
+    off2()
+    history.push('/d')
+    expect(second).toHaveLength(2)
+  })
+
+  it('throws when createBrowserHistory has no injected window and global window is missing', () => {
+    vi.stubGlobal('window', undefined)
+    expect(() => createBrowserHistory()).toThrow('createBrowserHistory requires a browser window')
   })
 
   it('browser history uses pushState/replaceState and popstate listener', () => {
