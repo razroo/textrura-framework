@@ -52,4 +52,22 @@ describe('query helpers', () => {
     expect(query).toBe('?q=alice%20bob&topic=routing%2Fintro')
     expect(parseQuery(query)).toEqual({ q: 'alice bob', topic: 'routing/intro' })
   })
+
+  it('preserves equals signs inside a value (only first = splits key from value)', () => {
+    expect(parseQuery('expr=a=b')).toEqual({ expr: 'a=b' })
+    expect(parseQuery('?a=b=c&d=1')).toEqual({ a: 'b=c', d: '1' })
+  })
+
+  it('merges repeated keys when an earlier value is empty', () => {
+    expect(parseQuery('x=&x=1')).toEqual({ x: ['', '1'] })
+  })
+
+  it('stringifies boolean false and true', () => {
+    expect(stringifyQuery({ ok: true, no: false })).toBe('?no=false&ok=true')
+  })
+
+  it('round-trips booleans through parse and stringify', () => {
+    const q = stringifyQuery({ flag: true })
+    expect(parseQuery(q)).toEqual({ flag: 'true' })
+  })
 })

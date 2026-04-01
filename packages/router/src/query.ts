@@ -1,5 +1,6 @@
 export type QueryValue = string | number | boolean | null | undefined
 export type QueryInput = Record<string, QueryValue | QueryValue[]>
+/** Result of {@link parseQuery}: each key maps to one value or, when repeated in the input, an array of values (order preserved). */
 export type ParsedQuery = Record<string, string | string[]>
 
 function decode(value: string): string {
@@ -14,6 +15,11 @@ function encode(value: string): string {
   return encodeURIComponent(value)
 }
 
+/**
+ * Parse a URL query string (optional leading `?`). Keys and values are percent-decoded;
+ * `+` in values is treated as space. Duplicate keys collapse to `string[]` in encounter order.
+ * If decoding a segment throws, that segment is left as the raw string (see malformed `%` escapes).
+ */
 export function parseQuery(search: string): ParsedQuery {
   const input = search.startsWith('?') ? search.slice(1) : search
   if (input === '') return {}
@@ -37,6 +43,11 @@ export function parseQuery(search: string): ParsedQuery {
   return result
 }
 
+/**
+ * Serialize a shallow query object to `?a=1&b=2`. Keys are sorted lexicographically for stable output.
+ * Skips `null` and `undefined`; array values become repeated keys. Booleans become `"true"` / `"false"`.
+ * Returns `""` when there are no pairs to emit.
+ */
 export function stringifyQuery(query: QueryInput): string {
   const keys = Object.keys(query).sort((a, b) => a.localeCompare(b))
   const pairs: string[] = []
