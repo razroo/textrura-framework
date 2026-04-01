@@ -103,6 +103,14 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('oblique 0.25turn 16px Inter, sans-serif')).toEqual(['Inter'])
   })
 
+  it('parses oblique angle in rad units before size and family', () => {
+    expect(extractFontFamiliesFromCSSFont('oblique 0.5rad 16px Inter, sans-serif')).toEqual(['Inter'])
+  })
+
+  it('parses oblique angle in grad units before size and family', () => {
+    expect(extractFontFamiliesFromCSSFont('oblique 100grad 14px Literata, serif')).toEqual(['Literata'])
+  })
+
   it('parses oblique keyword without angle before size and family', () => {
     expect(extractFontFamiliesFromCSSFont('oblique 14px Inter, sans-serif')).toEqual(['Inter'])
   })
