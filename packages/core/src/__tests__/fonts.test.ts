@@ -243,6 +243,7 @@ describe('extractFontFamiliesFromCSSFont', () => {
 
   it('parses dynamic and large/small viewport units before family', () => {
     expect(extractFontFamiliesFromCSSFont('4dvh Display Pro')).toEqual(['Display Pro'])
+    expect(extractFontFamiliesFromCSSFont('10dvw Wide Sans, sans-serif')).toEqual(['Wide Sans'])
     expect(extractFontFamiliesFromCSSFont('3svw Side, sans-serif')).toEqual(['Side'])
     expect(extractFontFamiliesFromCSSFont('5lvmin Body Text')).toEqual(['Body Text'])
   })
