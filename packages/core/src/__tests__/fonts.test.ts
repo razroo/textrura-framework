@@ -261,6 +261,11 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('bolder 16px Inter')).toEqual(['Inter'])
     expect(extractFontFamiliesFromCSSFont('lighter 12px Georgia, serif')).toEqual(['Georgia'])
   })
+
+  it('collapses repeated custom families in one list to first spelling (case-insensitive)', () => {
+    expect(extractFontFamiliesFromCSSFont('14px Inter, Inter, Mono, sans-serif')).toEqual(['Inter', 'Mono'])
+    expect(extractFontFamiliesFromCSSFont('12px Inter, inter, JetBrains Mono')).toEqual(['Inter', 'JetBrains Mono'])
+  })
 })
 
 describe('collectFontFamiliesFromTree', () => {
@@ -302,6 +307,18 @@ describe('collectFontFamiliesFromTree', () => {
       text({ text: 'c', font: '12px Inter', lineHeight: 16 }),
     ])
     expect(collectFontFamiliesFromTree(tree).sort()).toEqual(['Inter'])
+  })
+
+  it('preserves distinct family order from a single shorthand on one text node', () => {
+    const tree = box({}, [
+      text({ text: 'x', font: '12px Alpha, Beta, serif', lineHeight: 16 }),
+    ])
+    expect(collectFontFamiliesFromTree(tree)).toEqual(['Alpha', 'Beta'])
+  })
+
+  it('dedupes repeated names within one shorthand when collecting from tree', () => {
+    const tree = box({}, [text({ text: 'x', font: '14px Inter, Inter, Mono', lineHeight: 20 })])
+    expect(collectFontFamiliesFromTree(tree)).toEqual(['Inter', 'Mono'])
   })
 })
 

@@ -80,7 +80,9 @@ function splitFontFamilyList(tail: string): string[] {
 
 /**
  * Extract custom font family names from a CSS `font` shorthand (e.g. `600 14px Inter`).
- * Drops generic fallbacks like `sans-serif`. Best-effort parsing for common patterns.
+ * Drops generic fallbacks like `sans-serif`. Repeated custom names in the same list collapse
+ * to the first spelling (comparison is case-insensitive, e.g. `Inter, inter` → one entry).
+ * Best-effort parsing for common patterns.
  * Commas inside quoted family names are ignored; `\\` escapes the next character inside quotes (e.g. `\"` for a literal `"`).
  * Recognizes common font-size units (px, em, rem, cap/ic/lh/rlh, root-relative r* units, pt, %, viewport, dynamic-viewport, container query, Q, and math units).
  * When a percentage is used as `font-stretch` before the real font size (e.g. `75% 14px Inter`),
@@ -89,9 +91,18 @@ function splitFontFamilyList(tail: string): string[] {
  */
 export function extractFontFamiliesFromCSSFont(font: string): string[] {
   function filterFamilies(tail: string): string[] {
-    return splitFontFamilyList(tail)
+    const raw = splitFontFamilyList(tail)
       .map(s => s.trim().replace(/^["']|["']$/g, ''))
       .filter(f => f.length > 0 && !GENERIC_FAMILIES.has(f.toLowerCase()) && !FONT_SIZE_ONLY.test(f))
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const f of raw) {
+      const key = f.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push(f)
+    }
+    return out
   }
 
   let trimmed = font.trim()
