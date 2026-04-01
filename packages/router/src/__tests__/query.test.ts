@@ -127,6 +127,14 @@ describe('query helpers', () => {
     expect(parseQuery('x=&x=1')).toEqual({ x: ['', '1'] })
   })
 
+  it('merges a bare key segment after an earlier value for the same key', () => {
+    expect(parseQuery('a=1&a')).toEqual({ a: ['1', ''] })
+  })
+
+  it('merges a bare key before a later explicit value for the same key', () => {
+    expect(parseQuery('a&a=2')).toEqual({ a: ['', '2'] })
+  })
+
   it('stringifies boolean false and true', () => {
     expect(stringifyQuery({ ok: true, no: false })).toBe('?no=false&ok=true')
   })
