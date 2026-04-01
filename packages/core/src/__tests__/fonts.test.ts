@@ -309,7 +309,6 @@ describe('extractFontFamiliesFromCSSFont', () => {
   it(
     'returns empty for absurd leading stretch stacks beyond remainder ceiling (no bogus family)',
     () => {
-      // After the primary strip budget, remainder length still exceeds MAX_REMAINDER_AFTER_PRIMARY_STRIP.
       const font = `${'75% '.repeat(8200)}14px Inter`
       expect(extractFontFamiliesFromCSSFont(font)).toEqual([])
     },
@@ -524,12 +523,14 @@ describe('extractFontFamiliesFromCSSFont', () => {
 })
 
 describe('resolveFontLoadTimeoutMs', () => {
-  it('returns default when undefined', () => {
+  it('returns defaultMs when timeoutMs is undefined', () => {
     expect(resolveFontLoadTimeoutMs(undefined)).toBe(10_000)
     expect(resolveFontLoadTimeoutMs(undefined, 5_000)).toBe(5_000)
+    expect(resolveFontLoadTimeoutMs(undefined, 3000)).toBe(3000)
   })
 
-  it('returns default for NaN, non-finite, negative, or non-number', () => {
+  it('returns defaultMs for NaN, non-finite, negative, or non-number values', () => {
+    const fallback = 7777
     for (const bad of [
       Number.NaN,
       Number.POSITIVE_INFINITY,
@@ -538,14 +539,18 @@ describe('resolveFontLoadTimeoutMs', () => {
     ] as const) {
       expect(resolveFontLoadTimeoutMs(bad)).toBe(10_000)
       expect(resolveFontLoadTimeoutMs(bad, 3_000)).toBe(3_000)
+      expect(resolveFontLoadTimeoutMs(bad, fallback)).toBe(fallback)
     }
     expect(resolveFontLoadTimeoutMs('500' as unknown as number)).toBe(10_000)
+    expect(resolveFontLoadTimeoutMs('500' as unknown as number, fallback)).toBe(fallback)
   })
 
   it('preserves finite non-negative timeouts', () => {
     expect(resolveFontLoadTimeoutMs(0)).toBe(0)
     expect(resolveFontLoadTimeoutMs(80)).toBe(80)
     expect(resolveFontLoadTimeoutMs(0, 5_000)).toBe(0)
+    expect(resolveFontLoadTimeoutMs(2500)).toBe(2500)
+    expect(resolveFontLoadTimeoutMs(2500, 999)).toBe(2500)
   })
 })
 

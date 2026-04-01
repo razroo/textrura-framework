@@ -6,6 +6,26 @@ let currentSubscriber: Subscriber | null = null
 const batchQueue = new Set<Subscriber>()
 let batchDepth = 0
 
+/** Per-subscriber cleanups so re-runs drop stale signal/computed edges (conditional reads). */
+const subscriberCleanups = new WeakMap<Subscriber, Set<() => void>>()
+
+function trackDependency(cleanup: () => void): void {
+  if (!currentSubscriber) return
+  let set = subscriberCleanups.get(currentSubscriber)
+  if (!set) {
+    set = new Set()
+    subscriberCleanups.set(currentSubscriber, set)
+  }
+  set.add(cleanup)
+}
+
+function releaseSubscriber(sub: Subscriber): void {
+  const cleanups = subscriberCleanups.get(sub)
+  if (!cleanups || cleanups.size === 0) return
+  for (const c of cleanups) c()
+  cleanups.clear()
+}
+
 /** Batch multiple signal updates into a single flush. */
 export function batch(fn: () => void): void {
   batchDepth++
@@ -34,7 +54,13 @@ export function signal<T>(initial: T): Signal<T> {
 
   return {
     get value(): T {
-      if (currentSubscriber) subscribers.add(currentSubscriber)
+      if (currentSubscriber) {
+        const sub = currentSubscriber
+        subscribers.add(sub)
+        trackDependency(() => {
+          subscribers.delete(sub)
+        })
+      }
       return value
     },
     set(next: T) {
@@ -77,8 +103,8 @@ export function computed<T>(fn: () => T): Computed<T> {
 
   return {
     get value(): T {
-      if (currentSubscriber) subscribers.add(currentSubscriber)
       if (dirty) {
+        releaseSubscriber(recompute)
         const prev = currentSubscriber
         currentSubscriber = recompute
         try {
@@ -87,6 +113,13 @@ export function computed<T>(fn: () => T): Computed<T> {
           currentSubscriber = prev
         }
         dirty = false
+      }
+      if (currentSubscriber) {
+        const sub = currentSubscriber
+        subscribers.add(sub)
+        trackDependency(() => {
+          subscribers.delete(sub)
+        })
       }
       return cached
     },
@@ -99,6 +132,7 @@ export function effect(fn: () => void): () => void {
 
   const run: Subscriber = () => {
     if (disposed) return
+    releaseSubscriber(run)
     const prev = currentSubscriber
     currentSubscriber = run
     try {
@@ -109,5 +143,8 @@ export function effect(fn: () => void): () => void {
   }
 
   run()
-  return () => { disposed = true }
+  return () => {
+    disposed = true
+    releaseSubscriber(run)
+  }
 }

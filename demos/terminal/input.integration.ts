@@ -102,112 +102,114 @@ async function runScenario(options: RunOptions): Promise<void> {
 }
 
 async function run(): Promise<void> {
-  await runScenario({
-    name: 'chunked-keys-and-quit',
-    steps: [
-      { keys: 'aj' },
-      { keys: 'q' },
-    ],
-    assert: ({ events, exitCode, output }) => {
-      if (!output.includes('TEXTURA TUI')) {
-        throw new Error('Expected title not rendered')
-      }
-      if (!events.includes('add-item')) {
-        throw new Error(`Expected add-item (saw: ${events.join(', ')})`)
-      }
-      if (!events.includes('nav-down')) {
-        throw new Error(`Expected nav-down (saw: ${events.join(', ')})`)
-      }
-      if (!events.includes('quit')) {
-        throw new Error(`Expected quit from handler (saw: ${events.join(', ')})`)
-      }
-      if (exitCode !== 0) {
-        throw new Error(`Expected exit 0, got ${exitCode}`)
-      }
-    },
-  })
+  await Promise.all([
+    runScenario({
+      name: 'chunked-keys-and-quit',
+      steps: [
+        { keys: 'aj' },
+        { keys: 'q' },
+      ],
+      assert: ({ events, exitCode, output }) => {
+        if (!output.includes('TEXTURA TUI')) {
+          throw new Error('Expected title not rendered')
+        }
+        if (!events.includes('add-item')) {
+          throw new Error(`Expected add-item (saw: ${events.join(', ')})`)
+        }
+        if (!events.includes('nav-down')) {
+          throw new Error(`Expected nav-down (saw: ${events.join(', ')})`)
+        }
+        if (!events.includes('quit')) {
+          throw new Error(`Expected quit from handler (saw: ${events.join(', ')})`)
+        }
+        if (exitCode !== 0) {
+          throw new Error(`Expected exit 0, got ${exitCode}`)
+        }
+      },
+    }),
 
-  await runScenario({
-    name: 'arrow-escape-sequences',
-    steps: [
-      { keys: '\x1b[B\x1b[A', delayMs: 400 },
-      { keys: 'q' },
-    ],
-    assert: ({ events, exitCode }) => {
-      if (!events.includes('nav-down')) {
-        throw new Error(`Expected ArrowDown -> nav-down (saw: ${events.join(', ')})`)
-      }
-      if (!events.includes('nav-up')) {
-        throw new Error(`Expected ArrowUp -> nav-up (saw: ${events.join(', ')})`)
-      }
-      if (exitCode !== 0) {
-        throw new Error(`Expected exit 0, got ${exitCode}`)
-      }
-    },
-  })
+    runScenario({
+      name: 'arrow-escape-sequences',
+      steps: [
+        { keys: '\x1b[B\x1b[A', delayMs: 400 },
+        { keys: 'q' },
+      ],
+      assert: ({ events, exitCode }) => {
+        if (!events.includes('nav-down')) {
+          throw new Error(`Expected ArrowDown -> nav-down (saw: ${events.join(', ')})`)
+        }
+        if (!events.includes('nav-up')) {
+          throw new Error(`Expected ArrowUp -> nav-up (saw: ${events.join(', ')})`)
+        }
+        if (exitCode !== 0) {
+          throw new Error(`Expected exit 0, got ${exitCode}`)
+        }
+      },
+    }),
 
-  await runScenario({
-    name: 'tab-focus-and-stats',
-    // One stdin chunk so Tab → x → Shift+Tab → q stay ordered (matches real TTY coalescing).
-    steps: [{ keys: '\tx\x1b[Zq', delayMs: 400 }],
-    assert: ({ events, exitCode }) => {
-      if (!events.includes('focus-slot-1')) {
-        throw new Error(`Expected focus on stats panel (focus-slot-1) (saw: ${events.join(', ')})`)
-      }
-      if (!events.includes('stats-tick')) {
-        throw new Error(`Expected stats-tick after x (saw: ${events.join(', ')})`)
-      }
-      if (!events.includes('focus-slot-0')) {
-        throw new Error(`Expected focus back on list after Shift+Tab (saw: ${events.join(', ')})`)
-      }
-      if (exitCode !== 0) {
-        throw new Error(`Expected exit 0, got ${exitCode}`)
-      }
-    },
-  })
+    runScenario({
+      name: 'tab-focus-and-stats',
+      // One stdin chunk so Tab → x → Shift+Tab → q stay ordered (matches real TTY coalescing).
+      steps: [{ keys: '\tx\x1b[Zq', delayMs: 400 }],
+      assert: ({ events, exitCode }) => {
+        if (!events.includes('focus-slot-1')) {
+          throw new Error(`Expected focus on stats panel (focus-slot-1) (saw: ${events.join(', ')})`)
+        }
+        if (!events.includes('stats-tick')) {
+          throw new Error(`Expected stats-tick after x (saw: ${events.join(', ')})`)
+        }
+        if (!events.includes('focus-slot-0')) {
+          throw new Error(`Expected focus back on list after Shift+Tab (saw: ${events.join(', ')})`)
+        }
+        if (exitCode !== 0) {
+          throw new Error(`Expected exit 0, got ${exitCode}`)
+        }
+      },
+    }),
 
-  await runScenario({
-    name: 'tab-wrap-focus-cycles',
-    steps: [{ keys: '\t\tq', delayMs: 400 }],
-    assert: ({ events, exitCode }) => {
-      const focusEvents = events.filter(e => e.startsWith('focus-slot-'))
-      if (!focusEvents.includes('focus-slot-1')) {
-        throw new Error(`Expected first Tab to reach focus-slot-1 (saw: ${events.join(', ')})`)
-      }
-      if (!focusEvents.includes('focus-slot-0')) {
-        throw new Error(`Expected second Tab to wrap back to focus-slot-0 (saw: ${events.join(', ')})`)
-      }
-      if (exitCode !== 0) {
-        throw new Error(`Expected exit 0, got ${exitCode}`)
-      }
-    },
-  })
+    runScenario({
+      name: 'tab-wrap-focus-cycles',
+      steps: [{ keys: '\t\tq', delayMs: 400 }],
+      assert: ({ events, exitCode }) => {
+        const focusEvents = events.filter(e => e.startsWith('focus-slot-'))
+        if (!focusEvents.includes('focus-slot-1')) {
+          throw new Error(`Expected first Tab to reach focus-slot-1 (saw: ${events.join(', ')})`)
+        }
+        if (!focusEvents.includes('focus-slot-0')) {
+          throw new Error(`Expected second Tab to wrap back to focus-slot-0 (saw: ${events.join(', ')})`)
+        }
+        if (exitCode !== 0) {
+          throw new Error(`Expected exit 0, got ${exitCode}`)
+        }
+      },
+    }),
 
-  await runScenario({
-    name: 'ctrl-c-exit',
-    steps: [{ keys: '\x03', delayMs: 500 }],
-    assert: ({ events, exitCode }) => {
-      if (!events.includes('stdin-quit')) {
-        throw new Error(`Expected stdin-quit for Ctrl+C (saw: ${events.join(', ')})`)
-      }
-      if (exitCode !== 0) {
-        throw new Error(`Expected exit 0, got ${exitCode}`)
-      }
-    },
-  })
+    runScenario({
+      name: 'ctrl-c-exit',
+      steps: [{ keys: '\x03', delayMs: 500 }],
+      assert: ({ events, exitCode }) => {
+        if (!events.includes('stdin-quit')) {
+          throw new Error(`Expected stdin-quit for Ctrl+C (saw: ${events.join(', ')})`)
+        }
+        if (exitCode !== 0) {
+          throw new Error(`Expected exit 0, got ${exitCode}`)
+        }
+      },
+    }),
 
-  await runScenario({
-    name: 'ctrl-d-exit',
-    steps: [{ keys: '\x04', delayMs: 500 }],
-    assert: ({ events, exitCode }) => {
-      if (!events.includes('stdin-quit')) {
-        throw new Error(`Expected stdin-quit for Ctrl+D (saw: ${events.join(', ')})`)
-      }
-      if (exitCode !== 0) {
-        throw new Error(`Expected exit 0, got ${exitCode}`)
-      }
-    },
-  })
+    runScenario({
+      name: 'ctrl-d-exit',
+      steps: [{ keys: '\x04', delayMs: 500 }],
+      assert: ({ events, exitCode }) => {
+        if (!events.includes('stdin-quit')) {
+          throw new Error(`Expected stdin-quit for Ctrl+D (saw: ${events.join(', ')})`)
+        }
+        if (exitCode !== 0) {
+          throw new Error(`Expected exit 0, got ${exitCode}`)
+        }
+      },
+    }),
+  ])
 
   process.stdout.write('Terminal input integration tests passed.\n')
 }

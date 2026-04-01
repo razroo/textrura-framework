@@ -34,6 +34,32 @@ describe('signal', () => {
     s.set(5)
     expect(runs).toBe(1)
   })
+
+  it('drops stale signal subscriptions when the effect branch changes', () => {
+    const gate = signal(true)
+    const a = signal(0)
+    const b = signal(0)
+    const seen: string[] = []
+    effect(() => {
+      if (gate.value) {
+        seen.push(`a:${a.value}`)
+      } else {
+        seen.push(`b:${b.value}`)
+      }
+    })
+    expect(seen).toEqual(['a:0'])
+    seen.length = 0
+    a.set(1)
+    expect(seen).toEqual(['a:1'])
+    seen.length = 0
+    gate.set(false)
+    expect(seen).toEqual(['b:0'])
+    seen.length = 0
+    a.set(2)
+    expect(seen).toEqual([])
+    b.set(1)
+    expect(seen).toEqual(['b:1'])
+  })
 })
 
 describe('computed', () => {
@@ -69,6 +95,32 @@ describe('computed', () => {
     expect(c.value).toBe(8)
     expect(evalCount).toBe(2)
   })
+
+  it('drops inner signal deps when the computed branch changes', () => {
+    const gate = signal(true)
+    const x = signal(1)
+    const y = signal(10)
+    let evalCount = 0
+    const c = computed(() => {
+      evalCount++
+      return gate.value ? x.value : y.value
+    })
+
+    expect(c.value).toBe(1)
+    expect(evalCount).toBe(1)
+    x.set(2)
+    expect(c.value).toBe(2)
+    expect(evalCount).toBe(2)
+    gate.set(false)
+    expect(c.value).toBe(10)
+    expect(evalCount).toBe(3)
+    x.set(99)
+    expect(c.value).toBe(10)
+    expect(evalCount).toBe(3)
+    y.set(11)
+    expect(c.value).toBe(11)
+    expect(evalCount).toBe(4)
+  })
 })
 
 describe('effect', () => {
@@ -82,6 +134,30 @@ describe('effect', () => {
     expect(seen).toEqual([2])
     s.set(5)
     expect(seen).toEqual([2, 6])
+  })
+
+  it('drops stale computed subscription when the effect stops reading it', () => {
+    const gate = signal(true)
+    const s = signal(0)
+    const c = computed(() => s.value * 2)
+    const seen: number[] = []
+    effect(() => {
+      if (gate.value) {
+        seen.push(c.value)
+      } else {
+        seen.push(-1)
+      }
+    })
+    expect(seen).toEqual([0])
+    seen.length = 0
+    s.set(1)
+    expect(seen).toEqual([2])
+    seen.length = 0
+    gate.set(false)
+    expect(seen).toEqual([-1])
+    seen.length = 0
+    s.set(2)
+    expect(seen).toEqual([])
   })
 
   it('runs immediately and re-runs on dependency change', () => {
