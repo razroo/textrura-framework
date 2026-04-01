@@ -202,6 +202,15 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('600 14px Custom, INHERIT')).toEqual(['Custom'])
   })
 
+  it('returns empty when the entire font value is a bare CSS-wide keyword', () => {
+    expect(extractFontFamiliesFromCSSFont('inherit')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('initial')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('unset')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('revert')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('revert-layer')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('  INHERIT  ')).toEqual([])
+  })
+
   it('drops cursive, fantasy, and emoji generic fallbacks', () => {
     expect(extractFontFamiliesFromCSSFont('14px Display, cursive')).toEqual(['Display'])
     expect(extractFontFamiliesFromCSSFont('16px "Brand", fantasy')).toEqual(['Brand'])
