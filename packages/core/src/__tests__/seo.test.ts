@@ -83,6 +83,34 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<img src="https://example.com/photo.jpg" alt="A photo">')
   })
 
+  it('escapes img src and alt for HTML attribute safety', () => {
+    const el = box({ width: 200, height: 200 }, [
+      image({
+        src: 'https://example.com/q?a=1&b=2"onerror=',
+        alt: 'A & B <tag>',
+        width: 100,
+        height: 100,
+      }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain(
+      'src="https://example.com/q?a=1&amp;b=2&quot;onerror="',
+    )
+    expect(html).toContain('alt="A &amp; B &lt;tag&gt;"')
+  })
+
+  it('infers h2, h3, and h4 from bold px thresholds', () => {
+    const el = box({ width: 400, height: 200 }, [
+      text({ text: 'Section', font: 'bold 24px sans-serif', lineHeight: 30 }),
+      text({ text: 'Sub', font: 'bold 19px sans-serif', lineHeight: 24 }),
+      text({ text: 'Minor', font: 'bold 15px sans-serif', lineHeight: 20 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<h2>Section</h2>')
+    expect(html).toContain('<h3>Sub</h3>')
+    expect(html).toContain('<h4>Minor</h4>')
+  })
+
   it('emits stable semantic snapshot for nav and article tree', () => {
     const el = box({ semantic: { tag: 'main' } }, [
       box({ semantic: { tag: 'nav', ariaLabel: 'Primary' } }, [
