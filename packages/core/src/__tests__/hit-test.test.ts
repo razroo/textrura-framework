@@ -62,6 +62,32 @@ describe('dispatchHit', () => {
     expect((received as HitEvent & { buttons: number }).buttons).toBe(4)
   })
 
+  it('applies extra after base HitEvent fields so renderer-supplied keys can override coordinates', () => {
+    let received: HitEvent | undefined
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
+    const el = box({
+      width: 100,
+      height: 50,
+      onPointerDown: e => {
+        received = e
+      },
+    })
+
+    dispatchHit(el, layout, 'onPointerDown', 50, 25, {
+      x: 1,
+      y: 2,
+      localX: 3,
+      localY: 4,
+    })
+
+    expect(received).toBeDefined()
+    expect(received!.x).toBe(1)
+    expect(received!.y).toBe(2)
+    expect(received!.localX).toBe(3)
+    expect(received!.localY).toBe(4)
+    expect(received!.target).toBe(layout)
+  })
+
   it('zero-size box: only the origin corner is inside', () => {
     let fired = false
     const el = box({ width: 0, height: 0, onClick: () => { fired = true } })

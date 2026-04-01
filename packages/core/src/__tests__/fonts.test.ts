@@ -437,6 +437,13 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont("600 16px local('Acme UI'), monospace")).toEqual(["local('Acme UI')"])
   })
 
+  it('preserves unquoted local() when the face name is a CSS identifier', () => {
+    expect(extractFontFamiliesFromCSSFont('14px local(Inter), sans-serif')).toEqual(['local(Inter)'])
+    expect(extractFontFamiliesFromCSSFont('600 16px local(Acme_UI_Fallback), monospace')).toEqual([
+      'local(Acme_UI_Fallback)',
+    ])
+  })
+
   it('drops url() segments so @font-face src paste does not become a load target', () => {
     expect(extractFontFamiliesFromCSSFont('14px Inter, url("./font.woff2"), sans-serif')).toEqual(['Inter'])
     expect(extractFontFamiliesFromCSSFont('14px URL( "./font.woff2" ) format("woff2"), serif')).toEqual([])

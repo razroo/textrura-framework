@@ -13,7 +13,7 @@ function observedTestEvents(output: string): string[] {
 
 interface RunOptions {
   name: string
-  /** Max time to wait for the `[test-event] boot` marker (ms). Default 5000. */
+  /** Max time to wait for the `[test-event] boot` marker (ms). Default 15_000 (cold `tsx` + first frame can exceed 5s). */
   bootTimeoutMs?: number
   /** Key sequences with optional per-step delay (ms). */
   steps: Array<{ keys: string; delayMs?: number }>
@@ -77,7 +77,7 @@ async function runScenario(options: RunOptions): Promise<void> {
   })
 
   // Prefer an explicit readiness marker over fixed delays to reduce CI flake.
-  await waitForOutput(() => output, '[test-event] boot', options.bootTimeoutMs ?? 5000, options.name)
+  await waitForOutput(() => output, '[test-event] boot', options.bootTimeoutMs ?? 15_000, options.name)
   if (child.killed || child.exitCode !== null) {
     throw new Error(`${options.name}: process exited during boot\n${stripAnsi(output)}`)
   }
