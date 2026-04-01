@@ -457,6 +457,61 @@ describe('dispatchHit', () => {
     expect(result.focusTarget).toBeUndefined()
     expect(data).toBe('かな')
   })
+
+  it('onCompositionStart: deepest handler runs; merges data; no focusTarget', () => {
+    let data = ''
+    const child = box({
+      width: 40,
+      height: 40,
+      onCompositionStart: (e) => { data = e.data },
+    })
+    const parent = box({ width: 100, height: 100 }, [child])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+    const result = dispatchHit(parent, layout, 'onCompositionStart', 20, 20, { data: 'あ' })
+    expect(result.handled).toBe(true)
+    expect(result.focusTarget).toBeUndefined()
+    expect(data).toBe('あ')
+  })
+
+  it('onCompositionEnd: deepest handler runs; merges data; no focusTarget', () => {
+    let data = ''
+    const child = box({
+      width: 40,
+      height: 40,
+      onCompositionEnd: (e) => { data = e.data },
+    })
+    const parent = box({ width: 100, height: 100 }, [child])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+    const result = dispatchHit(parent, layout, 'onCompositionEnd', 20, 20, { data: '漢字' })
+    expect(result.handled).toBe(true)
+    expect(result.focusTarget).toBeUndefined()
+    expect(data).toBe('漢字')
+  })
+
+  it('nested boxes: onCompositionEnd — deepest handler fires first', () => {
+    const log: string[] = []
+    const child = box({
+      width: 40,
+      height: 40,
+      onCompositionEnd: () => { log.push('child') },
+    })
+    const parent = box(
+      { width: 100, height: 100, onCompositionEnd: () => { log.push('parent') } },
+      [child],
+    )
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+    dispatchHit(parent, layout, 'onCompositionEnd', 20, 20, { data: '' })
+    expect(log).toEqual(['child'])
+  })
 })
 
 describe('hitPathAtPoint', () => {
