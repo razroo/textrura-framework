@@ -362,6 +362,13 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('14px Inter, Inter, Mono, sans-serif')).toEqual(['Inter', 'Mono'])
     expect(extractFontFamiliesFromCSSFont('12px Inter, inter, JetBrains Mono')).toEqual(['Inter', 'JetBrains Mono'])
   })
+
+  it('keeps dashed and vendor-like concrete families (not confused with size tokens or generics)', () => {
+    expect(extractFontFamiliesFromCSSFont('16px -apple-system, sans-serif')).toEqual(['-apple-system'])
+    expect(extractFontFamiliesFromCSSFont('15px BlinkMacSystemFont, system-ui')).toEqual(['BlinkMacSystemFont'])
+    expect(extractFontFamiliesFromCSSFont('14px Segoe UI Variable, ui-sans-serif')).toEqual(['Segoe UI Variable'])
+    expect(extractFontFamiliesFromCSSFont('13px --custom-font-fallback, serif')).toEqual(['--custom-font-fallback'])
+  })
 })
 
 describe('collectFontFamiliesFromTree', () => {
