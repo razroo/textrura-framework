@@ -1504,6 +1504,36 @@ describe('scroll and overflow clipping', () => {
     expect(hitPathAtPoint(parent, layout, 75, 85)).toEqual([0])
   })
 
+  it('negative scrollX and scrollY shift child bounds (finite overscroll-style offsets)', () => {
+    let localX = -1
+    let localY = -1
+    const child = box({
+      width: 50,
+      height: 50,
+      onClick: e => {
+        localX = e.localX ?? -999
+        localY = e.localY ?? -999
+      },
+    })
+    const parent = box(
+      { width: 100, height: 100, overflow: 'scroll', scrollX: -30, scrollY: -20 },
+      [child],
+    )
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 10, y: 15, width: 50, height: 50, children: [] }],
+    }
+
+    // absX = 0 - scrollX + child.x = 40; absY = 0 - scrollY + child.y = 35
+    dispatchHit(parent, layout, 'onClick', 45, 40)
+    expect(localX).toBe(5)
+    expect(localY).toBe(5)
+    expect(hitPathAtPoint(parent, layout, 45, 40)).toEqual([0])
+  })
+
   it('hitPathAtPoint resolves path under scrollX', () => {
     const child = box({ width: 50, height: 50 })
     const parent = box({ width: 100, height: 100, overflow: 'scroll', scrollX: 40 }, [child])
