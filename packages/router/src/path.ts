@@ -41,8 +41,9 @@ function stringifyParam(value: string | number): string {
 /**
  * Build a pathname from a route pattern and {@link PathParams}. Static segments are copied as-is;
  * dynamic `:id` and optional `:id?` are filled from `params`; splat `*rest` (or a lone `*`, key `'*'`)
- * inserts the remainder with internal slashes preserved. Missing required params or an empty splat
- * value throw. Leading and trailing slashes on `pattern` are trimmed before building.
+ * inserts the remainder with internal slashes preserved. For optional segments, `null`, `undefined`,
+ * or empty string omits the segment (same as leaving the key unset). Required dynamic and splat
+ * params throw when missing or empty. Leading and trailing slashes on `pattern` are trimmed before building.
  */
 export function buildPath<Path extends string>(pattern: Path, params: PathParams<Path>): string {
   const trimmed = trimSlashes(pattern)

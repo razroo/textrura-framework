@@ -10,6 +10,22 @@ describe('path generation', () => {
     expect(buildPath('/users/:id?', {})).toBe('/users')
   })
 
+  it('omits optional params when value is empty string (same as unset)', () => {
+    expect(buildPath('/users/:id?', { id: '' })).toBe('/users')
+  })
+
+  it('throws when a required param is empty string', () => {
+    expect(() => buildPath('/users/:id', { id: '' } as PathParams<'/users/:id'>)).toThrow(
+      'Missing required path param: id',
+    )
+  })
+
+  it('throws when splat param is null at runtime', () => {
+    expect(() =>
+      buildPath('/docs/*rest', { rest: null as unknown as string } as PathParams<'/docs/*rest'>),
+    ).toThrow('Missing required splat param: rest')
+  })
+
   it('includes optional params when provided', () => {
     expect(buildPath('/users/:id?', { id: 7 })).toBe('/users/7')
   })
