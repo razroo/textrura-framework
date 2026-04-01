@@ -41,7 +41,8 @@ const SYSTEM_FONT_KEYWORDS = new Set([
  * Longer tokens precede shorter prefixes (e.g. `dvmin` before `vmin`, `rlh` before `lh`, `rch` before `ch`).
  */
 const FONT_SIZE_UNIT =
-  '(?:dvmin|dvmax|svmin|svmax|lvmin|lvmax|dvh|dvw|svh|svw|lvh|lvw|vmin|vmax|vh|vw|' +
+  '(?:dvmin|dvmax|svmin|svmax|lvmin|lvmax|dvh|dvw|dvi|dvb|svh|svw|svi|svb|lvh|lvw|lvi|lvb|' +
+  'vmin|vmax|vh|vw|vi|vb|' +
   'cqmin|cqmax|cqi|cqb|cqw|cqh|' +
   'rlh|rcap|rch|rex|ric|' +
   'rem|cap|px|em|pt|pc|in|cm|math|mm|Q|%|ch|ex|ic|lh)'
@@ -124,7 +125,7 @@ function splitFontFamilyList(tail: string): string[] {
  * to the first spelling (comparison is case-insensitive, e.g. `Inter, inter` → one entry).
  * Best-effort parsing for common patterns.
  * Commas inside quoted family names are ignored; `\\` escapes the next character inside quotes (e.g. `\"` for a literal `"`).
- * Recognizes common font-size units (px, em, rem, cap/ic/lh/rlh, root-relative r* units, pt, %, viewport, dynamic-viewport, container query, Q, and math units), including scientific notation on the numeric part (e.g. `1e2px`).
+ * Recognizes common font-size units (px, em, rem, cap/ic/lh/rlh, root-relative r* units, pt, %, viewport, viewport inline/block (`vi`/`vb` and `d*`/`s*`/`l*` variants), dynamic-viewport, container query, Q, and math units), including scientific notation on the numeric part (e.g. `1e2px`).
  * When a percentage is used as `font-stretch` before the real font size (e.g. `75% 14px Inter`),
  * skips that leading dimension so the size + family tail is parsed correctly.
  * Very long chains of leading size tokens are peeled with a bounded primary budget, then a secondary pass on modest remainders.

@@ -300,6 +300,17 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('5lvmin Body Text')).toEqual(['Body Text'])
   })
 
+  it('parses viewport inline and block units (vi/vb and d/s/l variants) before family', () => {
+    expect(extractFontFamiliesFromCSSFont('2.5vi Inline UI, sans-serif')).toEqual(['Inline UI'])
+    expect(extractFontFamiliesFromCSSFont('4vb Block Serif, serif')).toEqual(['Block Serif'])
+    expect(extractFontFamiliesFromCSSFont('3dvi Dynamic Inline, sans-serif')).toEqual(['Dynamic Inline'])
+    expect(extractFontFamiliesFromCSSFont('2dvb Dyn Block')).toEqual(['Dyn Block'])
+    expect(extractFontFamiliesFromCSSFont('1.5svi Small Inline')).toEqual(['Small Inline'])
+    expect(extractFontFamiliesFromCSSFont('2svb Small Block, monospace')).toEqual(['Small Block'])
+    expect(extractFontFamiliesFromCSSFont('2.25lvi Large Inline')).toEqual(['Large Inline'])
+    expect(extractFontFamiliesFromCSSFont('3lvb Large Block')).toEqual(['Large Block'])
+  })
+
   it('parses Q (quarter-mm) size before family', () => {
     expect(extractFontFamiliesFromCSSFont('40Q Mincho, serif')).toEqual(['Mincho'])
   })
