@@ -13,7 +13,10 @@ function cloneState(state: TextInputState): TextInputState {
   }
 }
 
-/** Create a history container for editable text state. */
+/**
+ * Create a history container for editable text state.
+ * Undo/redo stacks are empty; {@link pushTextInputHistory} appends the previous `present` to `past`.
+ */
 export function createTextInputHistory(initial: TextInputState): TextInputHistoryState {
   return {
     past: [],
@@ -22,7 +25,13 @@ export function createTextInputHistory(initial: TextInputState): TextInputHistor
   }
 }
 
-/** Push a new edit state and clear redo stack. */
+/**
+ * Push a new edit state and clear the redo stack (`future`).
+ * If `next` matches `present` (same joined text and identical selection anchors), returns `history` unchanged.
+ *
+ * @param maxPast — Maximum prior states kept in `past` after this push; older entries are dropped from the front.
+ *   Use `0` to disable undo (each push yields an empty `past`).
+ */
 export function pushTextInputHistory(
   history: TextInputHistoryState,
   next: TextInputState | TextInputEditResult,
@@ -54,7 +63,7 @@ export function pushTextInputHistory(
   }
 }
 
-/** Undo one step, if available. */
+/** Move `present` to `future`, restore the latest `past` entry as `present`, or no-op if `past` is empty. */
 export function undoTextInputHistory(history: TextInputHistoryState): TextInputHistoryState {
   if (history.past.length === 0) return history
   const past = [...history.past]
@@ -66,7 +75,7 @@ export function undoTextInputHistory(history: TextInputHistoryState): TextInputH
   }
 }
 
-/** Redo one step, if available. */
+/** Move `present` to `past`, restore the next `future` entry as `present`, or no-op if `future` is empty. */
 export function redoTextInputHistory(history: TextInputHistoryState): TextInputHistoryState {
   if (history.future.length === 0) return history
   const [next, ...future] = history.future

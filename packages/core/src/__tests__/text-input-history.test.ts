@@ -30,6 +30,31 @@ describe('text input history', () => {
     expect(h.present.selection).toEqual(sel(0, 5))
   })
 
+  it('records a new step when caret stays put but selection becomes a non-collapsed range', () => {
+    let h = createTextInputHistory({ nodes: ['hello'], selection: sel(0, 1) })
+    h = pushTextInputHistory(h, {
+      nodes: ['hello'],
+      selection: {
+        anchorNode: 0,
+        anchorOffset: 1,
+        focusNode: 0,
+        focusOffset: 4,
+      },
+    })
+    expect(h.past).toHaveLength(1)
+    expect(h.present.selection.focusOffset).toBe(4)
+  })
+
+  it('with maxPast 0, past stays empty and undo remains a no-op after edits', () => {
+    let h = createTextInputHistory({ nodes: ['a'], selection: sel(0, 1) })
+    h = pushTextInputHistory(h, { nodes: ['ab'], selection: sel(0, 2) }, 0)
+    expect(h.past).toHaveLength(0)
+    expect(h.present.nodes).toEqual(['ab'])
+    h = pushTextInputHistory(h, { nodes: ['abc'], selection: sel(0, 3) }, 0)
+    expect(h.past).toHaveLength(0)
+    expect(undoTextInputHistory(h)).toBe(h)
+  })
+
   it('treats equivalent multi-line text as unchanged when selection fields match (node split only)', () => {
     let h = createTextInputHistory({ nodes: ['x', 'y'], selection: sel(0, 1) })
     const sameJoin = pushTextInputHistory(h, { nodes: ['x\ny'], selection: sel(0, 1) })
