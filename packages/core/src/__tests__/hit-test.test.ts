@@ -701,6 +701,26 @@ describe('pointerEvents', () => {
     expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(true)
   })
 
+  it('pointerEvents none: overlay onClick is ignored for hasInteractiveHitAtPoint when geometry behind has no pointer handlers', () => {
+    const back = box({ width: 50, height: 50, zIndex: 0 })
+    const front = box({
+      width: 50,
+      height: 50,
+      zIndex: 2,
+      pointerEvents: 'none',
+      onClick: () => undefined,
+    })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+    expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(false)
+  })
+
   it('pointerEvents none: getCursorAtPoint resolves cursor from geometry behind overlay', () => {
     const back = box({ width: 50, height: 50, zIndex: 0, cursor: 'pointer' })
     const front = box({ width: 50, height: 50, zIndex: 3, pointerEvents: 'none', cursor: 'text' })

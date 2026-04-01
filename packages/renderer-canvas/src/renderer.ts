@@ -16,6 +16,7 @@ import {
   getSelectedText,
   hitTestText,
   getCursorAtPoint,
+  hasInteractiveHitAtPoint,
   focusedElement,
   toAccessibilityTree,
   hitPathAtPoint,
@@ -101,50 +102,6 @@ interface CachedImageEntry {
 interface FailedImageEntry {
   attempts: number
   nextRetryAt: number
-}
-
-function hasInteractiveHitAtPoint(
-  element: UIElement,
-  layout: ComputedLayout,
-  x: number,
-  y: number,
-  offsetX = 0,
-  offsetY = 0,
-): boolean {
-  const absX = offsetX + layout.x
-  const absY = offsetY + layout.y
-  const inside =
-    x >= absX &&
-    x <= absX + layout.width &&
-    y >= absY &&
-    y <= absY + layout.height
-  if (!inside) return false
-
-  if (element.kind === 'box') {
-    let childOffX = absX
-    let childOffY = absY
-    if (element.props.scrollX) childOffX -= element.props.scrollX
-    if (element.props.scrollY) childOffY -= element.props.scrollY
-
-    for (let i = element.children.length - 1; i >= 0; i--) {
-      const child = element.children[i]!
-      const childLayout = layout.children[i]
-      if (childLayout && hasInteractiveHitAtPoint(child, childLayout, x, y, childOffX, childOffY)) {
-        return true
-      }
-    }
-
-    const h = element.handlers
-    return !!(
-      h?.onClick ||
-      h?.onPointerDown ||
-      h?.onPointerUp ||
-      h?.onPointerMove ||
-      h?.onWheel
-    )
-  }
-
-  return false
 }
 
 /** Parse a CSS color string into [r, g, b] (0-255). Supports #hex and rgba(). */

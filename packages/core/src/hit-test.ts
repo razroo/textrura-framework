@@ -158,7 +158,11 @@ export function dispatchHit(
   return { handled: false }
 }
 
-/** True when point is over an interactive element (click/key/composition handlers). */
+/**
+ * True when the point is over an element that participates in pointer hit-testing
+ * (`onClick`, `onPointerDown` / `Up` / `Move`, `onWheel`). Keyboard and composition
+ * handlers alone do not count — use this for hover / pointer-capture style checks.
+ */
 export function hasInteractiveHitAtPoint(
   element: UIElement,
   layout: ComputedLayout,
