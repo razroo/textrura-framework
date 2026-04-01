@@ -3,11 +3,15 @@ import { parseQuery, stringifyQuery } from '../query.js'
 
 describe('query helpers', () => {
   it('parses empty search string', () => {
-    expect(parseQuery('')).toEqual({})
+    const q = parseQuery('')
+    expect(q).toEqual({})
+    expect(Object.getPrototypeOf(q)).toBeNull()
   })
 
   it('parses lone question mark as empty', () => {
-    expect(parseQuery('?')).toEqual({})
+    const q = parseQuery('?')
+    expect(q).toEqual({})
+    expect(Object.getPrototypeOf(q)).toBeNull()
   })
 
   it('parses key without equals as empty value', () => {
@@ -31,6 +35,16 @@ describe('query helpers', () => {
     expect(parseQuery('&a=1&')).toEqual({ a: '1' })
     expect(parseQuery('a=1&&b=2')).toEqual({ a: '1', b: '2' })
     expect(parseQuery('?&&')).toEqual({})
+    expect(Object.getPrototypeOf(parseQuery('?&&'))).toBeNull()
+  })
+
+  it('stores __proto__ as a normal key on a null-prototype result (no prototype pollution)', () => {
+    const q = parseQuery('__proto__=x')
+    // Object literal `{ __proto__: 'x' }` is special-cased in JS; assert own properties explicitly.
+    expect(Object.keys(q)).toEqual(['__proto__'])
+    expect(q['__proto__']).toBe('x')
+    expect(Object.getPrototypeOf(q)).toBeNull()
+    expect(Object.hasOwn(q, '__proto__')).toBe(true)
   })
 
   it('stringifies empty object as empty string', () => {

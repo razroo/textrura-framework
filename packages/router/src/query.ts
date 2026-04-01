@@ -1,6 +1,10 @@
 export type QueryValue = string | number | boolean | null | undefined
 export type QueryInput = Record<string, QueryValue | QueryValue[]>
-/** Result of {@link parseQuery}: each key maps to one value or, when repeated in the input, an array of values (order preserved). */
+/**
+ * Result of {@link parseQuery}: each key maps to one value or, when repeated in the input,
+ * an array of values (order preserved). Instances use a null prototype so query keys such as
+ * `__proto__` are stored as ordinary string keys and cannot mutate `Object.prototype`.
+ */
 export type ParsedQuery = Record<string, string | string[]>
 
 function decode(value: string): string {
@@ -19,12 +23,13 @@ function encode(value: string): string {
  * Parse a URL query string (optional leading `?`). Keys and values are percent-decoded;
  * `+` in values is treated as space. Duplicate keys collapse to `string[]` in encounter order.
  * If decoding a segment throws, that segment is left as the raw string (see malformed `%` escapes).
+ * The returned object has a null prototype (see {@link ParsedQuery}).
  */
 export function parseQuery(search: string): ParsedQuery {
   const input = search.startsWith('?') ? search.slice(1) : search
-  if (input === '') return {}
+  if (input === '') return Object.create(null) as ParsedQuery
 
-  const result: ParsedQuery = {}
+  const result = Object.create(null) as ParsedQuery
   for (const pair of input.split('&')) {
     if (pair === '') continue
     const [rawKey, ...rest] = pair.split('=')
