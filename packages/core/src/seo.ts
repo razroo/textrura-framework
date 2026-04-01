@@ -2,6 +2,11 @@ import type { UIElement, BoxElement, TextElement, ImageElement } from './types.j
 
 /** Options for semantic HTML generation. */
 export interface SemanticHTMLOptions {
+  /**
+   * BCP 47 language tag for the root `<html lang="...">` attribute (defaults to `en`).
+   * Value is HTML-escaped; prefer well-formed tags like `en-US` or `fr`.
+   */
+  lang?: string
   /** Page title for the <title> tag. */
   title?: string
   /** Meta description. */
@@ -123,9 +128,10 @@ export function toSemanticHTML(
   if (options.headExtra) meta.push(options.headExtra)
 
   const body = elementToHTML(tree, 2)
+  const lang = escapeHTML(options.lang ?? 'en')
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${lang}">
 <head>
   ${meta.join('\n  ')}
 </head>

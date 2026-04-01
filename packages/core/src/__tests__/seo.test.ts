@@ -11,6 +11,19 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('</html>')
   })
 
+  it('uses custom lang on the root html element', () => {
+    const el = box({ width: 100, height: 100 })
+    const html = toSemanticHTML(el, { lang: 'fr-CA' })
+    expect(html).toContain('<html lang="fr-CA">')
+  })
+
+  it('escapes lang attribute values', () => {
+    const el = box({ width: 100, height: 100 })
+    const html = toSemanticHTML(el, { lang: 'xx"><script' })
+    expect(html).toContain('<html lang="xx&quot;&gt;&lt;script">')
+    expect(html).not.toContain('<script')
+  })
+
   it('includes meta tags when provided', () => {
     const el = box({ width: 100, height: 100 })
     const html = toSemanticHTML(el, {
