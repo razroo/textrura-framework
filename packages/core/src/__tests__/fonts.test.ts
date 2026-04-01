@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   collectFontFamiliesFromTree,
   extractFontFamiliesFromCSSFont,
+  resolveFontLoadTimeoutMs,
   waitForFonts,
 } from '../fonts.js'
 import { box, image, text } from '../elements.js'
@@ -469,6 +470,32 @@ describe('extractFontFamiliesFromCSSFont', () => {
       extractFontFamiliesFromCSSFont('14px Body,\tFoRmAt ( "woff2" ), sans-serif'),
     ).toEqual(['Body'])
     expect(extractFontFamiliesFromCSSFont('16px Mono, uRl\t( font.ttf ), monospace')).toEqual(['Mono'])
+  })
+})
+
+describe('resolveFontLoadTimeoutMs', () => {
+  it('returns default when undefined', () => {
+    expect(resolveFontLoadTimeoutMs(undefined)).toBe(10_000)
+    expect(resolveFontLoadTimeoutMs(undefined, 5_000)).toBe(5_000)
+  })
+
+  it('returns default for NaN, non-finite, negative, or non-number', () => {
+    for (const bad of [
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      -1,
+    ] as const) {
+      expect(resolveFontLoadTimeoutMs(bad)).toBe(10_000)
+      expect(resolveFontLoadTimeoutMs(bad, 3_000)).toBe(3_000)
+    }
+    expect(resolveFontLoadTimeoutMs('500' as unknown as number)).toBe(10_000)
+  })
+
+  it('preserves finite non-negative timeouts', () => {
+    expect(resolveFontLoadTimeoutMs(0)).toBe(0)
+    expect(resolveFontLoadTimeoutMs(80)).toBe(80)
+    expect(resolveFontLoadTimeoutMs(0, 5_000)).toBe(0)
   })
 })
 

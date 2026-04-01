@@ -5,7 +5,7 @@ import { toLayoutTree } from './tree.js'
 import { dispatchHit } from './hit-test.js'
 import { effect } from './signals.js'
 import { focusedElement, setFocus } from './focus.js'
-import { collectFontFamiliesFromTree, waitForFonts } from './fonts.js'
+import { collectFontFamiliesFromTree, resolveFontLoadTimeoutMs, waitForFonts } from './fonts.js'
 import { dispatchKeyboardEvent, dispatchCompositionEvent } from './keyboard.js'
 
 export interface AppOptions {
@@ -20,7 +20,10 @@ export interface AppOptions {
    * Reduces first-paint layout shift for web fonts.
    */
   waitForFonts?: boolean
-  /** Max time to wait for fonts when `waitForFonts` is true. Default 10000. */
+  /**
+   * Max time to wait for fonts when `waitForFonts` is true. Default `10_000`.
+   * Non-finite or negative values fall back to the default (same rules as `waitForFonts` in `fonts.js`).
+   */
   fontLoadTimeoutMs?: number
 }
 
@@ -60,7 +63,10 @@ export async function createApp(
   if (options.waitForFonts && typeof document !== 'undefined') {
     try {
       const initialTree = view()
-      await waitForFonts(collectFontFamiliesFromTree(initialTree), options.fontLoadTimeoutMs ?? 10_000)
+      await waitForFonts(
+        collectFontFamiliesFromTree(initialTree),
+        resolveFontLoadTimeoutMs(options.fontLoadTimeoutMs, 10_000),
+      )
     } catch (err) {
       if (options.onError) {
         options.onError(err)
