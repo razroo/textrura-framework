@@ -37,6 +37,15 @@ describe('signal', () => {
 })
 
 describe('computed', () => {
+  it('chains through another computed', () => {
+    const s = signal(2)
+    const doubled = computed(() => s.value * 2)
+    const quadrupled = computed(() => doubled.value * 2)
+    expect(quadrupled.value).toBe(8)
+    s.set(3)
+    expect(quadrupled.value).toBe(12)
+  })
+
   it('lazy evaluation and caching', () => {
     let evalCount = 0
     const s = signal(3)
@@ -63,6 +72,18 @@ describe('computed', () => {
 })
 
 describe('effect', () => {
+  it('tracks dependencies through a computed', () => {
+    const s = signal(1)
+    const c = computed(() => s.value + 1)
+    const seen: number[] = []
+    effect(() => {
+      seen.push(c.value)
+    })
+    expect(seen).toEqual([2])
+    s.set(5)
+    expect(seen).toEqual([2, 6])
+  })
+
   it('runs immediately and re-runs on dependency change', () => {
     const s = signal('hello')
     const values: string[] = []
@@ -107,6 +128,28 @@ describe('batch', () => {
     })
 
     // After batch completes, effect runs once with both updates
+    expect(sums).toEqual([3, 30])
+  })
+
+  it('nested batches flush only when the outermost batch ends', () => {
+    const a = signal(1)
+    const b = signal(2)
+    const sums: number[] = []
+
+    effect(() => {
+      sums.push(a.value + b.value)
+    })
+    expect(sums).toEqual([3])
+
+    batch(() => {
+      a.set(10)
+      batch(() => {
+        b.set(20)
+        expect(sums).toEqual([3])
+      })
+      expect(sums).toEqual([3])
+    })
+
     expect(sums).toEqual([3, 30])
   })
 })
