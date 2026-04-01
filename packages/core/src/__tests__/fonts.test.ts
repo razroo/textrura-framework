@@ -172,6 +172,12 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('14px')).toEqual([])
   })
 
+  it('returns empty when size and line-height are present but no family list', () => {
+    expect(extractFontFamiliesFromCSSFont('14px / normal')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('600 14px / 1.5')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('italic 12px/18px')).toEqual([])
+  })
+
   it('parses unitless line-height before family', () => {
     expect(extractFontFamiliesFromCSSFont('14px / 1.5 Inter, sans-serif')).toEqual(['Inter'])
     expect(extractFontFamiliesFromCSSFont('14px/1.5 "Custom, Name"')).toEqual(['Custom, Name'])

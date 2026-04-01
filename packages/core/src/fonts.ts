@@ -54,6 +54,21 @@ const FONT_SIZE_NUMBER = String.raw`\d+(?:\.\d+)?(?:[eE][+-]?\d+)?`
 const FONT_SHORTHAND_LINE_HEIGHT =
   String.raw`(?:\/\s*(?:` + FONT_SIZE_NUMBER + FONT_SIZE_UNIT + String.raw`?|normal))?`
 
+/**
+ * Size + required `/ line-height` before the family list. Family tail may be empty (invalid shorthand
+ * with no family); tried before {@link FONT_SHORTHAND_FAMILY_TAIL} so `/ normal` is not misparsed as a family.
+ */
+const FONT_SHORTHAND_SLASH_LINE_TAIL = new RegExp(
+  String.raw`\b(` +
+    FONT_SIZE_NUMBER +
+    FONT_SIZE_UNIT +
+    String.raw`)\s*\/\s*(?:` +
+    FONT_SIZE_NUMBER +
+    FONT_SIZE_UNIT +
+    String.raw`?|normal)\s*(.*)$`,
+  'i',
+)
+
 const FONT_SHORTHAND_FAMILY_TAIL = new RegExp(
   String.raw`\b(` + FONT_SIZE_NUMBER + FONT_SIZE_UNIT + String.raw`)\s*` + FONT_SHORTHAND_LINE_HEIGHT + String.raw`\s+(.+)$`,
   'i',
@@ -133,7 +148,8 @@ function splitFontFamilyList(tail: string): string[] {
  * skips that leading dimension so the size + family tail is parsed correctly.
  * Very long chains of leading size tokens are peeled with a bounded primary budget, then a secondary pass on modest remainders.
  * If an oversized tail still looks like stacked size tokens, returns [] rather than inventing a family name or doing pathological work.
- * Line-height after `/` may be numeric (with optional unit) or the `normal` keyword.
+ * Line-height after `/` may be numeric (with optional unit) or the `normal` keyword; a slash line-height
+ * with no following family list yields no families (e.g. `14px / normal` alone).
  * Leading relative size keywords `smaller` and `larger` (CSS Fonts) are stripped so
  * values like `smaller Inter, serif` resolve to concrete families for {@link waitForFonts}.
  */
@@ -166,6 +182,16 @@ export function extractFontFamiliesFromCSSFont(font: string): string[] {
     | { kind: 'none' }
 
   function peelFontShorthand(s: string): PeelResult {
+    const slashM = s.match(FONT_SHORTHAND_SLASH_LINE_TAIL)
+    if (slashM) {
+      const tail = slashM[2] ?? ''
+      const firstSegment = splitFontFamilyList(tail)[0]?.trim() ?? ''
+      const tailLeadsWithAnotherSize =
+        FONT_SIZE_ONLY.test(firstSegment) || TAIL_LEADS_WITH_SIZE_TOKEN.test(tail)
+      if (!tailLeadsWithAnotherSize) return { kind: 'family', tail }
+      const matchIndex = slashM.index ?? 0
+      return { kind: 'peeled', next: s.slice(matchIndex + slashM[1]!.length).trimStart() }
+    }
     const m = s.match(FONT_SHORTHAND_FAMILY_TAIL)
     if (!m) return { kind: 'none' }
     const tail = m[2]!
