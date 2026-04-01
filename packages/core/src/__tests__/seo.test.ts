@@ -211,6 +211,18 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<p>Subheading</p>')
   })
 
+  it('does not treat bold keyword or large digits in the family list (after size) as bold weight', () => {
+    const el = box({ width: 200, height: 120 }, [
+      text({ text: 'Brand', font: '32px Bold Display, sans-serif', lineHeight: 40 }),
+      text({ text: 'Year', font: '32px "Company 2024", sans-serif', lineHeight: 40 }),
+      text({ text: 'Bolder name', font: '32px Foobolder Sans, sans-serif', lineHeight: 40 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<p>Brand</p>')
+    expect(html).toContain('<p>Year</p>')
+    expect(html).toContain('<p>Bolder name</p>')
+  })
+
   it('does not treat the semibold keyword as bold for heading inference', () => {
     const el = box({ width: 200, height: 50 }, [
       text({ text: 'UI label', font: 'semibold 32px sans-serif', lineHeight: 40 }),

@@ -50,12 +50,14 @@ const FONT_SIZE_LENGTH =
   /(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*(%|px|rem|em|pt|pc|in|cm|mm|Q|math|dvmin|dvmax|svmin|svmax|lvmin|lvmax|dvh|dvw|dvi|dvb|svh|svw|svi|svb|lvh|lvw|lvi|lvb|vmin|vmax|vh|vw|vi|vb|rlh|lh|rcap|rch|rex|ric|cap|ch|ex|ic|cqmin|cqmax|cqw|cqh|cqi|cqb)(?=[\s,;/]|$)/i
 
 /**
- * True when `font` shorthand indicates bold weight (the `bold` / `bolder` keywords as whole tokens,
- * or numeric 700–900). Substrings such as `semibold` must not match.
+ * True when the **leading** font shorthand style segment (before the first font-size length token)
+ * indicates bold weight: `bold` / `bolder` as whole tokens, or numeric 700–900.
+ * Substrings such as `semibold` must not match. Tokens after the size (e.g. family names like
+ * `Bold` or `2024`) must not affect heading inference.
  */
-function isFontBoldShorthand(fontLower: string): boolean {
-  if (/\bbold\b/.test(fontLower) || /\bbolder\b/.test(fontLower)) return true
-  const tokens = fontLower.match(/\b([1-9]\d{2,3})\b/g)
+function isFontBoldShorthand(stylePrefixLower: string): boolean {
+  if (/\bbold\b/.test(stylePrefixLower) || /\bbolder\b/.test(stylePrefixLower)) return true
+  const tokens = stylePrefixLower.match(/\b([1-9]\d{2,3})\b/g)
   if (!tokens) return false
   for (const token of tokens) {
     const n = Number.parseInt(token, 10)
@@ -173,7 +175,9 @@ function inferTag(element: TextElement): string {
     const unit = sizeMatch[2]!
     if (Number.isFinite(n)) size = fontLengthToApproxPx(n, unit)
   }
-  const isBold = isFontBoldShorthand(font)
+  const stylePrefix =
+    sizeMatch && sizeMatch.index !== undefined ? font.slice(0, sizeMatch.index) : font
+  const isBold = isFontBoldShorthand(stylePrefix)
 
   if (isBold && size >= 28) return 'h1'
   if (isBold && size >= 22) return 'h2'
