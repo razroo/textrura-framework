@@ -1,6 +1,10 @@
+/** Indices describing the visible slice of a virtual list after {@link syncVirtualWindow}. */
 export interface VirtualWindowState {
+  /** First visible row index (inclusive), in `[0, totalRows - 1]` when `totalRows > 0`. */
   start: number
+  /** Last visible row index (inclusive); equals `start` when at most one row is visible. */
   end: number
+  /** Selection index after clamping to valid row range. */
   selected: number
 }
 

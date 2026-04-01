@@ -69,4 +69,14 @@ describe('syncVirtualWindow', () => {
     expect(syncVirtualWindow(8, 3, 2, Number.POSITIVE_INFINITY)).toEqual({ start: 0, end: 2, selected: 2 })
     expect(syncVirtualWindow(8, 3, 2, Number.NEGATIVE_INFINITY)).toEqual({ start: 0, end: 2, selected: 2 })
   })
+
+  it('treats non-finite totalRows as zero rows (empty list semantics)', () => {
+    expect(syncVirtualWindow(Number.POSITIVE_INFINITY, 5, 0, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+    expect(syncVirtualWindow(Number.NEGATIVE_INFINITY, 5, 0, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+  })
+
+  it('treats non-finite windowSize as a single visible row', () => {
+    expect(syncVirtualWindow(8, Number.POSITIVE_INFINITY, 3, 0)).toEqual({ start: 3, end: 3, selected: 3 })
+    expect(syncVirtualWindow(8, Number.NEGATIVE_INFINITY, 1, 0)).toEqual({ start: 1, end: 1, selected: 1 })
+  })
 })
