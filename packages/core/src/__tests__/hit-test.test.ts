@@ -661,6 +661,20 @@ describe('hitPathAtPoint', () => {
     expect(hitPathAtPoint(root, layout, 5, 5)).toEqual([1])
   })
 
+  it('overlapping siblings: non-finite z-index is treated as 0 for path order (matches dispatchHit)', () => {
+    const invalid = box({ width: 40, height: 40, zIndex: Number.NaN })
+    const top = box({ width: 40, height: 40, zIndex: 3 })
+    const root = box({ width: 100, height: 100 }, [invalid, top])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+      ],
+    }
+    expect(hitPathAtPoint(root, layout, 5, 5)).toEqual([1])
+  })
+
   it('pointerEvents none on top sibling: path falls through to box behind', () => {
     const back = box({ width: 50, height: 50, zIndex: 0 })
     const front = box({ width: 50, height: 50, zIndex: 2, pointerEvents: 'none' })

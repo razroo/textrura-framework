@@ -195,7 +195,8 @@ export function hasInteractiveHitAtPoint(
 }
 
 /**
- * Child indices from root to the deepest box under (x, y). Among overlapping siblings, prefers higher z-index (topmost).
+ * Child indices from root to the deepest box under (x, y). Among overlapping siblings, prefers higher z-index (topmost);
+ * non-finite `zIndex` values match `dispatchHit` / paint order (treated as `0`).
  * Boxes with `pointerEvents: 'none'` do not terminate the path when they have no deeper hit (same idea as `getCursorAtPoint` and `collectHits`).
  * Returns `null` when the point misses the tree. Returns `[]` when the point hits the
  * root (or a leaf box) with no deeper box hit.

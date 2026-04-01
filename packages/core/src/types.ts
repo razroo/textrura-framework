@@ -18,7 +18,10 @@ export interface StyleProps {
   opacity?: number
   /** Cursor to show when hovering this element. */
   cursor?: 'default' | 'pointer' | 'grab' | 'grabbing' | 'text' | 'not-allowed' | 'crosshair' | 'move'
-  /** Z-index for paint ordering among siblings. Higher values paint on top. */
+  /**
+   * Z-index for paint ordering among siblings. Higher values paint on top.
+   * Non-finite values (`NaN`, `±Infinity`) are treated as `0` for hit-testing and renderer paint order.
+   */
   zIndex?: number
   /**
    * Pointer hit targeting. `'none'` skips this box for pointer handlers and cursor resolution;
