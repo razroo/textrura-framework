@@ -13,6 +13,27 @@ Current status:
 - API scaffold is implemented
 - Full paint parity with `@geometra/renderer-canvas` is not implemented yet
 
+## Install
+
+```bash
+npm install @geometra/renderer-webgpu
+```
+
+## Current support
+
+- WebGPU capability detection and async device/context initialization
+- Geometry render integration for solid box backgrounds
+- 2D clear-pass fallback before `init()` completes
+- Optional `onFallbackNeeded(count)` callback when a tree includes unsupported paint features
+
+Current gaps:
+
+- text paint
+- selection highlight
+- focus/debug overlays
+- gradients, shadows, and border-radius parity
+- full canvas feature parity
+
 ## Usage
 
 ```ts
@@ -32,3 +53,9 @@ await createApp(
   { width: 400, height: 200 },
 )
 ```
+
+## Notes
+
+- Call `await renderer.init()` before relying on GPU rendering. Until then, `render()` uses a predictable clear-pass fallback.
+- The current implementation is best treated as an MVP backend for capability probes and early integration work, not a canvas replacement.
+- For the current backend matrix, see [RENDERER_SUPPORT_MATRIX.md](https://github.com/razroo/geometra/blob/main/RENDERER_SUPPORT_MATRIX.md).

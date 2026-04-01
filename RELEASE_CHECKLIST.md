@@ -8,17 +8,20 @@ Use this checklist before creating a new `vX.Y.Z` GitHub release.
 # 1) version bumps (example)
 npm version 0.3.2 --no-git-tag-version -w @geometra/core -w @geometra/renderer-canvas -w @geometra/renderer-terminal -w @geometra/renderer-webgpu -w @geometra/server -w @geometra/client -w @geometra/ui -w @geometra/router
 
-# 2) required checks
+# 2) verify committed source versions match the intended tag
+npm run release:check-source -- 0.3.2
+
+# 3) required checks
 npm run test:all
 npm run test:terminal-input
 npm run test:perf
 
-# 3) commit + push
+# 4) commit + push
 git add .
 git commit -m "chore: release vX.Y.Z"
 git push origin HEAD
 
-# 4) trigger publish workflow
+# 5) trigger publish workflow
 gh release create vX.Y.Z --title "vX.Y.Z" --notes "..."
 ```
 
@@ -26,6 +29,7 @@ gh release create vX.Y.Z --title "vX.Y.Z" --notes "..."
 
 - [ ] Ensure working tree is clean.
 - [ ] Update versions for publishable packages (`@geometra/core`, `@geometra/renderer-canvas`, `@geometra/renderer-terminal`, `@geometra/renderer-webgpu`, `@geometra/server`, `@geometra/client`, `@geometra/ui`, `@geometra/router`).
+- [ ] Run `npm run release:check-source -- X.Y.Z` to confirm committed manifests already match the release tag.
 - [ ] Verify public exports and README/API docs are aligned (`packages/*/README.md`, root `README.md`).
 - [ ] Run targeted suites:
   - [ ] `npm run test:all`

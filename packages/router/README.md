@@ -2,7 +2,7 @@
 
 Routing primitives for Geometra.
 
-Current scope (foundation): route matching and nested branch composition utilities.
+The package now covers matching, history adapters, router lifecycle, loaders/actions, redirects, blockers, restoration policy, and a declarative `link` primitive.
 
 ## Install
 
@@ -40,8 +40,48 @@ npm install @geometra/router
 ## Usage
 
 ```ts
-import { matchPath } from '@geometra/router'
+import { createMemoryHistory, createRouter, redirect } from '@geometra/router'
 
-const match = matchPath('/users/:id?', '/users/42')
-// { params: { id: '42' } }
+const router = createRouter({
+  history: createMemoryHistory({ initialEntries: ['/'] }),
+  routes: [
+    {
+      id: 'home',
+      path: '/',
+      loader: async () => ({ ok: true }),
+    },
+    {
+      id: 'users.show',
+      path: '/users/:id',
+      loader: async ({ params }) => ({ userId: params.id }),
+      action: async ({ submission }) => {
+        return { saved: true, payload: submission.data }
+      },
+    },
+    {
+      id: 'legacy',
+      path: '/old-home',
+      loader: async () => redirect('/'),
+    },
+  ],
+})
+
+router.start()
+await router.navigate('/users/42')
+
+router.getState().location.pathname
+router.getState().loaderData['users.show']
+await router.submitAction('users.show', { method: 'POST', data: { theme: 'dark' } })
 ```
+
+## Notes
+
+- The router is renderer-agnostic. It manages navigation state and data flow; rendering matched content is still your app’s job.
+- `loader` and `action` contexts include route params, parsed query, optional request context, and an abort `signal`.
+- `router.addBlocker()` is the escape hatch for unsaved-changes flows and transition confirmation.
+- `router.isActive()` and `router.isPending()` are intended for link styling and transition-aware UI.
+
+## Links
+
+- [Delivery report](https://github.com/razroo/geometra/blob/main/ROUTER_DELIVERY_REPORT.md)
+- [RFC](https://github.com/razroo/geometra/blob/main/RFC_ROUTER.md)

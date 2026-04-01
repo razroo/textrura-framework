@@ -12,15 +12,6 @@ jobs:
       id-token: write
     env:
       TEXTURA_VERSION: ^1.1.2
-      PUBLISH_DIRS: >-
-        packages/core
-        packages/renderer-canvas
-        packages/renderer-terminal
-        packages/renderer-webgpu
-        packages/server
-        packages/client
-        packages/ui
-        packages/router
       CORE_DEPENDENT_DIRS: >-
         packages/renderer-canvas
         packages/renderer-terminal
@@ -55,6 +46,9 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
+      - name: Verify committed package versions match release tag
+        run: node scripts/release/check-source.mjs "$VERSION"
+
       - name: Normalize publish-time dependencies
         run: |
           cd packages/core
@@ -63,14 +57,6 @@ jobs:
           for dir in $CORE_DEPENDENT_DIRS; do
             cd "$dir"
             npm pkg set "dependencies.@geometra/core=^$VERSION"
-            cd "$GITHUB_WORKSPACE"
-          done
-
-      - name: Set version on publishable packages
-        run: |
-          for dir in $PUBLISH_DIRS; do
-            cd "$dir"
-            npm version "$VERSION" --no-git-tag-version --allow-same-version
             cd "$GITHUB_WORKSPACE"
           done
 

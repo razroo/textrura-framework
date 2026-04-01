@@ -32,7 +32,19 @@ The framework replaces the entire browser rendering pipeline. Layout is computed
 | `@geometra/renderer-webgpu` | WebGPU renderer scaffold (capability detection + initialization surface) |
 | `@geometra/server` | Server-side layout engine with WebSocket geometry streaming (versioned protocol) |
 | `@geometra/client` | Thin client that receives pre-computed geometry and paints it (versioned protocol checks) |
+| `@geometra/ui` | Starter UI primitives built on `@geometra/core`: form controls, overlays, lists, tables, trees, and command surfaces |
 | `@geometra/router` | Renderer-agnostic data router: nested routes, loaders/actions, redirects, blockers, lazy/prefetch, protocol-aware navigation |
+
+Package docs:
+
+- `@geometra/core`: `packages/core/README.md`
+- `@geometra/renderer-canvas`: `packages/renderer-canvas/README.md`
+- `@geometra/renderer-terminal`: `packages/renderer-terminal/README.md`
+- `@geometra/renderer-webgpu`: `packages/renderer-webgpu/README.md`
+- `@geometra/server`: `packages/server/README.md`
+- `@geometra/client`: `packages/client/README.md`
+- `@geometra/ui`: `packages/ui/README.md`
+- `@geometra/router`: `packages/router/README.md`
 
 ## Quick Start
 

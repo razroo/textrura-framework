@@ -19,11 +19,35 @@
         "@rolldown/binding-linux-x64-gnu": "1.0.0-rc.12",
       },
     },
+    "demos/ai-on-demand": {
+      "name": "@geometra/demo-ai-on-demand",
+      "dependencies": {
+        "@geometra/core": "*",
+        "@geometra/renderer-canvas": "*",
+      },
+      "devDependencies": {
+        "vite": "^8.0.3",
+      },
+    },
+    "demos/auth-server-client": {
+      "name": "@geometra/demo-auth-server-client",
+      "dependencies": {
+        "@geometra/client": "*",
+        "@geometra/core": "*",
+        "@geometra/renderer-canvas": "*",
+        "@geometra/server": "*",
+      },
+      "devDependencies": {
+        "tsx": "^4.19.0",
+        "vite": "^8.0.3",
+      },
+    },
     "demos/local-canvas": {
       "name": "@geometra/demo-local-canvas",
       "dependencies": {
         "@geometra/core": "*",
         "@geometra/renderer-canvas": "*",
+        "@geometra/ui": "*",
       },
       "devDependencies": {
         "vite": "^8.0.3",
@@ -74,16 +98,16 @@
     },
     "packages/client": {
       "name": "@geometra/client",
-      "version": "0.4.0",
+      "version": "1.0.1",
       "dependencies": {
         "@geometra/core": "file:../core",
       },
     },
     "packages/core": {
       "name": "@geometra/core",
-      "version": "0.4.0",
+      "version": "1.0.1",
       "dependencies": {
-        "textura": "^1.1.1",
+        "textura": "^1.1.2",
       },
       "optionalDependencies": {
         "@napi-rs/canvas": "^0.1.65",
@@ -91,14 +115,14 @@
     },
     "packages/renderer-canvas": {
       "name": "@geometra/renderer-canvas",
-      "version": "0.4.0",
+      "version": "1.0.1",
       "dependencies": {
         "@geometra/core": "file:../core",
       },
     },
     "packages/renderer-terminal": {
       "name": "@geometra/renderer-terminal",
-      "version": "0.4.0",
+      "version": "1.0.1",
       "dependencies": {
         "@geometra/core": "file:../core",
       },
@@ -106,16 +130,23 @@
         "@types/node": "^22.0.0",
       },
     },
+    "packages/renderer-webgpu": {
+      "name": "@geometra/renderer-webgpu",
+      "version": "1.0.1",
+      "dependencies": {
+        "@geometra/core": "file:../core",
+      },
+    },
     "packages/router": {
       "name": "@geometra/router",
-      "version": "0.2.1",
+      "version": "1.0.1",
       "dependencies": {
         "@geometra/core": "file:../core",
       },
     },
     "packages/server": {
       "name": "@geometra/server",
-      "version": "0.4.0",
+      "version": "1.0.1",
       "dependencies": {
         "@geometra/core": "file:../core",
         "ws": "^8.18.0",
@@ -126,7 +157,7 @@
     },
     "packages/ui": {
       "name": "@geometra/ui",
-      "version": "0.4.0",
+      "version": "1.0.1",
       "dependencies": {
         "@geometra/core": "file:../core",
       },
@@ -157,6 +188,10 @@
 
     "@geometra/core": ["@geometra/core@workspace:packages/core"],
 
+    "@geometra/demo-ai-on-demand": ["@geometra/demo-ai-on-demand@workspace:demos/ai-on-demand"],
+
+    "@geometra/demo-auth-server-client": ["@geometra/demo-auth-server-client@workspace:demos/auth-server-client"],
+
     "@geometra/demo-local-canvas": ["@geometra/demo-local-canvas@workspace:demos/local-canvas"],
 
     "@geometra/demo-server-client": ["@geometra/demo-server-client@workspace:demos/server-client"],
@@ -170,6 +205,8 @@
     "@geometra/renderer-canvas": ["@geometra/renderer-canvas@workspace:packages/renderer-canvas"],
 
     "@geometra/renderer-terminal": ["@geometra/renderer-terminal@workspace:packages/renderer-terminal"],
+
+    "@geometra/renderer-webgpu": ["@geometra/renderer-webgpu@workspace:packages/renderer-webgpu"],
 
     "@geometra/router": ["@geometra/router@workspace:packages/router"],
 
@@ -405,7 +442,7 @@
 
     "std-env": ["std-env@4.0.0", "", {}, "sha512-zUMPtQ/HBY3/50VbpkupYHbRroTRZJPRLvreamgErJVys0ceuzMkD44J/QjqhHjOzK42GQ3QZIeFG1OYfOtKqQ=="],
 
-    "textura": ["textura@1.1.1", "", { "dependencies": { "@chenglou/pretext": "^0.0.3", "yoga-layout": "^3.2.1" } }, "sha512-aWTCUIM7XO7X8FeYgyW+uy5srx556+r/B2l28feW70OX4eG9goV9Cy8R9lrnOnYqlTHCnWAyV2a33Nc0AOHzqg=="],
+    "textura": ["textura@1.1.2", "", { "dependencies": { "@chenglou/pretext": "^0.0.3", "yoga-layout": "^3.2.1" } }, "sha512-aSqxfQa5iv6t1wIPBIrjpUL8pHO7sIHqXVZDJJlVW8mpeNO20TqirADhbYlBziDJcY/qr0ZuepLl+B2LelGvBg=="],
 
     "tinybench": ["tinybench@2.9.0", "", {}, "sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg=="],
 
@@ -447,19 +484,17 @@
 
     "@eslint-community/eslint-utils/eslint-visitor-keys": ["eslint-visitor-keys@3.4.3", "", {}, "sha512-wpc+LXeiyiisxPlEkUzU6svyS1frIO3Mgxj1fdy7Pm8Ygzguax2N3Fa/D/ag1WqbOprdI+uY6wMUl8/a2G+iag=="],
 
-    "@geometra/client/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.1" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
     "@geometra/renderer-terminal/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.1" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
 
     "@geometra/router/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.1" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
 
-    "@geometra/server/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.1" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
-    "@geometra/ui/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.1" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
     "@types/ws/@types/node": ["@types/node@25.5.0", "", { "dependencies": { "undici-types": "~7.18.0" } }, ""],
 
     "@typescript-eslint/eslint-plugin/ignore": ["ignore@7.0.5", "", {}, "sha512-Hs59xBNfUIunMFgWAbGX5cq6893IbWg4KnrjbYwX3tx0ztorVgTDA6B2sxf8ejHJ4wz8BqGUMYlnzNBer5NvGg=="],
+
+    "@geometra/renderer-terminal/@geometra/core/textura": ["textura@1.1.1", "", { "dependencies": { "@chenglou/pretext": "^0.0.3", "yoga-layout": "^3.2.1" } }, "sha512-aWTCUIM7XO7X8FeYgyW+uy5srx556+r/B2l28feW70OX4eG9goV9Cy8R9lrnOnYqlTHCnWAyV2a33Nc0AOHzqg=="],
+
+    "@geometra/router/@geometra/core/textura": ["textura@1.1.1", "", { "dependencies": { "@chenglou/pretext": "^0.0.3", "yoga-layout": "^3.2.1" } }, "sha512-aWTCUIM7XO7X8FeYgyW+uy5srx556+r/B2l28feW70OX4eG9goV9Cy8R9lrnOnYqlTHCnWAyV2a33Nc0AOHzqg=="],
 
     "@types/ws/@types/node/undici-types": ["undici-types@7.18.2", "", {}, ""],
   }
