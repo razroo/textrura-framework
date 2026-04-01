@@ -14,7 +14,10 @@ export function isBinaryFrameArrayBuffer(data: ArrayBuffer): boolean {
   )
 }
 
-/** Decode JSON string from a v1 binary envelope (browser). */
+/**
+ * Decode JSON string from a v1 binary envelope (browser).
+ * Bytes after `header + payloadLength` are ignored so callers may pass a longer `ArrayBuffer`.
+ */
 export function decodeBinaryFrameJson(data: ArrayBuffer): string {
   if (!isBinaryFrameArrayBuffer(data)) {
     throw new Error('Not a GEOM binary frame')

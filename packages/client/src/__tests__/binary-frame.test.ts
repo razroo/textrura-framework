@@ -60,4 +60,13 @@ describe('client binary frame decode', () => {
     new DataView(emptyPayload.buffer).setUint32(5, 0, true)
     expect(decodeBinaryFrameJson(emptyPayload.buffer)).toBe('')
   })
+
+  it('ignores trailing bytes after the declared payload', () => {
+    const json = '{"type":"patch","patches":[]}'
+    const base = new Uint8Array(encodeBinaryFrameJsonV1(json))
+    const extended = new Uint8Array(base.length + 12)
+    extended.set(base)
+    for (let i = base.length; i < extended.length; i++) extended[i] = 0xff
+    expect(decodeBinaryFrameJson(extended.buffer)).toBe(json)
+  })
 })

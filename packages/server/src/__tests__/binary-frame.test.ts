@@ -8,4 +8,12 @@ describe('binary frame envelope', () => {
     expect(isBinaryFrameBuffer(buf)).toBe(true)
     expect(decodeBinaryFrameJson(buf)).toBe(json)
   })
+
+  it('ignores trailing bytes after the declared payload', () => {
+    const json = '{"a":1}'
+    const buf = encodeBinaryFrameJson(json)
+    const extended = Buffer.alloc(buf.length + 8, 0xfe)
+    buf.copy(extended, 0)
+    expect(decodeBinaryFrameJson(extended)).toBe(json)
+  })
 })

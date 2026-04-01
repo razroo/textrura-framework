@@ -28,7 +28,10 @@ export function encodeBinaryFrameJson(jsonUtf8: string): Buffer {
   return Buffer.concat([header, payload])
 }
 
-/** Decode JSON string from a v1 binary envelope. */
+/**
+ * Decode JSON string from a v1 binary envelope.
+ * Bytes after `header + payloadLength` are ignored so callers may pass a longer buffer.
+ */
 export function decodeBinaryFrameJson(data: Buffer): string {
   if (!isBinaryFrameBuffer(data)) {
     throw new Error('Not a GEOM binary frame')
