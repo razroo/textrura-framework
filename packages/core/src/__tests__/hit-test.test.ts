@@ -64,7 +64,7 @@ describe('dispatchHit', () => {
     expect(getCursorAtPoint(el, layout, NaN, 25)).toBeNull()
   })
 
-  it('non-finite layout bounds are a miss for dispatch and hit queries', () => {
+  it('non-finite layout bounds (NaN or ±Infinity) are a miss for dispatch and hit queries', () => {
     let fired: boolean
     const el = box({
       width: 100,
@@ -84,6 +84,14 @@ describe('dispatchHit', () => {
       { ...base, y: Number.NaN },
       { ...base, width: Number.NaN },
       { ...base, height: Number.NaN },
+      { ...base, x: Number.POSITIVE_INFINITY },
+      { ...base, x: Number.NEGATIVE_INFINITY },
+      { ...base, y: Number.POSITIVE_INFINITY },
+      { ...base, y: Number.NEGATIVE_INFINITY },
+      { ...base, width: Number.POSITIVE_INFINITY },
+      { ...base, width: Number.NEGATIVE_INFINITY },
+      { ...base, height: Number.POSITIVE_INFINITY },
+      { ...base, height: Number.NEGATIVE_INFINITY },
     ] as const) {
       fired = false
       expect(dispatchHit(el, bad, 'onClick', 50, 25).handled).toBe(false)
@@ -94,6 +102,24 @@ describe('dispatchHit', () => {
       expect(hasInteractiveHitAtPoint(el, bad, 50, 25)).toBe(false)
       expect(getCursorAtPoint(el, bad, 50, 25)).toBeNull()
     }
+  })
+
+  it('does not treat a child with infinite layout width as covering the parent', () => {
+    let childFired = false
+    let rootFired = false
+    const child = box({ width: 10, height: 10, onClick: () => { childFired = true } })
+    const root = box({ width: 100, height: 50, onClick: () => { rootFired = true } }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 50,
+      children: [{ x: 0, y: 0, width: Number.POSITIVE_INFINITY, height: 10, children: [] as const }],
+    }
+
+    expect(dispatchHit(root, layout, 'onClick', 5, 5).handled).toBe(true)
+    expect(rootFired).toBe(true)
+    expect(childFired).toBe(false)
   })
 
   it('negative finite layout dimensions are a miss for dispatch and hit queries', () => {

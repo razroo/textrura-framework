@@ -17,6 +17,16 @@ interface ZIndexCacheEntry {
 
 const zIndexOrderCache = new WeakMap<BoxElement, ZIndexCacheEntry>()
 
+/** Reject NaN and ±Infinity so `x <= absX + width` cannot match all finite points when width is infinite. */
+function layoutBoundsAreFinite(layout: ComputedLayout): boolean {
+  return (
+    Number.isFinite(layout.x) &&
+    Number.isFinite(layout.y) &&
+    Number.isFinite(layout.width) &&
+    Number.isFinite(layout.height)
+  )
+}
+
 function zIndexOf(el: UIElement): number {
   const z = (el.props as Record<string, unknown>).zIndex
   return typeof z === 'number' && Number.isFinite(z) ? z : 0
@@ -60,6 +70,7 @@ function collectHits(
   results: HitTarget[],
 ): void {
   if (!Number.isFinite(x) || !Number.isFinite(y)) return
+  if (!layoutBoundsAreFinite(layout)) return
 
   const absX = offsetX + layout.x
   const absY = offsetY + layout.y
@@ -111,6 +122,7 @@ function collectHits(
  * can pass modifier keys, `button`, wheel deltas, and other renderer-specific metadata.
  * For `onClick` only, the return value may include `focusTarget` for focus routing
  * (including click-to-focus when there is no `onClick` handler).
+ * Non-finite layout bounds (`NaN` or `±Infinity` on `x`, `y`, `width`, or `height`) are ignored for hit-testing.
  */
 export function dispatchHit(
   element: UIElement,
@@ -217,6 +229,7 @@ export function hitPathAtPoint(
   offsetY = 0,
 ): number[] | null {
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+  if (!layoutBoundsAreFinite(layout)) return null
 
   const absX = offsetX + layout.x
   const absY = offsetY + layout.y
@@ -268,6 +281,7 @@ export function getCursorAtPoint(
   offsetY = 0,
 ): string | null {
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+  if (!layoutBoundsAreFinite(layout)) return null
 
   const absX = offsetX + layout.x
   const absY = offsetY + layout.y
