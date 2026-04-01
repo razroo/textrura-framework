@@ -114,8 +114,14 @@ describe('dispatchHit', () => {
     expect(fired).toBe(false)
 
     expect(hitPathAtPoint(el, layout, NaN, 25)).toBeNull()
+    expect(hitPathAtPoint(el, layout, Number.POSITIVE_INFINITY, 25)).toBeNull()
+    expect(hitPathAtPoint(el, layout, 50, Number.NEGATIVE_INFINITY)).toBeNull()
     expect(hasInteractiveHitAtPoint(el, layout, NaN, 25)).toBe(false)
+    expect(hasInteractiveHitAtPoint(el, layout, Number.POSITIVE_INFINITY, 25)).toBe(false)
+    expect(hasInteractiveHitAtPoint(el, layout, 50, Number.NEGATIVE_INFINITY)).toBe(false)
     expect(getCursorAtPoint(el, layout, NaN, 25)).toBeNull()
+    expect(getCursorAtPoint(el, layout, Number.POSITIVE_INFINITY, 25)).toBeNull()
+    expect(getCursorAtPoint(el, layout, 50, Number.NEGATIVE_INFINITY)).toBeNull()
   })
 
   it('non-finite layout bounds (NaN or ±Infinity) are a miss for dispatch and hit queries', () => {
