@@ -50,4 +50,14 @@ describe('syncVirtualWindow', () => {
   it('single row list always spans index 0', () => {
     expect(syncVirtualWindow(1, 5, 0, 0)).toEqual({ start: 0, end: 0, selected: 0 })
   })
+
+  it('window larger than total rows shows the full list', () => {
+    expect(syncVirtualWindow(5, 10, 2, 0)).toEqual({ start: 0, end: 4, selected: 2 })
+    expect(syncVirtualWindow(3, 100, 1, 50)).toEqual({ start: 0, end: 2, selected: 1 })
+  })
+
+  it('window larger than total rows still scrolls start when currentStart is clamped then selection moves', () => {
+    // maxStart is 0 so currentStart is ignored; selection at last row stays visible
+    expect(syncVirtualWindow(4, 20, 3, 0)).toEqual({ start: 0, end: 3, selected: 3 })
+  })
 })
