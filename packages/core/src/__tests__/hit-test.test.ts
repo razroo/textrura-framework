@@ -1614,6 +1614,7 @@ describe('scroll and overflow clipping', () => {
     const child = box({
       width: 100,
       height: 50,
+      cursor: 'text',
       onClick: (e) => { localY = e.localY ?? -999 },
     })
     const parent = box({ width: 100, height: 100, overflow: 'scroll', scrollY: 40 }, [child])
@@ -1628,6 +1629,7 @@ describe('scroll and overflow clipping', () => {
     // Child absY = parentAbsY - scrollY + layout.y = 0 - 40 + 80 = 40
     dispatchHit(parent, layout, 'onClick', 50, 45)
     expect(localY).toBe(5)
+    expect(getCursorAtPoint(parent, layout, 50, 45)).toBe('text')
   })
 
   it('scrollX shifts child bounds; localX matches scrolled content', () => {
@@ -1635,6 +1637,7 @@ describe('scroll and overflow clipping', () => {
     const child = box({
       width: 50,
       height: 100,
+      cursor: 'text',
       onClick: (e) => { localX = e.localX ?? -999 },
     })
     const parent = box({ width: 100, height: 100, overflow: 'scroll', scrollX: 40 }, [child])
@@ -1649,6 +1652,7 @@ describe('scroll and overflow clipping', () => {
     // Child absX = parentAbsX - scrollX + layout.x = 0 - 40 + 80 = 40
     dispatchHit(parent, layout, 'onClick', 45, 50)
     expect(localX).toBe(5)
+    expect(getCursorAtPoint(parent, layout, 45, 50)).toBe('text')
   })
 
   it('scrollX and scrollY together shift child bounds; localX and localY match scrolled content', () => {
@@ -1657,6 +1661,7 @@ describe('scroll and overflow clipping', () => {
     const child = box({
       width: 50,
       height: 50,
+      cursor: 'crosshair',
       onClick: (e) => {
         localX = e.localX ?? -999
         localY = e.localY ?? -999
@@ -1679,6 +1684,7 @@ describe('scroll and overflow clipping', () => {
     expect(localX).toBe(5)
     expect(localY).toBe(5)
     expect(hitPathAtPoint(parent, layout, 75, 85)).toEqual([0])
+    expect(getCursorAtPoint(parent, layout, 75, 85)).toBe('crosshair')
   })
 
   it('negative scrollX and scrollY shift child bounds (finite overscroll-style offsets)', () => {
@@ -1687,6 +1693,7 @@ describe('scroll and overflow clipping', () => {
     const child = box({
       width: 50,
       height: 50,
+      cursor: 'grab',
       onClick: e => {
         localX = e.localX ?? -999
         localY = e.localY ?? -999
@@ -1709,6 +1716,7 @@ describe('scroll and overflow clipping', () => {
     expect(localX).toBe(5)
     expect(localY).toBe(5)
     expect(hitPathAtPoint(parent, layout, 45, 40)).toEqual([0])
+    expect(getCursorAtPoint(parent, layout, 45, 40)).toBe('grab')
   })
 
   it('hitPathAtPoint resolves path under scrollX', () => {
@@ -1747,6 +1755,7 @@ describe('scroll and overflow clipping', () => {
     const btn = box({
       width: 40,
       height: 40,
+      cursor: 'pointer',
       onClick: (e) => {
         localX = e.localX ?? -999
         localY = e.localY ?? -999
@@ -1779,6 +1788,7 @@ describe('scroll and overflow clipping', () => {
     expect(localY).toBe(35)
     expect(hitPathAtPoint(outer, layout, 20, 70)).toEqual([0, 0])
     expect(hasInteractiveHitAtPoint(outer, layout, 20, 70)).toBe(true)
+    expect(getCursorAtPoint(outer, layout, 20, 70)).toBe('pointer')
   })
 })
 
