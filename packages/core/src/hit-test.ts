@@ -17,13 +17,18 @@ interface ZIndexCacheEntry {
 
 const zIndexOrderCache = new WeakMap<BoxElement, ZIndexCacheEntry>()
 
-/** Reject NaN and ±Infinity so `x <= absX + width` cannot match all finite points when width is infinite. */
+/**
+ * Reject NaN, ±Infinity, and negative sizes so corrupt layout cannot invert the hit rect or make
+ * `x <= absX + width` match unbounded spans when width is infinite.
+ */
 function layoutBoundsAreFinite(layout: ComputedLayout): boolean {
   return (
     Number.isFinite(layout.x) &&
     Number.isFinite(layout.y) &&
     Number.isFinite(layout.width) &&
-    Number.isFinite(layout.height)
+    Number.isFinite(layout.height) &&
+    layout.width >= 0 &&
+    layout.height >= 0
   )
 }
 
@@ -127,7 +132,8 @@ function collectHits(
  * can pass modifier keys, `button`, wheel deltas, and other renderer-specific metadata.
  * For `onClick` only, the return value may include `focusTarget` for focus routing
  * (including click-to-focus when there is no `onClick` handler).
- * Non-finite layout bounds (`NaN` or `±Infinity` on `x`, `y`, `width`, or `height`) are ignored for hit-testing.
+ * Layout bounds must be finite and non-negative on `width` and `height`; otherwise the node is
+ * skipped for hit-testing (corrupt geometry from Yoga or a bad snapshot).
  */
 export function dispatchHit(
   element: UIElement,
