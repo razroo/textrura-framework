@@ -426,6 +426,12 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('small larger 12px Mono, monospace')).toEqual(['Mono'])
   })
 
+  it('still resolves explicit size+family when more absolute keywords lead than the prefix strip budget', () => {
+    // MAX_ABSOLUTE_SIZE_PREFIX_STRIPS is 16; extra keywords remain and must not block peeling the real shorthand.
+    expect(extractFontFamiliesFromCSSFont(`${'medium '.repeat(17)}14px Inter, sans-serif`)).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont(`${'xx-small '.repeat(17)}16px Literata, serif`)).toEqual(['Literata'])
+  })
+
   it('drops unquoted absolute size keywords as sole or fallback segments; keeps quoted keyword as family name', () => {
     expect(extractFontFamiliesFromCSSFont('medium')).toEqual([])
     expect(extractFontFamiliesFromCSSFont('14px medium, serif')).toEqual([])
