@@ -1568,6 +1568,41 @@ describe('scroll and overflow clipping', () => {
     expect(getCursorAtPoint(parentNaNX, layoutX, 85, 50)).toBe('grab')
   })
 
+  it('±Infinity scroll offsets are treated as zero (non-finite scroll cannot shift child geometry)', () => {
+    const layoutY = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 80, width: 100, height: 50, children: [] as const }],
+    }
+    const childY = box({ width: 100, height: 50, cursor: 'crosshair', onClick: () => {} })
+    const parentInfY = box(
+      { width: 100, height: 100, overflow: 'scroll', scrollY: Number.POSITIVE_INFINITY },
+      [childY],
+    )
+    expect(dispatchHit(parentInfY, layoutY, 'onClick', 50, 45).handled).toBe(false)
+    expect(dispatchHit(parentInfY, layoutY, 'onClick', 50, 85).handled).toBe(true)
+    expect(hitPathAtPoint(parentInfY, layoutY, 50, 85)).toEqual([0])
+    expect(getCursorAtPoint(parentInfY, layoutY, 50, 85)).toBe('crosshair')
+
+    const layoutX = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 80, y: 0, width: 50, height: 100, children: [] as const }],
+    }
+    const childX = box({ width: 50, height: 100, onClick: () => {} })
+    const parentNegInfX = box(
+      { width: 100, height: 100, overflow: 'scroll', scrollX: Number.NEGATIVE_INFINITY },
+      [childX],
+    )
+    expect(dispatchHit(parentNegInfX, layoutX, 'onClick', 45, 50).handled).toBe(false)
+    expect(dispatchHit(parentNegInfX, layoutX, 'onClick', 85, 50).handled).toBe(true)
+    expect(hitPathAtPoint(parentNegInfX, layoutX, 85, 50)).toEqual([0])
+  })
+
   it('overflow scroll: pointer outside parent bounds hits nothing', () => {
     let childFired = false
     let parentFired = false
