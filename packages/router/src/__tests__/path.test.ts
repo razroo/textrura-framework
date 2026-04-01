@@ -45,4 +45,16 @@ describe('path generation', () => {
       'Missing required path param: id',
     )
   })
+
+  it('includes numeric zero as a path segment (not treated as empty)', () => {
+    expect(buildPath('/items/:id', { id: 0 })).toBe('/items/0')
+  })
+
+  it('encodes reserved URI characters in param values', () => {
+    expect(buildPath('/search/:q', { q: 'a/b?c' })).toBe('/search/a%2Fb%3Fc')
+  })
+
+  it('normalizes redundant slashes in the pattern before building', () => {
+    expect(buildPath('//users/:id/', { id: 7 })).toBe('/users/7')
+  })
 })
