@@ -99,6 +99,10 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('oblique 14deg 16px Inter')).toEqual(['Inter'])
   })
 
+  it('parses oblique angle in turn units before size and family', () => {
+    expect(extractFontFamiliesFromCSSFont('oblique 0.25turn 16px Inter, sans-serif')).toEqual(['Inter'])
+  })
+
   it('parses oblique keyword without angle before size and family', () => {
     expect(extractFontFamiliesFromCSSFont('oblique 14px Inter, sans-serif')).toEqual(['Inter'])
   })
@@ -114,6 +118,11 @@ describe('extractFontFamiliesFromCSSFont', () => {
   it('parses unitless line-height before family', () => {
     expect(extractFontFamiliesFromCSSFont('14px / 1.5 Inter, sans-serif')).toEqual(['Inter'])
     expect(extractFontFamiliesFromCSSFont('14px/1.5 "Custom, Name"')).toEqual(['Custom, Name'])
+  })
+
+  it('parses line-height with lh unit before family', () => {
+    expect(extractFontFamiliesFromCSSFont('14px/1.2lh Inter, sans-serif')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('600 16px / 1.5lh "Display Face", serif')).toEqual(['Display Face'])
   })
 
   it('parses font-variant keyword stacks before size and family', () => {
