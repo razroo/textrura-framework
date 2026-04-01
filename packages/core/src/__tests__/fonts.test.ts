@@ -233,6 +233,16 @@ describe('waitForFonts', () => {
     expect(load).not.toHaveBeenCalled()
   })
 
+  it('no-ops when document is undefined (SSR / non-browser)', async () => {
+    vi.stubGlobal('document', undefined)
+    await expect(waitForFonts(['Inter'])).resolves.toBeUndefined()
+  })
+
+  it('no-ops when document.fonts is missing', async () => {
+    vi.stubGlobal('document', {})
+    await expect(waitForFonts(['Inter'])).resolves.toBeUndefined()
+  })
+
   it('no-ops when document.fonts.load is missing', async () => {
     vi.stubGlobal('document', { fonts: { ready: Promise.resolve() } })
     await waitForFonts(['Inter'])
