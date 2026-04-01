@@ -164,6 +164,18 @@ describe('extractFontFamiliesFromCSSFont', () => {
   it('treats unclosed quoted family as a single segment (best-effort)', () => {
     expect(extractFontFamiliesFromCSSFont('14px "Unclosed Name')).toEqual(['Unclosed Name'])
   })
+
+  it('respects backslash-escaped double quote inside a double-quoted family', () => {
+    expect(extractFontFamiliesFromCSSFont('14px "Foo\\"Bar", serif')).toEqual(['Foo"Bar'])
+  })
+
+  it('respects backslash-escaped single quote inside a single-quoted family', () => {
+    expect(extractFontFamiliesFromCSSFont("14px 'O\\'Reilly', serif")).toEqual(["O'Reilly"])
+  })
+
+  it('parses comma after a quoted family that contains an escaped quote', () => {
+    expect(extractFontFamiliesFromCSSFont('12px "A\\",B", "Second", serif')).toEqual(['A",B', 'Second'])
+  })
 })
 
 describe('collectFontFamiliesFromTree', () => {

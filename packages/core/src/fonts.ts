@@ -50,6 +50,11 @@ function splitFontFamilyList(tail: string): string[] {
   for (let i = 0; i < tail.length; i++) {
     const c = tail[i]!
     if (quote) {
+      if (c === '\\' && i + 1 < tail.length) {
+        cur += tail[i + 1]!
+        i++
+        continue
+      }
       cur += c
       if (c === quote) quote = null
       continue
@@ -75,6 +80,7 @@ function splitFontFamilyList(tail: string): string[] {
 /**
  * Extract custom font family names from a CSS `font` shorthand (e.g. `600 14px Inter`).
  * Drops generic fallbacks like `sans-serif`. Best-effort parsing for common patterns.
+ * Commas inside quoted family names are ignored; `\\` escapes the next character inside quotes (e.g. `\"` for a literal `"`).
  * Recognizes common font-size units (px, em, rem, cap/ic/lh/rlh, root-relative r* units, pt, %, viewport and dynamic-viewport units, Q).
  * When a percentage is used as `font-stretch` before the real font size (e.g. `75% 14px Inter`),
  * skips that leading dimension so the size + family tail is parsed correctly.
