@@ -19,6 +19,17 @@ describe('query helpers', () => {
     expect(parseQuery('?flag&on=1')).toEqual({ flag: '', on: '1' })
   })
 
+  it('parses empty key before equals as a normal property on null-prototype result', () => {
+    expect(parseQuery('=solo')).toEqual({ '': 'solo' })
+    expect(Object.getPrototypeOf(parseQuery('=solo'))).toBeNull()
+    expect(parseQuery('a=1&=2&=3')).toEqual({ a: '1', '': ['2', '3'] })
+  })
+
+  it('stringifies empty string keys (sorted before other keys) and round-trips', () => {
+    expect(stringifyQuery({ '': 'x', a: '1' })).toBe('?=x&a=1')
+    expect(parseQuery('?=x&a=1')).toEqual({ '': 'x', a: '1' })
+  })
+
   it('treats plus as space when decoding values', () => {
     expect(parseQuery('q=alice+bob')).toEqual({ q: 'alice bob' })
   })
