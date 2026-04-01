@@ -47,6 +47,7 @@ const rootWidth = signal(600)
 const direction = signal<'row' | 'column'>('row')
 const codeTab = signal('basic')
 const copied = signal(false)
+const starterCopied = signal(false)
 type DemoInputField = { value: string; caretOffset: number; selectionStart?: number; selectionEnd?: number }
 const inputName = signal<DemoInputField>({ value: '', caretOffset: 0 })
 const inputEmail = signal<DemoInputField>({ value: '', caretOffset: 0 })
@@ -1608,6 +1609,60 @@ function heroSection(): UIElement {
         ]),
       ),
     ]),
+    box({ opacity: e3, marginTop: Math.round(s3) }, [
+      center(
+        box({
+          backgroundColor: 'rgba(14,165,233,0.09)',
+          borderColor: 'rgba(14,165,233,0.4)',
+          borderWidth: 1,
+          borderRadius: 14,
+          paddingTop: 16,
+          paddingBottom: 16,
+          paddingLeft: 18,
+          paddingRight: 18,
+          flexDirection: 'column',
+          gap: 10,
+          width: Math.max(280, Math.min(vw.value - 48, 760)),
+        }, [
+          text({ text: 'Official starter: full-stack scaffold', font: '600 13px Inter', lineHeight: 18, color: '#7dd3fc' }),
+          text({
+            text: 'For a real app, clone the repo and generate the routed starter that combines @geometra/ui, @geometra/router, and the server/client protocol.',
+            font: '13px Inter',
+            lineHeight: 20,
+            color: MUTED,
+          }),
+          box({
+            backgroundColor: CODE_BG,
+            borderColor: BORDER,
+            borderRadius: 10,
+            paddingTop: 12,
+            paddingBottom: 12,
+            paddingLeft: 16,
+            paddingRight: 16,
+            flexDirection: 'row',
+            gap: 16,
+            cursor: 'pointer',
+            onClick: () => {
+              navigator.clipboard.writeText('npm run create:app -- ./my-geometra-app')
+              starterCopied.set(true)
+              setTimeout(() => starterCopied.set(false), 1500)
+            },
+          }, [
+            text({ text: '$ npm run create:app -- ./my-geometra-app', font: '13px JetBrains Mono', lineHeight: 20, color: TEXT_COLOR }),
+            text({
+              text: starterCopied.value ? '\u2713 Copied' : 'Copy starter command',
+              font: '600 12px Inter',
+              lineHeight: 20,
+              color: starterCopied.value ? ACCENT3 : DIM,
+            }),
+          ]),
+          box({ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }, [
+            btn('Starter Docs', false, () => window.open('https://github.com/razroo/geometra#start-here', '_blank')),
+            btn('Full-Stack Example', false, () => window.open('https://github.com/razroo/geometra/tree/main/demos/full-stack-dashboard', '_blank')),
+          ]),
+        ]),
+      ),
+    ]),
     // Pills
     box({ opacity: e3, marginTop: Math.round(s3) }, [
       center(
@@ -1745,11 +1800,14 @@ function archSection(): UIElement {
     { name: '@geometra/core', badge: 'Core', bg: 'rgba(233,69,96,0.15)', bc: ACCENT, desc: 'Signals, box()/text()/image(), hit-testing, text selection, SEO, animations.' },
     { name: '@geometra/renderer-canvas', badge: 'Render', bg: 'rgba(14,165,233,0.15)', bc: ACCENT2, desc: 'Canvas2D paint. Gradients, shadows, text wrapping, HiDPI, clipping.' },
     { name: '@geometra/renderer-terminal', badge: 'Render', bg: 'rgba(14,165,233,0.15)', bc: ACCENT2, desc: 'ANSI terminal renderer. Box-drawing, 256-color, TUI.' },
+    { name: '@geometra/renderer-webgpu', badge: 'Render', bg: 'rgba(14,165,233,0.15)', bc: ACCENT2, desc: 'WebGPU renderer scaffold with capability detection and initialization surface.' },
     { name: '@geometra/server', badge: 'Network', bg: 'rgba(34,197,94,0.15)', bc: ACCENT3, desc: 'Server-side layout. Diffs frames, streams patches over WebSocket.' },
     { name: '@geometra/client', badge: 'Network', bg: 'rgba(34,197,94,0.15)', bc: ACCENT3, desc: 'Thin client (~2KB). Receives geometry, paints. Auto-reconnect.' },
+    { name: '@geometra/ui', badge: 'App', bg: 'rgba(245,158,11,0.15)', bc: ACCENT4, desc: 'Starter UI primitives for forms, overlays, tables, trees, and command surfaces.' },
+    { name: '@geometra/router', badge: 'App', bg: 'rgba(245,158,11,0.15)', bc: ACCENT4, desc: 'Renderer-agnostic data router with nested routes, loaders, actions, blockers, and redirects.' },
   ]
   return section([
-    ...heading('Packages', '5 packages. One protocol. Every render target.'),
+    ...heading('Packages', '8 packages. One protocol. The official starter ships on ui + router + server/client.'),
     box({ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }, pkgs.map(p =>
       box({
         backgroundColor: SURFACE,
@@ -1790,8 +1848,9 @@ function archSection(): UIElement {
       ...(primitivesDialogOpen.value ? [
         uiDialog(
           'Quick Start',
-          'Composable starter primitives built on top of core elements.',
+          'Composable starter primitives built on core elements. The recommended app path is now the full-stack scaffold.',
           [
+            uiButton('Starter Docs', () => window.open('https://github.com/razroo/geometra#start-here', '_blank')),
             uiButton('View on GitHub', () => window.open('https://github.com/razroo/geometra/tree/main/packages/ui', '_blank')),
             uiButton('Dismiss', () => primitivesDialogOpen.set(false)),
           ],

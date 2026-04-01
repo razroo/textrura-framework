@@ -46,11 +46,14 @@ Package docs:
 - `@geometra/ui`: `packages/ui/README.md`
 - `@geometra/router`: `packages/router/README.md`
 
-## Scaffold A Starter
+## Start Here
 
-The default app scaffold now targets the full-stack Geometra architecture: `@geometra/ui + @geometra/router + @geometra/server/@geometra/client`.
+If you want a real Geometra app instead of isolated package snippets, start with the official full-stack scaffold. It matches the recommended architecture from the live demo: `@geometra/ui + @geometra/router + @geometra/server/@geometra/client`.
 
 ```bash
+git clone https://github.com/razroo/geometra.git
+cd geometra
+npm install
 npm run create:app -- ./my-geometra-app
 cd my-geometra-app
 npm install
@@ -58,7 +61,7 @@ npm run server
 npm run client
 ```
 
-Use `npm run create:app -- --list` to see the other templates (`canvas-local`, `server-client`, and `terminal`).
+Use `npm run create:app -- --list` to see the other templates (`canvas-local`, `server-client`, and `terminal`). The matching reference implementation lives in `demos/full-stack-dashboard`.
 
 ## Quick Start
 

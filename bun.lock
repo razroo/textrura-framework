@@ -113,14 +113,14 @@
     },
     "packages/client": {
       "name": "@geometra/client",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "dependencies": {
         "@geometra/core": "file:../core",
       },
     },
     "packages/core": {
       "name": "@geometra/core",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "dependencies": {
         "textura": "^1.1.2",
       },
@@ -130,14 +130,14 @@
     },
     "packages/renderer-canvas": {
       "name": "@geometra/renderer-canvas",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "dependencies": {
         "@geometra/core": "file:../core",
       },
     },
     "packages/renderer-terminal": {
       "name": "@geometra/renderer-terminal",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "dependencies": {
         "@geometra/core": "file:../core",
       },
@@ -147,21 +147,21 @@
     },
     "packages/renderer-webgpu": {
       "name": "@geometra/renderer-webgpu",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "dependencies": {
         "@geometra/core": "file:../core",
       },
     },
     "packages/router": {
       "name": "@geometra/router",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "dependencies": {
         "@geometra/core": "file:../core",
       },
     },
     "packages/server": {
       "name": "@geometra/server",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "dependencies": {
         "@geometra/core": "file:../core",
         "ws": "^8.18.0",
@@ -172,7 +172,7 @@
     },
     "packages/ui": {
       "name": "@geometra/ui",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "dependencies": {
         "@geometra/core": "file:../core",
       },
@@ -501,21 +501,9 @@
 
     "@eslint-community/eslint-utils/eslint-visitor-keys": ["eslint-visitor-keys@3.4.3", "", {}, "sha512-wpc+LXeiyiisxPlEkUzU6svyS1frIO3Mgxj1fdy7Pm8Ygzguax2N3Fa/D/ag1WqbOprdI+uY6wMUl8/a2G+iag=="],
 
-    "@geometra/client/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
-    "@geometra/demo-full-stack-dashboard/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
-    "@geometra/renderer-canvas/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
     "@geometra/renderer-terminal/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
 
     "@geometra/renderer-webgpu/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
-    "@geometra/router/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
-    "@geometra/server/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
-    "@geometra/ui/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
 
     "@types/ws/@types/node": ["@types/node@25.5.0", "", { "dependencies": { "undici-types": "~7.18.0" } }, ""],
 
