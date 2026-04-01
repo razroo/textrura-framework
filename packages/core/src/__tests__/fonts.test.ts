@@ -126,6 +126,13 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('12cqmax UI Sans, system-ui')).toEqual(['UI Sans'])
   })
 
+  it('parses root-relative rch, rex, ric, and rcap sizes before family', () => {
+    expect(extractFontFamiliesFromCSSFont('1.25rch Literata, serif')).toEqual(['Literata'])
+    expect(extractFontFamiliesFromCSSFont('600 2rex "Display", sans-serif')).toEqual(['Display'])
+    expect(extractFontFamiliesFromCSSFont('1ric JetBrains Mono, monospace')).toEqual(['JetBrains Mono'])
+    expect(extractFontFamiliesFromCSSFont('1.1rcap UI Text, system-ui')).toEqual(['UI Text'])
+  })
+
   it('skips font-stretch percentage before container-query font size and family', () => {
     expect(extractFontFamiliesFromCSSFont('75% 5cqw Inter')).toEqual(['Inter'])
   })
