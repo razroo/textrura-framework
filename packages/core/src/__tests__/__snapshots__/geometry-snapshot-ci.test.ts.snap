@@ -9,3 +9,21 @@ exports[`geometry snapshot CI > stable box-only layout (rounded) 1`] = `
   "y": 0,
 }
 `;
+
+exports[`geometry snapshot CI > stable text-in-padded-box layout (rounded) 1`] = `
+{
+  "children": [
+    {
+      "children": [],
+      "height": 56,
+      "width": 16,
+      "x": 12,
+      "y": 12,
+    },
+  ],
+  "height": 80,
+  "width": 200,
+  "x": 0,
+  "y": 0,
+}
+`;

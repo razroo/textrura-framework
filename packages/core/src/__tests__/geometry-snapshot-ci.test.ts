@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { init, computeLayout } from 'textura'
 import type { ComputedLayout } from 'textura'
-import { box } from '../elements.js'
+import { box, text } from '../elements.js'
 import { toLayoutTree } from '../tree.js'
 
 if (typeof globalThis.OffscreenCanvas === 'undefined') {
@@ -34,6 +34,16 @@ describe('geometry snapshot CI', () => {
     await init()
     const tree = box({ width: 120, height: 64, padding: 8 }, [])
     const layout = computeLayout(toLayoutTree(tree), { width: 120, height: 64 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
+
+  it('stable text-in-padded-box layout (rounded)', async () => {
+    await init()
+    const tree = box(
+      { width: 200, height: 80, padding: 12 },
+      [text({ text: 'Hi', font: '16px sans-serif', lineHeight: 20 })],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 80 })
     expect(roundLayout(layout)).toMatchSnapshot()
   })
 })
