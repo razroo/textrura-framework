@@ -21,6 +21,9 @@ jobs:
       - name: Lint
         run: bun run lint
 
+      - name: Fast tests
+        run: bun run test
+
       - name: Build
         run: bun run build
 

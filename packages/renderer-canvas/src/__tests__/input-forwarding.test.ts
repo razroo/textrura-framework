@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { enableInputForwarding } from '../renderer.js'
 import type { App } from '@geometra/core'
 
-type Listener = (event: any) => void
+type Listener = (event: unknown) => void
 
 class FakeEventTarget {
   private listeners = new Map<string, Set<Listener>>()
@@ -16,7 +16,7 @@ class FakeEventTarget {
     this.listeners.get(type)?.delete(listener as Listener)
   }
 
-  dispatch(type: string, event: any): void {
+  dispatch(type: string, event: unknown): void {
     const list = this.listeners.get(type)
     if (!list) return
     for (const listener of list) listener(event)

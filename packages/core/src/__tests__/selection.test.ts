@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
+import type { ComputedLayout } from 'textura'
 import { collectTextNodes, getSelectedText, hitTestText } from '../selection.js'
+import type { TextNodeInfo } from '../selection.js'
 import { text } from '../elements.js'
 import { box } from '../elements.js'
 
@@ -9,7 +11,7 @@ describe('collectTextNodes', () => {
       text({ text: 'Hello', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
       text({ text: 'World', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
     ])
-    const layout = {
+    const layout: ComputedLayout = {
       x: 0, y: 0, width: 200, height: 100,
       children: [
         { x: 0, y: 0, width: 100, height: 18, children: [] },
@@ -17,7 +19,7 @@ describe('collectTextNodes', () => {
       ],
     }
 
-    const results: any[] = []
+    const results: TextNodeInfo[] = []
     collectTextNodes(el, layout, 0, 0, results)
     expect(results).toHaveLength(2)
     expect(results[0].element.props.text).toBe('Hello')
@@ -31,7 +33,7 @@ describe('collectTextNodes', () => {
       text({ text: 'Visible', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18, selectable: false }),
       text({ text: 'Selectable', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
     ])
-    const layout = {
+    const layout: ComputedLayout = {
       x: 0, y: 0, width: 200, height: 100,
       children: [
         { x: 0, y: 0, width: 100, height: 18, children: [] },
@@ -39,7 +41,7 @@ describe('collectTextNodes', () => {
       ],
     }
 
-    const results: any[] = []
+    const results: TextNodeInfo[] = []
     collectTextNodes(el, layout, 0, 0, results)
     expect(results).toHaveLength(1)
     expect(results[0].element.props.text).toBe('Selectable')
@@ -55,7 +57,7 @@ describe('collectTextNodes', () => {
         text({ text: 'LTR override', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
       ]),
     ])
-    const layout = {
+    const layout: ComputedLayout = {
       x: 0, y: 0, width: 220, height: 80,
       children: [
         {
@@ -69,8 +71,8 @@ describe('collectTextNodes', () => {
       ],
     }
 
-    const results: any[] = []
-    collectTextNodes(el, layout as any, 0, 0, results)
+    const results: TextNodeInfo[] = []
+    collectTextNodes(el, layout, 0, 0, results)
     expect(results).toHaveLength(2)
     expect(results[0].direction).toBe('rtl')
     expect(results[1].direction).toBe('ltr')
@@ -78,7 +80,7 @@ describe('collectTextNodes', () => {
 })
 
 describe('getSelectedText', () => {
-  const makeNodes = () => [
+  const makeNodes = (): TextNodeInfo[] => [
     { element: { kind: 'text' as const, props: { text: 'Hello World', font: '14px sans-serif', lineHeight: 18 } }, direction: 'ltr' as const, x: 0, y: 0, width: 100, height: 18, lines: [], index: 0 },
     { element: { kind: 'text' as const, props: { text: 'Second line', font: '14px sans-serif', lineHeight: 18 } }, direction: 'ltr' as const, x: 0, y: 18, width: 100, height: 18, lines: [], index: 1 },
   ]
@@ -87,7 +89,7 @@ describe('getSelectedText', () => {
     const nodes = makeNodes()
     const result = getSelectedText(
       { anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 5 },
-      nodes as any,
+      nodes,
     )
     expect(result).toBe('Hello')
   })
@@ -96,7 +98,7 @@ describe('getSelectedText', () => {
     const nodes = makeNodes()
     const result = getSelectedText(
       { anchorNode: 0, anchorOffset: 6, focusNode: 1, focusOffset: 6 },
-      nodes as any,
+      nodes,
     )
     expect(result).toBe('World\nSecond')
   })
@@ -105,7 +107,7 @@ describe('getSelectedText', () => {
     const nodes = makeNodes()
     const result = getSelectedText(
       { anchorNode: 1, anchorOffset: 6, focusNode: 0, focusOffset: 6 },
-      nodes as any,
+      nodes,
     )
     expect(result).toBe('World\nSecond')
   })
@@ -119,12 +121,12 @@ describe('getSelectedText', () => {
   it('returns empty string for a collapsed selection', () => {
     const nodes = makeNodes()
     expect(
-      getSelectedText({ anchorNode: 0, anchorOffset: 5, focusNode: 0, focusOffset: 5 }, nodes as any),
+      getSelectedText({ anchorNode: 0, anchorOffset: 5, focusNode: 0, focusOffset: 5 }, nodes),
     ).toBe('')
   })
 
   it('returns empty string when offsets are past the node text (slice semantics)', () => {
-    const nodes = [
+    const nodes: TextNodeInfo[] = [
       {
         element: { kind: 'text' as const, props: { text: 'hi', font: '14px sans-serif', lineHeight: 18 } },
         direction: 'ltr' as const,
@@ -137,14 +139,14 @@ describe('getSelectedText', () => {
       },
     ]
     expect(
-      getSelectedText({ anchorNode: 0, anchorOffset: 2, focusNode: 0, focusOffset: 10 }, nodes as any),
+      getSelectedText({ anchorNode: 0, anchorOffset: 2, focusNode: 0, focusOffset: 10 }, nodes),
     ).toBe('')
   })
 })
 
 describe('hitTestText', () => {
   it('returns null for non-finite pointer coordinates', () => {
-    const textNodes = [
+    const textNodes: TextNodeInfo[] = [
       {
         element: { kind: 'text' as const, props: { text: 'ab', font: '14px sans-serif', lineHeight: 18 } },
         direction: 'ltr' as const,
@@ -156,14 +158,14 @@ describe('hitTestText', () => {
         lines: [{ text: 'ab', x: 0, y: 0, charOffsets: [0, 8], charWidths: [8, 8] }],
       },
     ]
-    expect(hitTestText(textNodes as any, Number.NaN, 5)).toBeNull()
-    expect(hitTestText(textNodes as any, 5, Number.NaN)).toBeNull()
-    expect(hitTestText(textNodes as any, Number.POSITIVE_INFINITY, 5)).toBeNull()
-    expect(hitTestText(textNodes as any, 5, Number.NEGATIVE_INFINITY)).toBeNull()
+    expect(hitTestText(textNodes, Number.NaN, 5)).toBeNull()
+    expect(hitTestText(textNodes, 5, Number.NaN)).toBeNull()
+    expect(hitTestText(textNodes, Number.POSITIVE_INFINITY, 5)).toBeNull()
+    expect(hitTestText(textNodes, 5, Number.NEGATIVE_INFINITY)).toBeNull()
   })
 
   it('skips nodes with non-finite layout bounds (matches pointer hit-test invariants)', () => {
-    const badWidth = [
+    const badWidth: TextNodeInfo[] = [
       {
         element: { kind: 'text' as const, props: { text: 'x', font: '14px sans-serif', lineHeight: 18 } },
         direction: 'ltr' as const,
@@ -175,9 +177,9 @@ describe('hitTestText', () => {
         lines: [{ text: 'x', x: 0, y: 0, charOffsets: [0], charWidths: [10] }],
       },
     ]
-    expect(hitTestText(badWidth as any, 5, 5)).toBeNull()
+    expect(hitTestText(badWidth, 5, 5)).toBeNull()
 
-    const badHeight = [
+    const badHeight: TextNodeInfo[] = [
       {
         element: { kind: 'text' as const, props: { text: 'x', font: '14px sans-serif', lineHeight: 18 } },
         direction: 'ltr' as const,
@@ -189,11 +191,11 @@ describe('hitTestText', () => {
         lines: [{ text: 'x', x: 0, y: 0, charOffsets: [0], charWidths: [10] }],
       },
     ]
-    expect(hitTestText(badHeight as any, 5, 5)).toBeNull()
+    expect(hitTestText(badHeight, 5, 5)).toBeNull()
   })
 
   it('skips a bad-bounds node and still hits a later node with finite geometry', () => {
-    const textNodes = [
+    const textNodes: TextNodeInfo[] = [
       {
         element: { kind: 'text' as const, props: { text: 'bad', font: '14px sans-serif', lineHeight: 18 } },
         direction: 'ltr' as const,
@@ -215,11 +217,11 @@ describe('hitTestText', () => {
         lines: [{ text: 'ok', x: 0, y: 20, charOffsets: [0, 12], charWidths: [12, 12] }],
       },
     ]
-    expect(hitTestText(textNodes as any, 3, 26)).toEqual({ nodeIndex: 1, charOffset: 0 })
+    expect(hitTestText(textNodes, 3, 26)).toEqual({ nodeIndex: 1, charOffset: 0 })
   })
 
   it('returns null when no node bounds match', () => {
-    const textNodes = [
+    const textNodes: TextNodeInfo[] = [
       {
         element: { kind: 'text' as const, props: { text: 'x', font: '14px sans-serif', lineHeight: 18 } },
         direction: 'ltr' as const,
@@ -231,11 +233,11 @@ describe('hitTestText', () => {
         lines: [{ text: 'x', x: 10, y: 10, charOffsets: [0], charWidths: [10] }],
       },
     ]
-    expect(hitTestText(textNodes as any, 0, 15)).toBeNull()
+    expect(hitTestText(textNodes, 0, 15)).toBeNull()
   })
 
   it('snaps to charOffset 0 when inside node box but lines are empty', () => {
-    const textNodes = [
+    const textNodes: TextNodeInfo[] = [
       {
         element: { kind: 'text' as const, props: { text: 'pending', font: '14px sans-serif', lineHeight: 18 } },
         direction: 'ltr' as const,
@@ -247,13 +249,13 @@ describe('hitTestText', () => {
         lines: [],
       },
     ]
-    expect(hitTestText(textNodes as any, 5, 5)).toEqual({ nodeIndex: 0, charOffset: 0 })
+    expect(hitTestText(textNodes, 5, 5)).toEqual({ nodeIndex: 0, charOffset: 0 })
   })
 })
 
 describe('hitTestText direction mapping', () => {
   it('maps x positions to logical offsets in rtl text nodes', () => {
-    const textNodes = [
+    const textNodes: TextNodeInfo[] = [
       {
         element: { kind: 'text' as const, props: { text: 'abcd', font: '14px sans-serif', lineHeight: 18 } },
         direction: 'rtl' as const,
@@ -269,9 +271,9 @@ describe('hitTestText direction mapping', () => {
     ]
 
     // Near the left edge of the rendered RTL line maps toward the logical end.
-    const leftHit = hitTestText(textNodes as any, 12, 24)
+    const leftHit = hitTestText(textNodes, 12, 24)
     // Near the right edge maps toward logical start.
-    const rightHit = hitTestText(textNodes as any, 48, 24)
+    const rightHit = hitTestText(textNodes, 48, 24)
 
     expect(leftHit).toEqual({ nodeIndex: 0, charOffset: 4 })
     expect(rightHit).toEqual({ nodeIndex: 0, charOffset: 0 })

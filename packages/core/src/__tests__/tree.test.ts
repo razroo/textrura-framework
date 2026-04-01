@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { toLayoutTree } from '../tree.js'
 import { box, text, image } from '../elements.js'
 
+type BoxLayoutNode = ReturnType<typeof toLayoutTree> & { children: Array<Record<string, unknown>> }
+
 describe('toLayoutTree', () => {
   it('strips backgroundColor, color, borderColor, borderRadius, borderWidth, opacity from box', () => {
     const el = box({
@@ -125,7 +127,7 @@ describe('toLayoutTree', () => {
       box({ width: 100, height: 100, backgroundColor: '#f00' }),
       text({ text: 'Hi', font: '14px sans-serif', lineHeight: 18, width: 50, height: 18 }),
     ])
-    const layout = toLayoutTree(el) as any
+    const layout = toLayoutTree(el) as BoxLayoutNode
     expect(layout.children).toHaveLength(2)
     expect(layout.children[0]).not.toHaveProperty('backgroundColor')
     expect(layout.children[0]).toHaveProperty('width', 100)
@@ -141,9 +143,9 @@ describe('toLayoutTree', () => {
       overflow: 'hidden',
       scrollX: 10,
       scrollY: 20,
-      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-      gradient: 'linear-gradient(red, blue)',
-    } as any)
+      boxShadow: { offsetX: 0, offsetY: 2, blur: 4, color: 'rgba(0,0,0,0.2)' },
+      gradient: { type: 'linear', stops: [{ offset: 0, color: 'red' }, { offset: 1, color: 'blue' }] },
+    })
     const layout = toLayoutTree(el)
     expect(layout).toHaveProperty('width', 100)
     expect(layout).not.toHaveProperty('cursor')

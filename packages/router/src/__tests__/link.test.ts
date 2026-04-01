@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { ComputedLayout } from 'textura'
 import { createMemoryHistory } from '../history.js'
 import { link } from '../link.js'
 import { createRouter } from '../router.js'
@@ -6,6 +7,7 @@ import type { RouteNode } from '../tree.js'
 
 describe('declarative link primitive', () => {
   const routes: RouteNode[] = [{ id: 'root', path: '/', children: [{ id: 'about', path: 'about' }] }]
+  const target: ComputedLayout = { x: 0, y: 0, width: 0, height: 0, children: [] }
 
   it('navigates on click', async () => {
     const history = createMemoryHistory({ initialEntries: ['/'] })
@@ -13,7 +15,7 @@ describe('declarative link primitive', () => {
     router.start()
 
     const node = link({ to: '/about', router })
-    node.handlers?.onClick?.({ x: 0, y: 0, target: {} as any })
+    node.handlers?.onClick?.({ x: 0, y: 0, target })
     await Promise.resolve()
 
     expect(router.getState().location.pathname).toBe('/about')
@@ -35,7 +37,7 @@ describe('declarative link primitive', () => {
       ctrlKey: false,
       altKey: false,
       metaKey: false,
-      target: {} as any,
+      target,
     })
     await Promise.resolve()
     expect(router.getState().location.pathname).toBe('/about')
@@ -48,7 +50,7 @@ describe('declarative link primitive', () => {
       ctrlKey: false,
       altKey: false,
       metaKey: false,
-      target: {} as any,
+      target,
     })
     await Promise.resolve()
     expect(router.getState().location.pathname).toBe('/about')
@@ -67,7 +69,7 @@ describe('declarative link primitive', () => {
       ctrlKey: false,
       altKey: false,
       metaKey: false,
-      target: {} as any,
+      target,
     })
 
     expect(router.getState().location.pathname).toBe('/')

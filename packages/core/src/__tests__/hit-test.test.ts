@@ -471,6 +471,25 @@ describe('dispatchHit', () => {
     expect(log).toEqual(['front'])
   })
 
+  it('overlapping siblings: focusable overlay does not beat clickable sibling behind', () => {
+    const log: string[] = []
+    const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } })
+    const front = box({ width: 50, height: 50, zIndex: 10, onKeyDown: () => undefined })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    const result = dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['back'])
+    expect(result.handled).toBe(true)
+    expect(result.focusTarget?.element).toBe(back)
+  })
+
   it('overlapping siblings: hit order updates when z-index values change between dispatches', () => {
     const log: string[] = []
     const back = box({

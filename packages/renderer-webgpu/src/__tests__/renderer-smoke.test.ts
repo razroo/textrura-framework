@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import type { ComputedLayout } from 'textura'
 import { box } from '@geometra/core'
 import { WebGPURenderer } from '../index.js'
 
@@ -21,8 +22,8 @@ describe('webgpu renderer smoke', () => {
 
     const renderer = new WebGPURenderer({ canvas, background: '#112233' })
     const tree = box({ width: 100, height: 40 }, [])
-    const layout = { x: 0, y: 0, width: 100, height: 40, children: [] }
-    renderer.render(layout as any, tree)
+    const layout: ComputedLayout = { x: 0, y: 0, width: 100, height: 40, children: [] }
+    renderer.render(layout, tree)
 
     expect(ctx.calls).toHaveLength(1)
     expect(ctx.calls[0]).toEqual({ x: 0, y: 0, w: 100, h: 40, color: '#112233' })

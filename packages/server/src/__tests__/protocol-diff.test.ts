@@ -1,13 +1,8 @@
 import { describe, it, expect } from 'vitest'
+import type { ComputedLayout } from 'textura'
 import { diffLayout, isProtocolCompatible, coalescePatches } from '../protocol.js'
 
-interface TestLayout {
-  x: number
-  y: number
-  width: number
-  height: number
-  children: TestLayout[]
-}
+type TestLayout = ComputedLayout
 
 function cloneLayout(layout: TestLayout): TestLayout {
   return {
@@ -65,7 +60,7 @@ describe('diffLayout', () => {
       next.children[1]!.children[1]!.y += 2
       next.children[1]!.height += 1
 
-      const patches = diffLayout(prev as any, next as any)
+      const patches = diffLayout(prev, next)
       const patched = cloneLayout(prev)
       applyPatches(patched, patches)
 
@@ -77,7 +72,7 @@ describe('diffLayout', () => {
   it('returns no patches when geometry is unchanged', () => {
     const base = makeBaseLayout()
     const same = cloneLayout(base)
-    const patches = diffLayout(base as any, same as any)
+    const patches = diffLayout(base, same)
     expect(patches).toEqual([])
   })
 

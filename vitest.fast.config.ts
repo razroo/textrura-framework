@@ -1,6 +1,7 @@
-import { defineConfig } from 'vitest/config'
+import { defineConfig, mergeConfig } from 'vitest/config'
+import baseConfig from './vitest.config'
 
-export default defineConfig({
+export default mergeConfig(baseConfig, defineConfig({
   test: {
     include: ['packages/*/src/__tests__/**/*.test.ts'],
     exclude: [
@@ -9,7 +10,5 @@ export default defineConfig({
       'packages/core/src/__tests__/virtual-scroll.test.ts',
       'packages/server/src/__tests__/protocol-perf-smoke.test.ts',
     ],
-    pool: 'threads',
-    testTimeout: 30_000,
   },
-})
+}))

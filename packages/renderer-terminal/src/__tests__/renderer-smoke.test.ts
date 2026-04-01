@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import type { ComputedLayout } from 'textura'
 import { TerminalRenderer } from '../renderer.js'
 import { box, text } from '../../../core/src/index.js'
 import { readFileSync } from 'node:fs'
@@ -47,7 +48,7 @@ describe('terminal renderer smoke', () => {
     const tree = box({ backgroundColor: '#111111' }, [
       text({ text: 'hello', font: '14px monospace', lineHeight: 18, color: '#ffffff' }),
     ])
-    const layout = {
+    const layout: ComputedLayout = {
       x: 0,
       y: 0,
       width: 120,
@@ -55,7 +56,7 @@ describe('terminal renderer smoke', () => {
       children: [{ x: 0, y: 0, width: 80, height: 20, children: [] }],
     }
 
-    renderer.render(layout as any, tree)
+    renderer.render(layout, tree)
     const ansi = output.toString()
 
     expect(ansi).toContain('\x1b[2J\x1b[H')
@@ -77,14 +78,14 @@ describe('terminal renderer smoke', () => {
         text({ text: 'HIGH', font: '14px monospace', lineHeight: 18, color: '#ffffff' }),
       ]),
     ])
-    const layout = {
+    const layout: ComputedLayout = {
       x: 0, y: 0, width: 200, height: 80,
       children: [
         { x: 0, y: 0, width: 100, height: 40, children: [{ x: 0, y: 0, width: 70, height: 20, children: [] }] },
         { x: 20, y: 0, width: 100, height: 40, children: [{ x: 0, y: 0, width: 60, height: 20, children: [] }] },
       ],
     }
-    renderer.render(layout as any, tree)
+    renderer.render(layout, tree)
     const ansi = output.toString()
     const plain = stripAnsiSequences(ansi)
       .replace(/[^\x20-\x7E\n]/g, '')
@@ -104,7 +105,7 @@ describe('terminal renderer smoke', () => {
     const tree = box({}, [
       text({ text: 'AB', dir: 'rtl', font: '14px monospace', lineHeight: 18, color: '#ffffff' }),
     ])
-    const layout = {
+    const layout: ComputedLayout = {
       x: 0,
       y: 0,
       width: 80, // 80 * 0.15 => 12 columns
@@ -112,7 +113,7 @@ describe('terminal renderer smoke', () => {
       children: [{ x: 0, y: 0, width: 80, height: 20, children: [] }],
     }
 
-    renderer.render(layout as any, tree)
+    renderer.render(layout, tree)
     const plain = stripAnsiSequences(output.toString())
     expect(plain).toContain('          AB')
   })

@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
+import type { ComputedLayout } from 'textura'
 import { box, text } from '../elements.js'
 import { dispatchHit } from '../hit-test.js'
 import { getInputCaretGeometry } from '../text-input.js'
+import type { TextNodeInfo } from '../selection.js'
 
 function nowMs(): number {
   return performance.now()
@@ -13,7 +15,7 @@ describe('core perf smoke', () => {
       box({ width: 40, height: 20, onClick: () => i }, []),
     )
     const tree = box({ width: 1000, height: 1000 }, leaves)
-    const layout = {
+    const layout: ComputedLayout = {
       x: 0, y: 0, width: 1000, height: 1000,
       children: leaves.map((_l, i) => ({
         x: (i % 30) * 32,
@@ -26,14 +28,14 @@ describe('core perf smoke', () => {
 
     // Warm up once to reduce one-time JIT noise.
     for (let i = 0; i < 500; i++) {
-      dispatchHit(tree, layout as any, 'onClick', (i % 30) * 32 + 1, (i % 10) * 22 + 1)
+      dispatchHit(tree, layout, 'onClick', (i % 30) * 32 + 1, (i % 10) * 22 + 1)
     }
 
     let best = Number.POSITIVE_INFINITY
     for (let run = 0; run < 3; run++) {
       const start = nowMs()
       for (let i = 0; i < 2000; i++) {
-        dispatchHit(tree, layout as any, 'onClick', (i % 30) * 32 + 1, (i % 10) * 22 + 1)
+        dispatchHit(tree, layout, 'onClick', (i % 30) * 32 + 1, (i % 10) * 22 + 1)
       }
       best = Math.min(best, nowMs() - start)
     }
@@ -51,8 +53,9 @@ describe('core perf smoke', () => {
       charOffsets: [0, 6, 12, 18, 24, 30],
       charWidths: [6, 6, 6, 6, 6, 6],
     }))
-    const textNode = {
+    const textNode: TextNodeInfo = {
       element: text({ text: lines.map(l => l.text).join(''), font: '14px Inter', lineHeight: 18 }),
+      direction: 'ltr',
       x: 0,
       y: 0,
       width: 400,
@@ -63,7 +66,7 @@ describe('core perf smoke', () => {
 
     const start = nowMs()
     for (let i = 0; i < 5000; i++) {
-      getInputCaretGeometry([textNode] as any, {
+      getInputCaretGeometry([textNode], {
         anchorNode: 0,
         anchorOffset: i % 800,
         focusNode: 0,

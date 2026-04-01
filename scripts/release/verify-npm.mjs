@@ -9,8 +9,11 @@ const packages = [
   '@geometra/core',
   '@geometra/renderer-canvas',
   '@geometra/renderer-terminal',
+  '@geometra/renderer-webgpu',
   '@geometra/server',
   '@geometra/client',
+  '@geometra/ui',
+  '@geometra/router',
 ]
 
 async function run() {

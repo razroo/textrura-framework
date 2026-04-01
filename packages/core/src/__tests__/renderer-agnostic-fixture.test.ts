@@ -1,16 +1,18 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
+import type { ComputedLayout } from 'textura'
 import { toSemanticHTML } from '../seo.js'
-import { toAccessibilityTree } from '../a11y.js'
+import { toAccessibilityTree, type AccessibilityNode } from '../a11y.js'
+import type { UIElement } from '../types.js'
 
 type Fixture = {
-  tree: any
-  layout: any
+  tree: UIElement
+  layout: ComputedLayout
   expectedSemanticIncludes: string[]
   expectedA11yRoles: string[]
 }
 
-function flattenRoles(node: any, out: string[] = []): string[] {
+function flattenRoles(node: AccessibilityNode, out: string[] = []): string[] {
   out.push(node.role)
   for (const child of node.children ?? []) flattenRoles(child, out)
   return out

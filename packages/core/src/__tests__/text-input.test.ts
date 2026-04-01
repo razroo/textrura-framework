@@ -12,6 +12,7 @@ import {
   getInputCaretGeometry,
   type TextInputState,
 } from '../text-input.js'
+import type { TextNodeInfo } from '../selection.js'
 import {
   createTextInputHistory,
   pushTextInputHistory,
@@ -236,6 +237,7 @@ describe('text-input foundation', () => {
     const caret = getInputCaretGeometry([
       {
         element: { kind: 'text', props: { text: 'hello', font: '14px Inter', lineHeight: 20 } },
+        direction: 'ltr',
         x: 0,
         y: 0,
         width: 100,
@@ -245,7 +247,7 @@ describe('text-input foundation', () => {
           { text: 'hello', x: 10, y: 30, charOffsets: [0, 5, 10, 15, 20], charWidths: [5, 5, 5, 5, 5] },
         ],
       },
-    ] as any, {
+    ] satisfies TextNodeInfo[], {
       anchorNode: 0,
       anchorOffset: 3,
       focusNode: 0,
@@ -259,9 +261,10 @@ describe('text-input foundation', () => {
   })
 
   it('computes caret geometry across multiline boundaries and clamps edges', () => {
-    const textNodes = [
+    const textNodes: TextNodeInfo[] = [
       {
         element: { kind: 'text', props: { text: 'abcd', font: '14px Inter', lineHeight: 18 } },
+        direction: 'ltr',
         x: 0,
         y: 0,
         width: 100,
@@ -272,7 +275,7 @@ describe('text-input foundation', () => {
           { text: 'cd', x: 10, y: 38, charOffsets: [0, 7], charWidths: [7, 7] },
         ],
       },
-    ] as any
+    ]
 
     const firstLineStart = getInputCaretGeometry(textNodes, {
       anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 0,
@@ -294,7 +297,7 @@ describe('text-input foundation', () => {
   })
 
   it('computes caret geometry with rtl direction-aware x mapping', () => {
-    const textNodes = [
+    const textNodes: TextNodeInfo[] = [
       {
         element: { kind: 'text', props: { text: 'abcd', font: '14px Inter', lineHeight: 18, dir: 'rtl' } },
         direction: 'rtl',
@@ -307,7 +310,7 @@ describe('text-input foundation', () => {
           { text: 'abcd', x: 10, y: 20, charOffsets: [0, 10, 20, 30], charWidths: [10, 10, 10, 10] },
         ],
       },
-    ] as any
+    ]
 
     const atStart = getInputCaretGeometry(textNodes, {
       anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 0,
@@ -378,4 +381,3 @@ describe('text-input foundation', () => {
     expect(history.present.nodes).toEqual(['hello world'])
   })
 })
-

@@ -10,7 +10,7 @@ interface HitTarget {
 }
 
 interface ZIndexCacheEntry {
-  signature: string
+  zValues: number[]
   /** Child indices in paint order: ascending z-index (matches canvas + terminal renderers). */
   asc: number[]
 }
@@ -43,14 +43,35 @@ function zIndexOf(el: UIElement): number {
 }
 
 function getChildrenByZAsc(boxEl: BoxElement): number[] {
-  const signature = boxEl.children.map((child, i) => `${i}:${zIndexOf(child)}`).join('|')
   const cached = zIndexOrderCache.get(boxEl)
-  if (cached && cached.signature === signature) {
-    return cached.asc
+  if (cached && cached.zValues.length === boxEl.children.length) {
+    let unchanged = true
+    for (let i = 0; i < boxEl.children.length; i++) {
+      if (cached.zValues[i] !== zIndexOf(boxEl.children[i]!)) {
+        unchanged = false
+        break
+      }
+    }
+    if (unchanged) return cached.asc
   }
-  const asc = boxEl.children.map((_, i) => i).sort((a, b) => zIndexOf(boxEl.children[a]!) - zIndexOf(boxEl.children[b]!))
-  zIndexOrderCache.set(boxEl, { signature, asc })
+
+  const zValues = boxEl.children.map(child => zIndexOf(child))
+  const asc = boxEl.children
+    .map((_, i) => i)
+    .sort((a, b) => zValues[a]! - zValues[b]!)
+  zIndexOrderCache.set(boxEl, { zValues, asc })
   return asc
+}
+
+function isFocusableHandlers(handlers: EventHandlers | undefined): boolean {
+  return !!(
+    handlers?.onClick ||
+    handlers?.onKeyDown ||
+    handlers?.onKeyUp ||
+    handlers?.onCompositionStart ||
+    handlers?.onCompositionUpdate ||
+    handlers?.onCompositionEnd
+  )
 }
 
 /**
@@ -124,6 +145,96 @@ function collectHits(
   }
 }
 
+function dispatchHitRecursive(
+  element: UIElement,
+  layout: ComputedLayout,
+  eventType: keyof EventHandlers,
+  x: number,
+  y: number,
+  offsetX: number,
+  offsetY: number,
+  extra: Record<string, unknown> | undefined,
+): HitDispatchResult {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return { handled: false }
+  if (!layoutBoundsAreFinite(layout)) return { handled: false }
+  if (element.kind !== 'box') return { handled: false }
+
+  const boxEl = element
+  const absX = offsetX + layout.x
+  const absY = offsetY + layout.y
+
+  const { overflow, scrollX, scrollY } = boxEl.props
+  if (overflow === 'hidden' || overflow === 'scroll') {
+    if (x < absX || x > absX + layout.width || y < absY || y > absY + layout.height) {
+      return { handled: false }
+    }
+  }
+
+  const inside =
+    x >= absX &&
+    x <= absX + layout.width &&
+    y >= absY &&
+    y <= absY + layout.height
+
+  if (!inside) return { handled: false }
+
+  let focusTarget: HitDispatchResult['focusTarget']
+  const childOffsetX = absX - finiteScrollOffset(scrollX)
+  const childOffsetY = absY - finiteScrollOffset(scrollY)
+  const asc = getChildrenByZAsc(boxEl)
+
+  for (let k = asc.length - 1; k >= 0; k--) {
+    const i = asc[k]!
+    const childLayout = layout.children[i]
+    if (!childLayout) continue
+    const childResult = dispatchHitRecursive(
+      boxEl.children[i]!,
+      childLayout,
+      eventType,
+      x,
+      y,
+      childOffsetX,
+      childOffsetY,
+      extra,
+    )
+    if (childResult.handled) return childResult
+    if (eventType === 'onClick' && !focusTarget && childResult.focusTarget) {
+      focusTarget = childResult.focusTarget
+    }
+  }
+
+  if (boxEl.props.pointerEvents === 'none') {
+    return focusTarget ? { handled: false, focusTarget } : { handled: false }
+  }
+
+  const handlers = boxEl.handlers
+  const handler = handlers?.[eventType]
+  if (handler) {
+    const event: HitEvent = {
+      x,
+      y,
+      localX: x - absX,
+      localY: y - absY,
+      target: layout,
+      ...extra,
+    }
+    ;(handler as (e: HitEvent) => void)(event)
+    return {
+      handled: true,
+      focusTarget:
+        eventType === 'onClick' && isFocusableHandlers(handlers)
+          ? { element: boxEl, layout }
+          : undefined,
+    }
+  }
+
+  if (eventType === 'onClick' && !focusTarget && isFocusableHandlers(handlers)) {
+    focusTarget = { element: boxEl, layout }
+  }
+
+  return focusTarget ? { handled: false, focusTarget } : { handled: false }
+}
+
 /**
  * Dispatch a hit at `(x, y)` against the element tree for the given handler key
  * (e.g. `onClick`, `onPointerDown`, `onKeyDown`, composition events).
@@ -143,57 +254,7 @@ export function dispatchHit(
   y: number,
   extra?: Record<string, unknown>,
 ): HitDispatchResult {
-  const hits: HitTarget[] = []
-  collectHits(element, layout, x, y, 0, 0, hits)
-
-  // Deepest hit first (last in list = most nested)
-  for (let i = hits.length - 1; i >= 0; i--) {
-    const hit = hits[i]!
-    const handler = hit.handlers[eventType]
-    if (handler) {
-      const event: HitEvent = {
-        x,
-        y,
-        localX: x - hit.absX,
-        localY: y - hit.absY,
-        target: hit.layout,
-        ...extra,
-      }
-      ;(handler as (e: HitEvent) => void)(event)
-      const focusable = !!(
-        hit.handlers.onClick ||
-        hit.handlers.onKeyDown ||
-        hit.handlers.onKeyUp ||
-        hit.handlers.onCompositionStart ||
-        hit.handlers.onCompositionUpdate ||
-        hit.handlers.onCompositionEnd
-      )
-      const focusTarget =
-        eventType === 'onClick' && focusable
-          ? { element: hit.element, layout: hit.layout }
-          : undefined
-      return { handled: true, focusTarget }
-    }
-  }
-  // Click-to-focus fallback: allow focusable boxes to receive focus on click
-  // even when they do not implement an onClick handler.
-  if (eventType === 'onClick') {
-    for (let i = hits.length - 1; i >= 0; i--) {
-      const hit = hits[i]!
-      const focusable = !!(
-        hit.handlers.onClick ||
-        hit.handlers.onKeyDown ||
-        hit.handlers.onKeyUp ||
-        hit.handlers.onCompositionStart ||
-        hit.handlers.onCompositionUpdate ||
-        hit.handlers.onCompositionEnd
-      )
-      if (focusable) {
-        return { handled: false, focusTarget: { element: hit.element, layout: hit.layout } }
-      }
-    }
-  }
-  return { handled: false }
+  return dispatchHitRecursive(element, layout, eventType, x, y, 0, 0, extra)
 }
 
 /**

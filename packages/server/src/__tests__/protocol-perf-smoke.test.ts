@@ -1,13 +1,8 @@
 import { describe, it, expect } from 'vitest'
+import type { ComputedLayout } from 'textura'
 import { diffLayout } from '../protocol.js'
 
-interface L {
-  x: number
-  y: number
-  width: number
-  height: number
-  children: L[]
-}
+type L = ComputedLayout
 
 function nowMs(): number {
   return performance.now()
@@ -56,7 +51,7 @@ describe('protocol perf smoke', () => {
     const start = nowMs()
     for (let i = 0; i < 60; i++) {
       const next = mutateLayout(prev)
-      const patches = diffLayout(prev as any, next as any)
+      const patches = diffLayout(prev, next)
       expect(patches.length).toBeGreaterThan(0)
       prev = next
     }
@@ -70,7 +65,7 @@ describe('protocol perf smoke', () => {
     const start = nowMs()
     for (let i = 0; i < 12; i++) {
       const next = mutateLayoutWorstCase(prev)
-      const patches = diffLayout(prev as any, next as any)
+      const patches = diffLayout(prev, next)
       expect(patches.length).toBeGreaterThan(100)
       prev = next
     }

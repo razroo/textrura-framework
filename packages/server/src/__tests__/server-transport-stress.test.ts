@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest'
+import type { ComputedLayout } from 'textura'
 import { coalescePatches, diffLayout } from '../protocol.js'
 
 describe('server transport stress', () => {
   it('coalesces burst patch streams deterministically', () => {
-    type L = { x: number; y: number; width: number; height: number; children: L[] }
+    type L = ComputedLayout
     const base: L = {
       x: 0,
       y: 0,
@@ -26,7 +27,7 @@ describe('server transport stress', () => {
           children: [],
         })),
       }
-      const raw = diffLayout(prev as any, next as any)
+      const raw = diffLayout(prev, next)
       // diffLayout never emits duplicate paths; coalescePatches only merges when the
       // same path appears multiple times (e.g. concatenated micro-updates). Duplicate
       // the burst to exercise last-write-wins coalescing deterministically.

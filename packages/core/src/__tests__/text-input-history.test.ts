@@ -172,7 +172,7 @@ describe('text input history', () => {
   })
 
   it('treats equivalent multi-line text as unchanged when selection fields match (node split only)', () => {
-    let h = createTextInputHistory({ nodes: ['x', 'y'], selection: sel(0, 1) })
+    const h = createTextInputHistory({ nodes: ['x', 'y'], selection: sel(0, 1) })
     const sameJoin = pushTextInputHistory(h, { nodes: ['x\ny'], selection: sel(0, 1) })
     expect(sameJoin).toBe(h)
   })

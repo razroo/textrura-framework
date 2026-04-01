@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import type { ComputedLayout } from 'textura'
 import { box, text } from '../elements.js'
 import { clearFocus, focusedElement, setFocus } from '../focus.js'
 import { trapFocusStep } from '../focus-trap.js'
@@ -14,7 +15,7 @@ describe('trapFocusStep', () => {
       box({}, [modalA, modalB]),
       outside,
     ])
-    const layout = {
+    const layout: ComputedLayout = {
       x: 0, y: 0, width: 300, height: 100,
       children: [
         {
@@ -28,15 +29,15 @@ describe('trapFocusStep', () => {
       ],
     }
 
-    expect(trapFocusStep(tree, layout as any, [0], 'next')).toBe(true)
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
     const first = focusedElement.peek()
     expect(first?.element).toBe(modalA)
 
-    expect(trapFocusStep(tree, layout as any, [0], 'next')).toBe(true)
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
     const second = focusedElement.peek()
     expect(second?.element).toBe(modalB)
 
-    expect(trapFocusStep(tree, layout as any, [0], 'next')).toBe(true)
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
     const wrapped = focusedElement.peek()
     expect(wrapped?.element).toBe(modalA)
     expect(wrapped?.element).not.toBe(outside)
@@ -44,32 +45,32 @@ describe('trapFocusStep', () => {
 
   it('returns false when scope path is out of range', () => {
     const tree = box({}, [box({ onKeyDown: () => undefined }, [])])
-    const layout = {
+    const layout: ComputedLayout = {
       x: 0,
       y: 0,
       width: 100,
       height: 40,
       children: [{ x: 0, y: 0, width: 100, height: 40, children: [] }],
     }
-    expect(trapFocusStep(tree, layout as any, [2], 'next')).toBe(false)
-    expect(trapFocusStep(tree, layout as any, [0, 1], 'next')).toBe(false)
+    expect(trapFocusStep(tree, layout, [2], 'next')).toBe(false)
+    expect(trapFocusStep(tree, layout, [0, 1], 'next')).toBe(false)
   })
 
   it('returns false when scope resolves to a non-box node', () => {
     const tree = box({}, [text({ text: 'x', font: '14px sans-serif', lineHeight: 20 })])
-    const layout = {
+    const layout: ComputedLayout = {
       x: 0,
       y: 0,
       width: 50,
       height: 20,
-      children: [{ x: 0, y: 0, width: 50, height: 20, lines: [] }],
+      children: [{ x: 0, y: 0, width: 50, height: 20, children: [] }],
     }
-    expect(trapFocusStep(tree, layout as any, [0], 'next')).toBe(false)
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(false)
   })
 
   it('returns false when subtree has no focusable boxes', () => {
     const tree = box({}, [box({}, [box({}, [])])])
-    const layout = {
+    const layout: ComputedLayout = {
       x: 0,
       y: 0,
       width: 100,
@@ -84,14 +85,14 @@ describe('trapFocusStep', () => {
         },
       ],
     }
-    expect(trapFocusStep(tree, layout as any, [0], 'next')).toBe(false)
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(false)
   })
 
   it('cycles backward with prev', () => {
     const a = box({ onKeyDown: () => undefined }, [])
     const b = box({ onKeyDown: () => undefined }, [])
     const tree = box({}, [box({}, [a, b])])
-    const layout = {
+    const layout: ComputedLayout = {
       x: 0,
       y: 0,
       width: 200,
@@ -110,13 +111,13 @@ describe('trapFocusStep', () => {
       ],
     }
 
-    expect(trapFocusStep(tree, layout as any, [0], 'prev')).toBe(true)
+    expect(trapFocusStep(tree, layout, [0], 'prev')).toBe(true)
     expect(focusedElement.peek()?.element).toBe(b)
 
-    expect(trapFocusStep(tree, layout as any, [0], 'prev')).toBe(true)
+    expect(trapFocusStep(tree, layout, [0], 'prev')).toBe(true)
     expect(focusedElement.peek()?.element).toBe(a)
 
-    expect(trapFocusStep(tree, layout as any, [0], 'prev')).toBe(true)
+    expect(trapFocusStep(tree, layout, [0], 'prev')).toBe(true)
     expect(focusedElement.peek()?.element).toBe(b)
   })
 
@@ -125,7 +126,7 @@ describe('trapFocusStep', () => {
     const modalB = box({ onKeyDown: () => undefined }, [])
     const outside = box({ onKeyDown: () => undefined }, [])
     const tree = box({}, [box({}, [modalA, modalB]), outside])
-    const layout = {
+    const layout: ComputedLayout = {
       x: 0,
       y: 0,
       width: 300,
@@ -145,12 +146,12 @@ describe('trapFocusStep', () => {
       ],
     }
 
-    setFocus(outside, layout.children[1] as any)
-    expect(trapFocusStep(tree, layout as any, [0], 'next')).toBe(true)
+    setFocus(outside, layout.children[1]!)
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
     expect(focusedElement.peek()?.element).toBe(modalA)
 
-    setFocus(outside, layout.children[1] as any)
-    expect(trapFocusStep(tree, layout as any, [0], 'prev')).toBe(true)
+    setFocus(outside, layout.children[1]!)
+    expect(trapFocusStep(tree, layout, [0], 'prev')).toBe(true)
     expect(focusedElement.peek()?.element).toBe(modalB)
   })
 
@@ -158,7 +159,7 @@ describe('trapFocusStep', () => {
     const clickOnly = box({ onClick: () => undefined }, [])
     const keyOnly = box({ onKeyDown: () => undefined }, [])
     const tree = box({}, [box({}, [clickOnly, keyOnly])])
-    const layout = {
+    const layout: ComputedLayout = {
       x: 0,
       y: 0,
       width: 200,
@@ -177,13 +178,13 @@ describe('trapFocusStep', () => {
       ],
     }
 
-    expect(trapFocusStep(tree, layout as any, [0], 'next')).toBe(true)
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
     expect(focusedElement.peek()?.element).toBe(clickOnly)
 
-    expect(trapFocusStep(tree, layout as any, [0], 'next')).toBe(true)
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
     expect(focusedElement.peek()?.element).toBe(keyOnly)
 
-    expect(trapFocusStep(tree, layout as any, [0], 'next')).toBe(true)
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
     expect(focusedElement.peek()?.element).toBe(clickOnly)
   })
 
@@ -191,7 +192,7 @@ describe('trapFocusStep', () => {
     const compOnly = box({ onCompositionStart: () => undefined }, [])
     const keyOnly = box({ onKeyDown: () => undefined }, [])
     const tree = box({}, [box({}, [compOnly, keyOnly])])
-    const layout = {
+    const layout: ComputedLayout = {
       x: 0,
       y: 0,
       width: 200,
@@ -210,10 +211,10 @@ describe('trapFocusStep', () => {
       ],
     }
 
-    expect(trapFocusStep(tree, layout as any, [0], 'next')).toBe(true)
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
     expect(focusedElement.peek()?.element).toBe(compOnly)
 
-    expect(trapFocusStep(tree, layout as any, [0], 'next')).toBe(true)
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
     expect(focusedElement.peek()?.element).toBe(keyOnly)
   })
 })
