@@ -99,6 +99,14 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<h1>Hero</h1>')
   })
 
+  it('infers h1 from bolder keyword at large size', () => {
+    const el = box({ width: 200, height: 50 }, [
+      text({ text: 'Title', font: 'bolder 32px sans-serif', lineHeight: 40 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<h1>Title</h1>')
+  })
+
   it('does not treat semibold numeric weight (600) as bold for heading inference', () => {
     const el = box({ width: 200, height: 50 }, [
       text({ text: 'Subheading', font: '600 32px sans-serif', lineHeight: 40 }),
@@ -144,6 +152,29 @@ describe('toSemanticHTML', () => {
     ])
     const html = toSemanticHTML(el)
     expect(html).toContain('<img src="https://example.com/photo.jpg" alt="A photo">')
+  })
+
+  it('escapes semantic role and aria-label on text and box nodes', () => {
+    const el = box(
+      {
+        width: 200,
+        height: 80,
+        semantic: { role: 'banner" x=', ariaLabel: 'App <main>' },
+      },
+      [
+        text({
+          text: 'Hi',
+          font: '14px sans-serif',
+          lineHeight: 18,
+          semantic: { role: 'note"x', ariaLabel: 'Say "ok"' },
+        }),
+      ],
+    )
+    const html = toSemanticHTML(el)
+    expect(html).toContain('role="banner&quot; x="')
+    expect(html).toContain('aria-label="App &lt;main&gt;"')
+    expect(html).toContain('role="note&quot;x"')
+    expect(html).toContain('aria-label="Say &quot;ok&quot;"')
   })
 
   it('escapes img src and alt for HTML attribute safety', () => {
