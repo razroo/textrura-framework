@@ -638,4 +638,34 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<br>')
     expect(html).not.toContain('</br>')
   })
+
+  it('infers button for onClick with a single text child or empty box', () => {
+    const leaf = box({ width: 80, height: 32, onClick: () => {} }, [
+      text({ text: 'OK', font: '14px sans-serif', lineHeight: 18 }),
+    ])
+    const empty = box({ width: 40, height: 40, onClick: () => {} }, [])
+    const html = toSemanticHTML(box({ width: 200, height: 100 }, [leaf, empty]))
+    expect(html).toContain('<button>')
+    expect(html).toContain('<p>OK</p>')
+    expect(html).toContain('</button>')
+    expect(html.match(/<button>/g)?.length).toBe(2)
+  })
+
+  it('infers div for onClick on compound targets (multiple children or nested box)', () => {
+    const row = box({ width: 200, height: 40, onClick: () => {} }, [
+      text({ text: 'A', font: '14px sans-serif', lineHeight: 18 }),
+      text({ text: 'B', font: '14px sans-serif', lineHeight: 18 }),
+    ])
+    const wrapped = box({ width: 200, height: 40, onClick: () => {} }, [
+      box({ width: 100, height: 20 }, [
+        text({ text: 'Inner', font: '14px sans-serif', lineHeight: 18 }),
+      ]),
+    ])
+    const icon = box({ width: 48, height: 48, onClick: () => {} }, [
+      image({ src: '/i.png', alt: '', width: 24, height: 24 }),
+    ])
+    const html = toSemanticHTML(box({ width: 220, height: 200 }, [row, wrapped, icon]))
+    expect(html).not.toContain('<button>')
+    expect(html.match(/<div>/g)?.length).toBeGreaterThanOrEqual(3)
+  })
 })

@@ -186,10 +186,16 @@ function inferTag(element: TextElement): string {
   return 'p'
 }
 
-/** Infer an HTML tag from a box element's styling and children. */
+/**
+ * Infer an HTML tag for a box without `semantic.tag`.
+ * Click handlers on compound regions (multiple nodes or non-text children) stay `div` so crawlers do
+ * not see one oversized `<button>`; leaf controls (`onClick` + lone text, or empty with `onClick`) map to `button`.
+ */
 function inferBoxTag(element: BoxElement): string {
-  // Check for nav-like patterns (row of clickable items)
-  if (element.handlers?.onClick) return 'button'
+  if (!element.handlers?.onClick) return 'div'
+  const kids = element.children
+  if (kids.length === 0) return 'button'
+  if (kids.length === 1 && kids[0]!.kind === 'text') return 'button'
   return 'div'
 }
 
@@ -309,6 +315,9 @@ function elementToHTML(element: UIElement, indent: number): string {
  *
  * `semantic.tag` is validated as a safe HTML local name (letter, then letters/digits/hyphen, ≤128
  * chars); invalid values fall back to font/box inference so crawlers cannot receive broken markup.
+ *
+ * Default box tags: `onClick` maps to `<button>` only for an empty box or a box whose sole child is
+ * `text()`; otherwise `div` (compound click targets should use `semantic.tag` / roles when needed).
  */
 export function toSemanticHTML(
   tree: UIElement,
