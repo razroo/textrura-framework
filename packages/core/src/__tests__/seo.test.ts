@@ -17,6 +17,32 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<html lang="fr-CA">')
   })
 
+  it('emits HTML dir on boxes and text when props.dir is ltr, rtl, or auto', () => {
+    const el = box({ width: 200, height: 80, dir: 'rtl' }, [
+      text({ text: 'mixed', font: '14px sans-serif', lineHeight: 18, dir: 'ltr' }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<div dir="rtl">')
+    expect(html).toContain('<p dir="ltr">')
+  })
+
+  it('emits dir on image elements', () => {
+    const el = box({ width: 100, height: 100 }, [
+      image({ src: '/a.png', width: 10, height: 10, alt: 'x', dir: 'auto' }),
+    ])
+    expect(toSemanticHTML(el)).toMatch(/<img[^>]*dir="auto"/)
+  })
+
+  it('omits dir when props.dir is unset', () => {
+    const el = box({ width: 100, height: 100 })
+    expect(toSemanticHTML(el)).not.toMatch(/<div[^>]*\sdir=/)
+  })
+
+  it('ignores invalid runtime dir values', () => {
+    const el = box({ width: 100, height: 100, dir: 'evil" onclick=' as never })
+    expect(toSemanticHTML(el)).not.toContain('dir=')
+  })
+
   it('escapes lang attribute values', () => {
     const el = box({ width: 100, height: 100 })
     const html = toSemanticHTML(el, { lang: 'xx"><script' })

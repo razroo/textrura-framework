@@ -150,6 +150,18 @@ function escapeHTML(str: string): string {
     .replace(/"/g, '&quot;')
 }
 
+/**
+ * HTML `dir` attribute for explicit bidi hints. Only known values are emitted so malformed
+ * serialized trees cannot inject attribute text.
+ */
+function dirAttribute(props: { dir?: unknown }): string | null {
+  const d = props.dir
+  if (d === 'ltr' || d === 'rtl' || d === 'auto') {
+    return `dir="${escapeHTML(d)}"`
+  }
+  return null
+}
+
 /** Convert a UIElement tree to a semantic HTML string body. */
 function elementToHTML(element: UIElement, indent: number): string {
   const pad = '  '.repeat(indent)
@@ -157,12 +169,16 @@ function elementToHTML(element: UIElement, indent: number): string {
   if (element.kind === 'image') {
     const imgEl = element as ImageElement
     const alt = imgEl.semantic?.alt ?? imgEl.props.alt ?? ''
-    return `${pad}<img src="${escapeHTML(imgEl.props.src)}" alt="${escapeHTML(alt)}">`
+    const dir = dirAttribute(imgEl.props)
+    const dirStr = dir ? ` ${dir}` : ''
+    return `${pad}<img src="${escapeHTML(imgEl.props.src)}" alt="${escapeHTML(alt)}"${dirStr}>`
   }
 
   if (element.kind === 'text') {
     const tag = element.semantic?.tag ?? inferTag(element)
     const attrs: string[] = []
+    const dir = dirAttribute(element.props)
+    if (dir) attrs.push(dir)
     if (element.semantic?.role) attrs.push(`role="${escapeHTML(element.semantic.role)}"`)
     if (element.semantic?.ariaLabel) attrs.push(`aria-label="${escapeHTML(element.semantic.ariaLabel)}"`)
     const attrStr = attrs.length ? ' ' + attrs.join(' ') : ''
@@ -171,6 +187,8 @@ function elementToHTML(element: UIElement, indent: number): string {
 
   const tag = element.semantic?.tag ?? inferBoxTag(element)
   const attrs: string[] = []
+  const dir = dirAttribute(element.props)
+  if (dir) attrs.push(dir)
   if (element.semantic?.role) attrs.push(`role="${escapeHTML(element.semantic.role)}"`)
   if (element.semantic?.ariaLabel) {
     attrs.push(`aria-label="${escapeHTML(element.semantic.ariaLabel)}"`)
@@ -196,6 +214,9 @@ function elementToHTML(element: UIElement, indent: number): string {
  * This produces a full HTML document suitable for search engine crawlers.
  * Serve this to user-agents like Googlebot while rendering the canvas
  * version for real users.
+ *
+ * When `props.dir` is `ltr`, `rtl`, or `auto` on a box, text, or image node, the HTML `dir`
+ * attribute is emitted on that element’s tag.
  */
 export function toSemanticHTML(
   tree: UIElement,
