@@ -110,6 +110,12 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('14px Inter, ui-rounded')).toEqual(['Inter'])
   })
 
+  it('drops cursive, fantasy, and emoji generic fallbacks', () => {
+    expect(extractFontFamiliesFromCSSFont('14px Display, cursive')).toEqual(['Display'])
+    expect(extractFontFamiliesFromCSSFont('16px "Brand", fantasy')).toEqual(['Brand'])
+    expect(extractFontFamiliesFromCSSFont('12px Color UI, emoji')).toEqual(['Color UI'])
+  })
+
   it('skips font-stretch percentage before real font size and family', () => {
     expect(extractFontFamiliesFromCSSFont('75% 14px Inter')).toEqual(['Inter'])
     expect(extractFontFamiliesFromCSSFont('500 75% 14px Inter, sans-serif')).toEqual(['Inter'])

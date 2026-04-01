@@ -109,6 +109,24 @@ describe('dispatchHit', () => {
     expect(result.focusTarget?.element).toBe(el)
   })
 
+  it('click returns focus target for onCompositionUpdate-only focusable boxes', () => {
+    const el = box({ width: 100, height: 50, onCompositionUpdate: () => undefined })
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
+
+    const result = dispatchHit(el, layout, 'onClick', 50, 25)
+    expect(result.handled).toBe(false)
+    expect(result.focusTarget?.element).toBe(el)
+  })
+
+  it('click returns focus target for onCompositionEnd-only focusable boxes', () => {
+    const el = box({ width: 100, height: 50, onCompositionEnd: () => undefined })
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
+
+    const result = dispatchHit(el, layout, 'onClick', 50, 25)
+    expect(result.handled).toBe(false)
+    expect(result.focusTarget?.element).toBe(el)
+  })
+
   it('merges extra fields into the hit event', () => {
     let received: Record<string, unknown> | null = null
     const el = box({
@@ -144,6 +162,24 @@ describe('dispatchHit', () => {
 
     dispatchHit(root, layout, 'onClick', 10, 10)
     expect(log).toEqual(['front'])
+  })
+
+  it('overlapping siblings: missing layout for top z-index still dispatches to sibling behind', () => {
+    const log: string[] = []
+    const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } })
+    const front = box({ width: 50, height: 50, zIndex: 10, onClick: () => { log.push('front') } })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 50, height: 50, children: [] }],
+    }
+
+    const result = dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['back'])
+    expect(result.handled).toBe(true)
   })
 
   it('overlapping siblings: negative z-index still stacks below a higher sibling', () => {
