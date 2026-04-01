@@ -72,6 +72,14 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('1rem Inter')).toEqual(['Inter'])
   })
 
+  it('parses zero px size before family', () => {
+    expect(extractFontFamiliesFromCSSFont('0px Inter, sans-serif')).toEqual(['Inter'])
+  })
+
+  it('parses unclosed double-quoted family with trailing backslash (escape at EOF)', () => {
+    expect(extractFontFamiliesFromCSSFont('14px "Trail\\')).toEqual(['Trail\\'])
+  })
+
   it('parses pt- and pc-sized shorthand', () => {
     expect(extractFontFamiliesFromCSSFont('12pt Times New Roman, serif')).toEqual(['Times New Roman'])
     expect(extractFontFamiliesFromCSSFont('1pc Courier New, monospace')).toEqual(['Courier New'])
@@ -351,6 +359,13 @@ describe('collectFontFamiliesFromTree', () => {
       text({ text: 'hi', font: '14px Inter', lineHeight: 20 }),
     ])
     expect(collectFontFamiliesFromTree(tree)).toEqual(['Inter'])
+  })
+
+  it('returns empty when every family in a shorthand is generic or CSS-wide', () => {
+    const tree = box({}, [
+      text({ text: 'a', font: '14px inherit, initial, sans-serif', lineHeight: 20 }),
+    ])
+    expect(collectFontFamiliesFromTree(tree)).toEqual([])
   })
 })
 
