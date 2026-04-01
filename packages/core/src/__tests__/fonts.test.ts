@@ -105,6 +105,16 @@ describe('extractFontFamiliesFromCSSFont', () => {
   it('drops ui-prefixed generic families', () => {
     expect(extractFontFamiliesFromCSSFont('14px Inter, ui-rounded')).toEqual(['Inter'])
   })
+
+  it('skips font-stretch percentage before real font size and family', () => {
+    expect(extractFontFamiliesFromCSSFont('75% 14px Inter')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('500 75% 14px Inter, sans-serif')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('condensed 75% 14px "Custom Face"')).toEqual(['Custom Face'])
+  })
+
+  it('still treats a single percentage as font-size when it is followed only by family', () => {
+    expect(extractFontFamiliesFromCSSFont('112% Georgia, serif')).toEqual(['Georgia'])
+  })
 })
 
 describe('collectFontFamiliesFromTree', () => {

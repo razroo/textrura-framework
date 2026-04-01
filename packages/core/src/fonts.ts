@@ -31,6 +31,14 @@ const FONT_SHORTHAND_FAMILY_TAIL = new RegExp(
 
 const FONT_SIZE_ONLY = new RegExp(String.raw`^\d+(?:\.\d+)?` + FONT_SIZE_UNIT + String.raw`$`, 'i')
 
+/** True when the family tail begins with a dimension token + space (another size before the real family). */
+const TAIL_LEADS_WITH_SIZE_TOKEN = new RegExp(
+  String.raw`^\d+(?:\.\d+)?` + FONT_SIZE_UNIT + String.raw`\s+`,
+  'i',
+)
+
+const MAX_SHORTHAND_STRIP_ITERATIONS = 8
+
 /** Split a CSS font-family list on commas not inside single or double quotes. */
 function splitFontFamilyList(tail: string): string[] {
   const parts: string[] = []
@@ -65,14 +73,32 @@ function splitFontFamilyList(tail: string): string[] {
  * Extract custom font family names from a CSS `font` shorthand (e.g. `600 14px Inter`).
  * Drops generic fallbacks like `sans-serif`. Best-effort parsing for common patterns.
  * Recognizes common font-size units (px, em, rem, pt, %, viewport units, etc.).
+ * When a percentage is used as `font-stretch` before the real font size (e.g. `75% 14px Inter`),
+ * skips that leading dimension so the size + family tail is parsed correctly.
  */
 export function extractFontFamiliesFromCSSFont(font: string): string[] {
-  const trimmed = font.trim()
-  const m = trimmed.match(FONT_SHORTHAND_FAMILY_TAIL)
-  const tail = m ? m[2]! : trimmed
-  return splitFontFamilyList(tail)
-    .map(s => s.trim().replace(/^["']|["']$/g, ''))
-    .filter(f => f.length > 0 && !GENERIC_FAMILIES.has(f.toLowerCase()) && !FONT_SIZE_ONLY.test(f))
+  function filterFamilies(tail: string): string[] {
+    return splitFontFamilyList(tail)
+      .map(s => s.trim().replace(/^["']|["']$/g, ''))
+      .filter(f => f.length > 0 && !GENERIC_FAMILIES.has(f.toLowerCase()) && !FONT_SIZE_ONLY.test(f))
+  }
+
+  let trimmed = font.trim()
+  for (let i = 0; i < MAX_SHORTHAND_STRIP_ITERATIONS; i++) {
+    const m = trimmed.match(FONT_SHORTHAND_FAMILY_TAIL)
+    if (!m) break
+    const tail = m[2]!
+    const firstSegment = splitFontFamilyList(tail)[0]?.trim() ?? ''
+    const tailLeadsWithAnotherSize =
+      FONT_SIZE_ONLY.test(firstSegment) || TAIL_LEADS_WITH_SIZE_TOKEN.test(tail)
+    if (tailLeadsWithAnotherSize) {
+      const matchIndex = m.index ?? 0
+      trimmed = trimmed.slice(matchIndex + m[1]!.length).trimStart()
+      continue
+    }
+    return filterFamilies(tail)
+  }
+  return filterFamilies(trimmed)
 }
 
 /** Collect unique font families referenced by text nodes in a UI tree. */
