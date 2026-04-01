@@ -802,6 +802,26 @@ describe('hasInteractiveHitAtPoint', () => {
     }
     expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(false)
   })
+
+  it('ignores other key- and composition-only handlers for hover hit-test', () => {
+    const layoutBase = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    } as const
+    const onlyHandlers = [
+      { onKeyUp: () => undefined },
+      { onCompositionUpdate: () => undefined },
+      { onCompositionEnd: () => undefined },
+    ] as const
+    for (const handlers of onlyHandlers) {
+      const inner = box({ width: 40, height: 40, ...handlers })
+      const root = box({ width: 100, height: 100 }, [inner])
+      expect(hasInteractiveHitAtPoint(root, layoutBase, 10, 10)).toBe(false)
+    }
+  })
 })
 
 describe('pointerEvents', () => {
