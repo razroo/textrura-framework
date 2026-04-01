@@ -181,6 +181,16 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont(`${pre} 14px Inter, sans-serif`)).toEqual(['Inter'])
   })
 
+  it('parses family after a full strip run leaves bare size + family shorthand', () => {
+    const pre = Array(32).fill('75%').join(' ')
+    expect(extractFontFamiliesFromCSSFont(`${pre} 14px Inter, sans-serif`)).toEqual(['Inter'])
+  })
+
+  it('parses family through a long leading stretch-percent stack', () => {
+    const pre = Array(40).fill('75%').join(' ')
+    expect(extractFontFamiliesFromCSSFont(`${pre} 14px Inter, sans-serif`)).toEqual(['Inter'])
+  })
+
   it('still treats a single percentage as font-size when it is followed only by family', () => {
     expect(extractFontFamiliesFromCSSFont('112% Georgia, serif')).toEqual(['Georgia'])
   })

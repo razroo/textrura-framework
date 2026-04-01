@@ -41,7 +41,7 @@ const TAIL_LEADS_WITH_SIZE_TOKEN = new RegExp(
 )
 
 /** Enough for long font-stretch / leading-percent stacks before the real size + family (each token can consume one strip). */
-const MAX_SHORTHAND_STRIP_ITERATIONS = 32
+const MAX_SHORTHAND_STRIP_ITERATIONS = 128
 
 /** Split a CSS font-family list on commas not inside single or double quotes. */
 function splitFontFamilyList(tail: string): string[] {
@@ -108,6 +108,14 @@ export function extractFontFamiliesFromCSSFont(font: string): string[] {
       continue
     }
     return filterFamilies(tail)
+  }
+  const tailMatch = trimmed.match(FONT_SHORTHAND_FAMILY_TAIL)
+  if (tailMatch) {
+    const tail = tailMatch[2]!
+    const firstSegment = splitFontFamilyList(tail)[0]?.trim() ?? ''
+    const tailLeadsWithAnotherSize =
+      FONT_SIZE_ONLY.test(firstSegment) || TAIL_LEADS_WITH_SIZE_TOKEN.test(tail)
+    if (!tailLeadsWithAnotherSize) return filterFamilies(tail)
   }
   return filterFamilies(trimmed)
 }
