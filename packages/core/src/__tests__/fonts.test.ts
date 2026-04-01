@@ -115,6 +115,30 @@ describe('extractFontFamiliesFromCSSFont', () => {
   it('still treats a single percentage as font-size when it is followed only by family', () => {
     expect(extractFontFamiliesFromCSSFont('112% Georgia, serif')).toEqual(['Georgia'])
   })
+
+  it('parses cap, lh, rlh, and ic sizes before family', () => {
+    expect(extractFontFamiliesFromCSSFont('1.25cap Inter, sans-serif')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('1.2lh Literata, serif')).toEqual(['Literata'])
+    expect(extractFontFamiliesFromCSSFont('1rlh System Font')).toEqual(['System Font'])
+    expect(extractFontFamiliesFromCSSFont('2ic "Noto Sans CJK"')).toEqual(['Noto Sans CJK'])
+  })
+
+  it('parses root-relative r* units before family', () => {
+    expect(extractFontFamiliesFromCSSFont('1rcap Brand UI')).toEqual(['Brand UI'])
+    expect(extractFontFamiliesFromCSSFont('1.1rch Mono, monospace')).toEqual(['Mono'])
+    expect(extractFontFamiliesFromCSSFont('0.9rex Condensed')).toEqual(['Condensed'])
+    expect(extractFontFamiliesFromCSSFont('1ric Han Serif')).toEqual(['Han Serif'])
+  })
+
+  it('parses dynamic and large/small viewport units before family', () => {
+    expect(extractFontFamiliesFromCSSFont('4dvh Display Pro')).toEqual(['Display Pro'])
+    expect(extractFontFamiliesFromCSSFont('3svw Side, sans-serif')).toEqual(['Side'])
+    expect(extractFontFamiliesFromCSSFont('5lvmin Body Text')).toEqual(['Body Text'])
+  })
+
+  it('parses Q (quarter-mm) size before family', () => {
+    expect(extractFontFamiliesFromCSSFont('40Q Mincho, serif')).toEqual(['Mincho'])
+  })
 })
 
 describe('collectFontFamiliesFromTree', () => {

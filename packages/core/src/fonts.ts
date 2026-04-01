@@ -16,9 +16,12 @@ const GENERIC_FAMILIES = new Set([
 
 /**
  * Font-size units we treat as the numeric token before the family list in `font` shorthand.
- * Longer tokens (vmin/vmax) precede shorter vw/vh so alternation matches unambiguously.
+ * Longer tokens precede shorter prefixes (e.g. `dvmin` before `vmin`, `rlh` before `lh`, `rch` before `ch`).
  */
-const FONT_SIZE_UNIT = '(?:vmin|vmax|px|em|rem|pt|pc|in|cm|mm|%|ch|ex|vh|vw)'
+const FONT_SIZE_UNIT =
+  '(?:dvmin|dvmax|svmin|svmax|lvmin|lvmax|dvh|dvw|svh|svw|lvh|lvw|vmin|vmax|vh|vw|' +
+  'rlh|rcap|rch|rex|ric|' +
+  'rem|cap|px|em|pt|pc|in|cm|mm|Q|%|ch|ex|ic|lh)'
 
 const FONT_SHORTHAND_FAMILY_TAIL = new RegExp(
   String.raw`\b(\d+(?:\.\d+)?` +
@@ -72,7 +75,7 @@ function splitFontFamilyList(tail: string): string[] {
 /**
  * Extract custom font family names from a CSS `font` shorthand (e.g. `600 14px Inter`).
  * Drops generic fallbacks like `sans-serif`. Best-effort parsing for common patterns.
- * Recognizes common font-size units (px, em, rem, pt, %, viewport units, etc.).
+ * Recognizes common font-size units (px, em, rem, cap/ic/lh/rlh, root-relative r* units, pt, %, viewport and dynamic-viewport units, Q).
  * When a percentage is used as `font-stretch` before the real font size (e.g. `75% 14px Inter`),
  * skips that leading dimension so the size + family tail is parsed correctly.
  */
