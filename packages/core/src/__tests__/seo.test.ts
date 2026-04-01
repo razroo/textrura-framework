@@ -36,6 +36,30 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('rel="canonical" href="https://example.com"')
   })
 
+  it('escapes HTML special characters in title, description, canonical, and OG meta values', () => {
+    const el = box({ width: 100, height: 100 })
+    const html = toSemanticHTML(el, {
+      title: 'A & B <title>',
+      description: 'Say "hi" & <br> safely',
+      canonical: 'https://example.com/path?a=1&b=2"onload=',
+      og: {
+        title: 'OG & Co',
+        description: 'OG <desc>',
+        image: 'https://cdn.example.com/i.png?x=1&y=2',
+        url: 'https://example.com/share?u=1&evil=3"',
+        type: 'article&evil',
+      },
+    })
+    expect(html).toContain('<title>A &amp; B &lt;title&gt;</title>')
+    expect(html).toContain('content="Say &quot;hi&quot; &amp; &lt;br&gt; safely"')
+    expect(html).toContain('href="https://example.com/path?a=1&amp;b=2&quot;onload="')
+    expect(html).toContain('property="og:title" content="OG &amp; Co"')
+    expect(html).toContain('property="og:description" content="OG &lt;desc&gt;"')
+    expect(html).toContain('property="og:image" content="https://cdn.example.com/i.png?x=1&amp;y=2"')
+    expect(html).toContain('property="og:url" content="https://example.com/share?u=1&amp;evil=3&quot;"')
+    expect(html).toContain('property="og:type" content="article&amp;evil"')
+  })
+
   it('includes OG tags', () => {
     const el = box({ width: 100, height: 100 })
     const html = toSemanticHTML(el, {
