@@ -311,6 +311,20 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<h4>Cqi minor</h4>')
   })
 
+  it('infers headings from cqh, cqb, and cqmax using approximate px', () => {
+    const el = box({ width: 400, height: 220 }, [
+      text({ text: 'Cqh hero', font: 'bold 10cqh sans-serif', lineHeight: 40 }),
+      text({ text: 'Cqmax section', font: 'bold 2cqmax sans-serif', lineHeight: 32 }),
+      text({ text: 'Cqb sub', font: 'bold 1cqb sans-serif', lineHeight: 28 }),
+      text({ text: 'Cqb minor', font: 'bold 0.9cqb sans-serif', lineHeight: 22 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<h1>Cqh hero</h1>')
+    expect(html).toContain('<h2>Cqmax section</h2>')
+    expect(html).toContain('<h3>Cqb sub</h3>')
+    expect(html).toContain('<h4>Cqb minor</h4>')
+  })
+
   it('infers headings from root-relative rch/rcap/rex/ric units', () => {
     const el = box({ width: 400, height: 200 }, [
       text({ text: 'Rch hero', font: 'bold 4rch sans-serif', lineHeight: 40 }),
