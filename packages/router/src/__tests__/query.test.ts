@@ -23,6 +23,16 @@ describe('query helpers', () => {
     expect(parseQuery('a=%ZZ&b=ok')).toEqual({ a: '%ZZ', b: 'ok' })
   })
 
+  it('keeps raw key when percent-decoding the key throws', () => {
+    expect(parseQuery('%ZZ=1&ok=2')).toEqual({ '%ZZ': '1', ok: '2' })
+  })
+
+  it('ignores empty segments from leading, trailing, or repeated ampersands', () => {
+    expect(parseQuery('&a=1&')).toEqual({ a: '1' })
+    expect(parseQuery('a=1&&b=2')).toEqual({ a: '1', b: '2' })
+    expect(parseQuery('?&&')).toEqual({})
+  })
+
   it('stringifies empty object as empty string', () => {
     expect(stringifyQuery({})).toBe('')
   })
@@ -69,5 +79,15 @@ describe('query helpers', () => {
   it('round-trips booleans through parse and stringify', () => {
     const q = stringifyQuery({ flag: true })
     expect(parseQuery(q)).toEqual({ flag: 'true' })
+  })
+
+  it('stringifies empty string values and round-trips them', () => {
+    expect(stringifyQuery({ x: '' })).toBe('?x=')
+    expect(parseQuery('?x=')).toEqual({ x: '' })
+  })
+
+  it('stringifies numeric zero and round-trips as string', () => {
+    expect(stringifyQuery({ n: 0 })).toBe('?n=0')
+    expect(parseQuery('?n=0')).toEqual({ n: '0' })
   })
 })
