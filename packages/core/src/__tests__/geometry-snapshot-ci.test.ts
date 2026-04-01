@@ -46,4 +46,17 @@ describe('geometry snapshot CI', () => {
     const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 80 })
     expect(roundLayout(layout)).toMatchSnapshot()
   })
+
+  it('stable row with gap and two text children (rounded)', async () => {
+    await init()
+    const tree = box(
+      { width: 200, height: 80, padding: 12, flexDirection: 'row', gap: 8 },
+      [
+        text({ text: 'A', font: '16px sans-serif', lineHeight: 20 }),
+        text({ text: 'B', font: '16px sans-serif', lineHeight: 20 }),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 80 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
 })
