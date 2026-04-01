@@ -53,6 +53,17 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('1rem Inter')).toEqual(['Inter'])
   })
 
+  it('parses pt- and pc-sized shorthand', () => {
+    expect(extractFontFamiliesFromCSSFont('12pt Times New Roman, serif')).toEqual(['Times New Roman'])
+    expect(extractFontFamiliesFromCSSFont('1pc Courier New, monospace')).toEqual(['Courier New'])
+  })
+
+  it('parses percentage and viewport-unit sizes before family', () => {
+    expect(extractFontFamiliesFromCSSFont('112% Georgia, serif')).toEqual(['Georgia'])
+    expect(extractFontFamiliesFromCSSFont('2.5vmin Inter')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('10vh "Display Font"')).toEqual(['Display Font'])
+  })
+
   it('drops generic fallbacks case-insensitively', () => {
     expect(extractFontFamiliesFromCSSFont('14px Inter, SANS-SERIF, Monospace')).toEqual(['Inter'])
   })

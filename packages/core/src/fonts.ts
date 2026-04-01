@@ -14,6 +14,23 @@ const GENERIC_FAMILIES = new Set([
   'emoji',
 ])
 
+/**
+ * Font-size units we treat as the numeric token before the family list in `font` shorthand.
+ * Longer tokens (vmin/vmax) precede shorter vw/vh so alternation matches unambiguously.
+ */
+const FONT_SIZE_UNIT = '(?:vmin|vmax|px|em|rem|pt|pc|in|cm|mm|%|ch|ex|vh|vw)'
+
+const FONT_SHORTHAND_FAMILY_TAIL = new RegExp(
+  String.raw`\b(\d+(?:\.\d+)?` +
+    FONT_SIZE_UNIT +
+    String.raw`)\s*(?:\/\s*[\d.]+` +
+    FONT_SIZE_UNIT +
+    String.raw`?)?\s+(.+)$`,
+  'i',
+)
+
+const FONT_SIZE_ONLY = new RegExp(String.raw`^\d+(?:\.\d+)?` + FONT_SIZE_UNIT + String.raw`$`, 'i')
+
 /** Split a CSS font-family list on commas not inside single or double quotes. */
 function splitFontFamilyList(tail: string): string[] {
   const parts: string[] = []
@@ -47,17 +64,15 @@ function splitFontFamilyList(tail: string): string[] {
 /**
  * Extract custom font family names from a CSS `font` shorthand (e.g. `600 14px Inter`).
  * Drops generic fallbacks like `sans-serif`. Best-effort parsing for common patterns.
+ * Recognizes common font-size units (px, em, rem, pt, %, viewport units, etc.).
  */
 export function extractFontFamiliesFromCSSFont(font: string): string[] {
   const trimmed = font.trim()
-  const m = trimmed.match(
-    /\b(\d+(?:\.\d+)?(?:px|em|rem))\s*(?:\/\s*[\d.]+(?:px|em|rem)?)?\s+(.+)$/i,
-  )
+  const m = trimmed.match(FONT_SHORTHAND_FAMILY_TAIL)
   const tail = m ? m[2]! : trimmed
-  const sizeLike = /^\d+(\.\d+)?(px|em|rem)$/i
   return splitFontFamilyList(tail)
     .map(s => s.trim().replace(/^["']|["']$/g, ''))
-    .filter(f => f.length > 0 && !GENERIC_FAMILIES.has(f.toLowerCase()) && !sizeLike.test(f))
+    .filter(f => f.length > 0 && !GENERIC_FAMILIES.has(f.toLowerCase()) && !FONT_SIZE_ONLY.test(f))
 }
 
 /** Collect unique font families referenced by text nodes in a UI tree. */
