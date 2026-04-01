@@ -41,12 +41,13 @@ export interface SemanticHTMLOptions {
 /**
  * First explicit `font-size` length in the shorthand (supports scientific notation).
  * Used only for heading-level heuristics in static HTML; non-px units map to approximate px.
- * Covers `%`, viewport units, common font-relative units (`ch`, `cap`, `math`), and absolute lengths
+ * Covers `%`, viewport units (including dynamic `d*`, small `s*`, and large `l*` variants), common font-relative units (`ch`, `cap`, `math`), and absolute lengths
  * (`pt`, `pc`, `in`, `cm`, `mm`, `Q`) aligned with typical `fonts.ts` shorthand shapes (subset of units;
  * coarse px mapping for tier heuristics only).
  */
+/** Longer viewport unit tokens precede shorter prefixes (e.g. `dvmin` before `vmin`), aligned with `fonts.ts`. */
 const FONT_SIZE_LENGTH =
-  /(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*(%|px|rem|em|pt|pc|in|cm|mm|Q|math|vmin|vmax|vh|vw|vi|vb|rlh|lh|rcap|rch|rex|ric|cap|ch|ex|ic|cqmin|cqmax|cqw|cqh|cqi|cqb)(?=[\s,;/]|$)/i
+  /(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*(%|px|rem|em|pt|pc|in|cm|mm|Q|math|dvmin|dvmax|svmin|svmax|lvmin|lvmax|dvh|dvw|dvi|dvb|svh|svw|svi|svb|lvh|lvw|lvi|lvb|vmin|vmax|vh|vw|vi|vb|rlh|lh|rcap|rch|rex|ric|cap|ch|ex|ic|cqmin|cqmax|cqw|cqh|cqi|cqb)(?=[\s,;/]|$)/i
 
 /**
  * True when `font` shorthand indicates bold weight (the `bold` / `bolder` keywords as whole tokens,
@@ -92,11 +93,30 @@ function fontLengthToApproxPx(value: number, unit: string): number {
       return value * 16
     case '%':
       return (value / 100) * 16
+    case 'dvmin':
+    case 'dvmax':
+    case 'svmin':
+    case 'svmax':
+    case 'lvmin':
+    case 'lvmax':
     case 'vmin':
     case 'vmax':
       return value * 9
+    case 'dvh':
+    case 'dvw':
+    case 'svh':
+    case 'svw':
+    case 'lvh':
+    case 'lvw':
     case 'vh':
     case 'vw':
+      return value * 3
+    case 'dvi':
+    case 'dvb':
+    case 'svi':
+    case 'svb':
+    case 'lvi':
+    case 'lvb':
     case 'vi':
     case 'vb':
       return value * 3

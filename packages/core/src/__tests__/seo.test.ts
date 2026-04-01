@@ -277,6 +277,25 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<p>Large pct body</p>')
   })
 
+  it('infers headings from dynamic, small, and large viewport font units (aligned with fonts.ts)', () => {
+    // Coarse px mapping matches seo `fontLengthToApproxPx`: axis units *3, min/max *9.
+    const el = box({ width: 400, height: 220 }, [
+      text({ text: 'Dvh hero', font: 'bold 10dvh sans-serif', lineHeight: 40 }),
+      text({ text: 'Svw section', font: 'bold 8svw sans-serif', lineHeight: 32 }),
+      text({ text: 'Lvh sub', font: 'bold 6lvh sans-serif', lineHeight: 28 }),
+      text({ text: 'Dvmin h4', font: 'bold 1.7dvmin sans-serif', lineHeight: 20 }),
+      text({ text: 'Svi minor', font: 'bold 5.2svi sans-serif', lineHeight: 22 }),
+      text({ text: 'Dvb edge', font: 'bold 5dvb sans-serif', lineHeight: 22 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<h1>Dvh hero</h1>')
+    expect(html).toContain('<h2>Svw section</h2>')
+    expect(html).toContain('<h3>Lvh sub</h3>')
+    expect(html).toContain('<h4>Dvmin h4</h4>')
+    expect(html).toContain('<h4>Svi minor</h4>')
+    expect(html).toContain('<h4>Dvb edge</h4>')
+  })
+
   it('infers h1 from scientific-notation percentage before bold keyword', () => {
     const el = box({ width: 200, height: 50 }, [
       text({ text: 'Hero', font: 'bold 2e2% sans-serif', lineHeight: 40 }),
