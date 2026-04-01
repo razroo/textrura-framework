@@ -498,6 +498,37 @@ describe('dispatchHit', () => {
     expect(result.focusTarget).toBeUndefined()
   })
 
+  it('onClick: key-only focusable box yields focusTarget without firing a handler', () => {
+    const el = box({ width: 100, height: 50, onKeyDown: () => undefined })
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
+    const result = dispatchHit(el, layout, 'onClick', 50, 25)
+    expect(result.handled).toBe(false)
+    expect(result.focusTarget?.element).toBe(el)
+  })
+
+  it('onClick: composition-only focusable box yields focusTarget without firing a handler', () => {
+    const el = box({ width: 100, height: 50, onCompositionStart: () => undefined })
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
+    const result = dispatchHit(el, layout, 'onClick', 50, 25)
+    expect(result.handled).toBe(false)
+    expect(result.focusTarget?.element).toBe(el)
+  })
+
+  it('onClick: parent without handlers still routes click-to-focus to key-only child', () => {
+    const child = box({ width: 40, height: 40, onKeyDown: () => undefined })
+    const parent = box({ width: 100, height: 100 }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+    const result = dispatchHit(parent, layout, 'onClick', 20, 20)
+    expect(result.handled).toBe(false)
+    expect(result.focusTarget?.element).toBe(child)
+  })
+
   it('onKeyDown: deepest handler runs first; no focusTarget', () => {
     const log: string[] = []
     const child = box({ width: 40, height: 40, onKeyDown: () => { log.push('child') } })
