@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "tsx app.ts",
     "dev:watch": "tsx watch app.ts",
-    "test:input": "tsx input.integration.ts",
+    "test:input": "bun input.integration.ts",
     "build": "echo 'No build step required for terminal demo.'"
   },
   "dependencies": {

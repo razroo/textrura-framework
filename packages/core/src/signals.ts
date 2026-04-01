@@ -66,7 +66,9 @@ export function signal<T>(initial: T): Signal<T> {
     set(next: T) {
       if (Object.is(value, next)) return
       value = next
-      for (const sub of subscribers) {
+      // Notify a stable snapshot so unsubscribe/resubscribe during a run
+      // cannot perturb the current flush.
+      for (const sub of [...subscribers]) {
         if (batchDepth > 0) {
           batchQueue.add(sub)
         } else {
@@ -92,7 +94,7 @@ export function computed<T>(fn: () => T): Computed<T> {
 
   const recompute: Subscriber = () => {
     dirty = true
-    for (const sub of subscribers) {
+    for (const sub of [...subscribers]) {
       if (batchDepth > 0) {
         batchQueue.add(sub)
       } else {

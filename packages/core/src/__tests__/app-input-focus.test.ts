@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createApp } from '../app.js'
 import { box, text } from '../elements.js'
-import { clearFocus } from '../focus.js'
+import { clearFocus, focusNext } from '../focus.js'
 import { signal } from '../signals.js'
 import { backspaceInput, insertInputText, moveInputCaret } from '../text-input.js'
 import type { Renderer, UIElement } from '../types.js'
@@ -23,8 +23,10 @@ if (typeof globalThis.OffscreenCanvas === 'undefined') {
 }
 
 class TestRenderer implements Renderer {
+  renders = 0
+
   render(_layout: unknown, _tree: UIElement): void {
-    // no-op
+    this.renders++
   }
   destroy(): void {
     // no-op
@@ -74,6 +76,34 @@ describe('app input focus routing', () => {
 
     expect(keyHandled).toBe(true)
     expect(typed).toBe('a')
+
+    app.destroy()
+  })
+
+  it('focusNext after createApp re-renders once and returns', async () => {
+    const renderer = new TestRenderer()
+    const app = await createApp(
+      () =>
+        box(
+          { width: 220, height: 120 },
+          [
+            box(
+              {
+                width: 180,
+                height: 40,
+                onKeyDown: () => {},
+              },
+              [],
+            ),
+          ],
+        ),
+      renderer,
+      { width: 220, height: 120 },
+    )
+
+    expect(renderer.renders).toBe(1)
+    focusNext(app.tree!, app.layout!)
+    expect(renderer.renders).toBe(2)
 
     app.destroy()
   })

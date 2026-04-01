@@ -1,4 +1,5 @@
-import { spawn } from 'node:child_process'
+import { TerminalRenderer } from '@geometra/renderer-terminal'
+import { createTerminalDemo } from './demo.js'
 
 // eslint-disable-next-line no-control-regex -- strip ANSI CSI sequences from captured output
 const ESCAPE_PATTERN = /\x1b\[[0-9;?]*[ -/]*[@-~]/g
@@ -7,103 +8,58 @@ function stripAnsi(text: string): string {
   return text.replace(ESCAPE_PATTERN, '').replace(/\r/g, '')
 }
 
-function observedTestEvents(output: string): string[] {
-  return [...output.matchAll(/\[test-event\]\s+([^\n]+)/g)].map((m) => m[1]!)
+class MemoryOutput {
+  output = ''
+
+  write(chunk: string | Uint8Array): boolean {
+    this.output += typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8')
+    return true
+  }
 }
 
 interface RunOptions {
   name: string
-  /** Max time to wait for the `[test-event] boot` marker (ms). Default 15_000 (cold `tsx` + first frame can exceed 5s). */
-  bootTimeoutMs?: number
-  /** Key sequences with optional per-step delay (ms). */
-  steps: Array<{ keys: string; delayMs?: number }>
+  steps: Array<{ keys: string }>
   assert: (ctx: { events: string[]; exitCode: number; output: string }) => void
 }
 
-function spawnDemo(): ReturnType<typeof spawn> {
-  return spawn('bunx', ['tsx', 'app.ts'], {
-    cwd: process.cwd(),
-    env: { ...process.env, TERM: 'xterm-256color', GEOMETRA_TERMINAL_TEST: '1' },
-    stdio: ['pipe', 'pipe', 'pipe'],
-  })
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-async function waitForOutput(
-  getOutput: () => string,
-  needle: string,
-  timeoutMs: number,
-  scenarioName: string,
-): Promise<void> {
-  const started = Date.now()
-  while (Date.now() - started < timeoutMs) {
-    if (getOutput().includes(needle)) return
-    await sleep(50)
-  }
-  throw new Error(`${scenarioName}: timed out waiting for output marker "${needle}"`)
-}
-
 async function runScenario(options: RunOptions): Promise<void> {
-  const child = spawnDemo()
-  let output = ''
-  child.stdout.on('data', (chunk: Buffer) => {
-    output += chunk.toString('utf8')
-  })
-  child.stderr.on('data', (chunk: Buffer) => {
-    output += chunk.toString('utf8')
-  })
+  const output = new MemoryOutput()
+  const events: string[] = []
+  let exitCode = 1
 
-  const send = (key: string, delayMs = 300): Promise<void> =>
-    new Promise((resolve, reject) => {
-      if (child.killed || child.exitCode !== null) {
-        reject(new Error(`${options.name}: process exited before key send`))
-        return
-      }
-      child.stdin.write(key, 'utf8', (err) => {
-        if (err) {
-          reject(err)
-          return
-        }
-        setTimeout(() => resolve(), delayMs)
-      })
-    })
-
-  const exitPromise = new Promise<number>((resolve, reject) => {
-    child.on('error', reject)
-    child.on('exit', (code) => resolve(code ?? 1))
-  })
-
-  // Prefer an explicit readiness marker over fixed delays to reduce CI flake.
-  await waitForOutput(() => output, '[test-event] boot', options.bootTimeoutMs ?? 15_000, options.name)
-  if (child.killed || child.exitCode !== null) {
-    throw new Error(`${options.name}: process exited during boot\n${stripAnsi(output)}`)
-  }
-  for (const step of options.steps) {
-    await send(step.keys, step.delayMs ?? 300)
-  }
-
-  const exitCode = await Promise.race<number>([
-    exitPromise,
-    new Promise<number>((_, reject) => {
-      setTimeout(() => {
-        const plain = stripAnsi(output)
-        const events = observedTestEvents(plain)
-        reject(new Error(`${options.name}: timed out waiting for exit (events: ${events.join(', ') || 'none'})\n${plain}`))
-      }, 15_000)
+  const demo = await createTerminalDemo({
+    cols: 80,
+    rows: 24,
+    renderer: new TerminalRenderer({
+      width: 80,
+      height: 24,
+      output: output as unknown as NodeJS.WritableStream,
     }),
-  ])
+    onTestEvent: (event) => events.push(event),
+    onQuit: () => {
+      exitCode = 0
+    },
+  })
 
-  const allFrames = stripAnsi(output)
-  const events = observedTestEvents(allFrames)
-  options.assert({ events, exitCode, output: allFrames })
+  try {
+    for (const step of options.steps) {
+      demo.dispatchChunk(step.keys)
+    }
+
+    options.assert({
+      events,
+      exitCode,
+      output: stripAnsi(output.output),
+    })
+  } finally {
+    demo.destroy()
+  }
 }
 
 async function run(): Promise<void> {
-  await Promise.all([
-    runScenario({
+  for (const scenario of [
+    {
       name: 'chunked-keys-and-quit',
       steps: [
         { keys: 'aj' },
@@ -126,12 +82,11 @@ async function run(): Promise<void> {
           throw new Error(`Expected exit 0, got ${exitCode}`)
         }
       },
-    }),
-
-    runScenario({
+    },
+    {
       name: 'arrow-escape-sequences',
       steps: [
-        { keys: '\x1b[B\x1b[A', delayMs: 400 },
+        { keys: '\x1b[B\x1b[A' },
         { keys: 'q' },
       ],
       assert: ({ events, exitCode }) => {
@@ -145,12 +100,10 @@ async function run(): Promise<void> {
           throw new Error(`Expected exit 0, got ${exitCode}`)
         }
       },
-    }),
-
-    runScenario({
+    },
+    {
       name: 'tab-focus-and-stats',
-      // One stdin chunk so Tab → x → Shift+Tab → q stay ordered (matches real TTY coalescing).
-      steps: [{ keys: '\tx\x1b[Zq', delayMs: 400 }],
+      steps: [{ keys: '\tx\x1b[Zq' }],
       assert: ({ events, exitCode }) => {
         if (!events.includes('focus-slot-1')) {
           throw new Error(`Expected focus on stats panel (focus-slot-1) (saw: ${events.join(', ')})`)
@@ -165,11 +118,10 @@ async function run(): Promise<void> {
           throw new Error(`Expected exit 0, got ${exitCode}`)
         }
       },
-    }),
-
-    runScenario({
+    },
+    {
       name: 'tab-wrap-focus-cycles',
-      steps: [{ keys: '\t\tq', delayMs: 400 }],
+      steps: [{ keys: '\t\tq' }],
       assert: ({ events, exitCode }) => {
         const focusEvents = events.filter(e => e.startsWith('focus-slot-'))
         if (!focusEvents.includes('focus-slot-1')) {
@@ -182,11 +134,10 @@ async function run(): Promise<void> {
           throw new Error(`Expected exit 0, got ${exitCode}`)
         }
       },
-    }),
-
-    runScenario({
+    },
+    {
       name: 'ctrl-c-exit',
-      steps: [{ keys: '\x03', delayMs: 500 }],
+      steps: [{ keys: '\x03' }],
       assert: ({ events, exitCode }) => {
         if (!events.includes('stdin-quit')) {
           throw new Error(`Expected stdin-quit for Ctrl+C (saw: ${events.join(', ')})`)
@@ -195,11 +146,10 @@ async function run(): Promise<void> {
           throw new Error(`Expected exit 0, got ${exitCode}`)
         }
       },
-    }),
-
-    runScenario({
+    },
+    {
       name: 'ctrl-d-exit',
-      steps: [{ keys: '\x04', delayMs: 500 }],
+      steps: [{ keys: '\x04' }],
       assert: ({ events, exitCode }) => {
         if (!events.includes('stdin-quit')) {
           throw new Error(`Expected stdin-quit for Ctrl+D (saw: ${events.join(', ')})`)
@@ -208,8 +158,10 @@ async function run(): Promise<void> {
           throw new Error(`Expected exit 0, got ${exitCode}`)
         }
       },
-    }),
-  ])
+    },
+  ] satisfies RunOptions[]) {
+    await runScenario(scenario)
+  }
 
   process.stdout.write('Terminal input integration tests passed.\n')
 }
