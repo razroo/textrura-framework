@@ -199,6 +199,32 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<p>Small pt</p>')
   })
 
+  it('infers headings from percentage and viewport units using approximate px', () => {
+    const el = box({ width: 400, height: 200 }, [
+      text({ text: 'Pct hero', font: 'bold 200% sans-serif', lineHeight: 40 }),
+      text({ text: 'Vmin section', font: 'bold 2.5vmin sans-serif', lineHeight: 32 }),
+      text({ text: 'Vw sub', font: 'bold 8vw sans-serif', lineHeight: 28 }),
+      text({ text: 'Vh minor', font: 'bold 6vh sans-serif', lineHeight: 22 }),
+      text({ text: 'Vmax h4', font: 'bold 1.8vmax sans-serif', lineHeight: 20 }),
+      text({ text: 'Large pct body', font: '150% sans-serif', lineHeight: 22 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<h1>Pct hero</h1>')
+    expect(html).toContain('<h2>Vmin section</h2>')
+    expect(html).toContain('<h2>Vw sub</h2>')
+    expect(html).toContain('<h3>Vh minor</h3>')
+    expect(html).toContain('<h4>Vmax h4</h4>')
+    expect(html).toContain('<p>Large pct body</p>')
+  })
+
+  it('infers h1 from scientific-notation percentage before bold keyword', () => {
+    const el = box({ width: 200, height: 50 }, [
+      text({ text: 'Hero', font: 'bold 2e2% sans-serif', lineHeight: 40 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<h1>Hero</h1>')
+  })
+
   it('infers p from small regular font', () => {
     const el = box({ width: 200, height: 50 }, [
       text({ text: 'Body text', font: '14px sans-serif', lineHeight: 18 }),

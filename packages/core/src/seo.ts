@@ -41,9 +41,10 @@ export interface SemanticHTMLOptions {
 /**
  * First explicit `font-size` length in the shorthand (supports scientific notation).
  * Used only for heading-level heuristics in static HTML; non-px units map to approximate px.
+ * Covers `%` and viewport units often seen in `font` shorthands alongside `fonts.ts` extraction.
  */
 const FONT_SIZE_LENGTH =
-  /(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*(px|rem|em|pt)\b/i
+  /(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*(%|px|rem|em|pt|vmin|vmax|vh|vw)(?=[\s,;/]|$)/i
 
 /** True when `font` shorthand indicates bold weight (keyword or numeric 700–900). */
 function isFontBoldShorthand(fontLower: string): boolean {
@@ -57,7 +58,11 @@ function isFontBoldShorthand(fontLower: string): boolean {
   return false
 }
 
-/** Approximate CSS px used for heading inference when the first size token is not `px`. */
+/**
+ * Approximate CSS px used for heading inference when the first size token is not `px`.
+ * Percent is treated as a fraction of a 16px parent (common root text size). Viewport units use a
+ * coarse middle viewport so hero-style `vw`/`vmin` titles map to heading tiers without a real layout.
+ */
 function fontLengthToApproxPx(value: number, unit: string): number {
   switch (unit.toLowerCase()) {
     case 'px':
@@ -68,6 +73,14 @@ function fontLengthToApproxPx(value: number, unit: string): number {
       return value * 14
     case 'pt':
       return value * (96 / 72)
+    case '%':
+      return (value / 100) * 16
+    case 'vmin':
+    case 'vmax':
+      return value * 9
+    case 'vh':
+    case 'vw':
+      return value * 3
     default:
       return value
   }
