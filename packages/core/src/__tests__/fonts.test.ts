@@ -293,6 +293,23 @@ describe('waitForFonts', () => {
     expect(load).not.toHaveBeenCalled()
   })
 
+  it('no-ops when every family is empty or whitespace-only after trim', async () => {
+    const load = vi.fn()
+    vi.stubGlobal('document', { fonts: { load, ready: Promise.resolve() } })
+    await waitForFonts(['', '   ', '\t'])
+    expect(load).not.toHaveBeenCalled()
+  })
+
+  it('trims family names and dedupes before load', async () => {
+    const load = vi.fn().mockResolvedValue(undefined)
+    const ready = Promise.resolve()
+    vi.stubGlobal('document', { fonts: { load, ready } })
+    await waitForFonts([' Inter ', 'Inter', '  JetBrains Mono  '])
+    expect(load).toHaveBeenCalledTimes(2)
+    expect(load).toHaveBeenCalledWith('16px Inter')
+    expect(load).toHaveBeenCalledWith('16px JetBrains Mono')
+  })
+
   it('no-ops when document is undefined (SSR / non-browser)', async () => {
     vi.stubGlobal('document', undefined)
     await expect(waitForFonts(['Inter'])).resolves.toBeUndefined()

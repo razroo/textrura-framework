@@ -134,13 +134,15 @@ export function collectFontFamiliesFromTree(root: UIElement): string[] {
 /**
  * Wait for web fonts used by the app. Browser only; no-op on server.
  * Uses `document.fonts.load` per family; timeouts are swallowed so startup never hard-fails.
+ * Empty and whitespace-only family strings are ignored; names are trimmed before load and deduped.
  */
 export async function waitForFonts(families: string[], timeoutMs = 10_000): Promise<void> {
   if (typeof document === 'undefined' || families.length === 0) return
   const api = document.fonts
   if (!api?.load) return
 
-  const unique = [...new Set(families)]
+  const unique = [...new Set(families.map(f => f.trim()).filter(f => f.length > 0))]
+  if (unique.length === 0) return
   const work = Promise.all(unique.map(f => api.load(`16px ${f}`).catch(() => undefined))).then(() =>
     Promise.resolve(api.ready).catch(() => undefined),
   )
