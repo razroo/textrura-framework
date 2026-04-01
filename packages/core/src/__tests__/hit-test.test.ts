@@ -167,6 +167,27 @@ describe('dispatchHit', () => {
     expect(log).toEqual(['front'])
   })
 
+  it('overlapping siblings: equal z-index ties break to later sibling (stable paint order)', () => {
+    const log: string[] = []
+    const first = box(
+      { width: 50, height: 50, zIndex: 1, onClick: () => { log.push('first') } },
+    )
+    const second = box(
+      { width: 50, height: 50, zIndex: 1, onClick: () => { log.push('second') } },
+    )
+    const root = box({ width: 100, height: 100 }, [first, second])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['second'])
+  })
+
   it('nested boxes: deepest onPointerDown fires first', () => {
     const log: string[] = []
     const child = box(
@@ -240,6 +261,20 @@ describe('hitPathAtPoint', () => {
     }
     expect(hitPathAtPoint(root, layout, 5, 5)).toEqual([1])
   })
+
+  it('overlapping siblings: equal z-index prefers later child index', () => {
+    const a = box({ width: 40, height: 40, zIndex: 2 })
+    const b = box({ width: 40, height: 40, zIndex: 2 })
+    const root = box({ width: 100, height: 100 }, [a, b])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+      ],
+    }
+    expect(hitPathAtPoint(root, layout, 5, 5)).toEqual([1])
+  })
 })
 
 describe('getCursorAtPoint', () => {
@@ -291,6 +326,20 @@ describe('getCursorAtPoint', () => {
       ],
     }
     expect(getCursorAtPoint(root, layout, 5, 5)).toBe('pointer')
+  })
+
+  it('overlapping siblings: equal z-index uses cursor from later sibling', () => {
+    const first = box({ width: 40, height: 40, zIndex: 0, cursor: 'default' })
+    const second = box({ width: 40, height: 40, zIndex: 0, cursor: 'text' })
+    const root = box({ width: 100, height: 100 }, [first, second])
+    const layout = {
+      x: 0, y: 0, width: 100, height: 100,
+      children: [
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+      ],
+    }
+    expect(getCursorAtPoint(root, layout, 5, 5)).toBe('text')
   })
 
   it('uses child cursor under horizontal scroll offset', () => {
