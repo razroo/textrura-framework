@@ -41,11 +41,12 @@ export interface SemanticHTMLOptions {
 /**
  * First explicit `font-size` length in the shorthand (supports scientific notation).
  * Used only for heading-level heuristics in static HTML; non-px units map to approximate px.
- * Covers `%`, viewport units, and common font-relative units (`ch`, `cap`) aligned with typical
- * `fonts.ts` shorthand shapes (subset of units; coarse px mapping for tier heuristics only).
+ * Covers `%`, viewport units, common font-relative units (`ch`, `cap`, `math`), and absolute lengths
+ * (`pt`, `pc`, `in`, `cm`, `mm`, `Q`) aligned with typical `fonts.ts` shorthand shapes (subset of units;
+ * coarse px mapping for tier heuristics only).
  */
 const FONT_SIZE_LENGTH =
-  /(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*(%|px|rem|em|pt|vmin|vmax|vh|vw|vi|vb|rlh|lh|rcap|rch|rex|ric|cap|ch|ex|ic|cqmin|cqmax|cqw|cqh|cqi|cqb)(?=[\s,;/]|$)/i
+  /(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*(%|px|rem|em|pt|pc|in|cm|mm|Q|math|vmin|vmax|vh|vw|vi|vb|rlh|lh|rcap|rch|rex|ric|cap|ch|ex|ic|cqmin|cqmax|cqw|cqh|cqi|cqb)(?=[\s,;/]|$)/i
 
 /**
  * True when `font` shorthand indicates bold weight (the `bold` / `bolder` keywords as whole tokens,
@@ -77,6 +78,18 @@ function fontLengthToApproxPx(value: number, unit: string): number {
       return value * 14
     case 'pt':
       return value * (96 / 72)
+    case 'pc':
+      return value * 16
+    case 'in':
+      return value * 96
+    case 'cm':
+      return (value * 96) / 2.54
+    case 'mm':
+      return (value * 96) / 25.4
+    case 'q':
+      return (value * 96) / 25.4 / 4
+    case 'math':
+      return value * 16
     case '%':
       return (value / 100) * 16
     case 'vmin':

@@ -239,6 +239,26 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<p>Small pt</p>')
   })
 
+  it('infers headings from math unit and absolute lengths (pc, in, cm, mm, Q)', () => {
+    const el = box({ width: 400, height: 240 }, [
+      text({ text: 'Math hero', font: 'bold 2math sans-serif', lineHeight: 40 }),
+      text({ text: 'Pc section', font: 'bold 1.5pc sans-serif', lineHeight: 32 }),
+      text({ text: 'In sub', font: 'bold 0.25in sans-serif', lineHeight: 28 }),
+      text({ text: 'Cm minor', font: 'bold 0.5cm sans-serif', lineHeight: 24 }),
+      text({ text: 'Mm h4', font: 'bold 4.2mm sans-serif', lineHeight: 20 }),
+      text({ text: 'Q h3', font: 'bold 21Q sans-serif', lineHeight: 22 }),
+      text({ text: 'Large Q body', font: '140Q sans-serif', lineHeight: 18 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<h1>Math hero</h1>')
+    expect(html).toContain('<h2>Pc section</h2>')
+    expect(html).toContain('<h2>In sub</h2>')
+    expect(html).toContain('<h3>Cm minor</h3>')
+    expect(html).toContain('<h4>Mm h4</h4>')
+    expect(html).toContain('<h3>Q h3</h3>')
+    expect(html).toContain('<p>Large Q body</p>')
+  })
+
   it('infers headings from percentage and viewport units using approximate px', () => {
     const el = box({ width: 400, height: 200 }, [
       text({ text: 'Pct hero', font: 'bold 200% sans-serif', lineHeight: 40 }),
