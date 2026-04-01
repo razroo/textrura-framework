@@ -90,6 +90,34 @@ describe('text input history', () => {
     expect(h.present.nodes).toEqual(['5'])
   })
 
+  it('treats -Infinity maxPast as default 100', () => {
+    let h = createTextInputHistory({ nodes: ['0'], selection: sel(0, 1) })
+    for (let i = 1; i <= 5; i++) {
+      h = pushTextInputHistory(
+        h,
+        { nodes: [String(i)], selection: sel(0, 1) },
+        Number.NEGATIVE_INFINITY,
+      )
+    }
+    expect(h.past).toHaveLength(5)
+    expect(h.past.map(p => p.nodes.join('\n'))).toEqual(['0', '1', '2', '3', '4'])
+    expect(h.present.nodes).toEqual(['5'])
+  })
+
+  it('treats non-number maxPast as default 100', () => {
+    let h = createTextInputHistory({ nodes: ['0'], selection: sel(0, 1) })
+    for (let i = 1; i <= 5; i++) {
+      h = pushTextInputHistory(
+        h,
+        { nodes: [String(i)], selection: sel(0, 1) },
+        'oops' as unknown as number,
+      )
+    }
+    expect(h.past).toHaveLength(5)
+    expect(h.past.map(p => p.nodes.join('\n'))).toEqual(['0', '1', '2', '3', '4'])
+    expect(h.present.nodes).toEqual(['5'])
+  })
+
   it('treats equivalent multi-line text as unchanged when selection fields match (node split only)', () => {
     let h = createTextInputHistory({ nodes: ['x', 'y'], selection: sel(0, 1) })
     const sameJoin = pushTextInputHistory(h, { nodes: ['x\ny'], selection: sel(0, 1) })
