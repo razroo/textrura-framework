@@ -213,6 +213,16 @@ describe('extractFontFamiliesFromCSSFont', () => {
   it('parses comma after a quoted family that contains an escaped quote', () => {
     expect(extractFontFamiliesFromCSSFont('12px "A\\",B", "Second", serif')).toEqual(['A",B', 'Second'])
   })
+
+  it('parses line-height keyword normal between size and family', () => {
+    expect(extractFontFamiliesFromCSSFont('600 14px / normal Inter, sans-serif')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('italic 12px / normal Georgia, serif')).toEqual(['Georgia'])
+  })
+
+  it('parses relative font-weight bolder and lighter before size', () => {
+    expect(extractFontFamiliesFromCSSFont('bolder 16px Inter')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('lighter 12px Georgia, serif')).toEqual(['Georgia'])
+  })
 })
 
 describe('collectFontFamiliesFromTree', () => {

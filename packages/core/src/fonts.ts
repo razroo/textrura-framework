@@ -24,12 +24,11 @@ const FONT_SIZE_UNIT =
   'rlh|rcap|rch|rex|ric|' +
   'rem|cap|px|em|pt|pc|in|cm|mm|Q|%|ch|ex|ic|lh)'
 
+/** Optional `/ line-height` after font-size in shorthand (numeric length or keyword `normal`). */
+const FONT_SHORTHAND_LINE_HEIGHT = String.raw`(?:\/\s*(?:[\d.]+` + FONT_SIZE_UNIT + String.raw`?|normal))?`
+
 const FONT_SHORTHAND_FAMILY_TAIL = new RegExp(
-  String.raw`\b(\d+(?:\.\d+)?` +
-    FONT_SIZE_UNIT +
-    String.raw`)\s*(?:\/\s*[\d.]+` +
-    FONT_SIZE_UNIT +
-    String.raw`?)?\s+(.+)$`,
+  String.raw`\b(\d+(?:\.\d+)?` + FONT_SIZE_UNIT + String.raw`)\s*` + FONT_SHORTHAND_LINE_HEIGHT + String.raw`\s+(.+)$`,
   'i',
 )
 
@@ -86,6 +85,7 @@ function splitFontFamilyList(tail: string): string[] {
  * Recognizes common font-size units (px, em, rem, cap/ic/lh/rlh, root-relative r* units, pt, %, viewport, dynamic-viewport, container query, and Q units).
  * When a percentage is used as `font-stretch` before the real font size (e.g. `75% 14px Inter`),
  * skips that leading dimension so the size + family tail is parsed correctly.
+ * Line-height after `/` may be numeric (with optional unit) or the `normal` keyword.
  */
 export function extractFontFamiliesFromCSSFont(font: string): string[] {
   function filterFamilies(tail: string): string[] {
