@@ -121,6 +121,11 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('500 75% 62.5% 16px "Display", sans-serif')).toEqual(['Display'])
   })
 
+  it('skips a long stack of leading stretch percentages before real size and family', () => {
+    const pre = Array(12).fill('75%').join(' ')
+    expect(extractFontFamiliesFromCSSFont(`${pre} 14px Inter, sans-serif`)).toEqual(['Inter'])
+  })
+
   it('still treats a single percentage as font-size when it is followed only by family', () => {
     expect(extractFontFamiliesFromCSSFont('112% Georgia, serif')).toEqual(['Georgia'])
   })
