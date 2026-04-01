@@ -1,13 +1,26 @@
 # Starter templates
 
-Minimal end-to-end starters:
+Use the scaffold generator to turn the repo starters into a runnable standalone app:
+
+```bash
+npm run create:app -- ./my-geometra-app
+```
+
+That command defaults to the `full-stack-dashboard` template, which is now the recommended entry point for new Geometra apps.
+
+Other templates:
+
+- `npm run create:app -- ./my-canvas-app --template canvas-local`
+- `npm run create:app -- ./my-thin-client --template server-client`
+- `npm run create:app -- ./my-terminal-app --template terminal`
+
+Template source files still live in the repo for reference:
 
 - `starters/canvas-local/app.ts`
 - `starters/full-stack-dashboard/server.ts`
 - `starters/full-stack-dashboard/client.ts`
-- `starters/terminal/app.ts`
 - `starters/server-client/server.ts`
 - `starters/server-client/client.ts`
+- `starters/terminal/app.ts`
 
-These templates are intentionally minimal and only depend on published Geometra packages.
-Browser-facing starters assume an HTML shell with a `<canvas id="app"></canvas>` mount point.
+Generated browser templates include their own `index.html`, `package.json`, and `tsconfig.json`, so they are runnable without extra shell wiring.

@@ -46,6 +46,20 @@ Package docs:
 - `@geometra/ui`: `packages/ui/README.md`
 - `@geometra/router`: `packages/router/README.md`
 
+## Scaffold A Starter
+
+The default app scaffold now targets the full-stack Geometra architecture: `@geometra/ui + @geometra/router + @geometra/server/@geometra/client`.
+
+```bash
+npm run create:app -- ./my-geometra-app
+cd my-geometra-app
+npm install
+npm run server
+npm run client
+```
+
+Use `npm run create:app -- --list` to see the other templates (`canvas-local`, `server-client`, and `terminal`).
+
 ## Quick Start
 
 ### Phase 1: Local Canvas Rendering
