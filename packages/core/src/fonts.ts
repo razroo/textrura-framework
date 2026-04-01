@@ -104,7 +104,10 @@ export function extractFontFamiliesFromCSSFont(font: string): string[] {
   return filterFamilies(trimmed)
 }
 
-/** Collect unique font families referenced by text nodes in a UI tree. */
+/**
+ * Collect unique font families referenced by text nodes in a UI tree.
+ * Order is first-seen in a depth-first preorder walk (later duplicates are skipped).
+ */
 export function collectFontFamiliesFromTree(root: UIElement): string[] {
   const out = new Set<string>()
   function walk(el: UIElement): void {

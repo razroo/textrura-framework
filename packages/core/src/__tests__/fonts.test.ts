@@ -156,6 +156,11 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('1.5pc Heading, serif')).toEqual(['Heading'])
   })
 
+  it('parses ex- and ch-sized shorthand before family', () => {
+    expect(extractFontFamiliesFromCSSFont('2ex Literata, serif')).toEqual(['Literata'])
+    expect(extractFontFamiliesFromCSSFont('1.5ch Mono, monospace')).toEqual(['Mono'])
+  })
+
   it('treats unclosed quoted family as a single segment (best-effort)', () => {
     expect(extractFontFamiliesFromCSSFont('14px "Unclosed Name')).toEqual(['Unclosed Name'])
   })
@@ -175,6 +180,15 @@ describe('collectFontFamiliesFromTree', () => {
     ])
     const fam = collectFontFamiliesFromTree(tree).sort()
     expect(fam).toEqual(['Inter', 'JetBrains Mono'])
+  })
+
+  it('returns unique families in first-seen preorder (depth-first) order', () => {
+    const tree = box({}, [
+      text({ text: 'a', font: '12px Beta, serif', lineHeight: 16 }),
+      text({ text: 'b', font: '12px Alpha, serif', lineHeight: 16 }),
+      text({ text: 'c', font: '12px Beta', lineHeight: 16 }),
+    ])
+    expect(collectFontFamiliesFromTree(tree)).toEqual(['Beta', 'Alpha'])
   })
 
   it('collects families from nested text under boxes', () => {
