@@ -52,4 +52,20 @@ describe('route matcher', () => {
   it('leaves param segments unchanged when decodeURIComponent fails', () => {
     expect(matchPath('/raw/:token', '/raw/%')).toEqual({ params: { token: '%' } })
   })
+
+  it('does not collapse empty pathname segments: single-slash pattern misses double-slash URL', () => {
+    expect(matchPath('/foo/bar', '/foo//bar')).toBeNull()
+    expect(matchPath('/users/:id', '/users//42')).toBeNull()
+  })
+
+  it('matches when pattern and pathname both include empty segments between slashes', () => {
+    expect(matchPath('/foo//bar', '/foo//bar')).toEqual({ params: {} })
+    expect(matchPath('/a//b/c', '/a//b/c')).toEqual({ params: {} })
+  })
+
+  it('splat captures slashes including doubled segments in the rest', () => {
+    expect(matchPath('/docs/*', '/docs/guides//section')).toEqual({
+      params: { '*': 'guides//section' },
+    })
+  })
 })
