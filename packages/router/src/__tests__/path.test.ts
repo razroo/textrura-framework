@@ -36,6 +36,10 @@ describe('path generation', () => {
     expect(buildPath('/docs/*rest', { rest: 'guides/routing/intro' })).toBe('/docs/guides/routing/intro')
   })
 
+  it('supports anonymous splat (param key *)', () => {
+    expect(buildPath('/*', { '*': 'guides/routing/intro' })).toBe('/guides/routing/intro')
+  })
+
   it('encodes param values', () => {
     expect(buildPath('/search/:query', { query: 'alice bob' })).toBe('/search/alice%20bob')
   })

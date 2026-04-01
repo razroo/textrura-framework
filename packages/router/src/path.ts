@@ -20,6 +20,10 @@ type SegmentRequiredParamKeys<Path extends string> =
 
 type SegmentOptionalParamKeys<Path extends string> = Exclude<SegmentParamKeys<Path>, SegmentRequiredParamKeys<Path>>
 
+/**
+ * Path parameters inferred from a pattern string (static segments, `:param`, optional `:param?`,
+ * and splat `*name` or anonymous `*`). Use with {@link buildPath}.
+ */
 export type PathParams<Path extends string> = {
   [K in SegmentRequiredParamKeys<Path>]: string | number
 } & {
@@ -34,6 +38,12 @@ function stringifyParam(value: string | number): string {
   return encodeURIComponent(String(value))
 }
 
+/**
+ * Build a pathname from a route pattern and {@link PathParams}. Static segments are copied as-is;
+ * dynamic `:id` and optional `:id?` are filled from `params`; splat `*rest` (or a lone `*`, key `'*'`)
+ * inserts the remainder with internal slashes preserved. Missing required params or an empty splat
+ * value throw. Leading and trailing slashes on `pattern` are trimmed before building.
+ */
 export function buildPath<Path extends string>(pattern: Path, params: PathParams<Path>): string {
   const trimmed = trimSlashes(pattern)
   if (trimmed === '') return '/'
