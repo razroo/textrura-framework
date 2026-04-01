@@ -4,6 +4,10 @@ export interface VirtualWindowState {
   selected: number
 }
 
+function finiteOr(n: number, fallback: number): number {
+  return Number.isFinite(n) ? n : fallback
+}
+
 /**
  * Keep the selected row index visible inside a fixed-size virtual window.
  *
@@ -11,6 +15,7 @@ export interface VirtualWindowState {
  * @param windowSize — Visible row count; values below 1 are clamped to 1.
  * @param selected — Desired selection index; clamped into `[0, totalRows - 1]`.
  * @param currentStart — Current window start index; clamped into valid range before adjusting for selection.
+ * Non-finite arguments use the same defaults as empty/reset UI state (`0` rows, window `1`, selection/start `0`).
  */
 export function syncVirtualWindow(
   totalRows: number,
@@ -18,13 +23,13 @@ export function syncVirtualWindow(
   selected: number,
   currentStart: number,
 ): VirtualWindowState {
-  const safeTotal = Math.max(0, totalRows)
-  const safeWindow = Math.max(1, windowSize)
+  const safeTotal = Math.max(0, finiteOr(totalRows, 0))
+  const safeWindow = Math.max(1, finiteOr(windowSize, 1))
   const maxIndex = Math.max(0, safeTotal - 1)
-  const nextSelected = Math.max(0, Math.min(maxIndex, selected))
+  const nextSelected = Math.max(0, Math.min(maxIndex, finiteOr(selected, 0)))
   const maxStart = Math.max(0, safeTotal - safeWindow)
 
-  let start = Math.max(0, Math.min(maxStart, currentStart))
+  let start = Math.max(0, Math.min(maxStart, finiteOr(currentStart, 0)))
   const end = Math.min(maxIndex, start + safeWindow - 1)
 
   if (nextSelected < start) {

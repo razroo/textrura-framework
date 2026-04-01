@@ -60,4 +60,13 @@ describe('syncVirtualWindow', () => {
     // maxStart is 0 so currentStart is ignored; selection at last row stays visible
     expect(syncVirtualWindow(4, 20, 3, 0)).toEqual({ start: 0, end: 3, selected: 3 })
   })
+
+  it('treats non-finite numeric inputs as safe defaults so state never propagates NaN', () => {
+    expect(syncVirtualWindow(Number.NaN, 5, 2, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+    // windowSize NaN → visible height 1; window scrolls so selected row 2 is the sole visible row
+    expect(syncVirtualWindow(8, Number.NaN, 2, 0)).toEqual({ start: 2, end: 2, selected: 2 })
+    expect(syncVirtualWindow(8, 3, Number.NaN, 0)).toEqual({ start: 0, end: 2, selected: 0 })
+    expect(syncVirtualWindow(8, 3, 2, Number.POSITIVE_INFINITY)).toEqual({ start: 0, end: 2, selected: 2 })
+    expect(syncVirtualWindow(8, 3, 2, Number.NEGATIVE_INFINITY)).toEqual({ start: 0, end: 2, selected: 2 })
+  })
 })
