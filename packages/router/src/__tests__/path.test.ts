@@ -38,6 +38,16 @@ describe('path generation', () => {
     expect(buildPath('/', {})).toBe('/')
   })
 
+  it('normalizes patterns that are only slashes to root', () => {
+    expect(buildPath('//', {})).toBe('/')
+    expect(buildPath('///', {})).toBe('/')
+  })
+
+  it('treats explicit undefined like an omitted optional path param', () => {
+    expect(buildPath('/users/:id?', { id: undefined })).toBe('/users')
+    expect(buildPath('/a/:seg?/c', { seg: undefined })).toBe('/a/c')
+  })
+
   it('builds path with multiple dynamic segments', () => {
     expect(buildPath('/users/:userId/posts/:postId', { userId: 'a', postId: 2 })).toBe(
       '/users/a/posts/2',
@@ -72,6 +82,10 @@ describe('path generation', () => {
 
   it('encodes reserved URI characters in param values', () => {
     expect(buildPath('/search/:q', { q: 'a/b?c' })).toBe('/search/a%2Fb%3Fc')
+  })
+
+  it('encodes non-ASCII path params with encodeURIComponent', () => {
+    expect(buildPath('/wiki/:title', { title: '日本語' })).toBe('/wiki/%E6%97%A5%E6%9C%AC%E8%AA%9E')
   })
 
   it('normalizes redundant slashes in the pattern before building', () => {
