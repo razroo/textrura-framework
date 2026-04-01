@@ -96,7 +96,12 @@ function collectHits(
   }
 }
 
-/** Dispatch an event at (x, y) against the element tree. Returns true if any handler fired. */
+/**
+ * Dispatch a pointer-style event at (x, y) against the element tree.
+ * The deepest hit with a matching handler runs first; only one handler runs per call.
+ * Optional `extra` is shallow-merged onto the `HitEvent` after base fields so callers
+ * can pass modifier keys, `button`, wheel deltas, and other renderer-specific metadata.
+ */
 export function dispatchHit(
   element: UIElement,
   layout: ComputedLayout,

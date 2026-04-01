@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { dispatchHit, getCursorAtPoint, hasInteractiveHitAtPoint, hitPathAtPoint } from '../hit-test.js'
 import { box } from '../elements.js'
+import type { HitEvent } from '../types.js'
 
 describe('dispatchHit', () => {
   it('hit inside a box fires handler', () => {
@@ -89,6 +90,29 @@ describe('dispatchHit', () => {
     dispatchHit(parent, layout, 'onClick', 20, 30)
     expect(localX).toBe(8)
     expect(localY).toBe(11)
+  })
+
+  it('merges extra fields onto the HitEvent for pointer handlers', () => {
+    type PointerExtras = { button: number; shiftKey: boolean }
+    let received: (HitEvent & PointerExtras) | null = null
+    const el = box({
+      width: 100,
+      height: 50,
+      onPointerDown: (e) => {
+        received = e as HitEvent & PointerExtras
+      },
+    })
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
+
+    dispatchHit(el, layout, 'onPointerDown', 10, 20, { button: 2, shiftKey: true })
+    expect(received).not.toBeNull()
+    expect(received!.x).toBe(10)
+    expect(received!.y).toBe(20)
+    expect(received!.localX).toBe(10)
+    expect(received!.localY).toBe(20)
+    expect(received!.target).toBe(layout)
+    expect(received!.button).toBe(2)
+    expect(received!.shiftKey).toBe(true)
   })
 
   it('click returns focus target for key-only focusable boxes', () => {
