@@ -1307,6 +1307,36 @@ describe('scroll and overflow clipping', () => {
     expect(localX).toBe(5)
   })
 
+  it('scrollX and scrollY together shift child bounds; localX and localY match scrolled content', () => {
+    let localX = -1
+    let localY = -1
+    const child = box({
+      width: 50,
+      height: 50,
+      onClick: (e) => {
+        localX = e.localX ?? -999
+        localY = e.localY ?? -999
+      },
+    })
+    const parent = box(
+      { width: 100, height: 100, overflow: 'scroll', scrollX: 30, scrollY: 20 },
+      [child],
+    )
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 100, y: 100, width: 50, height: 50, children: [] }],
+    }
+
+    // absX = 0 - scrollX + child.x = 70; absY = 0 - scrollY + child.y = 80
+    dispatchHit(parent, layout, 'onClick', 75, 85)
+    expect(localX).toBe(5)
+    expect(localY).toBe(5)
+    expect(hitPathAtPoint(parent, layout, 75, 85)).toEqual([0])
+  })
+
   it('hitPathAtPoint resolves path under scrollX', () => {
     const child = box({ width: 50, height: 50 })
     const parent = box({ width: 100, height: 100, overflow: 'scroll', scrollX: 40 }, [child])
