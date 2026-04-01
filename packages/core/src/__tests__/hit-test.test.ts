@@ -200,6 +200,30 @@ describe('dispatchHit', () => {
     expect(hitPathAtPoint(parent, layout, 5, 5)).toBeNull()
   })
 
+  it('does not visit children when parent layout has negative height (corrupt geometry)', () => {
+    let childFired = false
+    const child = box({
+      width: 10,
+      height: 10,
+      onClick: () => {
+        childFired = true
+      },
+    })
+    const parent = box({ width: 100, height: 100 }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: -40,
+      children: [{ x: 0, y: 0, width: 10, height: 10, children: [] as const }],
+    }
+
+    dispatchHit(parent, layout, 'onClick', 5, 5)
+    expect(childFired).toBe(false)
+    expect(hitPathAtPoint(parent, layout, 5, 5)).toBeNull()
+    expect(hasInteractiveHitAtPoint(parent, layout, 5, 5)).toBe(false)
+  })
+
   it('nested boxes: deepest handler fires first', () => {
     const log: string[] = []
     const child = box(
