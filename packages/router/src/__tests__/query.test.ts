@@ -34,6 +34,26 @@ describe('query helpers', () => {
     expect(parseQuery('q=alice+bob')).toEqual({ q: 'alice bob' })
   })
 
+  it('treats plus as space when decoding keys', () => {
+    expect(parseQuery('my+key=1')).toEqual({ 'my key': '1' })
+    expect(parseQuery('?a+b=c')).toEqual({ 'a b': 'c' })
+  })
+
+  it('treats literal plus as space before URI decoding; %2B survives as a plus sign', () => {
+    expect(parseQuery('q=a+b')).toEqual({ q: 'a b' })
+    expect(parseQuery('q=a%2Bb')).toEqual({ q: 'a+b' })
+    expect(parseQuery('k%2Bey=v')).toEqual({ 'k+ey': 'v' })
+  })
+
+  it('stores constructor as an own string key on a null-prototype result', () => {
+    const q = parseQuery('constructor=proto')
+    expect(Object.getPrototypeOf(q)).toBeNull()
+    expect(Object.hasOwn(q, 'constructor')).toBe(true)
+    expect(q['constructor']).toBe('proto')
+    expect(q.constructor).toBe('proto')
+    expect(Object.keys(q)).toEqual(['constructor'])
+  })
+
   it('keeps raw segment when percent-decoding throws', () => {
     expect(parseQuery('a=%ZZ&b=ok')).toEqual({ a: '%ZZ', b: 'ok' })
   })
