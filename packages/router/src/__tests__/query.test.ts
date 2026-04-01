@@ -187,4 +187,15 @@ describe('query helpers', () => {
     expect(parsed['__proto__']).toBe('safe')
     expect(parsed.constructor).toBe('also-safe')
   })
+
+  it('decodes UTF-8 percent-encoded values including non-BMP code points', () => {
+    expect(parseQuery('emoji=%F0%9F%9A%80')).toEqual({ emoji: '🚀' })
+    expect(parseQuery('check=%E2%9C%93')).toEqual({ check: '✓' })
+    expect(parseQuery('%F0%9F%98%80=1')).toEqual({ '😀': '1' })
+  })
+
+  it('round-trips emoji and mixed-script keys and values through stringify and parse', () => {
+    const input = { '🚀': 'lift-off', q: '🙂', café: 'naïve' }
+    expect(parseQuery(stringifyQuery(input))).toEqual(input)
+  })
 })
