@@ -112,6 +112,11 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('condensed 75% 14px "Custom Face"')).toEqual(['Custom Face'])
   })
 
+  it('skips multiple leading percentage tokens before size and family', () => {
+    expect(extractFontFamiliesFromCSSFont('75% 50% 14px Inter')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('500 75% 62.5% 16px "Display", sans-serif')).toEqual(['Display'])
+  })
+
   it('still treats a single percentage as font-size when it is followed only by family', () => {
     expect(extractFontFamiliesFromCSSFont('112% Georgia, serif')).toEqual(['Georgia'])
   })
@@ -139,6 +144,17 @@ describe('extractFontFamiliesFromCSSFont', () => {
   it('parses Q (quarter-mm) size before family', () => {
     expect(extractFontFamiliesFromCSSFont('40Q Mincho, serif')).toEqual(['Mincho'])
   })
+
+  it('parses absolute length units (cm, mm, in, pc) before family', () => {
+    expect(extractFontFamiliesFromCSSFont('1.2cm Literata, serif')).toEqual(['Literata'])
+    expect(extractFontFamiliesFromCSSFont('3mm Micro, monospace')).toEqual(['Micro'])
+    expect(extractFontFamiliesFromCSSFont('0.25in Print Serif, serif')).toEqual(['Print Serif'])
+    expect(extractFontFamiliesFromCSSFont('1.5pc Heading, serif')).toEqual(['Heading'])
+  })
+
+  it('treats unclosed quoted family as a single segment (best-effort)', () => {
+    expect(extractFontFamiliesFromCSSFont('14px "Unclosed Name')).toEqual(['Unclosed Name'])
+  })
 })
 
 describe('collectFontFamiliesFromTree', () => {
@@ -162,5 +178,14 @@ describe('collectFontFamiliesFromTree', () => {
       box({}, [text({ text: 'inner', font: '16px Source Sans 3', lineHeight: 22 })]),
     ])
     expect(collectFontFamiliesFromTree(tree)).toEqual(['Source Sans 3'])
+  })
+
+  it('ignores empty font strings on text nodes', () => {
+    const tree = box({}, [
+      text({ text: 'a', font: '', lineHeight: 20 }),
+      text({ text: 'b', font: '   ', lineHeight: 20 }),
+      text({ text: 'c', font: '12px Inter', lineHeight: 16 }),
+    ])
+    expect(collectFontFamiliesFromTree(tree).sort()).toEqual(['Inter'])
   })
 })
