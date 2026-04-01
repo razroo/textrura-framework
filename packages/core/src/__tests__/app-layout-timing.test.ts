@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import { createApp } from '../app.js'
-import { box } from '../elements.js'
+import { box, text } from '../elements.js'
 import type { Renderer } from '../types.js'
 
 describe('createApp layout timing', () => {
@@ -53,5 +53,39 @@ describe('createApp layout timing', () => {
     })
 
     expect(render).toHaveBeenCalled()
+  })
+})
+
+describe('createApp waitForFonts', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('awaits document.fonts.load for families from the initial view before the reactive effect runs', async () => {
+    const load = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('document', { fonts: { load, ready: Promise.resolve() } })
+
+    const renderer: Renderer = {
+      render: vi.fn(),
+      destroy: vi.fn(),
+    }
+
+    await createApp(
+      () =>
+        box({ width: 100, height: 50 }, [
+          text({
+            text: 'hi',
+            font: '14px CustomFace, sans-serif',
+            lineHeight: 20,
+            width: 10,
+            height: 20,
+          }),
+        ]),
+      renderer,
+      { width: 200, height: 100, waitForFonts: true },
+    )
+
+    expect(load).toHaveBeenCalledTimes(1)
+    expect(load).toHaveBeenCalledWith('16px CustomFace')
   })
 })
