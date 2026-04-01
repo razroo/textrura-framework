@@ -431,6 +431,14 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('14px URL( "./font.woff2" ) format("woff2"), serif')).toEqual([])
     expect(extractFontFamiliesFromCSSFont('600 16px Inter, url(font.ttf), monospace')).toEqual(['Inter'])
   })
+
+  it('drops format() segments from mistaken @font-face src paste', () => {
+    expect(extractFontFamiliesFromCSSFont('14px Inter, format("woff2"), sans-serif')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('16px FORMAT( "opentype" ) , serif')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('600 16px Literata, format(woff2), monospace')).toEqual([
+      'Literata',
+    ])
+  })
 })
 
 describe('collectFontFamiliesFromTree', () => {
