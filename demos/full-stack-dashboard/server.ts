@@ -9,19 +9,16 @@ import {
 } from '@geometra/router'
 import {
   button,
-  checkbox,
   commandPalette,
   dataTable,
   dialog,
   list,
-  selectControl,
   toast,
 } from '@geometra/ui'
 
 type ThemeKey = 'midnight' | 'ember' | 'frost'
 
 type OverviewData = {
-  kpis: Array<{ label: string; value: string; detail: string }>
   releases: Array<Record<string, string>>
 }
 
@@ -100,7 +97,6 @@ const savedTheme = signal<ThemeKey>('midnight')
 const draftTheme = signal<ThemeKey>(savedTheme.peek())
 const compactMode = signal(false)
 const draftCompactMode = signal(compactMode.peek())
-const themeMenuOpen = signal(false)
 const saveDialogOpen = signal(false)
 const toastMessage = signal(
   'Canvas is only the paint/input surface. Router state, loaders, and actions live on the server.',
@@ -136,8 +132,13 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+function rerender(): void {
+  server?.update()
+}
+
 function announce(message: string): void {
   toastMessage.set(message)
+  rerender()
 }
 
 function currentRouteLabel(pathname: string): string {
@@ -322,6 +323,86 @@ function detailCard(title: string, body: string): UIElement {
   )
 }
 
+function queueHeaderCell(label: string): UIElement {
+  return box({ flexGrow: 1 }, [
+    text({
+      text: label,
+      font: 'bold 12px Inter, system-ui',
+      lineHeight: 16,
+      color: palette().muted,
+    }),
+  ])
+}
+
+function queueValueCell(value: string): UIElement {
+  return box({ flexGrow: 1 }, [
+    text({
+      text: value,
+      font: '13px Inter, system-ui',
+      lineHeight: 18,
+      color: palette().text,
+    }),
+  ])
+}
+
+function approvalQueueTable(rows: QueueData['rows']): UIElement {
+  const theme = palette()
+  return box(
+    {
+      flexDirection: 'column',
+      gap: 0,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.panelBg,
+      overflow: 'hidden',
+    },
+    [
+      box(
+        {
+          flexDirection: 'row',
+          gap: 12,
+          paddingLeft: 14,
+          paddingRight: 14,
+          paddingTop: 12,
+          paddingBottom: 10,
+          backgroundColor: theme.panelAlt,
+        },
+        [
+          queueHeaderCell('Service'),
+          queueHeaderCell('Severity'),
+          queueHeaderCell('Owner'),
+          queueHeaderCell('Status'),
+        ],
+      ),
+      ...rows.map((row) =>
+        box(
+          {
+            flexDirection: 'row',
+            gap: 12,
+            paddingLeft: 14,
+            paddingRight: 14,
+            paddingTop: 10,
+            paddingBottom: 10,
+            borderTopWidth: 1,
+            borderTopColor: theme.border,
+            cursor: 'pointer',
+            onClick: () => {
+              announce(`Selected ${row.service} (${row.severity}) routed to ${row.owner}.`)
+            },
+          },
+          [
+            queueValueCell(row.service),
+            queueValueCell(row.severity),
+            queueValueCell(row.owner),
+            queueValueCell(row.status),
+          ],
+        ),
+      ),
+    ],
+  )
+}
+
 function fieldCard(title: string, description: string, control: UIElement): UIElement {
   const theme = palette()
   return box(
@@ -333,7 +414,6 @@ function fieldCard(title: string, description: string, control: UIElement): UIEl
       borderWidth: 1,
       borderColor: theme.border,
       backgroundColor: theme.panelBg,
-      flexGrow: 1,
       minWidth: 260,
     },
     [
@@ -356,6 +436,35 @@ function fieldCard(title: string, description: string, control: UIElement): UIEl
   )
 }
 
+function optionButton(label: string, active: boolean, onClick: () => void): UIElement {
+  const theme = palette()
+  return box(
+    {
+      paddingLeft: 12,
+      paddingRight: 12,
+      paddingTop: 8,
+      paddingBottom: 8,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: active ? theme.accent : theme.border,
+      backgroundColor: active ? theme.accentSoft : theme.panelBg,
+      cursor: 'pointer',
+      onClick: () => {
+        onClick()
+        rerender()
+      },
+    },
+    [
+      text({
+        text: label,
+        font: '12px Inter, system-ui',
+        lineHeight: 16,
+        color: active ? theme.text : theme.muted,
+      }),
+    ],
+  )
+}
+
 function renderOverviewPage(): UIElement {
   const data = getLoaderData<OverviewData>('overview')
   if (!data) {
@@ -370,6 +479,23 @@ function renderOverviewPage(): UIElement {
   }
 
   const p1Count = approvalQueue.value.filter((row) => row.severity === 'P1').length
+  const metrics = [
+    {
+      label: 'Connected clients',
+      value: String(connectedClients.value),
+      detail: 'WS sessions on this server',
+    },
+    {
+      label: 'Approval queue',
+      value: String(approvalQueue.value.length),
+      detail: 'Actionable review items',
+    },
+    {
+      label: 'Theme',
+      value: THEME_LABELS[savedTheme.value],
+      detail: compactMode.value ? 'compact tables on' : 'comfortable density',
+    },
+  ]
 
   return box(
     {
@@ -387,7 +513,7 @@ function renderOverviewPage(): UIElement {
           gap: 16,
         },
         [
-          box({ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }, data.kpis.map(metricCard)),
+          box({ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }, metrics.map(metricCard)),
           panel(
             'Deploy health',
             compactMode.value
@@ -526,22 +652,7 @@ function renderQueuePage(): UIElement {
         },
         [
           panel('Approval queue', 'Click any row to inspect an incident lane.', [
-            dataTable(
-              [
-                { key: 'service', header: 'Service' },
-                { key: 'severity', header: 'Severity' },
-                { key: 'owner', header: 'Owner' },
-                { key: 'status', header: 'Status' },
-              ],
-              data.rows,
-              {
-                ariaLabel: 'Approval queue',
-                onRowClick: (rowIndex) => {
-                  const row = data.rows[rowIndex]
-                  if (row) announce(`Selected ${row.service} (${row.severity}) routed to ${row.owner}.`)
-                },
-              },
-            ),
+            approvalQueueTable(data.rows),
           ]),
           box(
             {
@@ -590,37 +701,46 @@ function renderSettingsPage(): UIElement {
             [
               box(
                 {
-                  flexDirection: 'row',
+                  flexDirection: 'column',
                   gap: 12,
-                  flexWrap: 'wrap',
                 },
                 [
                   fieldCard(
                     'Theme shell',
                     'Pick the full-canvas visual treatment for the app shell.',
-                    selectControl({
-                      open: themeMenuOpen.value,
-                      value: draftTheme.value,
-                      placeholder: 'Theme',
-                      onToggle: () => themeMenuOpen.set(!themeMenuOpen.peek()),
-                      onChange: (value) => {
-                        draftTheme.set(value as ThemeKey)
-                        themeMenuOpen.set(false)
+                    box(
+                      {
+                        flexDirection: 'row',
+                        gap: 10,
+                        flexWrap: 'wrap',
                       },
-                      options: [
-                        { value: 'midnight', label: THEME_LABELS.midnight },
-                        { value: 'ember', label: THEME_LABELS.ember },
-                        { value: 'frost', label: THEME_LABELS.frost },
-                      ],
-                    }),
+                      (Object.keys(THEME_LABELS) as ThemeKey[]).map((themeKey) =>
+                        optionButton(
+                          THEME_LABELS[themeKey],
+                          draftTheme.value === themeKey,
+                          () => draftTheme.set(themeKey),
+                        ),
+                      ),
+                    ),
                   ),
                   fieldCard(
                     'Density',
                     'Compact mode trims row-heavy routes for faster operator scanning.',
-                    checkbox('Compact tables across routes', {
-                      checked: draftCompactMode.value,
-                      onChange: (checked) => draftCompactMode.set(checked),
-                    }),
+                    box(
+                      {
+                        flexDirection: 'row',
+                        gap: 10,
+                        flexWrap: 'wrap',
+                      },
+                      [
+                        optionButton('Comfortable', !draftCompactMode.value, () => {
+                          draftCompactMode.set(false)
+                        }),
+                        optionButton('Compact', draftCompactMode.value, () => {
+                          draftCompactMode.set(true)
+                        }),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -648,6 +768,7 @@ function renderSettingsPage(): UIElement {
                 dirty
                   ? button('Review changes', () => {
                       saveDialogOpen.set(true)
+                      rerender()
                     })
                   : statBadge('Status', 'Saved', 'success'),
                 text({
@@ -668,6 +789,7 @@ function renderSettingsPage(): UIElement {
                 [
                   button('Apply', () => {
                     saveDialogOpen.set(false)
+                    rerender()
                     void router.submitAction('settings', {
                       method: 'POST',
                       data: {
@@ -678,6 +800,7 @@ function renderSettingsPage(): UIElement {
                   }),
                   button('Cancel', () => {
                     saveDialogOpen.set(false)
+                    rerender()
                   }),
                 ],
               )
@@ -697,7 +820,7 @@ function renderSettingsPage(): UIElement {
             detailCard('Save model', 'The canvas renders the controls, while the router action persists preferences on the server.'),
           ]),
           panel('What this route proves', 'This is still one Geometra page handling controls, actions, and feedback.', [
-            detailCard('No DOM widgets', 'The select menu, checkbox, toast, and dialog are all rendered in the Geometra tree.'),
+            detailCard('No DOM widgets', 'The theme picker, density toggle, toast, and dialog are all rendered in the Geometra tree.'),
             detailCard('Server authority', 'Saved state, loader data, and timestamps come from the route on the server, not local client state.'),
           ]),
         ],
@@ -913,23 +1036,6 @@ const routes: RouteNode<UIElement>[] = [
           await delay(70)
           const visibleReleases = releases.peek().slice(0, compactMode.peek() ? 4 : 6)
           return {
-            kpis: [
-              {
-                label: 'Connected clients',
-                value: String(connectedClients.peek()),
-                detail: 'WS sessions on this server',
-              },
-              {
-                label: 'Approval queue',
-                value: String(approvalQueue.peek().length),
-                detail: 'Actionable review items',
-              },
-              {
-                label: 'Theme',
-                value: THEME_LABELS[savedTheme.peek()],
-                detail: compactMode.peek() ? 'compact tables on' : 'comfortable density',
-              },
-            ],
             releases: visibleReleases,
           } satisfies OverviewData
         },
@@ -970,7 +1076,6 @@ const routes: RouteNode<UIElement>[] = [
           draftTheme.set(nextTheme)
           compactMode.set(nextCompactMode)
           draftCompactMode.set(nextCompactMode)
-          themeMenuOpen.set(false)
           announce(`Saved ${THEME_LABELS[nextTheme]} with compact mode ${nextCompactMode ? 'on' : 'off'}.`)
           return {
             theme: nextTheme,
@@ -996,7 +1101,6 @@ const router = createRouter<UIElement>({
 router.subscribe((state) => {
   if (state.location.pathname !== lastPathname) {
     lastPathname = state.location.pathname
-    themeMenuOpen.set(false)
     saveDialogOpen.set(false)
     draftTheme.set(savedTheme.peek())
     draftCompactMode.set(compactMode.peek())

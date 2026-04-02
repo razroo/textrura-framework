@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import WebSocket from 'ws'
-import { box, signal } from '@geometra/core'
+import { box, signal, text } from '@geometra/core'
 import type { ComputedLayout } from 'textura'
 import type { UIElement } from '@geometra/core'
 import { createServer } from '../server.js'
@@ -167,6 +167,69 @@ describe('server transport integration (1.4)', () => {
     expect(s2.layout?.width).toBe(900 + 23)
 
     ws2.close()
+    server.close()
+  }, 25000)
+
+  it('sends a full frame when only tree content changes and geometry is stable', async () => {
+    const port = pickPort()
+    const label = signal('alpha')
+    const server = await createServer(
+      () =>
+        box({ width: 160, height: 60, padding: 8 }, [
+          text({
+            text: label.value,
+            font: '13px Inter, system-ui',
+            lineHeight: 18,
+            width: 120,
+            height: 18,
+            color: '#fff',
+          }),
+        ]),
+      { port, width: 240, height: 120 },
+    )
+
+    const rawMessages: string[] = []
+    const ws = await new Promise<WebSocket>((resolve, reject) => {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}`)
+      const t = setTimeout(() => reject(new Error('open timeout')), 8000)
+      socket.on('message', (data) => {
+        rawMessages.push(String(data))
+      })
+      socket.on('open', () => {
+        clearTimeout(t)
+        resolve(socket)
+      })
+      socket.on('error', (e) => {
+        clearTimeout(t)
+        reject(e)
+      })
+    })
+
+    await waitFor(() => rawMessages.length >= 1, 6000, 'initial frame')
+
+    label.set('omega')
+    server.update()
+
+    await waitFor(() => rawMessages.length >= 2, 6000, 'tree-only refresh frame')
+
+    const followup = JSON.parse(rawMessages[1] ?? '{}') as { type?: string; tree?: UIElement }
+    expect(followup.type).toBe('frame')
+
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    replayJsonMessages(rawMessages, state)
+    expect(state.tree).toMatchObject({
+      kind: 'box',
+      children: [
+        {
+          kind: 'text',
+          props: {
+            text: 'omega',
+          },
+        },
+      ],
+    })
+
+    ws.close()
     server.close()
   }, 25000)
 })

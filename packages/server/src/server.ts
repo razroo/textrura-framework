@@ -3,7 +3,12 @@ import type { WebSocket } from 'ws'
 import type { IncomingMessage } from 'http'
 import { init, computeLayout } from 'textura'
 import type { ComputedLayout } from 'textura'
-import { toLayoutTree, dispatchHit, dispatchKeyboardEvent, dispatchCompositionEvent } from '@geometra/core'
+import {
+  toLayoutTree,
+  dispatchHit,
+  dispatchKeyboardEvent,
+  dispatchCompositionEvent,
+} from '@geometra/core'
 import type { UIElement, EventHandlers } from '@geometra/core'
 import { diffLayout, coalescePatches, PROTOCOL_VERSION, isProtocolCompatible, CLOSE_AUTH_FAILED, CLOSE_FORBIDDEN } from './protocol.js'
 import type { ServerMessage, ClientMessage } from './protocol.js'
@@ -85,60 +90,64 @@ export async function createServer(
   const contexts = new Map<WebSocket, unknown>()
   let prevLayout: ComputedLayout | null = null
   let currentTree: UIElement | null = null
+  let prevSerializedTree: string | null = null
   const backpressureBytes = Math.max(1024, options.backpressureBytes ?? 512 * 1024)
 
   function computeAndBroadcast(): void {
     try {
-    currentTree = view()
-    const layoutTree = toLayoutTree(currentTree)
-    const layout = computeLayout(layoutTree, { width, height })
+      currentTree = view()
+      const serializedTree = JSON.stringify(currentTree)
+      const layoutTree = toLayoutTree(currentTree)
+      const layout = computeLayout(layoutTree, { width, height })
 
-    let msg: ServerMessage
-    let coalescedPatchDelta = 0
-    if (prevLayout) {
-      const rawPatches = diffLayout(prevLayout, layout)
-      const patches = coalescePatches(rawPatches)
-      coalescedPatchDelta = Math.max(0, rawPatches.length - patches.length)
-      if (patches.length === 0) return
-      // If patches are more than half the tree, just send full frame
-      if (patches.length > 20) {
-        msg = { type: 'frame', layout, tree: currentTree, protocolVersion: PROTOCOL_VERSION }
-      } else {
-        msg = { type: 'patch', patches, protocolVersion: PROTOCOL_VERSION }
-      }
-    } else {
-      msg = { type: 'frame', layout, tree: currentTree, protocolVersion: PROTOCOL_VERSION }
-    }
-
-    prevLayout = layout
-    let deferredSends = 0
-    let binaryOutboundFrames = 0
-    for (const client of clients) {
-      if (client.readyState === client.OPEN) {
-        if (shouldDeferClientSend(client.bufferedAmount, backpressureBytes)) {
-          deferredSends++
-          needsResync.add(client)
-          continue
-        }
-        const clientMsg: ServerMessage =
-          needsResync.has(client)
-            ? { type: 'frame', layout, tree: currentTree, protocolVersion: PROTOCOL_VERSION }
-            : msg
-        if (needsResync.has(client)) needsResync.delete(client)
-        const json = JSON.stringify(clientMsg)
-        if (clientBinaryFraming.get(client)) {
-          binaryOutboundFrames++
-          client.send(encodeBinaryFrameJson(json), { binary: true })
+      let msg: ServerMessage
+      let coalescedPatchDelta = 0
+      const treeChanged = prevSerializedTree !== serializedTree
+      if (prevLayout && !treeChanged) {
+        const rawPatches = diffLayout(prevLayout, layout)
+        const patches = coalescePatches(rawPatches)
+        coalescedPatchDelta = Math.max(0, rawPatches.length - patches.length)
+        if (patches.length === 0) return
+        // Patch streams are only safe when the render tree is byte-for-byte stable.
+        if (patches.length > 20) {
+          msg = { type: 'frame', layout, tree: currentTree, protocolVersion: PROTOCOL_VERSION }
         } else {
-          client.send(json)
+          msg = { type: 'patch', patches, protocolVersion: PROTOCOL_VERSION }
+        }
+      } else {
+        msg = { type: 'frame', layout, tree: currentTree, protocolVersion: PROTOCOL_VERSION }
+      }
+
+      prevLayout = layout
+      prevSerializedTree = serializedTree
+      let deferredSends = 0
+      let binaryOutboundFrames = 0
+      for (const client of clients) {
+        if (client.readyState === client.OPEN) {
+          if (shouldDeferClientSend(client.bufferedAmount, backpressureBytes)) {
+            deferredSends++
+            needsResync.add(client)
+            continue
+          }
+          const clientMsg: ServerMessage =
+            needsResync.has(client)
+              ? { type: 'frame', layout, tree: currentTree, protocolVersion: PROTOCOL_VERSION }
+              : msg
+          if (needsResync.has(client)) needsResync.delete(client)
+          const json = JSON.stringify(clientMsg)
+          if (clientBinaryFraming.get(client)) {
+            binaryOutboundFrames++
+            client.send(encodeBinaryFrameJson(json), { binary: true })
+          } else {
+            client.send(json)
+          }
         }
       }
-    }
-    options.onTransportMetrics?.({
-      deferredSends,
-      coalescedPatchDelta,
-      binaryOutboundFrames,
-    })
+      options.onTransportMetrics?.({
+        deferredSends,
+        coalescedPatchDelta,
+        binaryOutboundFrames,
+      })
     } catch (err) {
       if (options.onError) {
         options.onError(err)
