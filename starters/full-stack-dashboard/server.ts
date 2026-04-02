@@ -147,17 +147,15 @@ function navLink(to: string, label: string): UIElement {
 function shell(outlet: UIElement | null): UIElement {
   return box(
     {
-      width: 820,
-      height: 520,
-      padding: 18,
-      gap: 16,
+      padding: 24,
+      gap: 20,
       flexDirection: 'row',
       backgroundColor: '#07111b',
     },
     [
       box(
         {
-          width: 220,
+          width: 250,
           flexDirection: 'column',
           gap: 12,
           padding: 14,
@@ -263,8 +261,8 @@ function view(): UIElement {
 
 server = await createServer(view, {
   port: 3300,
-  width: 820,
-  height: 520,
+  width: 1180,
+  height: 760,
 })
 
 router.start()

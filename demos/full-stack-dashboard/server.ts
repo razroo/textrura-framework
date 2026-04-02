@@ -160,11 +160,11 @@ function panel(title: string, description: string, children: UIElement[]): UIEle
     {
       flexDirection: 'column',
       gap: 10,
-      padding: 14,
-      borderRadius: 14,
+      padding: 16,
+      borderRadius: 16,
       borderWidth: 1,
       borderColor: theme.border,
-      backgroundColor: theme.panelBg,
+      backgroundColor: theme.panelAlt,
     },
     [
       box({ flexDirection: 'column', gap: 3 }, [
@@ -198,7 +198,7 @@ function metricCard(metric: { label: string; value: string; detail: string }): U
       borderColor: theme.border,
       backgroundColor: theme.panelAlt,
       flexGrow: 1,
-      minWidth: 0,
+      minWidth: 160,
     },
     [
       text({
@@ -223,6 +223,139 @@ function metricCard(metric: { label: string; value: string; detail: string }): U
   )
 }
 
+function statBadge(
+  label: string,
+  value: string,
+  tone: 'neutral' | 'accent' | 'success' = 'neutral',
+): UIElement {
+  const theme = palette()
+  const valueColor =
+    tone === 'success'
+      ? theme.success
+      : tone === 'accent'
+        ? theme.accent
+        : theme.text
+
+  return box(
+    {
+      flexDirection: 'column',
+      gap: 2,
+      minWidth: 132,
+      paddingLeft: 12,
+      paddingRight: 12,
+      paddingTop: 10,
+      paddingBottom: 10,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: tone === 'neutral' ? theme.border : valueColor,
+      backgroundColor: theme.panelBg,
+    },
+    [
+      text({
+        text: label,
+        font: '11px Inter, system-ui',
+        lineHeight: 14,
+        color: theme.muted,
+      }),
+      text({
+        text: value,
+        font: 'bold 13px Inter, system-ui',
+        lineHeight: 18,
+        color: valueColor,
+      }),
+    ],
+  )
+}
+
+function metaChip(value: string): UIElement {
+  const theme = palette()
+  return box(
+    {
+      paddingLeft: 10,
+      paddingRight: 10,
+      paddingTop: 6,
+      paddingBottom: 6,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.panelBg,
+    },
+    [
+      text({
+        text: value,
+        font: '11px Inter, system-ui',
+        lineHeight: 14,
+        color: theme.muted,
+      }),
+    ],
+  )
+}
+
+function detailCard(title: string, body: string): UIElement {
+  const theme = palette()
+  return box(
+    {
+      flexDirection: 'column',
+      gap: 6,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.panelBg,
+      minWidth: 0,
+      flexGrow: 1,
+    },
+    [
+      text({
+        text: title,
+        font: 'bold 13px Inter, system-ui',
+        lineHeight: 18,
+        color: theme.text,
+      }),
+      text({
+        text: body,
+        font: '12px Inter, system-ui',
+        lineHeight: 17,
+        color: theme.muted,
+      }),
+    ],
+  )
+}
+
+function fieldCard(title: string, description: string, control: UIElement): UIElement {
+  const theme = palette()
+  return box(
+    {
+      flexDirection: 'column',
+      gap: 10,
+      padding: 14,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.panelBg,
+      flexGrow: 1,
+      minWidth: 260,
+    },
+    [
+      box({ flexDirection: 'column', gap: 3 }, [
+        text({
+          text: title,
+          font: 'bold 13px Inter, system-ui',
+          lineHeight: 18,
+          color: theme.text,
+        }),
+        text({
+          text: description,
+          font: '12px Inter, system-ui',
+          lineHeight: 17,
+          color: theme.muted,
+        }),
+      ]),
+      control,
+    ],
+  )
+}
+
 function renderOverviewPage(): UIElement {
   const data = getLoaderData<OverviewData>('overview')
   if (!data) {
@@ -236,33 +369,67 @@ function renderOverviewPage(): UIElement {
     ])
   }
 
+  const p1Count = approvalQueue.value.filter((row) => row.severity === 'P1').length
+
   return box(
     {
-      flexDirection: 'column',
-      gap: 14,
+      flexDirection: 'row',
+      gap: 16,
+      flexGrow: 1,
+      minHeight: 0,
     },
     [
-      box({ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }, data.kpis.map(metricCard)),
-      panel(
-        'Deploy health',
-        compactMode.value ? 'Compact mode trims the table for faster operator scans.' : 'Recent release health streamed from server state.',
+      box(
+        {
+          flexGrow: 1,
+          minWidth: 0,
+          flexDirection: 'column',
+          gap: 16,
+        },
         [
-          dataTable(
+          box({ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }, data.kpis.map(metricCard)),
+          panel(
+            'Deploy health',
+            compactMode.value
+              ? 'Compact mode trims the table for faster operator scans.'
+              : 'Recent release health streamed from server state.',
             [
-              { key: 'service', header: 'Service' },
-              { key: 'channel', header: 'Channel' },
-              { key: 'latency', header: 'Latency' },
-              { key: 'status', header: 'Status' },
+              dataTable(
+                [
+                  { key: 'service', header: 'Service' },
+                  { key: 'channel', header: 'Channel' },
+                  { key: 'latency', header: 'Latency' },
+                  { key: 'status', header: 'Status' },
+                ],
+                data.releases,
+                {
+                  ariaLabel: 'Release health',
+                  onRowClick: (rowIndex) => {
+                    const row = data.releases[rowIndex]
+                    if (row) announce(`Focused ${row.service} (${row.status}) from the overview table.`)
+                  },
+                },
+              ),
             ],
-            data.releases,
-            {
-              ariaLabel: 'Release health',
-              onRowClick: (rowIndex) => {
-                const row = data.releases[rowIndex]
-                if (row) announce(`Focused ${row.service} (${row.status}) from the overview table.`)
-              },
-            },
           ),
+        ],
+      ),
+      box(
+        {
+          width: 320,
+          flexDirection: 'column',
+          gap: 16,
+        },
+        [
+          panel('Stack posture', 'This entire dashboard is server-rendered and streamed into the client canvas.', [
+            statBadge('Queue lanes', `${approvalQueue.value.length} open`, 'accent'),
+            statBadge('P1 incidents', String(p1Count), p1Count > 0 ? 'success' : 'neutral'),
+            detailCard('Transport', 'Binary WebSocket frames carry layout and paint updates from the server.'),
+          ]),
+          panel('Live notes', 'Layout, routing, loader data, and feedback are all in the same geometry tree.', [
+            detailCard('Focus model', 'Click once inside the canvas and keyboard navigation stays inside the Geometra app.'),
+            detailCard('Mutation loop', 'Queue actions update server signals, then router loaders revalidate and redraw the next frame.'),
+          ]),
         ],
       ),
     ],
@@ -320,35 +487,74 @@ function renderQueuePage(): UIElement {
     ])
   }
 
+  const escalated = data.rows.filter((row) => row.status === 'Escalated').length
+  const waiting = data.rows.filter((row) => row.status === 'Waiting').length
+
   return box(
     {
-      flexDirection: 'column',
-      gap: 14,
+      flexDirection: 'row',
+      gap: 16,
+      flexGrow: 1,
+      minHeight: 0,
     },
     [
-      panel('Quick actions', 'Commands mutate server state and then revalidate the active route.', [
-        commandPalette(data.commands, {
-          onSelect: handleQueueCommand,
-        }),
-      ]),
-      panel('Approval queue', 'Click any row to inspect an incident lane.', [
-        dataTable(
-          [
-            { key: 'service', header: 'Service' },
-            { key: 'severity', header: 'Severity' },
-            { key: 'owner', header: 'Owner' },
-            { key: 'status', header: 'Status' },
-          ],
-          data.rows,
-          {
-            ariaLabel: 'Approval queue',
-            onRowClick: (rowIndex) => {
-              const row = data.rows[rowIndex]
-              if (row) announce(`Selected ${row.service} (${row.severity}) routed to ${row.owner}.`)
+      box(
+        {
+          width: 320,
+          flexDirection: 'column',
+          gap: 16,
+        },
+        [
+          panel('Command deck', 'Commands mutate server state and then revalidate the active route.', [
+            commandPalette(data.commands, {
+              onSelect: handleQueueCommand,
+            }),
+          ]),
+          panel('Queue pressure', 'This route shows mutation + loader refresh without leaving the canvas.', [
+            statBadge('Waiting', `${waiting} lanes`, waiting > 0 ? 'accent' : 'neutral'),
+            statBadge('Escalated', `${escalated} lanes`, escalated > 0 ? 'success' : 'neutral'),
+            detailCard('Fast path', 'Approve the next rollout or promote a hotfix to watch both Queue and Overview repaint from server state.'),
+          ]),
+        ],
+      ),
+      box(
+        {
+          flexGrow: 1,
+          minWidth: 0,
+          flexDirection: 'column',
+          gap: 16,
+        },
+        [
+          panel('Approval queue', 'Click any row to inspect an incident lane.', [
+            dataTable(
+              [
+                { key: 'service', header: 'Service' },
+                { key: 'severity', header: 'Severity' },
+                { key: 'owner', header: 'Owner' },
+                { key: 'status', header: 'Status' },
+              ],
+              data.rows,
+              {
+                ariaLabel: 'Approval queue',
+                onRowClick: (rowIndex) => {
+                  const row = data.rows[rowIndex]
+                  if (row) announce(`Selected ${row.service} (${row.severity}) routed to ${row.owner}.`)
+                },
+              },
+            ),
+          ]),
+          box(
+            {
+              flexDirection: 'row',
+              gap: 12,
+              flexWrap: 'wrap',
             },
-          },
-        ),
-      ]),
+            data.rows.slice(0, 3).map((row) =>
+              detailCard(row.service, `${row.severity} · ${row.owner} · ${row.status}`),
+            ),
+          ),
+        ],
+      ),
     ],
   )
 }
@@ -362,75 +568,140 @@ function renderSettingsPage(): UIElement {
 
   return box(
     {
-      flexDirection: 'column',
-      gap: 14,
+      flexDirection: 'row',
+      gap: 16,
+      flexGrow: 1,
+      minHeight: 0,
     },
     [
-      panel(
-        'Operator preferences',
-        data
-          ? `Saved theme: ${THEME_LABELS[data.theme]}. Compact mode: ${data.compactMode ? 'on' : 'off'}.`
-          : 'Loading saved preferences from the route loader.',
+      box(
+        {
+          flexGrow: 1,
+          minWidth: 0,
+          flexDirection: 'column',
+          gap: 16,
+        },
         [
-          selectControl({
-            open: themeMenuOpen.value,
-            value: draftTheme.value,
-            placeholder: 'Theme',
-            onToggle: () => themeMenuOpen.set(!themeMenuOpen.peek()),
-            onChange: (value) => {
-              draftTheme.set(value as ThemeKey)
-              themeMenuOpen.set(false)
-            },
-            options: [
-              { value: 'midnight', label: THEME_LABELS.midnight },
-              { value: 'ember', label: THEME_LABELS.ember },
-              { value: 'frost', label: THEME_LABELS.frost },
+          panel(
+            'Appearance',
+            data
+              ? `Saved theme: ${THEME_LABELS[data.theme]}. Compact mode: ${data.compactMode ? 'on' : 'off'}.`
+              : 'Loading saved preferences from the route loader.',
+            [
+              box(
+                {
+                  flexDirection: 'row',
+                  gap: 12,
+                  flexWrap: 'wrap',
+                },
+                [
+                  fieldCard(
+                    'Theme shell',
+                    'Pick the full-canvas visual treatment for the app shell.',
+                    selectControl({
+                      open: themeMenuOpen.value,
+                      value: draftTheme.value,
+                      placeholder: 'Theme',
+                      onToggle: () => themeMenuOpen.set(!themeMenuOpen.peek()),
+                      onChange: (value) => {
+                        draftTheme.set(value as ThemeKey)
+                        themeMenuOpen.set(false)
+                      },
+                      options: [
+                        { value: 'midnight', label: THEME_LABELS.midnight },
+                        { value: 'ember', label: THEME_LABELS.ember },
+                        { value: 'frost', label: THEME_LABELS.frost },
+                      ],
+                    }),
+                  ),
+                  fieldCard(
+                    'Density',
+                    'Compact mode trims row-heavy routes for faster operator scanning.',
+                    checkbox('Compact tables across routes', {
+                      checked: draftCompactMode.value,
+                      onChange: (checked) => draftCompactMode.set(checked),
+                    }),
+                  ),
+                ],
+              ),
             ],
-          }),
-          checkbox('Compact tables across routes', {
-            checked: draftCompactMode.value,
-            onChange: (checked) => draftCompactMode.set(checked),
-          }),
-          box({ flexDirection: 'row', gap: 10, alignItems: 'center' }, [
-            button(dirty ? 'Review changes' : 'Saved', () => {
-              if (!dirty) {
-                announce('Settings already match the saved server state.')
-                return
-              }
-              saveDialogOpen.set(true)
-            }),
-            text({
-              text: saveResult
-                ? `Last saved at ${saveResult.savedAt}`
-                : 'Route action will save and revalidate on the server.',
-              font: '12px Inter, system-ui',
-              lineHeight: 16,
-              color: palette().muted,
-            }),
+          ),
+          panel(
+            'Save through the router',
+            dirty
+              ? 'Draft changes are ready to submit through a route action.'
+              : 'The current draft already matches the saved server state.',
+            [
+              box(
+                {
+                  flexDirection: 'row',
+                  gap: 12,
+                  flexWrap: 'wrap',
+                },
+                [
+                  detailCard('Saved theme', THEME_LABELS[savedTheme.value]),
+                  detailCard('Draft theme', THEME_LABELS[draftTheme.value]),
+                  detailCard('Table density', draftCompactMode.value ? 'Compact tables' : 'Comfortable spacing'),
+                ],
+              ),
+              box({ flexDirection: 'row', gap: 12, alignItems: 'center', flexWrap: 'wrap' }, [
+                dirty
+                  ? button('Review changes', () => {
+                      saveDialogOpen.set(true)
+                    })
+                  : statBadge('Status', 'Saved', 'success'),
+                text({
+                  text: saveResult
+                    ? `Last saved at ${saveResult.savedAt}`
+                    : 'Route action will save and revalidate on the server.',
+                  font: '12px Inter, system-ui',
+                  lineHeight: 16,
+                  color: palette().muted,
+                }),
+              ]),
+            ],
+          ),
+          saveDialogOpen.value
+            ? dialog(
+                'Apply server-side preferences',
+                `Theme: ${THEME_LABELS[draftTheme.value]} | Compact mode: ${draftCompactMode.value ? 'on' : 'off'}`,
+                [
+                  button('Apply', () => {
+                    saveDialogOpen.set(false)
+                    void router.submitAction('settings', {
+                      method: 'POST',
+                      data: {
+                        theme: draftTheme.value,
+                        compactMode: draftCompactMode.value,
+                      } satisfies SettingsSubmission,
+                    })
+                  }),
+                  button('Cancel', () => {
+                    saveDialogOpen.set(false)
+                  }),
+                ],
+              )
+            : box({ height: 0 }, []),
+        ],
+      ),
+      box(
+        {
+          width: 320,
+          flexDirection: 'column',
+          gap: 16,
+        },
+        [
+          panel('Live preview', 'The next action round-trip will repaint the shell with these preferences.', [
+            statBadge('Theme', THEME_LABELS[draftTheme.value], 'accent'),
+            statBadge('Density', draftCompactMode.value ? 'Compact' : 'Comfortable', draftCompactMode.value ? 'success' : 'neutral'),
+            detailCard('Save model', 'The canvas renders the controls, while the router action persists preferences on the server.'),
+          ]),
+          panel('What this route proves', 'This is still one Geometra page handling controls, actions, and feedback.', [
+            detailCard('No DOM widgets', 'The select menu, checkbox, toast, and dialog are all rendered in the Geometra tree.'),
+            detailCard('Server authority', 'Saved state, loader data, and timestamps come from the route on the server, not local client state.'),
           ]),
         ],
       ),
-      saveDialogOpen.value
-        ? dialog(
-            'Apply server-side preferences',
-            `Theme: ${THEME_LABELS[draftTheme.value]} | Compact mode: ${draftCompactMode.value ? 'on' : 'off'}`,
-            [
-              button('Apply', () => {
-                saveDialogOpen.set(false)
-                void router.submitAction('settings', {
-                  method: 'POST',
-                  data: {
-                    theme: draftTheme.value,
-                    compactMode: draftCompactMode.value,
-                  } satisfies SettingsSubmission,
-                })
-              }),
-              button('Cancel', () => {
-                saveDialogOpen.set(false)
-              }),
-            ],
-          )
-        : box({ height: 0 }, []),
     ],
   )
 }
@@ -498,16 +769,22 @@ function renderShell(outlet: UIElement | null): UIElement {
   return box(
     {
       flexDirection: 'row',
-      gap: 18,
-      padding: 18,
-      width: 980,
-      height: 640,
+      gap: 24,
+      padding: 24,
       backgroundColor: theme.appBg,
+      gradient: {
+        type: 'linear',
+        angle: 145,
+        stops: [
+          { offset: 0, color: theme.appBg },
+          { offset: 1, color: theme.panelBg },
+        ],
+      },
     },
     [
       box(
         {
-          width: 250,
+          width: 280,
           flexDirection: 'column',
           gap: 14,
           padding: 16,
@@ -515,6 +792,12 @@ function renderShell(outlet: UIElement | null): UIElement {
           borderWidth: 1,
           borderColor: theme.border,
           backgroundColor: theme.panelBg,
+          boxShadow: {
+            offsetX: 0,
+            offsetY: 18,
+            blur: 36,
+            color: 'rgba(1, 8, 18, 0.28)',
+          },
         },
         [
           box({ flexDirection: 'column', gap: 4 }, [
@@ -539,6 +822,11 @@ function renderShell(outlet: UIElement | null): UIElement {
           panel('Why this example matters', 'The same route tree drives layout, interaction, and transport.', [
             list(FEATURE_BULLETS),
           ]),
+          box({ flexGrow: 1 }, []),
+          panel('Transport', 'The browser client only paints and forwards input into the Geometra tree.', [
+            detailCard('Thin client', 'Binary framing is enabled for server-to-canvas updates.'),
+            detailCard('Connected sessions', `${connectedClients.value} browser client${connectedClients.value === 1 ? '' : 's'} attached to this server.`),
+          ]),
         ],
       ),
       box(
@@ -551,48 +839,62 @@ function renderShell(outlet: UIElement | null): UIElement {
           borderWidth: 1,
           borderColor: theme.border,
           backgroundColor: theme.panelBg,
+          boxShadow: {
+            offsetX: 0,
+            offsetY: 18,
+            blur: 40,
+            color: 'rgba(1, 8, 18, 0.28)',
+          },
         },
         [
           box(
             {
               flexDirection: 'row',
               justifyContent: 'space-between',
-              alignItems: 'center',
-              gap: 12,
+              alignItems: 'flex-start',
+              gap: 16,
+              flexWrap: 'wrap',
             },
             [
-              box({ flexDirection: 'column', gap: 3 }, [
+              box({ flexDirection: 'column', gap: 8 }, [
                 text({
                   text: routeLabel,
                   font: 'bold 20px Inter, system-ui',
                   lineHeight: 26,
                   color: theme.text,
                 }),
-                text({
-                  text: `Path: ${state.location.pathname} | Theme: ${THEME_LABELS[savedTheme.value]}`,
-                  font: '12px Inter, system-ui',
-                  lineHeight: 16,
-                  color: theme.muted,
-                }),
+                box({ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }, [
+                  metaChip(`Path ${state.location.pathname}`),
+                  metaChip(`${connectedClients.value} client${connectedClients.value === 1 ? '' : 's'} online`),
+                ]),
               ]),
-              box({ flexDirection: 'column', alignItems: 'flex-end', gap: 3 }, [
-                text({
-                  text: `Navigation: ${state.navigation}`,
-                  font: 'bold 12px Inter, system-ui',
-                  lineHeight: 16,
-                  color: state.navigation === 'idle' ? theme.success : theme.accent,
-                }),
-                text({
-                  text: compactMode.value ? 'Compact mode enabled' : 'Comfortable table spacing',
-                  font: '12px Inter, system-ui',
-                  lineHeight: 16,
-                  color: theme.muted,
-                }),
+              box({ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }, [
+                statBadge(
+                  'Navigation',
+                  state.navigation === 'idle' ? 'Idle' : 'Syncing',
+                  state.navigation === 'idle' ? 'success' : 'accent',
+                ),
+                statBadge(
+                  'Density',
+                  compactMode.value ? 'Compact' : 'Comfortable',
+                  compactMode.value ? 'accent' : 'neutral',
+                ),
+                statBadge('Theme', THEME_LABELS[savedTheme.value], 'neutral'),
               ]),
             ],
           ),
-          banner,
-          outlet ?? panel('No route matched', 'The server-side router could not resolve this path.', []),
+          box(
+            {
+              flexDirection: 'column',
+              gap: 16,
+              flexGrow: 1,
+              minHeight: 0,
+            },
+            [
+              banner,
+              outlet ?? panel('No route matched', 'The server-side router could not resolve this path.', []),
+            ],
+          ),
         ],
       ),
     ],
@@ -712,8 +1014,8 @@ function view(): UIElement {
 
 server = await createServer(view, {
   port: 3200,
-  width: 980,
-  height: 640,
+  width: 1280,
+  height: 820,
   onConnection: () => {
     connectedClients.set(connectedClients.peek() + 1)
     server?.update()
@@ -731,6 +1033,7 @@ console.log(`
   Geometra Full-Stack Dashboard
   ─────────────────────────────
   Server: ws://localhost:3200
+  Client: http://localhost:5173/
 
   Run the client with:
     cd demos/full-stack-dashboard
