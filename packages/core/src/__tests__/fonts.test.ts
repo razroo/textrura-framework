@@ -766,6 +766,21 @@ describe('collectFontFamiliesFromTree', () => {
     expect(collectFontFamiliesFromTree(tree)).toEqual([])
   })
 
+  it('returns empty when shorthand is only unset, revert, revert-layer, and generics', () => {
+    const tree = box({}, [
+      text({ text: 'a', font: '14px unset, revert, revert-layer, serif', lineHeight: 20 }),
+    ])
+    expect(collectFontFamiliesFromTree(tree)).toEqual([])
+  })
+
+  it('keeps distinct spellings across nodes (tree Set dedup is case-sensitive unlike a single shorthand list)', () => {
+    const tree = box({}, [
+      text({ text: 'a', font: '14px Inter, serif', lineHeight: 20 }),
+      text({ text: 'b', font: '14px inter, serif', lineHeight: 20 }),
+    ])
+    expect(collectFontFamiliesFromTree(tree)).toEqual(['Inter', 'inter'])
+  })
+
   it('treats non-string font on text nodes as empty (walk does not throw on bad deserialized props)', () => {
     const node = text({ text: 'x', font: '14px Inter', lineHeight: 20 })
     Object.assign(node.props, { font: null as unknown as string })
