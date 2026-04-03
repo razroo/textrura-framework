@@ -130,6 +130,53 @@ describe('createClient WebSocket message parse errors', () => {
     expect(String((errors[0] as Error).message)).toContain('Invalid server message')
   })
 
+  it('invokes onError when type is error but message is not a string, then accepts a valid frame', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+    const renders: ComputedLayout[] = []
+    const renderer: Renderer = {
+      render: (layout: ComputedLayout) => {
+        renders.push({ ...layout, children: layout.children })
+      },
+      destroy: () => {},
+    }
+
+    const client = createClient({
+      url: 'ws://mock.test',
+      renderer,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    sockets[0]!.emit('message', {
+      data: JSON.stringify({ type: 'error', message: 503, protocolVersion: 1 }),
+    })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(Error)
+    expect(String((errors[0] as Error).message)).toContain('Invalid server message')
+
+    const validFrame = {
+      type: 'frame',
+      layout: { x: 0, y: 0, width: 31, height: 32, children: [] },
+      tree: { kind: 'box', props: {}, children: [] } satisfies UIElement,
+      protocolVersion: 1,
+    }
+    sockets[0]!.emit('message', { data: JSON.stringify(validFrame) })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(renders).toHaveLength(1)
+    expect(renders[0]?.width).toBe(31)
+    expect(client.layout?.width).toBe(31)
+  })
+
   it('invokes onError for JSON text null, primitives, and arrays without breaking the socket', async () => {
     const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
     installMockWebSocket(sockets)
