@@ -80,4 +80,16 @@ describe('route matcher', () => {
       params: { '*': 'guides//section' },
     })
   })
+
+  it('treats empty pathname as root (same as /) after normalization', () => {
+    expect(matchPath('/', '')).toEqual({ params: {} })
+    expect(matchPath('/', '/')).toEqual({ params: {} })
+    expect(matchPath('/home', '')).toBeNull()
+  })
+
+  it('when the same param name appears twice, the later capture wins', () => {
+    expect(matchPath('/users/:id/posts/:id', '/users/1/posts/2')).toEqual({
+      params: { id: '2' },
+    })
+  })
 })
