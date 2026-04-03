@@ -188,6 +188,39 @@ describe('trapFocusStep', () => {
     expect(focusedElement.peek()?.element).toBe(clickOnly)
   })
 
+  it('includes onCompositionUpdate-only and onCompositionEnd-only boxes in trap order', () => {
+    const updateOnly = box({ onCompositionUpdate: () => undefined }, [])
+    const endOnly = box({ onCompositionEnd: () => undefined }, [])
+    const tree = box({}, [box({}, [updateOnly, endOnly])])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: [
+        {
+          x: 0,
+          y: 0,
+          width: 200,
+          height: 100,
+          children: [
+            { x: 0, y: 0, width: 100, height: 40, children: [] },
+            { x: 0, y: 50, width: 100, height: 40, children: [] },
+          ],
+        },
+      ],
+    }
+
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(updateOnly)
+
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(endOnly)
+
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(updateOnly)
+  })
+
   it('includes composition-only boxes in trap order (same rule as collectFocusOrder)', () => {
     const compOnly = box({ onCompositionStart: () => undefined }, [])
     const keyOnly = box({ onKeyDown: () => undefined }, [])
