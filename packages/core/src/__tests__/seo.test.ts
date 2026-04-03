@@ -531,6 +531,43 @@ describe('toSemanticHTML', () => {
     expect(toSemanticHTML(el)).toContain('<span>Hi</span>')
   })
 
+  it('uses semantic.alt on images when props.alt is omitted', () => {
+    const el = box({ width: 200, height: 200 }, [
+      image({
+        src: '/hero.png',
+        width: 100,
+        height: 100,
+        semantic: { alt: 'Hero illustration' },
+      }),
+    ])
+    expect(toSemanticHTML(el)).toContain('alt="Hero illustration"')
+  })
+
+  it('escapes semantic.alt on images when props.alt is omitted', () => {
+    const el = box({ width: 200, height: 200 }, [
+      image({
+        src: '/x.png',
+        width: 10,
+        height: 10,
+        semantic: { alt: 'A & B <tag>' },
+      }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('alt="A &amp; B &lt;tag&gt;"')
+  })
+
+  it('ignores semantic.tag that starts with a hyphen and falls back to inferred tags', () => {
+    const el = box({ width: 200, height: 50 }, [
+      text({
+        text: 'Heading',
+        font: 'bold 32px sans-serif',
+        lineHeight: 40,
+        semantic: { tag: '-h1' },
+      }),
+    ])
+    expect(toSemanticHTML(el)).toContain('<h1>Heading</h1>')
+  })
+
   it('ignores malformed semantic.tag and falls back to inferred tags', () => {
     const el = box({ width: 200, height: 120 }, [
       text({
