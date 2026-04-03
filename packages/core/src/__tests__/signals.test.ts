@@ -483,3 +483,12 @@ describe('batch', () => {
     expect(runs).toBe(1)
   })
 })
+
+describe('@geometra/core/node subpath entry', () => {
+  it('re-exports core public API after polyfill bootstrap', async () => {
+    const mod = await import('../node.js')
+    expect(typeof mod.signal).toBe('function')
+    expect(typeof mod.createApp).toBe('function')
+    expect(typeof mod.dispatchHit).toBe('function')
+  })
+})
