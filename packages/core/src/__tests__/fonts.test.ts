@@ -139,6 +139,7 @@ describe('extractFontFamiliesFromCSSFont', () => {
       extractFontFamiliesFromCSSFont('calc(min(1rem, max(12px, 10vw))) Literata, serif'),
     ).toEqual(['Literata'])
     expect(extractFontFamiliesFromCSSFont('calc((14px + 1px)) Inter, sans-serif')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('calc(((((14px))))) Inter, sans-serif')).toEqual(['Inter'])
     expect(
       extractFontFamiliesFromCSSFont('min(max(12px, 1rem), 3rem) JetBrains Mono, monospace'),
     ).toEqual(['JetBrains Mono'])
@@ -770,8 +771,10 @@ describe('waitForFonts', () => {
   })
 
   it('no-ops when document.fonts.load is missing', async () => {
-    vi.stubGlobal('document', { fonts: { ready: Promise.resolve() } })
-    await waitForFonts(['Inter'])
+    const fonts = { ready: Promise.resolve() }
+    vi.stubGlobal('document', { fonts })
+    await expect(waitForFonts(['Inter'])).resolves.toBeUndefined()
+    expect(fonts).not.toHaveProperty('load')
   })
 
   it('resolves when fonts.ready is absent after load succeeds', async () => {
