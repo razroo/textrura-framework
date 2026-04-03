@@ -139,6 +139,59 @@ describe('collectTextNodes', () => {
     expect(collect(3, Number.POSITIVE_INFINITY)[0]).toMatchObject({ x: 18, y: 20 })
     expect(collect('7' as unknown as number, 0)[0]).toMatchObject({ x: 15, y: 20 })
   })
+
+  it('skips the whole walk when root layout bounds are corrupt (aligned with hit-test / focus)', () => {
+    const el = box({ width: 200, height: 100 }, [
+      text({ text: 'Hi', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
+    ])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: Number.NaN,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 100, height: 18, children: [] }],
+    }
+    const results: TextNodeInfo[] = []
+    collectTextNodes(el, layout, 0, 0, results)
+    expect(results).toHaveLength(0)
+  })
+
+  it('does not descend under a box with corrupt layout even when a child layout looks valid', () => {
+    const el = box({ width: 200, height: 100 }, [
+      text({ text: 'Hidden', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
+    ])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: [{ x: 0, y: 0, width: -1, height: 18, children: [] }],
+    }
+    const results: TextNodeInfo[] = []
+    collectTextNodes(el, layout, 0, 0, results)
+    expect(results).toHaveLength(0)
+  })
+
+  it('skips a text leaf whose own layout bounds are corrupt', () => {
+    const el = box({ width: 200, height: 100 }, [
+      text({ text: 'Bad', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
+      text({ text: 'Good', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
+    ])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: Number.NaN, height: 18, children: [] },
+        { x: 0, y: 18, width: 100, height: 18, children: [] },
+      ],
+    }
+    const results: TextNodeInfo[] = []
+    collectTextNodes(el, layout, 0, 0, results)
+    expect(results).toHaveLength(1)
+    expect(results[0].element.props.text).toBe('Good')
+  })
 })
 
 describe('getSelectedText', () => {

@@ -51,6 +51,10 @@ export interface SelectionRange {
  * Root `offsetX` / `offsetY` share the same coordinate space as pointer hits; non-finite or non-number
  * values are treated as `0` (same rule as {@link import('./hit-test.js').dispatchHit} /
  * {@link import('./hit-test.js').hitPathAtPoint} for rooted surfaces).
+ *
+ * Nodes whose {@link ComputedLayout} bounds fail {@link layoutBoundsAreFinite} are skipped, and box
+ * subtrees under a corrupt parent are not walked — same rule as hit-testing and focus order so bad
+ * geometry cannot poison absolute coordinates or flood selection with unusable entries.
  */
 export function collectTextNodes(
   element: UIElement,
@@ -78,6 +82,8 @@ function collectTextNodesWalk(
   results: TextNodeInfo[],
   parentDirection: ResolvedDirection,
 ): void {
+  if (!layoutBoundsAreFinite(layout)) return
+
   const x = offsetX + layout.x
   const y = offsetY + layout.y
   const direction = resolveElementDirection(element, parentDirection)
