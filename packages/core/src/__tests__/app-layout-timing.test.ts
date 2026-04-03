@@ -555,6 +555,42 @@ describe('createApp dispatch guards', () => {
     expect(focusedElement.value).not.toBeNull()
   })
 
+  it('returns false from dispatch when pointer coordinates are non-numbers (matches dispatchHit)', async () => {
+    let clicks = 0
+    const renderer: Renderer = {
+      render: vi.fn(),
+      destroy: vi.fn(),
+    }
+    const app = await createApp(
+      () =>
+        box({ width: 100, height: 100, onKeyDown: () => {}, onClick: () => {
+          clicks++
+        } }, []),
+      renderer,
+      { width: 100, height: 100 },
+    )
+
+    clearFocus()
+    expect(focusedElement.value).toBeNull()
+
+    const str50 = '50' as unknown as number
+    expect(() => app.dispatch('onClick', str50, 50)).not.toThrow()
+    expect(app.dispatch('onClick', str50, 50)).toBe(false)
+    expect(clicks).toBe(0)
+    expect(focusedElement.value).toBeNull()
+
+    expect(app.dispatch('onClick', 50, str50)).toBe(false)
+    expect(clicks).toBe(0)
+
+    const bx = 1n as unknown as number
+    expect(() => app.dispatch('onPointerDown', bx, 50)).not.toThrow()
+    expect(app.dispatch('onPointerDown', bx, 50)).toBe(false)
+
+    expect(app.dispatch('onClick', 50, 50)).toBe(true)
+    expect(clicks).toBe(1)
+    expect(focusedElement.value).not.toBeNull()
+  })
+
   it('returns false from dispatchKey and dispatchComposition when tree or layout is null', async () => {
     const renderer: Renderer = {
       render: vi.fn(),
