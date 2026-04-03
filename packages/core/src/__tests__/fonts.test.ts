@@ -151,6 +151,10 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('14px "Trail\\')).toEqual(['Trail\\'])
   })
 
+  it('parses unclosed single-quoted family with trailing backslash (escape at EOF)', () => {
+    expect(extractFontFamiliesFromCSSFont("14px 'Trail\\")).toEqual(['Trail\\'])
+  })
+
   it('parses pt- and pc-sized shorthand', () => {
     expect(extractFontFamiliesFromCSSFont('12pt Times New Roman, serif')).toEqual(['Times New Roman'])
     expect(extractFontFamiliesFromCSSFont('1pc Courier New, monospace')).toEqual(['Courier New'])
@@ -404,6 +408,7 @@ describe('extractFontFamiliesFromCSSFont', () => {
 
   it('treats unclosed quoted family as a single segment (best-effort)', () => {
     expect(extractFontFamiliesFromCSSFont('14px "Unclosed Name')).toEqual(['Unclosed Name'])
+    expect(extractFontFamiliesFromCSSFont("14px 'Unclosed Name")).toEqual(['Unclosed Name'])
   })
 
   it('respects backslash-escaped double quote inside a double-quoted family', () => {
