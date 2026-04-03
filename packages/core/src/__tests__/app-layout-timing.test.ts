@@ -118,6 +118,33 @@ describe('createApp layout timing', () => {
   })
 })
 
+describe('createApp destroy', () => {
+  it('stops reactive re-layout after destroy so signal updates do not render', async () => {
+    const setFrameTimings = vi.fn()
+    const render = vi.fn()
+    const renderer: Renderer = {
+      setFrameTimings,
+      render,
+      destroy: vi.fn(),
+    }
+    const width = signal(40)
+    const app = await createApp(() => box({ width: width.value, height: 20 }, []), renderer, {
+      width: 100,
+      height: 50,
+    })
+
+    expect(setFrameTimings).toHaveBeenCalledTimes(1)
+    expect(render).toHaveBeenCalledTimes(1)
+
+    app.destroy()
+
+    width.set(99)
+    expect(setFrameTimings).toHaveBeenCalledTimes(1)
+    expect(render).toHaveBeenCalledTimes(1)
+    expect(renderer.destroy).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('createApp onError', () => {
   afterEach(() => {
     vi.restoreAllMocks()
