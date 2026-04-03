@@ -26,6 +26,10 @@ fi
 # Extend an allowlisted file when adding release-critical tests unless you intentionally widen the gate.
 # Layout/Yoga geometry regression: use `packages/core/src/__tests__/geometry-snapshot-ci.test.ts` (gate-listed)
 # and `GEOMETRY_SNAPSHOT_TESTING.md`; avoid unrelated snapshot churn unless widening the gate on purpose.
+# Demos and starter output: read `AGENTS.md` — Geometra should own the full viewport; no marketing DOM shells
+# or extra chrome around the canvas; diagnostics belong in-tree, not adjacent HTML panels.
+# Interaction / protocol / renderer changes: skim `FRAMEWORK_NORTH_STAR.md` merge checklist (DOM-free invariants,
+# input tests, perf hot paths, docs accuracy) before shipping.
 # Ignore `[ ]` in RELEASE_CHECKLIST.md / v1-release-checklist.md
 # (maintainer release steps, not framework backlog).
 #
@@ -115,7 +119,7 @@ You are working on Geometra, a DOM-free UI framework. Respect CLAUDE.md, FRAMEWO
 
 Single iteration — do exactly one cohesive, meaningful slice of work:
 
-1. Explore the codebase. Read ROADMAP.md, CLAUDE.md, and browse the source in packages/. Understand the architecture and what already exists.
+1. Explore the codebase. Read ROADMAP.md, CLAUDE.md, and browse the source in packages/. Understand the architecture and what already exists. If the task touches demo sites, \`create:app\` templates, or starter examples, read AGENTS.md (full-viewport canvas; no extra DOM chrome around Geometra).
 
 2. Decide what to work on. Use this priority order:
    a) Unchecked items in ROADMAP.md (if any remain). Grep the whole file for \`[ ]\` — not only Phase A–C; post-1.0, release polish, and next-frontier blocks use the same pattern. When every checkbox is \`[x]\`, still grep ROUTING_COMPETITIVENESS_CHECKLIST.md for any remaining \`[ ]\` lines; use those sections for thematic priorities (fonts/metrics, hit-test and input, protocol, renderers, demos). The ROADMAP "Deferred / research" subsection has no checkboxes — read it explicitly when everything else is \`[x]\` and you want roadmap-aligned themes. Ignore \`[ ]\` in RELEASE_CHECKLIST.md and v1-release-checklist.md — those are maintainer release steps, not framework backlog.
@@ -128,8 +132,8 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
       - Improve or add JSDoc on public API surfaces
       - Fix any TODO/FIXME/HACK comments in the source
       - Add small, useful features that fit the framework's philosophy
-      - Improve the demo site or starter templates
-      Prefer one primary subsystem or package per iteration (e.g. core hit-test, fonts, server protocol); avoid wide drive-by refactors unless the task truly spans boundaries.
+      - Improve the demo site or starter templates (follow AGENTS.md: Geometra owns the page; minimal host HTML)
+      Prefer one primary subsystem or package per iteration (e.g. core hit-test, fonts, server protocol); avoid wide drive-by refactors unless the task truly spans boundaries. For hit-test, text input, protocol, or layout/repaint work, align with FRAMEWORK_NORTH_STAR.md (merge checklist: tests where practical, no DOM leaks, no avoidable perf regressions).
       When adding tests without a specific bugfix, prefer extending files already run by root \`package.json\` \`release:gate\` (keeps new coverage in the vetted CI path; only widen the gate when the suite is release-critical). The gate is an explicit file allowlist — \`npm run test\` (vitest.fast) may run additional files that the gate does not; confirm in \`package.json\` rather than assuming. If you widen the gate, grep or read the existing \`vitest run ...\` list first so you do not add a duplicate path (vitest would execute that file twice).
       When both roadmap checklists are fully checked, re-read ROADMAP "Deferred / research" for themes, or target north-star hot paths (hit-test, text measurement, protocol encode/decode, layout/repaint).
       Pick something concrete and high-value. Do NOT say there is nothing to do — there is always room to improve a codebase.
