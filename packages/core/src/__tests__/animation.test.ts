@@ -215,6 +215,23 @@ describe('animation timeline', () => {
     expect(timelineNeg.state()).toBe('finished')
   })
 
+  it('treats non-finite step deltas as 0 so elapsed and values stay finite', () => {
+    const timeline = createTweenTimeline(0)
+    timeline.to(100, 1000, easing.linear)
+    expect(timeline.step(500)).toBe(50)
+    expect(timeline.step(Number.NaN)).toBe(50)
+    expect(timeline.value.peek()).toBe(50)
+    expect(timeline.state()).toBe('running')
+    expect(timeline.step(Number.POSITIVE_INFINITY)).toBe(50)
+
+    const props = createPropertyTimeline({ x: 0 })
+    props.to({ x: 100 }, 1000, easing.linear)
+    props.step(400)
+    expect(props.values.x.peek()).toBe(40)
+    expect(props.step(Number.NaN).x).toBe(40)
+    expect(props.values.x.peek()).toBe(40)
+  })
+
   it('jumps to target when duration is non-finite (aligned with transition)', () => {
     const nan = createTweenTimeline(0)
     nan.to(42, Number.NaN, easing.linear)

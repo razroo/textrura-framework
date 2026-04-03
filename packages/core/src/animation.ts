@@ -14,6 +14,11 @@ function finiteTimelineNumber(value: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
 
+/** Advance amount for timeline stepping: finite `deltaMs` clamped to `>= 0`; otherwise `0` (NaN/±Infinity cannot poison `elapsed`). */
+function stepDeltaMs(deltaMs: number): number {
+  return typeof deltaMs === 'number' && Number.isFinite(deltaMs) ? Math.max(0, deltaMs) : 0
+}
+
 /** Common easing functions. */
 export const easing = {
   linear: (t: number) => t,
@@ -29,7 +34,10 @@ export interface TweenTimeline {
   value: Signal<number>
   /** Schedule/interrupt toward a new target. */
   to(to: number, durationMs: number, easingFn?: EasingFn): void
-  /** Deterministically advance timeline by fixed milliseconds. */
+  /**
+   * Deterministically advance the timeline by up to `deltaMs` ms (finite values clamped to `>= 0`).
+   * Non-finite or non-number `deltaMs` is treated as `0`.
+   */
   step(deltaMs: number): number
   pause(): void
   resume(): void
@@ -40,6 +48,7 @@ export interface TweenTimeline {
 export interface PropertyTimeline {
   values: Record<string, Signal<number>>
   to(targets: Record<string, number>, durationMs: number, easingFn?: EasingFn): void
+  /** Per-key stepping; `deltaMs` rules match {@link TweenTimeline.step}. */
   step(deltaMs: number): Record<string, number>
   pause(): void
   resume(): void
@@ -111,6 +120,9 @@ export function transition(
  * matching {@link transition} so corrupt or serialized values never leave `step()` dividing by NaN.
  *
  * Non-finite `initialValue` normalizes to `0` so a corrupt starting pose cannot freeze timelines in NaN.
+ *
+ * {@link TweenTimeline.step} uses the same finite guard for `deltaMs` so a bad frame clock (NaN/±Infinity)
+ * cannot poison internal elapsed time.
  */
 export function createTweenTimeline(initialValue: number): TweenTimeline {
   const initial = finiteTimelineNumber(initialValue)
@@ -153,7 +165,7 @@ export function createTweenTimeline(initialValue: number): TweenTimeline {
 
   function step(deltaMs: number): number {
     if (playbackState !== 'running') return value.peek()
-    elapsed += Math.max(0, deltaMs)
+    elapsed += stepDeltaMs(deltaMs)
     const t = Math.min(elapsed / duration, 1)
     const next = from + (to - from) * easingFn(t)
     value.set(next)
