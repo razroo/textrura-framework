@@ -25,9 +25,16 @@ function encode(value: string): string {
  * `+` in values is treated as space. Duplicate keys collapse to `string[]` in encounter order.
  * If decoding a segment throws, that segment is left as the raw string (see malformed `%` escapes).
  * The returned object has a null prototype (see {@link ParsedQuery}).
+ *
+ * Any raw `#` and following characters are ignored (URL fragment delimiter), so accidental
+ * `?a=1#hash` input still parses like `location.search`. Encoded `#` inside values (`%23`) is unchanged.
  */
 export function parseQuery(search: string): ParsedQuery {
-  const input = search.startsWith('?') ? search.slice(1) : search
+  let input = search.startsWith('?') ? search.slice(1) : search
+  const hashIdx = input.indexOf('#')
+  if (hashIdx >= 0) {
+    input = input.slice(0, hashIdx)
+  }
   if (input === '') return Object.create(null) as ParsedQuery
 
   const result = Object.create(null) as ParsedQuery

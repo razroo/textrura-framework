@@ -14,6 +14,17 @@ describe('query helpers', () => {
     expect(Object.getPrototypeOf(q)).toBeNull()
   })
 
+  it('ignores a URL fragment after the first raw # (query vs hash boundary)', () => {
+    expect(parseQuery('?a=1#ignored')).toEqual({ a: '1' })
+    expect(parseQuery('a=2&b=3#hash')).toEqual({ a: '2', b: '3' })
+    expect(parseQuery('?#')).toEqual({})
+    expect(parseQuery('#solo')).toEqual({})
+  })
+
+  it('does not strip # that is percent-encoded inside a value', () => {
+    expect(parseQuery('q=a%23b')).toEqual({ q: 'a#b' })
+  })
+
   it('parses key without equals as empty value', () => {
     expect(parseQuery('enable')).toEqual({ enable: '' })
     expect(parseQuery('?flag&on=1')).toEqual({ flag: '', on: '1' })
