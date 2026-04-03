@@ -10,6 +10,19 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ x: -10, y: 3.5, width: 0, height: 0, children: [] })).toBe(true)
   })
 
+  it('ignores extra enumerable keys on the layout object (only x, y, width, height are validated)', () => {
+    const withExtra = {
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+      children: [],
+      extra: 'ignored',
+      depth: NaN,
+    } as unknown as ComputedLayout
+    expect(layoutBoundsAreFinite(withExtra)).toBe(true)
+  })
+
   it('accepts extreme finite coordinates and subnormal positive width/height (still Number.isFinite)', () => {
     const children = [] as const
     expect(
