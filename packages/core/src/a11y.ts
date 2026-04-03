@@ -63,12 +63,17 @@ function inferName(element: UIElement): string | undefined {
   return element.semantic?.alt
 }
 
+/** Matches `collectFocusOrder` / click-to-focus: key, click, or composition handlers make a box focusable. */
 function isFocusable(element: UIElement): boolean {
   if (element.kind !== 'box') return false
+  const h = element.handlers
   return !!(
-    element.handlers?.onClick ||
-    element.handlers?.onKeyDown ||
-    element.handlers?.onKeyUp
+    h?.onClick ||
+    h?.onKeyDown ||
+    h?.onKeyUp ||
+    h?.onCompositionStart ||
+    h?.onCompositionUpdate ||
+    h?.onCompositionEnd
   )
 }
 

@@ -45,6 +45,36 @@ describe('toAccessibilityTree', () => {
     expect(a11y.children[0]?.focusable).toBe(true)
   })
 
+  it('marks composition-only boxes as focusable (parity with Tab order and click-to-focus)', () => {
+    const tree = box({}, [
+      box(
+        {
+          width: 120,
+          height: 28,
+          onCompositionStart: () => undefined,
+        },
+        [text({ text: 'IME field', font: '14px Inter', lineHeight: 18 })],
+      ),
+    ])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: [
+        {
+          x: 8,
+          y: 10,
+          width: 120,
+          height: 28,
+          children: [{ x: 0, y: 0, width: 120, height: 18, children: [] }],
+        },
+      ],
+    }
+    const a11y = toAccessibilityTree(tree, layout)
+    expect(a11y.children[0]?.focusable).toBe(true)
+  })
+
   it('applies scroll offsets to child geometry', () => {
     const tree = box({ scrollX: 10, scrollY: 20 }, [
       text({ text: 'Item', font: '14px Inter', lineHeight: 18 }),
