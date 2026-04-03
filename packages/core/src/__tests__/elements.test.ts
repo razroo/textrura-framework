@@ -62,6 +62,26 @@ describe('box', () => {
     const el = box({ width: 1, height: 1, dir: 'rtl' })
     expect((el.props as { dir?: string }).dir).toBe('rtl')
   })
+
+  it('preserves pointer/hit and scroll style props on props (layout snapshot strips them for Yoga)', () => {
+    const el = box({
+      width: 1,
+      height: 1,
+      cursor: 'pointer',
+      pointerEvents: 'none',
+      zIndex: 2,
+      overflow: 'hidden',
+      scrollX: 3,
+      scrollY: 4,
+    })
+    const p = el.props as Record<string, unknown>
+    expect(p.cursor).toBe('pointer')
+    expect(p.pointerEvents).toBe('none')
+    expect(p.zIndex).toBe(2)
+    expect(p.overflow).toBe('hidden')
+    expect(p.scrollX).toBe(3)
+    expect(p.scrollY).toBe(4)
+  })
 })
 
 describe('text', () => {
@@ -94,6 +114,18 @@ describe('text', () => {
     })
     expect((el.props as { dir?: string }).dir).toBe('ltr')
   })
+
+  it('preserves cursor and selectable on props for renderers and pointer metadata', () => {
+    const el = text({
+      text: 'x',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      cursor: 'text',
+      selectable: true,
+    })
+    expect((el.props as { cursor?: string }).cursor).toBe('text')
+    expect((el.props as { selectable?: boolean }).selectable).toBe(true)
+  })
 })
 
 describe('image', () => {
@@ -122,5 +154,18 @@ describe('image', () => {
   it('preserves dir on props for runtime direction resolution (toLayoutTree strips dir from Yoga input)', () => {
     const el = image({ src: '/a.png', width: 8, height: 8, dir: 'rtl' })
     expect((el.props as { dir?: string }).dir).toBe('rtl')
+  })
+
+  it('preserves pointer style props on props for hit-test and paint', () => {
+    const el = image({
+      src: '/a.png',
+      width: 8,
+      height: 8,
+      cursor: 'crosshair',
+      pointerEvents: 'auto',
+    })
+    const p = el.props as Record<string, unknown>
+    expect(p.cursor).toBe('crosshair')
+    expect(p.pointerEvents).toBe('auto')
   })
 })
