@@ -60,6 +60,19 @@ describe('geometry snapshot CI', () => {
     expect(roundLayout(layout)).toMatchSnapshot()
   })
 
+  it('stable row-reverse with gap and two text children (rounded)', async () => {
+    await init()
+    const tree = box(
+      { width: 200, height: 80, padding: 12, flexDirection: 'row-reverse', gap: 8 },
+      [
+        text({ text: 'A', font: '16px sans-serif', lineHeight: 20 }),
+        text({ text: 'B', font: '16px sans-serif', lineHeight: 20 }),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 80 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
+
   it('stable rtl root row mirrors two text children (rounded)', async () => {
     await init()
     const tree = box(
