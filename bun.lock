@@ -130,14 +130,14 @@
     },
     "packages/client": {
       "name": "@geometra/client",
-      "version": "1.1.2",
+      "version": "1.2.1",
       "dependencies": {
-        "@geometra/core": "file:../core",
+        "@geometra/core": "^1.2.1",
       },
     },
     "packages/core": {
       "name": "@geometra/core",
-      "version": "1.1.2",
+      "version": "1.2.1",
       "dependencies": {
         "textura": "^1.1.2",
       },
@@ -147,17 +147,17 @@
     },
     "packages/renderer-canvas": {
       "name": "@geometra/renderer-canvas",
-      "version": "1.1.2",
+      "version": "1.2.1",
       "dependencies": {
-        "@geometra/client": "file:../client",
-        "@geometra/core": "file:../core",
+        "@geometra/client": "^1.2.1",
+        "@geometra/core": "^1.2.1",
       },
     },
     "packages/renderer-terminal": {
       "name": "@geometra/renderer-terminal",
-      "version": "1.1.2",
+      "version": "1.2.1",
       "dependencies": {
-        "@geometra/core": "file:../core",
+        "@geometra/core": "^1.2.1",
       },
       "devDependencies": {
         "@types/node": "^22.0.0",
@@ -165,23 +165,23 @@
     },
     "packages/renderer-webgpu": {
       "name": "@geometra/renderer-webgpu",
-      "version": "1.1.2",
+      "version": "1.2.1",
       "dependencies": {
-        "@geometra/core": "file:../core",
+        "@geometra/core": "^1.2.1",
       },
     },
     "packages/router": {
       "name": "@geometra/router",
-      "version": "1.1.2",
+      "version": "1.2.1",
       "dependencies": {
-        "@geometra/core": "file:../core",
+        "@geometra/core": "^1.2.1",
       },
     },
     "packages/server": {
       "name": "@geometra/server",
-      "version": "1.1.2",
+      "version": "1.2.1",
       "dependencies": {
-        "@geometra/core": "file:../core",
+        "@geometra/core": "^1.2.1",
         "ws": "^8.18.0",
       },
       "devDependencies": {
@@ -190,9 +190,9 @@
     },
     "packages/ui": {
       "name": "@geometra/ui",
-      "version": "1.1.2",
+      "version": "1.2.1",
       "dependencies": {
-        "@geometra/core": "file:../core",
+        "@geometra/core": "^1.2.1",
       },
     },
   },
@@ -580,22 +580,6 @@
     "yoga-layout": ["yoga-layout@3.2.1", "", {}, "sha512-0LPOt3AxKqMdFBZA3HBAt/t/8vIKq7VaQYbuA8WxCgung+p9TVyKRYdpvCb80HcdTN2NkbIKbhNwKUfm3tQywQ=="],
 
     "@eslint-community/eslint-utils/eslint-visitor-keys": ["eslint-visitor-keys@3.4.3", "", {}, "sha512-wpc+LXeiyiisxPlEkUzU6svyS1frIO3Mgxj1fdy7Pm8Ygzguax2N3Fa/D/ag1WqbOprdI+uY6wMUl8/a2G+iag=="],
-
-    "@geometra/client/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
-    "@geometra/demo-auth-registry-server-client/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
-    "@geometra/renderer-canvas/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
-    "@geometra/renderer-terminal/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
-    "@geometra/renderer-webgpu/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
-    "@geometra/router/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
-    "@geometra/server/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
-    "@geometra/ui/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
 
     "@types/ws/@types/node": ["@types/node@25.5.0", "", { "dependencies": { "undici-types": "~7.18.0" } }, ""],
 

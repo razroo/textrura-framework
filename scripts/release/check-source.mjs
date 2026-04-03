@@ -18,6 +18,20 @@ const packages = [
   ['@geometra/router', 'packages/router/package.json'],
 ]
 
+function assertNoFileProtocolDeps(pkg, relPath, releaseVersion) {
+  for (const section of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
+    const deps = pkg[section]
+    if (!deps || typeof deps !== 'object') continue
+    for (const [name, spec] of Object.entries(deps)) {
+      if (typeof spec === 'string' && spec.startsWith('file:')) {
+        throw new Error(
+          `${relPath}: ${section}["${name}"] is "${spec}" — file: deps are published verbatim to npm and break consumers; use semver (e.g. ^${releaseVersion})`,
+        )
+      }
+    }
+  }
+}
+
 async function run() {
   for (const [expectedName, path] of packages) {
     const raw = await readFile(path, 'utf8')
@@ -28,6 +42,7 @@ async function run() {
     if (pkg.version !== version) {
       throw new Error(`${pkg.name}: package.json version ${pkg.version ?? 'unknown'} expected ${version}`)
     }
+    assertNoFileProtocolDeps(pkg, path, version)
     console.log(`${pkg.name}: ${pkg.version}`)
   }
 }
