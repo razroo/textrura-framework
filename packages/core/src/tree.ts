@@ -1,7 +1,11 @@
 import type { LayoutNode } from 'textura'
 import type { UIElement } from './types.js'
 
-/** Style/visual props that must be stripped before passing to Yoga layout. */
+/**
+ * Removes paint, hit-target, scroll-container, and non-Yoga metadata from element props.
+ * Keep this list aligned with {@link StyleProps}, text/image-only fields, and `dir` /
+ * `selectable` (see tests in `tree.test.ts`).
+ */
 function stripStyleProps(props: Record<string, unknown>): Record<string, unknown> {
   const layoutProps = { ...props }
   delete layoutProps.backgroundColor
@@ -28,7 +32,17 @@ function stripStyleProps(props: Record<string, unknown>): Record<string, unknown
   return layoutProps
 }
 
-/** Convert a UIElement tree into a textura LayoutNode tree for layout computation. */
+/**
+ * Convert a {@link UIElement} tree into a Textura {@link LayoutNode} for Yoga/WASM layout.
+ *
+ * Strips everything that is not consumed by Textura layout: colors, borders, opacity, cursor,
+ * `pointerEvents`, `zIndex`, `overflow` / `scrollX` / `scrollY`, `boxShadow`, `gradient`,
+ * `selectable`, `dir`, and image `src` / `alt` / `objectFit`. Remaining props are flex and
+ * sizing fields that belong in the layout pipeline.
+ *
+ * Runtime fields on boxes (`handlers`, `semantic`, `key`) are not part of `element.props` and
+ * are unchanged on the live tree — they are not copied into the layout snapshot.
+ */
 export function toLayoutTree(element: UIElement): LayoutNode {
   const layoutProps = stripStyleProps(element.props as Record<string, unknown>)
 
