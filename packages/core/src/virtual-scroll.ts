@@ -8,8 +8,9 @@ export interface VirtualWindowState {
   selected: number
 }
 
+/** Only plain finite `number` values count (`typeof` + `Number.isFinite`, same idea as `layoutBoundsAreFinite` in `layout-bounds.js`). */
 function finiteOr(n: number, fallback: number): number {
-  return Number.isFinite(n) ? n : fallback
+  return typeof n === 'number' && Number.isFinite(n) ? n : fallback
 }
 
 /**

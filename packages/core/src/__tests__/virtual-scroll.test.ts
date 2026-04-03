@@ -81,13 +81,21 @@ describe('syncVirtualWindow', () => {
   })
 
   it('treats non-number arguments as non-finite (defensive against bad serialized props)', () => {
-    // Number.isFinite does not coerce; strings and objects never count as finite numbers.
+    // typeof + Number.isFinite: strings, BigInt, and objects never count as finite numbers.
     expect(syncVirtualWindow('10' as unknown as number, 3, 2, 0)).toEqual({ start: 0, end: 0, selected: 0 })
     expect(syncVirtualWindow(8, '3' as unknown as number, 2, 0)).toEqual({ start: 2, end: 2, selected: 2 })
     expect(syncVirtualWindow(8, 3, '2' as unknown as number, 0)).toEqual({ start: 0, end: 2, selected: 0 })
     expect(syncVirtualWindow(8, 3, 2, '1' as unknown as number)).toEqual({ start: 0, end: 2, selected: 2 })
     expect(syncVirtualWindow({} as unknown as number, 5, 2, 0)).toEqual({ start: 0, end: 0, selected: 0 })
     expect(syncVirtualWindow(8, 3, 2, null as unknown as number)).toEqual({ start: 0, end: 2, selected: 2 })
+  })
+
+  it('treats BigInt arguments like non-numbers on every axis (aligned with layoutBoundsAreFinite)', () => {
+    const z = 0n as unknown as number
+    expect(syncVirtualWindow(z, 3, 2, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+    expect(syncVirtualWindow(8, z, 2, 0)).toEqual({ start: 2, end: 2, selected: 2 })
+    expect(syncVirtualWindow(8, 3, z, 0)).toEqual({ start: 0, end: 2, selected: 0 })
+    expect(syncVirtualWindow(8, 3, 2, z)).toEqual({ start: 0, end: 2, selected: 2 })
   })
 
   it(
