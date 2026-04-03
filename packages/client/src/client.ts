@@ -82,11 +82,18 @@ function isWellFormedPatchList(patches: unknown): boolean {
   return true
 }
 
+/** Root layout from the wire must carry an array `children` (matches Textura `ComputedLayout`). */
+function layoutRootHasChildrenArray(layout: unknown): boolean {
+  if (!isPlainLayoutTreeValue(layout)) return false
+  const rec = layout as Record<string, unknown>
+  return Array.isArray(rec.children)
+}
+
 /** Reject malformed payloads that JSON.parse can produce without throwing. */
 function isWellFormedGeomV1Message(msg: Record<string, unknown>): boolean {
   const t = msg.type
   if (t === 'frame') {
-    return isPlainLayoutTreeValue(msg.layout) && isPlainLayoutTreeValue(msg.tree)
+    return layoutRootHasChildrenArray(msg.layout) && isPlainLayoutTreeValue(msg.tree)
   }
   if (t === 'patch') {
     return isWellFormedPatchList(msg.patches)
@@ -192,7 +199,8 @@ function applyPatches(layout: ComputedLayout, patches: ServerPatch['patches']): 
  * `layout`/`tree`, `patch` with a `patches` array of objects that each include an integer `path` and
  * only finite numeric geometry fields, or `error` with string `message`), calls `onError` and returns
  * without mutating state or invoking `onMetrics`. Full `frame` messages additionally require root `layout`
- * bounds that satisfy {@link layoutBoundsAreFinite} (finite `x`/`y`, non-negative finite `width`/`height`).
+ * to be a plain object with an array `children`, and root bounds that satisfy {@link layoutBoundsAreFinite}
+ * (finite `x`/`y`, non-negative finite `width`/`height`).
  *
  * When `msg.protocolVersion` is omitted, no version check runs (message is treated as compatible).
  * When it is present but not a finite number, or is greater than the client’s supported version,

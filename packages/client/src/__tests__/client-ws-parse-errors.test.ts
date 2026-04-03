@@ -435,7 +435,7 @@ describe('createClient WebSocket message parse errors', () => {
     expect(String((errors[0] as Error).message)).toContain('Invalid server message')
   })
 
-  it('invokes onError when type is frame but layout or tree is a JSON array (not a plain object)', async () => {
+  it('invokes onError when type is frame but layout or tree shape is invalid (array layout/tree, non-array children)', async () => {
     const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
     installMockWebSocket(sockets)
 
@@ -475,6 +475,20 @@ describe('createClient WebSocket message parse errors', () => {
     sockets[0]!.emit('message', {
       data: JSON.stringify({
         type: 'frame',
+        layout: { x: 0, y: 0, width: 1, height: 1, children: {} },
+        tree: { kind: 'box', props: {}, children: [] },
+        protocolVersion: 1,
+      }),
+    })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(Error)
+    expect(String((errors[0] as Error).message)).toContain('frame')
+
+    errors.length = 0
+    sockets[0]!.emit('message', {
+      data: JSON.stringify({
+        type: 'frame',
         layout: { x: 0, y: 0, width: 1, height: 1, children: [] },
         tree: [],
         protocolVersion: 1,
@@ -483,6 +497,32 @@ describe('createClient WebSocket message parse errors', () => {
     await new Promise<void>(resolve => queueMicrotask(() => resolve()))
     expect(errors).toHaveLength(1)
     expect(errors[0]).toBeInstanceOf(Error)
+    expect(String((errors[0] as Error).message)).toContain('frame')
+
+    errors.length = 0
+    sockets[0]!.emit('message', {
+      data: JSON.stringify({
+        type: 'frame',
+        layout: { x: 0, y: 0, width: 1, height: 1 },
+        tree: { kind: 'box', props: {}, children: [] },
+        protocolVersion: 1,
+      }),
+    })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
+    expect(String((errors[0] as Error).message)).toContain('frame')
+
+    errors.length = 0
+    sockets[0]!.emit('message', {
+      data: JSON.stringify({
+        type: 'frame',
+        layout: { x: 0, y: 0, width: 1, height: 1, children: '[]' },
+        tree: { kind: 'box', props: {}, children: [] },
+        protocolVersion: 1,
+      }),
+    })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
     expect(String((errors[0] as Error).message)).toContain('frame')
   })
 
