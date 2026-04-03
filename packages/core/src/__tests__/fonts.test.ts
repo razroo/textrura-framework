@@ -391,6 +391,15 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('5lvmin Body Text')).toEqual(['Body Text'])
   })
 
+  it('parses min/max viewport variants (dv/sv/lv + min/max) without mistaking them for generic vmin/vmax', () => {
+    expect(extractFontFamiliesFromCSSFont('2dvmin Dyn Min UI, sans-serif')).toEqual(['Dyn Min UI'])
+    expect(extractFontFamiliesFromCSSFont('2.5svmin Small Min, sans-serif')).toEqual(['Small Min'])
+    expect(extractFontFamiliesFromCSSFont('3lvmin Large Min Serif, serif')).toEqual(['Large Min Serif'])
+    expect(extractFontFamiliesFromCSSFont('4dvmax Dyn Max, sans-serif')).toEqual(['Dyn Max'])
+    expect(extractFontFamiliesFromCSSFont('5svmax Small Max, sans-serif')).toEqual(['Small Max'])
+    expect(extractFontFamiliesFromCSSFont('6lvmax Large Max UI, system-ui')).toEqual(['Large Max UI'])
+  })
+
   it('parses viewport inline and block units (vi/vb and d/s/l variants) before family', () => {
     expect(extractFontFamiliesFromCSSFont('2.5vi Inline UI, sans-serif')).toEqual(['Inline UI'])
     expect(extractFontFamiliesFromCSSFont('4vb Block Serif, serif')).toEqual(['Block Serif'])
