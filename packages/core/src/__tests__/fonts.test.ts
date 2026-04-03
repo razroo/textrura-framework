@@ -465,6 +465,14 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('lighter 12px Georgia, serif')).toEqual(['Georgia'])
   })
 
+  it('peels leading var() and font-variant values before size+family (real-world shorthand pastes)', () => {
+    expect(extractFontFamiliesFromCSSFont('var(--fs) 14px Inter, serif')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('var(--x, 16px) 14px Literata, serif')).toEqual(['Literata'])
+    expect(extractFontFamiliesFromCSSFont('stylistic(salt) 14px JetBrains Mono, monospace')).toEqual([
+      'JetBrains Mono',
+    ])
+  })
+
   it('collapses repeated custom families in one list to first spelling (case-insensitive)', () => {
     expect(extractFontFamiliesFromCSSFont('14px Inter, Inter, Mono, sans-serif')).toEqual(['Inter', 'Mono'])
     expect(extractFontFamiliesFromCSSFont('12px Inter, inter, JetBrains Mono')).toEqual(['Inter', 'JetBrains Mono'])
