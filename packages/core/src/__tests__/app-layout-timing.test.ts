@@ -101,6 +101,30 @@ describe('createApp layout direction (Textura computeLayout)', () => {
     expect(a!.x).toBeGreaterThan(b!.x)
   })
 
+  it('ignores boxed-string layoutDirection (Object("ltr")) and derives direction from the root', async () => {
+    const layouts: Array<{ children: Array<{ x: number }> }> = []
+    const renderer: Renderer = {
+      render(layout) {
+        layouts.push(layout as { children: Array<{ x: number }> })
+      },
+      destroy: vi.fn(),
+    }
+
+    await createApp(
+      () =>
+        box({ width: 100, height: 40, flexDirection: 'row', dir: 'rtl' }, [
+          box({ width: 30, height: 20 }),
+          box({ width: 30, height: 20 }),
+        ]),
+      renderer,
+      { width: 100, height: 50, layoutDirection: Object('ltr') as never },
+    )
+
+    expect(layouts).toHaveLength(1)
+    const [a, b] = layouts[0]!.children
+    expect(a!.x).toBeGreaterThan(b!.x)
+  })
+
   it('applies AppOptions.layoutDirection rtl when the root has no explicit dir (document-level RTL)', async () => {
     const layouts: Array<{ children: Array<{ x: number }> }> = []
     const renderer: Renderer = {
