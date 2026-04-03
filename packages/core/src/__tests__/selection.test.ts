@@ -226,6 +226,23 @@ describe('hitTestText', () => {
     expect(hitTestText(textNodes, 5, Number.NEGATIVE_INFINITY)).toBeNull()
   })
 
+  it('skips nodes with non-number bounds without throwing (aligned with layoutBoundsAreFinite)', () => {
+    const bigintW: TextNodeInfo[] = [
+      {
+        element: { kind: 'text' as const, props: { text: 'x', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 1n as unknown as number,
+        height: 18,
+        index: 0,
+        lines: [{ text: 'x', x: 0, y: 0, charOffsets: [0], charWidths: [10] }],
+      },
+    ]
+    expect(() => hitTestText(bigintW, 5, 5)).not.toThrow()
+    expect(hitTestText(bigintW, 5, 5)).toBeNull()
+  })
+
   it('skips nodes with non-finite layout bounds (matches pointer hit-test invariants)', () => {
     const badWidth: TextNodeInfo[] = [
       {

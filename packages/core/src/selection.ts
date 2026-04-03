@@ -1,6 +1,7 @@
 import type { ComputedLayout } from 'textura'
 import type { UIElement, TextElement } from './types.js'
 import { resolveElementDirection, type ResolvedDirection } from './direction.js'
+import { layoutBoundsAreFinite } from './layout-bounds.js'
 
 /** Info about a rendered text node's position and content. */
 export interface TextNodeInfo {
@@ -145,14 +146,13 @@ export function getSelectedText(
 }
 
 function textNodeBoundsAreFinite(node: TextNodeInfo): boolean {
-  return (
-    Number.isFinite(node.x) &&
-    Number.isFinite(node.y) &&
-    Number.isFinite(node.width) &&
-    Number.isFinite(node.height) &&
-    node.width >= 0 &&
-    node.height >= 0
-  )
+  return layoutBoundsAreFinite({
+    x: node.x,
+    y: node.y,
+    width: node.width,
+    height: node.height,
+    children: [],
+  })
 }
 
 /** Find which text node and character offset is at a given (x, y) point. Non-finite pointer coordinates return `null`; nodes with non-finite or negative-size bounds are skipped (aligned with {@link import('./layout-bounds.js').layoutBoundsAreFinite}). */
