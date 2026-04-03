@@ -196,4 +196,30 @@ describe('client binary frame decode', () => {
     expect(isBinaryFrameArrayBuffer(u32)).toBe(true)
     expect(decodeBinaryFrameJson(u32)).toBe(json)
   })
+
+  it('decodes a v1 frame when the same bytes are exposed as Int16Array, Int32Array, or BigUint64Array', () => {
+    const json = '{"type":"patch","patches":[]}'
+    const frame = new Uint8Array(encodeBinaryFrameJsonV1(json))
+
+    const len16 = Math.ceil(frame.byteLength / 2) * 2
+    const buf16 = new ArrayBuffer(len16)
+    new Uint8Array(buf16).set(frame)
+    const i16 = new Int16Array(buf16)
+    expect(isBinaryFrameArrayBuffer(i16)).toBe(true)
+    expect(decodeBinaryFrameJson(i16)).toBe(json)
+
+    const len32 = Math.ceil(frame.byteLength / 4) * 4
+    const buf32 = new ArrayBuffer(len32)
+    new Uint8Array(buf32).set(frame)
+    const i32 = new Int32Array(buf32)
+    expect(isBinaryFrameArrayBuffer(i32)).toBe(true)
+    expect(decodeBinaryFrameJson(i32)).toBe(json)
+
+    const len64 = Math.ceil(frame.byteLength / 8) * 8
+    const buf64 = new ArrayBuffer(len64)
+    new Uint8Array(buf64).set(frame)
+    const u64 = new BigUint64Array(buf64)
+    expect(isBinaryFrameArrayBuffer(u64)).toBe(true)
+    expect(decodeBinaryFrameJson(u64)).toBe(json)
+  })
 })
