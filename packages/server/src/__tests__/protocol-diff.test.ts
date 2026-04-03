@@ -83,6 +83,14 @@ describe('diffLayout', () => {
     expect(isProtocolCompatible(2, 1)).toBe(false)
   })
 
+  it('treats negative peer versions as compatible (numeric ordering vs current)', () => {
+    expect(isProtocolCompatible(-1, 1)).toBe(true)
+  })
+
+  it('rejects NaN peer version (comparison is false; malformed wire values are not treated as legacy)', () => {
+    expect(isProtocolCompatible(Number.NaN, 1)).toBe(false)
+  })
+
   it('coalesces repeated path updates with last-write wins semantics', () => {
     const merged = coalescePatches([
       { path: [1, 2], x: 10 },
@@ -137,5 +145,14 @@ describe('coalescePatches', () => {
       { path: [0], x: undefined as unknown as number, width: 5 },
     ])
     expect(merged).toEqual([{ path: [0], x: 10, y: 20, width: 5 }])
+  })
+
+  it('coalesces burst updates to the root path (empty path segment)', () => {
+    const merged = coalescePatches([
+      { path: [], x: 1 },
+      { path: [], y: 2 },
+      { path: [], height: 99 },
+    ])
+    expect(merged).toEqual([{ path: [], x: 1, y: 2, height: 99 }])
   })
 })
