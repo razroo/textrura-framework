@@ -9,7 +9,8 @@ function normalizeResolvedDirection(value: unknown): ResolvedDirection {
 /**
  * Resolve an element direction value to a concrete runtime direction.
  * Only `ltr` and `rtl` are honored; `undefined`, `auto`, and any other value (e.g. malformed
- * serialized props) inherit {@link parentDirection} until script-level `auto` detection lands.
+ * serialized props) inherit {@link parentDirection}. Document-level direction for Yoga flex rows is set
+ * separately via {@link import('./app.js').createApp}'s `layoutDirection` option (see `AppOptions` in `app.js`).
  * Non-`ltr` / non-`rtl` {@link parentDirection} values (bad callers or deserialized state) fall back to `ltr`.
  */
 export function resolveDirectionValue(

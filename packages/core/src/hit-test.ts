@@ -24,7 +24,7 @@ function finiteNumber(value: unknown): number {
 }
 
 function zIndexOf(el: UIElement): number {
-  const z = (el.props as Record<string, unknown>).zIndex
+  const z = el.props.zIndex
   return typeof z === 'number' && Number.isFinite(z) ? z : 0
 }
 
@@ -412,7 +412,5 @@ export function getCursorAtPoint(
 
   if (element.props.pointerEvents === 'none') return null
 
-  // Return this element's cursor
-  const cursor = (element.props as Record<string, unknown>).cursor as string | undefined
-  return cursor ?? null
+  return element.props.cursor ?? null
 }
