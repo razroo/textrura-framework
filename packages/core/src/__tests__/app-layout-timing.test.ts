@@ -443,6 +443,40 @@ describe('createApp dispatch guards', () => {
     expect(fired).toBe(false)
   })
 
+  it('treats non-finite and non-number dispatch offsets like dispatchHit (finiteNumber)', async () => {
+    let fired = false
+    const renderer: Renderer = {
+      render: vi.fn(),
+      destroy: vi.fn(),
+    }
+    const child = box({
+      width: 40,
+      height: 40,
+      onClick: () => {
+        fired = true
+      },
+    })
+    const app = await createApp(() => box({ width: 100, height: 100 }, [child]), renderer, {
+      width: 200,
+      height: 200,
+    })
+
+    expect(app.dispatch('onClick', 70, 30, undefined, 50, 0)).toBe(true)
+    expect(fired).toBe(true)
+
+    fired = false
+    expect(app.dispatch('onClick', 70, 30, undefined, Number.NaN, 0)).toBe(false)
+    expect(fired).toBe(false)
+    expect(app.dispatch('onClick', 20, 30, undefined, Number.NaN, 0)).toBe(true)
+    expect(fired).toBe(true)
+
+    fired = false
+    expect(app.dispatch('onClick', 70, 30, undefined, 50n as unknown as number, 0)).toBe(false)
+    expect(fired).toBe(false)
+    expect(app.dispatch('onClick', 20, 30, undefined, 50n as unknown as number, 0)).toBe(true)
+    expect(fired).toBe(true)
+  })
+
   it('returns false from dispatch when pointer coordinates are non-finite without click-to-focus', async () => {
     const renderer: Renderer = {
       render: vi.fn(),
