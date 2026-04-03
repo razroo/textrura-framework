@@ -8,6 +8,16 @@ import {
 import { box, image, text } from '../elements.js'
 
 describe('extractFontFamiliesFromCSSFont', () => {
+  it('returns empty for non-string font argument (boxed strings, symbols, loose runtime data)', () => {
+    expect(extractFontFamiliesFromCSSFont(null as unknown as string)).toEqual([])
+    expect(extractFontFamiliesFromCSSFont(undefined as unknown as string)).toEqual([])
+    expect(extractFontFamiliesFromCSSFont(14 as unknown as string)).toEqual([])
+    expect(extractFontFamiliesFromCSSFont(Object('14px Inter') as unknown as string)).toEqual([])
+    expect(extractFontFamiliesFromCSSFont(new String('14px Inter') as unknown as string)).toEqual([])
+    expect(extractFontFamiliesFromCSSFont(Symbol('f') as unknown as string)).toEqual([])
+    expect(extractFontFamiliesFromCSSFont(['14px Inter'] as unknown as string)).toEqual([])
+  })
+
   it('parses weight + size + family', () => {
     expect(extractFontFamiliesFromCSSFont('600 14px Inter')).toEqual(['Inter'])
   })
@@ -789,6 +799,12 @@ describe('collectFontFamiliesFromTree', () => {
   it('treats non-string font on text nodes as empty (walk does not throw on bad deserialized props)', () => {
     const node = text({ text: 'x', font: '14px Inter', lineHeight: 20 })
     Object.assign(node.props, { font: null as unknown as string })
+    expect(collectFontFamiliesFromTree(box({}, [node]))).toEqual([])
+  })
+
+  it('treats boxed String font on text nodes as non-string (no families extracted)', () => {
+    const node = text({ text: 'x', font: '14px Inter', lineHeight: 20 })
+    Object.assign(node.props, { font: Object('14px Literata, serif') as unknown as string })
     expect(collectFontFamiliesFromTree(box({}, [node]))).toEqual([])
   })
 
