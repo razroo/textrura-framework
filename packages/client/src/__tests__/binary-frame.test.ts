@@ -56,6 +56,13 @@ describe('client binary frame decode', () => {
     expect(() => decodeBinaryFrameJson(plain)).toThrow('Not a GEOM binary frame')
   })
 
+  it('throws when magic matches but frame version is not v1', () => {
+    const wrongVersion = new Uint8Array(9)
+    wrongVersion.set([0x47, 0x45, 0x4f, 0x4d, 2], 0)
+    new DataView(wrongVersion.buffer).setUint32(5, 0, true)
+    expect(() => decodeBinaryFrameJson(wrongVersion.buffer)).toThrow('Not a GEOM binary frame')
+  })
+
   it('throws when declared payload length exceeds available bytes', () => {
     const headerOnly = new Uint8Array(9)
     headerOnly.set([0x47, 0x45, 0x4f, 0x4d, 1], 0)

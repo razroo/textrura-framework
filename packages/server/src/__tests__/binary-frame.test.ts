@@ -52,6 +52,11 @@ describe('binary frame envelope', () => {
     expect(() => decodeBinaryFrameJson(Buffer.from('not binary', 'utf8'))).toThrow('Not a GEOM binary frame')
   })
 
+  it('throws when magic matches but frame version is not v1', () => {
+    const wrongVersion = Buffer.from([0x47, 0x45, 0x4f, 0x4d, 2, 0, 0, 0, 0])
+    expect(() => decodeBinaryFrameJson(wrongVersion)).toThrow('Not a GEOM binary frame')
+  })
+
   it('throws when declared payload length exceeds available bytes', () => {
     const headerOnly = Buffer.from([0x47, 0x45, 0x4f, 0x4d, 1, 4, 0, 0, 0])
     expect(() => decodeBinaryFrameJson(headerOnly)).toThrow('Truncated binary frame payload')
