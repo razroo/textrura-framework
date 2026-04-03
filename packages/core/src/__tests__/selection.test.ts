@@ -138,6 +138,10 @@ describe('collectTextNodes', () => {
     expect(collect(Number.NaN, 4)[0]).toMatchObject({ x: 15, y: 24 })
     expect(collect(3, Number.POSITIVE_INFINITY)[0]).toMatchObject({ x: 18, y: 20 })
     expect(collect('7' as unknown as number, 0)[0]).toMatchObject({ x: 15, y: 20 })
+    const bx = 1n as unknown as number
+    expect(() => collect(bx, 4)).not.toThrow()
+    expect(collect(bx, 4)[0]).toMatchObject({ x: 15, y: 24 })
+    expect(collect(3, bx)[0]).toMatchObject({ x: 18, y: 20 })
   })
 
   it('skips the whole walk when root layout bounds are corrupt (aligned with hit-test / focus)', () => {
