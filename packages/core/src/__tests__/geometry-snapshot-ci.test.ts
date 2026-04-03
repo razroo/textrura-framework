@@ -314,6 +314,29 @@ describe('geometry snapshot CI', () => {
     expect(roundLayout(layout)).toMatchSnapshot()
   })
 
+  it('stable wrapped row with alignContent space-between and four fixed-width text children (rounded)', async () => {
+    await init()
+    const item = { font: '16px sans-serif', lineHeight: 20, width: 40, height: 20 } as const
+    const tree = box(
+      {
+        width: 100,
+        height: 100,
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignContent: 'space-between',
+        gap: 4,
+      },
+      [
+        text({ text: '1', ...item }),
+        text({ text: '2', ...item }),
+        text({ text: '3', ...item }),
+        text({ text: '4', ...item }),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 100, height: 100 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
+
   it('stable row with fixed-width text and flexGrow sibling (rounded)', async () => {
     await init()
     const item = { font: '16px sans-serif', lineHeight: 20, height: 20 } as const
