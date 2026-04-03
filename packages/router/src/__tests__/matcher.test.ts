@@ -30,6 +30,18 @@ describe('route matcher', () => {
     })
   })
 
+  it('treats a bare splat pattern as matching from root', () => {
+    expect(matchPath('*', '/guides/routing/intro')).toEqual({
+      params: { '*': 'guides/routing/intro' },
+    })
+    expect(matchPath('/*', '/guides/routing')).toEqual({ params: { '*': 'guides/routing' } })
+  })
+
+  it('captures empty remainder when splat matches only the root pathname', () => {
+    expect(matchPath('/*', '/')).toEqual({ params: { '*': '' } })
+    expect(matchPath('*', '/')).toEqual({ params: { '*': '' } })
+  })
+
   it('normalizes trailing slashes and decodes params', () => {
     expect(matchPath('/users/:name', '/users/alice%20bob/')).toEqual({ params: { name: 'alice bob' } })
   })

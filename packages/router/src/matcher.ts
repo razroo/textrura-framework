@@ -1,3 +1,4 @@
+/** Parameters captured when a pathname matches a route pattern (see {@link matchPath}). */
 export type RouteMatch = {
   params: Record<string, string>
 }
@@ -109,6 +110,19 @@ function matchRecursive(
   }
 }
 
+/**
+ * Match a route pattern against a URL pathname.
+ *
+ * - Segments are split on `/`. A leading slash on `pattern` or `pathname` is optional; trailing
+ *   slashes on the pathname are normalized away before matching.
+ * - Static segments must match exactly.
+ * - `:name` captures one path segment; `:name?` is optional (segment may be absent).
+ * - `*` or `*rest` is a splat: it greedily captures the rest of the path, including internal slashes.
+ * - `?` query and `#` hash are stripped from `pathname` before matching.
+ * - Each captured segment is passed through `decodeURIComponent`; invalid `%` sequences are left as-is.
+ *
+ * @returns `{ params }` on success, or `null` when the pathname does not match.
+ */
 export function matchPath(pattern: string, pathname: string): RouteMatch | null {
   const segments = parseSegments(pattern)
   const normalizedPath = normalizePath(pathname, true)
