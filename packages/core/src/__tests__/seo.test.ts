@@ -55,6 +55,28 @@ describe('toSemanticHTML', () => {
     expect(toSemanticHTML(el)).not.toContain('dir=')
   })
 
+  it('ignores boxed-string dir (Object("rtl")) so strict equality matches direction resolution', () => {
+    const rtlBoxed = box({ width: 100, height: 100, dir: Object('rtl') as never })
+    expect(toSemanticHTML(rtlBoxed)).not.toMatch(/\sdir=/)
+
+    const ltrText = text({
+      text: 'x',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      dir: Object('ltr') as never,
+    })
+    expect(toSemanticHTML(box({ width: 10, height: 10 }, [ltrText]))).not.toMatch(/<p[^>]*\sdir=/)
+
+    const autoImg = image({
+      src: '/a.png',
+      width: 1,
+      height: 1,
+      alt: '',
+      dir: Object('auto') as never,
+    })
+    expect(toSemanticHTML(box({ width: 10, height: 10 }, [autoImg]))).not.toMatch(/<img[^>]*\sdir=/)
+  })
+
   it('treats non-string font as empty for heading inference (no throw on bad deserialized nodes)', () => {
     const node = text({ text: 'Body', font: 'bold 32px sans-serif', lineHeight: 20 })
     Object.assign(node.props, { font: null as unknown as string })
