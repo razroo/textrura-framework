@@ -704,6 +704,18 @@ describe('collectFontFamiliesFromTree', () => {
     expect(collectFontFamiliesFromTree(tree)).toEqual(['Inter'])
   })
 
+  it('walks nested boxes in preorder, skipping image leaves between text nodes', () => {
+    const tree = box({}, [
+      text({ text: '1', font: '12px FirstFamily, serif', lineHeight: 16 }),
+      box({}, [
+        image({ src: '/x.png', width: 1, height: 1 }),
+        text({ text: '2', font: '12px SecondFamily, serif', lineHeight: 16 }),
+      ]),
+      text({ text: '3', font: '12px ThirdFamily, serif', lineHeight: 16 }),
+    ])
+    expect(collectFontFamiliesFromTree(tree)).toEqual(['FirstFamily', 'SecondFamily', 'ThirdFamily'])
+  })
+
   it('returns empty when every family in a shorthand is generic or CSS-wide', () => {
     const tree = box({}, [
       text({ text: 'a', font: '14px inherit, initial, sans-serif', lineHeight: 20 }),

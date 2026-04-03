@@ -374,6 +374,7 @@ export function extractFontFamiliesFromCSSFont(font: string): string[] {
 /**
  * Collect unique font families referenced by text nodes in a UI tree.
  * Order is first-seen in a depth-first preorder walk (later duplicates are skipped).
+ * Image leaves carry no `font` shorthand and are skipped.
  */
 export function collectFontFamiliesFromTree(root: UIElement): string[] {
   const out = new Set<string>()
@@ -382,9 +383,12 @@ export function collectFontFamiliesFromTree(root: UIElement): string[] {
       for (const f of extractFontFamiliesFromCSSFont(el.props.font)) {
         out.add(f)
       }
-    } else if (el.kind === 'box') {
-      for (const c of el.children) walk(c)
+      return
     }
+    if (el.kind === 'image') {
+      return
+    }
+    for (const c of el.children) walk(c)
   }
   walk(root)
   return [...out]
