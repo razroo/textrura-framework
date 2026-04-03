@@ -173,4 +173,23 @@ describe('geometry snapshot CI', () => {
     const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 80 })
     expect(roundLayout(layout)).toMatchSnapshot()
   })
+
+  it('stable column with in-flow text and absolutely positioned box (rounded)', async () => {
+    await init()
+    const tree = box(
+      { width: 200, height: 100, padding: 6, flexDirection: 'column', gap: 4 },
+      [
+        text({ text: 'Hello', font: '14px sans-serif', lineHeight: 18, width: 80, height: 18 }),
+        box({
+          position: 'absolute',
+          top: 14,
+          left: 22,
+          width: 44,
+          height: 28,
+        }),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 100 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
 })
