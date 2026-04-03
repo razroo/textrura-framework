@@ -68,6 +68,30 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 10, height: negSub, children: [] })).toBe(false)
   })
 
+  it('accepts positive subnormal width and height (finite, non-negative; distinct from negative subnormals)', () => {
+    expect(
+      layoutBoundsAreFinite({
+        x: 0,
+        y: 0,
+        width: Number.MIN_VALUE,
+        height: Number.MIN_VALUE,
+        children: [],
+      }),
+    ).toBe(true)
+  })
+
+  it('accepts finite extreme magnitudes including Number.MAX_VALUE (not limited to safe integers)', () => {
+    expect(
+      layoutBoundsAreFinite({
+        x: 0,
+        y: 0,
+        width: Number.MAX_VALUE,
+        height: Number.MAX_SAFE_INTEGER,
+        children: [],
+      }),
+    ).toBe(true)
+  })
+
   it('rejects NaN on any axis or dimension', () => {
     const base = { x: 0, y: 0, width: 10, height: 10, children: [] as [] }
     expect(layoutBoundsAreFinite({ ...base, x: NaN })).toBe(false)
