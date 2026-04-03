@@ -180,6 +180,24 @@ describe('animation timeline', () => {
     expect(timelineNeg.state()).toBe('finished')
   })
 
+  it('jumps to target when duration is non-finite (aligned with transition)', () => {
+    const nan = createTweenTimeline(0)
+    nan.to(42, Number.NaN, easing.linear)
+    expect(nan.value.peek()).toBe(42)
+    expect(nan.state()).toBe('finished')
+    expect(nan.step(100)).toBe(42)
+
+    const inf = createTweenTimeline(10)
+    inf.to(99, Number.POSITIVE_INFINITY, easing.linear)
+    expect(inf.value.peek()).toBe(99)
+    expect(inf.state()).toBe('finished')
+
+    const props = createPropertyTimeline({ x: 0 })
+    props.to({ x: 7 }, Number.NaN)
+    expect(props.values.x.peek()).toBe(7)
+    expect(props.state()).toBe('finished')
+  })
+
   it('steps deterministically to completion', () => {
     const timeline = createTweenTimeline(0)
     timeline.to(100, 1000, easing.linear)

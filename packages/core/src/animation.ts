@@ -101,6 +101,9 @@ export function transition(
 /**
  * Deterministic tween timeline for tests and frame-stepped animation orchestration.
  * Unlike `transition()`, this helper does not use `requestAnimationFrame`.
+ *
+ * Non-finite `durationMs` (NaN, ±Infinity) jumps immediately to the target and ends in `finished`,
+ * matching {@link transition} so corrupt or serialized values never leave `step()` dividing by NaN.
  */
 export function createTweenTimeline(initialValue: number): TweenTimeline {
   const value = signal(initialValue)
@@ -113,6 +116,16 @@ export function createTweenTimeline(initialValue: number): TweenTimeline {
 
   function toTarget(nextTo: number, durationMs: number, nextEasing: EasingFn = easing.easeInOut): void {
     if (getMotionPreference() === 'reduced') {
+      value.set(nextTo)
+      from = nextTo
+      to = nextTo
+      elapsed = 0
+      duration = 1
+      easingFn = nextEasing
+      playbackState = 'finished'
+      return
+    }
+    if (!Number.isFinite(durationMs)) {
       value.set(nextTo)
       from = nextTo
       to = nextTo
