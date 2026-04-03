@@ -12,9 +12,12 @@ export const CLOSE_FORBIDDEN = 4003
 
 /**
  * Protocol compatibility rule:
- * - undefined means legacy v1 and is accepted.
- * - newer peer versions are rejected explicitly.
- * - equal/older versions are accepted for backward compatibility.
+ * - `undefined` means legacy v1 and is accepted.
+ * - newer peer versions are rejected explicitly (`peerVersion > currentVersion`).
+ * - equal/older finite versions are accepted for backward compatibility.
+ *
+ * Non-finite `peerVersion` values (`NaN`, `±Infinity`) yield `false` — they are not treated as legacy
+ * — so corrupt wire numbers fail closed instead of connecting.
  */
 export function isProtocolCompatible(
   peerVersion: number | undefined,

@@ -117,7 +117,9 @@ describe('diffLayout', () => {
     }
     expect(diffLayout(prev, next)).toEqual([])
   })
+})
 
+describe('isProtocolCompatible', () => {
   it('treats undefined/older protocol versions as compatible and newer as incompatible', () => {
     expect(isProtocolCompatible(undefined, 1)).toBe(true)
     expect(isProtocolCompatible(1, 1)).toBe(true)
@@ -133,6 +135,16 @@ describe('diffLayout', () => {
     expect(isProtocolCompatible(Number.NaN, 1)).toBe(false)
   })
 
+  it('rejects positive Infinity peer version (non-finite wire values)', () => {
+    expect(isProtocolCompatible(Number.POSITIVE_INFINITY, 1)).toBe(false)
+  })
+})
+
+describe('coalescePatches', () => {
+  it('returns an empty array for an empty input', () => {
+    expect(coalescePatches([])).toEqual([])
+  })
+
   it('coalesces repeated path updates with last-write wins semantics', () => {
     const merged = coalescePatches([
       { path: [1, 2], x: 10 },
@@ -145,12 +157,6 @@ describe('diffLayout', () => {
       { path: [1, 2], x: 30, y: 20, width: 40 },
       { path: [3], height: 9, y: 5 },
     ])
-  })
-})
-
-describe('coalescePatches', () => {
-  it('returns an empty array for an empty input', () => {
-    expect(coalescePatches([])).toEqual([])
   })
 
   it('keeps distinct path keys separate (prefix paths are not merged)', () => {
