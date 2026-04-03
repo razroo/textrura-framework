@@ -84,6 +84,17 @@ describe('binary frame envelope', () => {
     expect(decodeBinaryFrameJson(view)).toBe(json)
   })
 
+  it('decodes a Buffer subarray with non-zero byteOffset (frame embedded in a larger Node allocation)', () => {
+    const json = '{"bufSlice":true}'
+    const frame = encodeBinaryFrameJson(json)
+    const prefix = 11
+    const combined = Buffer.alloc(prefix + frame.length + 4)
+    frame.copy(combined, prefix)
+    const view = combined.subarray(prefix, prefix + frame.length)
+    expect(isBinaryFrameBuffer(view)).toBe(true)
+    expect(decodeBinaryFrameJson(view)).toBe(json)
+  })
+
   it('returns false when GEOM magic is only present before the view offset (Buffer subarray)', () => {
     const json = '{"a":1}'
     const frame = encodeBinaryFrameJson(json)
