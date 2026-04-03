@@ -108,6 +108,14 @@ describe('text input history', () => {
     expect(undoTextInputHistory(h)).toBe(h)
   })
 
+  it('treats maxPast -0 like 0 (signed zero floors to an empty past)', () => {
+    let h = createTextInputHistory({ nodes: ['a'], selection: sel(0, 1) })
+    h = pushTextInputHistory(h, { nodes: ['ab'], selection: sel(0, 2) }, -0)
+    expect(h.past).toHaveLength(0)
+    expect(h.present.nodes).toEqual(['ab'])
+    expect(undoTextInputHistory(h)).toBe(h)
+  })
+
   it('clamps negative maxPast to 0 (same as disabling undo stack)', () => {
     let h = createTextInputHistory({ nodes: ['a'], selection: sel(0, 1) })
     h = pushTextInputHistory(h, { nodes: ['ab'], selection: sel(0, 2) }, -5)

@@ -646,9 +646,13 @@ describe('resolveFontLoadTimeoutMs', () => {
     expect(resolveFontLoadTimeoutMs(2500, 999)).toBe(2500)
   })
 
-  it('canonicalizes -0 to positive zero', () => {
+  it('canonicalizes -0 to positive zero (including when -0 is the fallback defaultMs)', () => {
     expect(resolveFontLoadTimeoutMs(-0)).toBe(0)
     expect(Object.is(resolveFontLoadTimeoutMs(-0), -0)).toBe(false)
+    expect(resolveFontLoadTimeoutMs(undefined, -0)).toBe(0)
+    expect(Object.is(resolveFontLoadTimeoutMs(undefined, -0), -0)).toBe(false)
+    expect(resolveFontLoadTimeoutMs(Number.NaN, -0)).toBe(0)
+    expect(Object.is(resolveFontLoadTimeoutMs(Number.NaN, -0), -0)).toBe(false)
   })
 
   it('falls back to 10_000 when defaultMs is NaN, non-finite, negative, or non-number', () => {
