@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+import { box } from '@geometra/core'
 import { CanvasRenderer } from '../renderer.js'
 
 class FakeCtx {
@@ -24,6 +25,25 @@ class FakeCtx {
 }
 
 describe('CanvasRenderer.setFrameTimings', () => {
+  it('treats omitted or non-finite layoutMs as 0', () => {
+    Object.defineProperty(globalThis, 'window', {
+      value: { devicePixelRatio: 1 },
+      configurable: true,
+      writable: true,
+    })
+    const ctx = new FakeCtx()
+    const canvas = {
+      style: {} as Record<string, string>,
+      getContext: () => ctx,
+    } as unknown as HTMLCanvasElement
+
+    const renderer = new CanvasRenderer({ canvas })
+    renderer.setFrameTimings({} as { layoutMs?: number })
+    expect(renderer.lastLayoutWallMs).toBe(0)
+    renderer.setFrameTimings({ layoutMs: undefined as unknown as number })
+    expect(renderer.lastLayoutWallMs).toBe(0)
+  })
+
   it('clamps non-finite or negative layoutMs to 0', () => {
     Object.defineProperty(globalThis, 'window', {
       value: { devicePixelRatio: 1 },
@@ -45,5 +65,35 @@ describe('CanvasRenderer.setFrameTimings', () => {
     expect(renderer.lastLayoutWallMs).toBe(0)
     renderer.setFrameTimings({ layoutMs: 4.25 })
     expect(renderer.lastLayoutWallMs).toBe(4.25)
+  })
+})
+
+describe('CanvasRenderer.render wall time', () => {
+  it('sets lastRenderWallMs to the elapsed performance.now() delta for the frame', () => {
+    Object.defineProperty(globalThis, 'window', {
+      value: { devicePixelRatio: 1 },
+      configurable: true,
+      writable: true,
+    })
+    const ctx = new FakeCtx()
+    const canvas = {
+      style: {} as Record<string, string>,
+      getContext: () => ctx,
+    } as unknown as HTMLCanvasElement
+
+    // render() samples performance.now() at frame start and again when computing lastRenderWallMs
+    // (inspector HUD is off by default, so there is no third sample).
+    const stamps = [100, 103.5]
+    let i = 0
+    const spy = vi.spyOn(performance, 'now').mockImplementation(() => stamps[i++] ?? stamps[stamps.length - 1]!)
+
+    const renderer = new CanvasRenderer({ canvas })
+    const tree = box({ width: 10, height: 10 })
+    const layout = { x: 0, y: 0, width: 10, height: 10, children: [] }
+
+    renderer.render(layout, tree)
+
+    expect(renderer.lastRenderWallMs).toBeCloseTo(3.5, 5)
+    spy.mockRestore()
   })
 })
