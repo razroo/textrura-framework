@@ -177,10 +177,20 @@ describe('createClient WebSocket message parse errors', () => {
     await new Promise<void>(resolve => queueMicrotask(() => resolve()))
     expect(sockets).toHaveLength(1)
 
-    sockets[0]!.emit('message', { data: '{ not json' })
+    sockets[0]!.emit('message', { data: '' })
     await new Promise<void>(resolve => queueMicrotask(() => resolve()))
     expect(errors).toHaveLength(1)
     expect(errors[0]).toBeInstanceOf(SyntaxError)
+
+    sockets[0]!.emit('message', { data: '   \t\n  ' })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(2)
+    expect(errors[1]).toBeInstanceOf(SyntaxError)
+
+    sockets[0]!.emit('message', { data: '{ not json' })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(3)
+    expect(errors[2]).toBeInstanceOf(SyntaxError)
 
     const validFrame = {
       type: 'frame',
@@ -190,7 +200,7 @@ describe('createClient WebSocket message parse errors', () => {
     }
     sockets[0]!.emit('message', { data: JSON.stringify(validFrame) })
     await new Promise<void>(resolve => queueMicrotask(() => resolve()))
-    expect(errors).toHaveLength(1)
+    expect(errors).toHaveLength(3)
     expect(client.layout?.width).toBe(10)
   })
 
