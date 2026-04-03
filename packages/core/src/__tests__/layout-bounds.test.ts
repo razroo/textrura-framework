@@ -52,6 +52,16 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ ...base, height: b })).toBe(false)
   })
 
+  it('rejects Symbol and function values on any axis without throwing', () => {
+    const base = { x: 0, y: 0, width: 10, height: 10, children: [] as [] }
+    const sym = Symbol('bounds') as unknown as number
+    expect(layoutBoundsAreFinite({ ...base, x: sym })).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, height: sym })).toBe(false)
+    const fn = (() => 0) as unknown as number
+    expect(layoutBoundsAreFinite({ ...base, y: fn })).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, width: fn })).toBe(false)
+  })
+
   it('rejects sparse or empty layout objects (undefined bounds from corrupt trees)', () => {
     expect(layoutBoundsAreFinite({} as unknown as ComputedLayout)).toBe(false)
     expect(
