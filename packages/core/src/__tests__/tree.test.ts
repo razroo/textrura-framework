@@ -238,6 +238,21 @@ describe('toLayoutTree', () => {
     expect(layout).not.toHaveProperty('dir')
   })
 
+  it('strips dir from text and image layout props (direction is resolved outside Yoga)', () => {
+    const t = text({
+      text: 'x',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      width: 10,
+      height: 18,
+      dir: 'rtl',
+    })
+    expect(toLayoutTree(t)).not.toHaveProperty('dir')
+
+    const img = image({ src: '/a.png', width: 8, height: 8, dir: 'ltr' })
+    expect(toLayoutTree(img)).not.toHaveProperty('dir')
+  })
+
   it('omits runtime box metadata (handlers, key, semantic) from the layout snapshot', () => {
     const child = text({
       text: 'Hi',
