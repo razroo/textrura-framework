@@ -619,6 +619,39 @@ describe('dispatchHit', () => {
     expect(log).toEqual(['front'])
   })
 
+  it('overlapping siblings: appended child wins after prior dispatch warmed z-order cache', () => {
+    const log: string[] = []
+    const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } })
+    const mid = box({ width: 50, height: 50, zIndex: 5, onClick: () => { log.push('mid') } })
+    const root = box({ width: 100, height: 100 }, [back, mid])
+    let layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['mid'])
+
+    log.length = 0
+    const top = box({ width: 50, height: 50, zIndex: 10, onClick: () => { log.push('top') } })
+    root.children.push(top)
+    layout = {
+      ...layout,
+      children: [
+        ...layout.children,
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['top'])
+  })
+
   it('overlapping siblings: missing layout for top z-index still dispatches to sibling behind', () => {
     const log: string[] = []
     const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } })
