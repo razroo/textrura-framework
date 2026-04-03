@@ -4,6 +4,7 @@ import {
   createTweenTimeline,
   easing,
   getMotionPreference,
+  normalizeSpringConfig,
   setMotionPreference,
   transition,
 } from '../animation.js'
@@ -31,6 +32,47 @@ describe('easing presets', () => {
       const t = i / 50
       expect(easing.easeInOut(t) + easing.easeInOut(1 - t)).toBeCloseTo(1, 12)
     }
+  })
+})
+
+describe('normalizeSpringConfig', () => {
+  it('uses defaults for non-finite or non-positive mass', () => {
+    expect(normalizeSpringConfig({ mass: Number.NaN })).toMatchObject({
+      stiffness: 170,
+      damping: 26,
+      mass: 1,
+    })
+    expect(normalizeSpringConfig({ mass: Number.POSITIVE_INFINITY })).toMatchObject({ mass: 1 })
+    expect(normalizeSpringConfig({ mass: -1 })).toMatchObject({ mass: 1 })
+    expect(normalizeSpringConfig({ mass: 0 })).toMatchObject({ mass: 1 })
+    expect(normalizeSpringConfig({ mass: '1' as never })).toMatchObject({ mass: 1 })
+  })
+
+  it('uses default stiffness when missing, non-finite, zero, or negative', () => {
+    expect(normalizeSpringConfig({ stiffness: Number.NaN })).toMatchObject({ stiffness: 170 })
+    expect(normalizeSpringConfig({ stiffness: Number.NEGATIVE_INFINITY })).toMatchObject({
+      stiffness: 170,
+    })
+    expect(normalizeSpringConfig({ stiffness: 0 })).toMatchObject({ stiffness: 170 })
+    expect(normalizeSpringConfig({ stiffness: -50 })).toMatchObject({ stiffness: 170 })
+    expect(normalizeSpringConfig({ stiffness: undefined })).toMatchObject({ stiffness: 170 })
+  })
+
+  it('preserves positive finite stiffness', () => {
+    expect(normalizeSpringConfig({ stiffness: 42 })).toMatchObject({ stiffness: 42 })
+  })
+
+  it('uses default damping when missing, non-finite, or negative; allows zero damping', () => {
+    expect(normalizeSpringConfig({ damping: Number.NaN })).toMatchObject({ damping: 26 })
+    expect(normalizeSpringConfig({ damping: Number.POSITIVE_INFINITY })).toMatchObject({ damping: 26 })
+    expect(normalizeSpringConfig({ damping: -1 })).toMatchObject({ damping: 26 })
+    expect(normalizeSpringConfig({ damping: 0 })).toMatchObject({ damping: 0 })
+    expect(normalizeSpringConfig({ damping: 12 })).toMatchObject({ damping: 12 })
+  })
+
+  it('leaves unrelated fields at defaults when only one option is set', () => {
+    expect(normalizeSpringConfig({ mass: 2 })).toEqual({ stiffness: 170, damping: 26, mass: 2 })
+    expect(normalizeSpringConfig({})).toEqual({ stiffness: 170, damping: 26, mass: 1 })
   })
 })
 

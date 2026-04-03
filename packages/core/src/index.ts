@@ -53,6 +53,7 @@ export type { TextNodeInfo, TextLineInfo, SelectionRange } from './selection.js'
 export {
   transition,
   spring,
+  normalizeSpringConfig,
   easing,
   animationLoop,
   createTweenTimeline,

@@ -229,6 +229,43 @@ export function createPropertyTimeline(initialValues: Record<string, number>): P
   return { values, to, step, pause, resume, cancel, state }
 }
 
+const DEFAULT_SPRING_STIFFNESS = 170
+const DEFAULT_SPRING_DAMPING = 26
+const DEFAULT_SPRING_MASS = 1
+
+/**
+ * Normalize spring config so physics integration never sees NaN, ±Infinity, negative mass, or
+ * negative stiffness (which would push away from the target or explode the state).
+ * Damping may be `0` (undamped). Stiffness `0` is treated as invalid and falls back to the default
+ * so the spring still has a restoring force toward the target.
+ */
+export function normalizeSpringConfig(config: {
+  stiffness?: number
+  damping?: number
+  mass?: number
+} = {}): { stiffness: number; damping: number; mass: number } {
+  let mass = config.mass
+  if (typeof mass !== 'number' || !Number.isFinite(mass) || mass <= 0) {
+    mass = DEFAULT_SPRING_MASS
+  }
+
+  let stiffness = config.stiffness
+  if (
+    typeof stiffness !== 'number' ||
+    !Number.isFinite(stiffness) ||
+    stiffness <= 0
+  ) {
+    stiffness = DEFAULT_SPRING_STIFFNESS
+  }
+
+  let damping = config.damping
+  if (typeof damping !== 'number' || !Number.isFinite(damping) || damping < 0) {
+    damping = DEFAULT_SPRING_DAMPING
+  }
+
+  return { stiffness, damping, mass }
+}
+
 /**
  * Create a spring-physics animated signal that follows a target value.
  * Returns a signal that smoothly converges to `target.value`.
@@ -237,7 +274,7 @@ export function spring(
   target: Signal<number>,
   config: { stiffness?: number; damping?: number; mass?: number } = {},
 ): Signal<number> {
-  const { stiffness = 170, damping = 26, mass = 1 } = config
+  const { stiffness, damping, mass } = normalizeSpringConfig(config)
   const s = signal(target.peek())
   let velocity = 0
   let prevTarget = target.peek()
