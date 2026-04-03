@@ -29,6 +29,10 @@ export interface TextLineInfo {
   charWidths: number[]
 }
 
+function finiteRootOffset(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
 /** A selection range across text nodes. */
 export interface SelectionRange {
   /** Index of the anchor text node. */
@@ -41,7 +45,12 @@ export interface SelectionRange {
   focusOffset: number
 }
 
-/** Collect all selectable text nodes from the element tree with their absolute positions. */
+/**
+ * Collect all selectable text nodes from the element tree with their absolute positions.
+ * Root `offsetX` / `offsetY` share the same coordinate space as pointer hits; non-finite or non-number
+ * values are treated as `0` (same rule as {@link import('./hit-test.js').dispatchHit} /
+ * {@link import('./hit-test.js').hitPathAtPoint} for rooted surfaces).
+ */
 export function collectTextNodes(
   element: UIElement,
   layout: ComputedLayout,
@@ -49,6 +58,24 @@ export function collectTextNodes(
   offsetY: number,
   results: TextNodeInfo[],
   parentDirection: ResolvedDirection = 'ltr',
+): void {
+  collectTextNodesWalk(
+    element,
+    layout,
+    finiteRootOffset(offsetX),
+    finiteRootOffset(offsetY),
+    results,
+    parentDirection,
+  )
+}
+
+function collectTextNodesWalk(
+  element: UIElement,
+  layout: ComputedLayout,
+  offsetX: number,
+  offsetY: number,
+  results: TextNodeInfo[],
+  parentDirection: ResolvedDirection,
 ): void {
   const x = offsetX + layout.x
   const y = offsetY + layout.y
@@ -75,7 +102,7 @@ export function collectTextNodes(
   for (let i = 0; i < element.children.length; i++) {
     const childLayout = layout.children[i]
     if (childLayout) {
-      collectTextNodes(element.children[i]!, childLayout, x, y, results, direction)
+      collectTextNodesWalk(element.children[i]!, childLayout, x, y, results, direction)
     }
   }
 }

@@ -115,6 +115,30 @@ describe('collectTextNodes', () => {
     expect(results).toHaveLength(1)
     expect(results[0].element.props.text).toBe('Only')
   })
+
+  it('treats non-finite root offsetX/Y as zero (aligned with pointer hit-test root offsets)', () => {
+    const el = box({ width: 200, height: 100 }, [
+      text({ text: 'Hi', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
+    ])
+    const layout: ComputedLayout = {
+      x: 10,
+      y: 20,
+      width: 200,
+      height: 100,
+      children: [{ x: 5, y: 0, width: 100, height: 18, children: [] }],
+    }
+    const collect = (ox: number, oy: number): TextNodeInfo[] => {
+      const r: TextNodeInfo[] = []
+      collectTextNodes(el, layout, ox, oy, r)
+      return r
+    }
+    const baseline = collect(3, 4)[0]!
+    expect(baseline).toMatchObject({ x: 18, y: 24 })
+
+    expect(collect(Number.NaN, 4)[0]).toMatchObject({ x: 15, y: 24 })
+    expect(collect(3, Number.POSITIVE_INFINITY)[0]).toMatchObject({ x: 18, y: 20 })
+    expect(collect('7' as unknown as number, 0)[0]).toMatchObject({ x: 15, y: 20 })
+  })
 })
 
 describe('getSelectedText', () => {
