@@ -5,8 +5,9 @@
 #
 # Task selection (humans/agents): grep ROADMAP.md and ROUTING_COMPETITIVENESS_CHECKLIST.md for `- [ ]`.
 # Many sections may already be all `[x]` — that only means unchecked roadmap boxes are exhausted,
-# not that the repo is "done". Then prefer ROADMAP "Deferred / research" themes, or one scoped change
-# under packages/ (tests, perf in hit-test/text/layout paths, types, public JSDoc, or
+# not that the repo is "done". ROADMAP "Deferred / research" uses plain bullets (no `- [ ]`), so an empty
+# grep does not mean no roadmap-backed themes — read that subsection when casting next work. Otherwise prefer
+# one scoped change under packages/ (tests, perf in hit-test/text/layout paths, types, public JSDoc, or
 # `rg 'TODO|FIXME|HACK' packages`). Ignore `[ ]` in RELEASE_CHECKLIST.md / v1-release-checklist.md
 # (maintainer release steps, not framework backlog).
 #
@@ -99,7 +100,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
 1. Explore the codebase. Read ROADMAP.md, CLAUDE.md, and browse the source in packages/. Understand the architecture and what already exists.
 
 2. Decide what to work on. Use this priority order:
-   a) Unchecked items in ROADMAP.md (if any remain). When roadmap tracking boxes are all done, still grep ROADMAP.md Phase A–C bullets and ROUTING_COMPETITIVENESS_CHECKLIST.md for any remaining \`[ ]\` lines; use those sections for thematic priorities (fonts/metrics, hit-test and input, protocol, renderers, demos). Ignore \`[ ]\` in RELEASE_CHECKLIST.md and v1-release-checklist.md — those are maintainer release steps, not framework backlog.
+   a) Unchecked items in ROADMAP.md (if any remain). When roadmap tracking boxes are all done, still grep ROADMAP.md Phase A–C bullets and ROUTING_COMPETITIVENESS_CHECKLIST.md for any remaining \`[ ]\` lines; use those sections for thematic priorities (fonts/metrics, hit-test and input, protocol, renderers, demos). The ROADMAP "Deferred / research" subsection has no checkboxes — read it explicitly when everything else is \`[x]\` and you want roadmap-aligned themes. Ignore \`[ ]\` in RELEASE_CHECKLIST.md and v1-release-checklist.md — those are maintainer release steps, not framework backlog.
    b) If nothing is unchecked there either, improve the framework on your own initiative. Examples of valuable work:
       - Add or expand test coverage (unit tests, edge cases, integration tests)
       - Improve performance in hot paths (hit-testing, text measurement, layout, repaint)
