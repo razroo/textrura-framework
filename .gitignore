@@ -8,6 +8,9 @@ test-results
 .playwright
 .playwright-mcp
 
+# Local debug screenshots (e.g. manual Playwright/canvas probes)
+tmp-*.png
+
 # Accidental tsc emit beside sources (build output belongs in dist/)
 packages/*/src/**/*.js
 packages/*/src/**/*.js.map
