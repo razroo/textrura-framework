@@ -12,7 +12,8 @@ export default defineConfig({
   reporter: process.env.CI ? [['line'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL,
-    viewport: { width: 1440, height: 960 },
+    // Align with thin-client resize → full-stack-dashboard layout used by canvas hit coordinates below.
+    viewport: { width: 1280, height: 820 },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -25,6 +26,8 @@ export default defineConfig({
         ...process.env,
         GEOMETRA_FULL_STACK_PORT: String(serverPort),
         GEOMETRA_FULL_STACK_CLIENT_ORIGIN: `${baseURL}/`,
+        // Stable canvas hit targets in tests/e2e (no default toast consuming banner height).
+        GEOMETRA_E2E: '1',
       },
       port: serverPort,
       timeout: 30_000,

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { box } from '@geometra/core'
+import { box, type FrameTimings } from '@geometra/core'
 import { CanvasRenderer } from '../renderer.js'
 
 class FakeCtx {
@@ -38,7 +38,7 @@ describe('CanvasRenderer.setFrameTimings', () => {
     } as unknown as HTMLCanvasElement
 
     const renderer = new CanvasRenderer({ canvas })
-    renderer.setFrameTimings({} as { layoutMs?: number })
+    renderer.setFrameTimings({} as unknown as FrameTimings)
     expect(renderer.lastLayoutWallMs).toBe(0)
     renderer.setFrameTimings({ layoutMs: undefined as unknown as number })
     expect(renderer.lastLayoutWallMs).toBe(0)

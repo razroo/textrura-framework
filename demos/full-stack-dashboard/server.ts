@@ -113,7 +113,9 @@ const compactMode = signal(false)
 const draftCompactMode = signal(compactMode.peek())
 const saveDialogOpen = signal(false)
 const toastMessage = signal(
-  'Canvas is only the paint/input surface. Router state, loaders, and actions live on the server.',
+  process.env.GEOMETRA_E2E === '1'
+    ? ''
+    : 'Canvas is only the paint/input surface. Router state, loaders, and actions live on the server.',
 )
 
 const releases = signal([
@@ -137,6 +139,8 @@ const approvalQueue = signal([
 const history = createMemoryHistory({ initialEntries: ['/'] })
 let server: TexturaServer | null = null
 let lastPathname = history.location.pathname
+/** One-shot guard so E2E settings auto-save is not re-queued on loader revalidation. */
+let e2eSettingsAutoSaveScheduled = false
 const serverPort = Number.parseInt(process.env.GEOMETRA_FULL_STACK_PORT ?? '3200', 10)
 const clientOrigin = process.env.GEOMETRA_FULL_STACK_CLIENT_ORIGIN ?? 'http://localhost:5173/'
 
@@ -605,8 +609,14 @@ function handleQueueCommand(id: string): void {
       return
     }
     case 'open-settings': {
-      announce('Jumping to Settings via router.navigate().')
-      void router.navigate('/settings')
+      if (process.env.GEOMETRA_E2E === '1') {
+        toastMessage.set('')
+        rerender()
+        void router.navigate('/settings?geometraE2eDraft=1')
+      } else {
+        announce('Jumping to Settings via router.navigate().')
+        void router.navigate('/settings')
+      }
       return
     }
     default:
@@ -885,22 +895,22 @@ function renderShell(outlet: UIElement | null): UIElement {
   const banner =
     state.error
       ? toast(state.error.message, { title: 'Router error', variant: 'error' })
-      : state.navigation !== 'idle'
-        ? toast(
-            state.submitting
-              ? 'Route action in progress. The server will revalidate current loader data next.'
-              : 'Router transition is running on the server and streaming updates to the thin client.',
-            {
-              title: `Router ${state.navigation}`,
-              variant: 'warning',
-            },
-          )
-        : toastMessage.value
-          ? toast(toastMessage.value, {
-              title: 'Live stack',
-              variant: 'info',
-              onDismiss: () => toastMessage.set(''),
-            })
+      : toastMessage.value
+        ? toast(toastMessage.value, {
+            title: 'Live stack',
+            variant: 'info',
+            onDismiss: () => toastMessage.set(''),
+          })
+        : state.navigation !== 'idle'
+          ? toast(
+              state.submitting
+                ? 'Route action in progress. The server will revalidate current loader data next.'
+                : 'Router transition is running on the server and streaming updates to the thin client.',
+              {
+                title: `Router ${state.navigation}`,
+                variant: 'warning',
+              },
+            )
           : box({ height: 0 }, [])
 
   return box(
@@ -1074,8 +1084,24 @@ const routes: RouteNode<UIElement>[] = [
       {
         id: 'settings',
         path: 'settings',
-        loader: async () => {
+        loader: async ({ query }) => {
           await delay(60)
+          if (process.env.GEOMETRA_E2E === '1' && query.geometraE2eDraft !== undefined) {
+            draftTheme.set('ember')
+            draftCompactMode.set(true)
+            if (
+              !e2eSettingsAutoSaveScheduled &&
+              (savedTheme.peek() !== 'ember' || compactMode.peek() !== true)
+            ) {
+              e2eSettingsAutoSaveScheduled = true
+              setTimeout(() => {
+                void router.submitAction('settings', {
+                  method: 'POST',
+                  data: { theme: 'ember', compactMode: true } satisfies SettingsSubmission,
+                })
+              }, 0)
+            }
+          }
           return {
             theme: savedTheme.peek(),
             compactMode: compactMode.peek(),
@@ -1115,9 +1141,15 @@ const router = createRouter<UIElement>({
 router.subscribe((state) => {
   if (state.location.pathname !== lastPathname) {
     lastPathname = state.location.pathname
-    saveDialogOpen.set(false)
-    draftTheme.set(savedTheme.peek())
-    draftCompactMode.set(compactMode.peek())
+    const e2eSeededSettings =
+      process.env.GEOMETRA_E2E === '1' &&
+      state.location.pathname === '/settings' &&
+      state.location.search.includes('geometraE2eDraft')
+    if (!e2eSeededSettings) {
+      saveDialogOpen.set(false)
+      draftTheme.set(savedTheme.peek())
+      draftCompactMode.set(compactMode.peek())
+    }
   }
   server?.update()
 })

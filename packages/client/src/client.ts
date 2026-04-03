@@ -222,7 +222,7 @@ export function applyServerMessage(
     onError?.(new Error('Invalid server message: expected a JSON object'))
     return
   }
-  const record = msg as Record<string, unknown>
+  const record = msg as unknown as Record<string, unknown>
   const protocolVersion = record.protocolVersion as unknown
   if (protocolVersion !== undefined) {
     if (typeof protocolVersion !== 'number' || !Number.isFinite(protocolVersion)) {
