@@ -1,15 +1,25 @@
 const FRAME_VERSION = 1
 const HEADER_BYTES = 9
 
-/** Input slice for v1 GEOM binary frames (whole `ArrayBuffer` or a view into a larger backing store). */
-export type BinaryFrameBytes = ArrayBuffer | ArrayBufferView
+/**
+ * Input slice for v1 GEOM binary frames: a whole backing buffer (`ArrayBuffer` or `SharedArrayBuffer`)
+ * or any `ArrayBufferView` into a larger store.
+ */
+export type BinaryFrameBytes = ArrayBuffer | SharedArrayBuffer | ArrayBufferView
+
+function isRootArrayBufferLike(data: BinaryFrameBytes): data is ArrayBuffer | SharedArrayBuffer {
+  return (
+    (typeof ArrayBuffer !== 'undefined' && data instanceof ArrayBuffer) ||
+    (typeof SharedArrayBuffer !== 'undefined' && data instanceof SharedArrayBuffer)
+  )
+}
 
 function resolveFrameBytes(data: BinaryFrameBytes): {
   buffer: ArrayBufferLike
   byteOffset: number
   byteLength: number
 } {
-  if (data instanceof ArrayBuffer) {
+  if (isRootArrayBufferLike(data)) {
     return { buffer: data, byteOffset: 0, byteLength: data.byteLength }
   }
   return { buffer: data.buffer, byteOffset: data.byteOffset, byteLength: data.byteLength }
@@ -19,7 +29,8 @@ function resolveFrameBytes(data: BinaryFrameBytes): {
  * True when `data` has at least the v1 GEOM header (`GEOM` magic + version byte).
  * Does not verify that the declared UTF-8 payload length fits the buffer — use
  * {@link decodeBinaryFrameJson} for full validation.
- * Accepts an `ArrayBuffer` or any `ArrayBufferView` (e.g. `Uint8Array` subarray) so callers can probe
+ * Accepts a root `ArrayBuffer` / `SharedArrayBuffer` or any `ArrayBufferView` (e.g. `Uint8Array` subarray)
+ * so callers can probe
  * frames embedded in a larger buffer without copying.
  */
 export function isBinaryFrameArrayBuffer(data: BinaryFrameBytes): boolean {
@@ -38,7 +49,8 @@ export function isBinaryFrameArrayBuffer(data: BinaryFrameBytes): boolean {
 /**
  * Decode JSON string from a v1 binary envelope (browser).
  * Bytes after `header + payloadLength` are ignored so callers may pass a longer backing buffer.
- * Accepts an `ArrayBuffer` or any `ArrayBufferView` with the same semantics as the server decoder.
+ * Accepts a root `ArrayBuffer` / `SharedArrayBuffer` or any `ArrayBufferView` with the same semantics as
+ * the server decoder.
  *
  * @throws {Error} When the buffer is not a v1 GEOM frame (`Not a GEOM binary frame`).
  * @throws {Error} When the declared payload length exceeds available bytes (`Truncated binary frame payload`).

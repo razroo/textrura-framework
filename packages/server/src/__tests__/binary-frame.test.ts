@@ -113,4 +113,13 @@ describe('binary frame envelope', () => {
     const raw = new Uint8Array([0xff, 0xfe, 0xfd])
     expect(decodeBinaryFrameJson(encodeBinaryFrameRawV1(raw))).toBe('\uFFFD\uFFFD\uFFFD')
   })
+
+  it('decodes a frame held in a SharedArrayBuffer-backed Uint8Array', () => {
+    if (typeof SharedArrayBuffer === 'undefined') return
+    const json = '{"sab":true}'
+    const buf = encodeBinaryFrameJson(json)
+    const sab = new SharedArrayBuffer(buf.length)
+    new Uint8Array(sab).set(buf)
+    expect(decodeBinaryFrameJson(new Uint8Array(sab))).toBe(json)
+  })
 })

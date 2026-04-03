@@ -154,4 +154,14 @@ describe('client binary frame decode', () => {
     const raw = new Uint8Array([0xff, 0xfe, 0xfd])
     expect(decodeBinaryFrameJson(encodeBinaryFrameRawV1(raw))).toBe('\uFFFD\uFFFD\uFFFD')
   })
+
+  it('decodes a v1 frame when the backing store is a root SharedArrayBuffer', () => {
+    if (typeof SharedArrayBuffer === 'undefined') return
+    const json = '{"sab":true}'
+    const enc = new Uint8Array(encodeBinaryFrameJsonV1(json))
+    const sab = new SharedArrayBuffer(enc.byteLength)
+    new Uint8Array(sab).set(enc)
+    expect(isBinaryFrameArrayBuffer(sab)).toBe(true)
+    expect(decodeBinaryFrameJson(sab)).toBe(json)
+  })
 })
