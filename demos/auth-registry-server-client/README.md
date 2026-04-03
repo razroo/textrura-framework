@@ -8,29 +8,23 @@ End-to-end demo matching **`PLATFORM_AUTH.md`**:
 
 Opaque tokens are minted at server startup (new random values each run). A small **localhost-only** HTTP server on **3098** exposes `GET /demo-tokens` so this page can load `{ admin, viewer }` without hard-coding secrets.
 
-## Run (two terminals)
+## Run (one command)
 
-From the **repo root**:
-
-```bash
-npm install
-cd demos/auth-registry-server-client
-npm install
-```
-
-**Terminal 1 — combined registry + Geometra server**
+From the **repo root** (after dependencies are installed):
 
 ```bash
-npm run server
+npm install && npm run demo:auth-registry
 ```
 
-**Terminal 2 — Vite client**
+Or from this directory only:
 
 ```bash
-npm run client
+npm install && npm start
 ```
 
-Open the URL Vite prints (usually `http://localhost:5173`). Use **Admin** / **Viewer** / **Invalid** to exercise handshake **4001**, **Forbidden** on blocked events, and live frames.
+This runs the combined Node server (registry + demo-tokens HTTP + Geometra WebSocket) and Vite together (`concurrently`; Ctrl+C stops both). Open the URL Vite prints (usually `http://localhost:5173`). If the page loads before Textura finishes initializing, wait a moment and click a connect button again.
+
+**Split terminals** (optional): `npm run server` in one, `npm run client` in the other.
 
 ## Optional env
 

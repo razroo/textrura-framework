@@ -28,7 +28,8 @@
     "lint": "eslint packages/*/src",
     "format": "prettier --write 'packages/*/src/**/*.ts'",
     "demo:dev": "vite --config demo/vite.config.ts",
-    "demo:build": "vite build --config demo/vite.config.ts"
+    "demo:build": "vite build --config demo/vite.config.ts",
+    "demo:auth-registry": "npm run start -w @geometra/demo-auth-registry-server-client"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.2",
