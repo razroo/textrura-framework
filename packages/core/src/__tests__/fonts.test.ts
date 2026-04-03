@@ -742,6 +742,11 @@ describe('waitForFonts', () => {
     await expect(waitForFonts(['Inter'])).resolves.toBeUndefined()
   })
 
+  it('no-ops when document is null (corrupt or stubbed global)', async () => {
+    vi.stubGlobal('document', null)
+    await expect(waitForFonts(['Inter'])).resolves.toBeUndefined()
+  })
+
   it('no-ops when document.fonts is missing', async () => {
     vi.stubGlobal('document', {})
     await expect(waitForFonts(['Inter'])).resolves.toBeUndefined()

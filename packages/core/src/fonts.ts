@@ -403,15 +403,17 @@ export function resolveFontLoadTimeoutMs(timeoutMs: number | undefined, defaultM
 }
 
 /**
- * Wait for web fonts used by the app. Browser only; no-op on server.
+ * Wait for web fonts used by the app. Browser only; no-op when `globalThis.document` is missing or null.
  * Uses `document.fonts.load` per family; timeouts are swallowed so startup never hard-fails.
  * Empty and whitespace-only family strings are ignored; names are trimmed before load and deduped.
  * `timeoutMs` must be a finite non-negative number; otherwise the default `10_000` is used (avoids
  * relying on `setTimeout` coercion for `NaN`, `±Infinity`, or negative values).
  */
 export async function waitForFonts(families: string[], timeoutMs = 10_000): Promise<void> {
-  if (typeof document === 'undefined' || families.length === 0) return
-  const api = document.fonts
+  if (families.length === 0) return
+  const root = globalThis.document
+  if (root == null) return
+  const api = root.fonts
   if (!api?.load) return
 
   const unique = [...new Set(families.map(f => f.trim()).filter(f => f.length > 0))]
