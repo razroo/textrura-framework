@@ -32,6 +32,9 @@ export function encodeBinaryFrameJson(jsonUtf8: string): Buffer {
  * Decode JSON string from a v1 binary envelope.
  * Bytes after `header + payloadLength` are ignored so callers may pass a longer buffer.
  * Accepts any `Uint8Array` view (including non-zero `byteOffset` into a shared `ArrayBuffer`).
+ *
+ * @throws {Error} When the buffer is not a v1 GEOM frame (`Not a GEOM binary frame`).
+ * @throws {Error} When the declared payload length exceeds available bytes (`Truncated binary frame payload`).
  */
 export function decodeBinaryFrameJson(data: Buffer | Uint8Array): string {
   if (!isBinaryFrameBuffer(data)) {

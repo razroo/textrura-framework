@@ -1,7 +1,11 @@
 const FRAME_VERSION = 1
 const HEADER_BYTES = 9
 
-/** True if ArrayBuffer looks like a v1 binary envelope. */
+/**
+ * True when `data` has at least the v1 GEOM header (`GEOM` magic + version byte).
+ * Does not verify that the declared UTF-8 payload length fits the buffer — use
+ * {@link decodeBinaryFrameJson} for full validation.
+ */
 export function isBinaryFrameArrayBuffer(data: ArrayBuffer): boolean {
   if (data.byteLength < HEADER_BYTES) return false
   const u8 = new Uint8Array(data)
@@ -17,6 +21,9 @@ export function isBinaryFrameArrayBuffer(data: ArrayBuffer): boolean {
 /**
  * Decode JSON string from a v1 binary envelope (browser).
  * Bytes after `header + payloadLength` are ignored so callers may pass a longer `ArrayBuffer`.
+ *
+ * @throws {Error} When the buffer is not a v1 GEOM frame (`Not a GEOM binary frame`).
+ * @throws {Error} When the declared payload length exceeds available bytes (`Truncated binary frame payload`).
  */
 export function decodeBinaryFrameJson(data: ArrayBuffer): string {
   if (!isBinaryFrameArrayBuffer(data)) {
