@@ -3021,6 +3021,28 @@ describe('pointerEvents', () => {
     expect(hitPathAtPoint(parent, layout, 50, 45)).toEqual([0])
   })
 
+  it('pointerEvents none on scroll parent: overflow clip still blocks descent (no pass-through past viewport)', () => {
+    let childFired = false
+    const child = box({ width: 100, height: 200, onClick: () => { childFired = true } })
+    const parent = box(
+      { width: 100, height: 100, overflow: 'scroll', scrollY: 0, pointerEvents: 'none' },
+      [child],
+    )
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 100, height: 200, children: [] }],
+    }
+
+    expect(dispatchHit(parent, layout, 'onClick', 150, 50).handled).toBe(false)
+    expect(childFired).toBe(false)
+    expect(hitPathAtPoint(parent, layout, 150, 50)).toBeNull()
+    expect(hasInteractiveHitAtPoint(parent, layout, 150, 50)).toBe(false)
+    expect(getCursorAtPoint(parent, layout, 150, 50)).toBeNull()
+  })
+
   it('pointerEvents none: hasInteractiveHitAtPoint sees interactive sibling behind overlay', () => {
     const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => undefined })
     const front = box({ width: 50, height: 50, zIndex: 2, pointerEvents: 'none' })
