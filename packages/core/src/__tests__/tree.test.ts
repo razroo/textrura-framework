@@ -188,4 +188,42 @@ describe('toLayoutTree', () => {
     expect(layout).toHaveProperty('width', 100)
     expect(layout).not.toHaveProperty('dir')
   })
+
+  it('omits runtime box metadata (handlers, key, semantic) from the layout snapshot', () => {
+    const child = text({
+      text: 'Hi',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      width: 20,
+      height: 18,
+      key: 'leaf',
+      semantic: { role: 'button' },
+    })
+    const el = box(
+      {
+        width: 100,
+        height: 50,
+        onClick: () => {},
+        key: 'root',
+        semantic: { role: 'main' },
+      },
+      [child],
+    )
+    expect(el.handlers).toBeDefined()
+
+    const layout = toLayoutTree(el) as BoxLayoutNode
+    expect(layout).not.toHaveProperty('handlers')
+    expect(layout).not.toHaveProperty('key')
+    expect(layout).not.toHaveProperty('semantic')
+    const textLayout = layout.children[0] as Record<string, unknown>
+    expect(textLayout).toMatchObject({
+      text: 'Hi',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      width: 20,
+      height: 18,
+    })
+    expect(textLayout).not.toHaveProperty('key')
+    expect(textLayout).not.toHaveProperty('semantic')
+  })
 })
