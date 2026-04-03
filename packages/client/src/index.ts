@@ -11,5 +11,9 @@ export type {
   ClientFrameMetrics,
   ServerMessageDecodeMeta,
 } from './client.js'
+export { createNoopRenderer } from './noop-renderer.js'
+export { createHeadlessClient } from './headless.js'
+export type { HeadlessClientOptions } from './headless.js'
+export { GEOM_DATA_CHANNEL_TRACKER_SNAPSHOT } from './data-channels.js'
 export { decodeBinaryFrameJson, isBinaryFrameArrayBuffer } from './binary-frame.js'
 export type { BinaryFrameBytes } from './binary-frame.js'

@@ -671,4 +671,49 @@ describe('applyServerMessage', () => {
     expect(state.layout).toEqual(nextLayout)
     expect(renders).toHaveLength(1)
   })
+
+  it('applies data messages via onData without rendering', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const dataCalls: Array<{ channel: string; payload: unknown }> = []
+    const metrics: ClientFrameMetrics[] = []
+
+    applyServerMessage(
+      state,
+      renderer,
+      {
+        type: 'data',
+        channel: 'geom.tracker.snapshot',
+        payload: { ok: true, nested: { x: 1 } },
+        protocolVersion: 1,
+      },
+      undefined,
+      m => metrics.push(m),
+      { decodeMs: 0 },
+      (ch, pl) => dataCalls.push({ channel: ch, payload: pl }),
+    )
+
+    expect(dataCalls).toEqual([{ channel: 'geom.tracker.snapshot', payload: { ok: true, nested: { x: 1 } } }])
+    expect(renders).toHaveLength(0)
+    expect(metrics).toHaveLength(1)
+    expect(metrics[0]!.messageType).toBe('data')
+    expect(metrics[0]!.renderMs).toBe(0)
+  })
+
+  it('rejects data with empty channel', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const errors: string[] = []
+    type Msg = Parameters<typeof applyServerMessage>[2]
+
+    applyServerMessage(
+      state,
+      renderer,
+      { type: 'data', channel: '   ', payload: {} } as unknown as Msg,
+      e => errors.push(String(e)),
+    )
+
+    expect(errors.length).toBeGreaterThan(0)
+    expect(renders).toHaveLength(0)
+  })
 })

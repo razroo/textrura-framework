@@ -13,7 +13,7 @@ import {
 } from '@geometra/core'
 import type { UIElement, EventHandlers } from '@geometra/core'
 import { diffLayout, coalescePatches, PROTOCOL_VERSION, isProtocolCompatible, CLOSE_AUTH_FAILED, CLOSE_FORBIDDEN } from './protocol.js'
-import type { ServerMessage, ClientMessage } from './protocol.js'
+import type { ServerMessage, ClientMessage, ServerDataMessage } from './protocol.js'
 import { encodeBinaryFrameJson } from './binary-frame.js'
 
 /** Default WebSocket pathname when attaching to an existing HTTP server. */
@@ -77,6 +77,11 @@ export interface ServerTransportMetrics {
 export interface TexturaServer {
   /** Trigger a re-render for all connected clients. */
   update(): void
+  /**
+   * Push a JSON `data` frame on the same WebSocket as layout updates (see {@link ServerDataMessage}).
+   * Safe for headless agents and hybrid renderers; does not trigger layout.
+   */
+  broadcastData(channel: string, payload: unknown): void
   /** Shut down the server. */
   close(): void
 }
@@ -355,6 +360,38 @@ export async function createServer(
     }
   })
 
+  function broadcastData(channel: string, payload: unknown): void {
+    if (typeof channel !== 'string' || channel.trim() === '') {
+      options.onError?.(new Error('broadcastData: channel must be a non-empty string'))
+      return
+    }
+    try {
+      JSON.stringify(payload)
+    } catch (err) {
+      options.onError?.(err)
+      return
+    }
+    const dataMsg: ServerDataMessage = {
+      type: 'data',
+      channel,
+      payload,
+      protocolVersion: PROTOCOL_VERSION,
+    }
+    const json = JSON.stringify(dataMsg)
+    for (const client of clients) {
+      if (client.readyState === client.OPEN) {
+        if (shouldDeferClientSend(client.bufferedAmount, backpressureBytes)) {
+          continue
+        }
+        if (clientBinaryFraming.get(client)) {
+          client.send(encodeBinaryFrameJson(json), { binary: true })
+        } else {
+          client.send(json)
+        }
+      }
+    }
+  }
+
   // Initial render
   computeAndBroadcast()
 
@@ -362,6 +399,7 @@ export async function createServer(
     update() {
       computeAndBroadcast()
     },
+    broadcastData,
     close() {
       if (options.httpServer != null && upgradeHandler != null) {
         options.httpServer.off('upgrade', upgradeHandler)

@@ -35,11 +35,25 @@ interface VersionedMessage {
   protocolVersion?: number
 }
 
+/**
+ * Arbitrary JSON-serializable payload on the same WebSocket as layout frames.
+ * Use namespaced `channel` strings (e.g. `geom.tracker.snapshot`) so clients and headless agents
+ * can subscribe without a second HTTP API.
+ */
+export type ServerDataMessage = VersionedMessage & {
+  type: 'data'
+  /** Non-empty namespaced id (e.g. `geom.tracker.snapshot`). */
+  channel: string
+  /** Must be JSON-serializable (structured clone / JSON.stringify safe). */
+  payload: unknown
+}
+
 /** Messages sent from server to client. */
 export type ServerMessage =
   | (VersionedMessage & { type: 'frame'; layout: ComputedLayout; tree: UIElement })
   | (VersionedMessage & { type: 'patch'; patches: LayoutPatch[] })
   | (VersionedMessage & { type: 'error'; message: string; code?: number })
+  | ServerDataMessage
 
 /** Messages sent from client to server. */
 export type ClientMessage =

@@ -45,7 +45,31 @@ interface ServerError {
   protocolVersion?: number
 }
 
-type ServerMessage = ServerFrame | ServerPatch | ServerError
+interface ServerData {
+  type: 'data'
+  channel: string
+  payload: unknown
+  protocolVersion?: number
+}
+
+type ServerMessage = ServerFrame | ServerPatch | ServerError | ServerData
+
+/** JSON-serializable plain data (no Date, Map, undefined in objects, etc.). */
+function isJsonSerializableValue(v: unknown): boolean {
+  if (v === null) return true
+  const t = typeof v
+  if (t === 'string' || t === 'number' || t === 'boolean') return true
+  if (t === 'bigint' || t === 'undefined' || t === 'function' || t === 'symbol') return false
+  if (Array.isArray(v)) return v.every(isJsonSerializableValue)
+  if (t === 'object') {
+    if (Object.getPrototypeOf(v) !== Object.prototype) return false
+    for (const key of Object.keys(v as object)) {
+      if (!isJsonSerializableValue((v as Record<string, unknown>)[key])) return false
+    }
+    return true
+  }
+  return false
+}
 
 function isPlainLayoutTreeValue(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -101,6 +125,13 @@ function isWellFormedGeomV1Message(msg: Record<string, unknown>): boolean {
   if (t === 'error') {
     return typeof msg.message === 'string'
   }
+  if (t === 'data') {
+    return (
+      typeof msg.channel === 'string' &&
+      msg.channel.trim().length > 0 &&
+      isJsonSerializableValue(msg.payload)
+    )
+  }
   return false
 }
 
@@ -150,6 +181,11 @@ export interface TexturaClientOptions {
   onFrameMetrics?: (metrics: ClientFrameMetrics) => void
   /** Enable automatic reconnection on disconnect. Default: true. */
   reconnect?: boolean
+  /**
+   * Called for each server `data` message (same WebSocket as layout frames).
+   * Pair with `GEOM_DATA_CHANNEL_TRACKER_SNAPSHOT` from `@geometra/client` or your own channel ids.
+   */
+  onData?: (channel: string, payload: unknown) => void
   /**
    * Negotiate optional binary JSON envelopes for server→client frames (same JSON payload as text).
    * Requires `resize` with `capabilities.binaryFraming` (sent automatically when true).
@@ -209,12 +245,16 @@ function applyPatches(layout: ComputedLayout, patches: ServerPatch['patches']): 
  * Well-formed `error` messages call `onError` with the server message and still invoke `onMetrics`
  * once with `messageType: 'error'` (no render; `renderMs` is zero).
  *
+ * Well-formed `data` messages invoke `onData(channel, payload)` when provided, invoke `onMetrics` with
+ * `messageType: 'data'`, and do not call `render` (`renderMs` is zero).
+ *
  * @param state — Mutable `{ layout, tree }` (same fields as {@link TexturaClient}).
  * @param renderer — Receives `render` after successful frame or patch application.
- * @param msg — `frame`, `patch`, or `error` payload from the wire after JSON/binary decode.
+ * @param msg — `frame`, `patch`, `error`, or `data` payload from the wire after JSON/binary decode.
  * @param onError — Server `error` messages and protocol-too-new mismatches.
  * @param onMetrics — Once per call when processing continues past the protocol guard; includes decode/apply/render timing.
  * @param decodeMeta — Optional timings and byte counts from the transport layer (binary vs JSON).
+ * @param onData — Optional handler for `data` messages (namespaced side-channel JSON).
  */
 export function applyServerMessage(
   state: ClientStateShape,
@@ -223,6 +263,7 @@ export function applyServerMessage(
   onError?: (error: unknown) => void,
   onMetrics?: (metrics: ClientFrameMetrics) => void,
   decodeMeta: ServerMessageDecodeMeta = { decodeMs: 0 },
+  onData?: (channel: string, payload: unknown) => void,
 ): void {
   const applyStart = performance.now()
   let renderMs = 0
@@ -255,7 +296,7 @@ export function applyServerMessage(
     const t = record.type
     onError?.(
       new Error(
-        `Invalid server message: expected type frame (layout+tree), patch (patches array), or error (message string); got ${String(t)}`,
+        `Invalid server message: expected type frame, patch, error, or data (channel+JSON payload); got ${String(t)}`,
       ),
     )
     return
@@ -283,6 +324,8 @@ export function applyServerMessage(
     didRender = true
   } else if (msg.type === 'error') {
     onError?.(new Error(msg.message))
+  } else if (msg.type === 'data') {
+    onData?.(msg.channel, msg.payload)
   }
   const applyMs = performance.now() - applyStart
   onMetrics?.({
@@ -305,7 +348,7 @@ export function applyServerMessage(
  */
 export function createClient(options: TexturaClientOptions): TexturaClient {
   const url = options.url ?? 'ws://localhost:3100'
-  const { renderer, canvas, onError, onFrameMetrics } = options
+  const { renderer, canvas, onError, onFrameMetrics, onData } = options
   const userWantsReconnect = options.reconnect !== false
   let allowReconnect = userWantsReconnect
 
@@ -371,7 +414,7 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
             bytesReceived: bytes.byteLength,
           }
         }
-        applyServerMessage(state, renderer, msg, onError, onFrameMetrics, decodeMeta)
+        applyServerMessage(state, renderer, msg, onError, onFrameMetrics, decodeMeta, onData)
       } catch (err) {
         onError?.(err)
       }

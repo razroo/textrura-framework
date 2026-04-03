@@ -10,7 +10,7 @@ npm install @geometra/server
 
 ## Key exports
 
-- `createServer` — Geometra layout server with WebSocket streaming (standalone `port` **or** attach to an existing HTTP server)
+- `createServer` — Geometra layout server with WebSocket streaming (standalone `port` **or** attach to an existing HTTP server); returned handle includes **`broadcastData(channel, payload)`** for JSON side-channels on the same socket as layout (`type: 'data'` messages)
 - `DEFAULT_GEOMETRA_WS_PATH` — default pathname (`/geometra-ws`) when using `httpServer`
 - `shouldDeferClientSend` — backpressure helper (used by the server and tests)
 - `onTransportMetrics` (option) — per-broadcast deferred send count, coalesced patch delta, binary outbound count
