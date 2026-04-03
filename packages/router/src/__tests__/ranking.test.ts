@@ -36,4 +36,9 @@ describe('route ranking', () => {
     const match = matchRouteTree(routes, '/users/settings')
     expect(match?.matches[0]?.id).toBe('static')
   })
+
+  it('treats doubled slashes as extra static segments (parity with matchPath segment split)', () => {
+    expect(scorePathPattern('/foo//bar')).toBeGreaterThan(scorePathPattern('/foo/bar'))
+    expect(comparePatternSpecificity('/foo//bar', '/foo/bar')).toBeLessThan(0)
+  })
 })

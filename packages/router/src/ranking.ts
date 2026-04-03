@@ -37,11 +37,22 @@ function scoreSegment(segment: RankedSegment): number {
   }
 }
 
+/**
+ * Sum specificity scores for each path segment in `pattern` (after the same leading/trailing slash trim
+ * as {@link matchPath} / {@link buildPath}). Static segments weigh highest, then params, optional
+ * segments, then splats. Empty segments produced by doubled slashes (e.g. `/a//b`) count as extra
+ * static segments so ranking depth stays aligned with {@link matchPath} segment lists.
+ */
 export function scorePathPattern(pattern: string): number {
   const segments = parseRankedSegments(pattern)
   return segments.reduce((total, segment) => total + scoreSegment(segment), 0)
 }
 
+/**
+ * Comparator for sorting patterns from most specific to least: higher {@link scorePathPattern} wins;
+ * on a tie, the deeper pattern (more segments) wins. Return value follows `Array.prototype.sort` —
+ * negative when `a` should sort before `b` (i.e. `a` is more specific).
+ */
 export function comparePatternSpecificity(a: string, b: string): number {
   const scoreA = scorePathPattern(a)
   const scoreB = scorePathPattern(b)
