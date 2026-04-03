@@ -360,6 +360,10 @@ export function hitPathAtPoint(
  * Resolve the deepest `cursor` style at `(x, y)` (boxes only; skips `pointerEvents: 'none'` the same way as
  * {@link hitPathAtPoint}). Scroll containers use the same clipping rules as {@link dispatchHit}.
  * Root `offsetX` / `offsetY` follow {@link dispatchHit}: non-finite or non-number values are treated as `0`.
+ *
+ * An empty-string `cursor` on a nested box does not stop the walk (child results are checked with truthiness),
+ * so the nearest ancestor with a non-empty `cursor` wins. A root hit on a lone box with `cursor: ''` still
+ * yields `''`.
  */
 export function getCursorAtPoint(
   element: UIElement,

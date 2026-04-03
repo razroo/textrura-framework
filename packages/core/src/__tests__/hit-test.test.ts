@@ -1738,6 +1738,25 @@ describe('getCursorAtPoint', () => {
     expect(cursor).toBeNull()
   })
 
+  it('treats empty-string cursor on a nested box as unset so an ancestor cursor wins', () => {
+    const child = box({ width: 40, height: 40, cursor: '' })
+    const parent = box({ width: 100, height: 100, cursor: 'pointer' }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+    expect(getCursorAtPoint(parent, layout, 20, 20)).toBe('pointer')
+  })
+
+  it('returns empty string when the hit target is the root box and cursor is explicitly empty', () => {
+    const el = box({ width: 100, height: 50, cursor: '' })
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
+    expect(getCursorAtPoint(el, layout, 50, 25)).toBe('')
+  })
+
   it('overlapping siblings: uses cursor from higher z-index', () => {
     const back = box({ width: 40, height: 40, zIndex: 0, cursor: 'default' })
     const front = box({ width: 40, height: 40, zIndex: 2, cursor: 'pointer' })
