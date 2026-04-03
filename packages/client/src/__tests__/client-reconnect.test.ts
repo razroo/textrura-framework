@@ -1,22 +1,20 @@
-import { describe, it, expect } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Renderer, UIElement } from '@geometra/core'
 import type { ComputedLayout } from 'textura'
 import { createClient } from '../client.js'
 
-async function waitFor(
-  predicate: () => boolean,
-  timeoutMs: number,
-  label: string,
-): Promise<void> {
-  const start = Date.now()
-  while (Date.now() - start < timeoutMs) {
-    if (predicate()) return
-    await new Promise(resolve => setTimeout(resolve, 50))
-  }
-  throw new Error(`Timed out waiting for ${label}`)
-}
+const origWebSocket = globalThis.WebSocket
 
 describe('client reconnect integration', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    globalThis.WebSocket = origWebSocket
+  })
+
   it('reconnects and resyncs state after server restart', async () => {
     class MockWebSocket {
       static CONNECTING = 0
@@ -55,7 +53,7 @@ describe('client reconnect integration', () => {
     }
 
     const sockets: MockWebSocket[] = []
-    ;(globalThis as { WebSocket?: unknown }).WebSocket = MockWebSocket as unknown
+    globalThis.WebSocket = MockWebSocket as unknown as typeof WebSocket
 
     const renders: ComputedLayout[] = []
     const renderer: Renderer = {
@@ -75,7 +73,9 @@ describe('client reconnect integration', () => {
       keyboardTarget: {} as Document,
     })
 
-    await waitFor(() => sockets.length === 1, 2000, 'first socket')
+    await vi.runAllTimersAsync()
+    expect(sockets).toHaveLength(1)
+
     sockets[0]!.emit('message', {
       data: JSON.stringify({
         type: 'frame',
@@ -84,12 +84,15 @@ describe('client reconnect integration', () => {
         protocolVersion: 1,
       }),
     })
-    await waitFor(() => renders.length > 0, 4000, 'initial frame')
+    expect(renders).toHaveLength(1)
     expect(client.layout?.width).toBe(40)
 
     sockets[0]!.close()
 
-    await waitFor(() => sockets.length === 2, 4000, 'reconnect socket')
+    await vi.advanceTimersByTimeAsync(1000)
+    await vi.runAllTimersAsync()
+    expect(sockets).toHaveLength(2)
+
     sockets[1]!.emit('message', {
       data: JSON.stringify({
         type: 'frame',
@@ -98,8 +101,10 @@ describe('client reconnect integration', () => {
         protocolVersion: 1,
       }),
     })
-    await waitFor(() => client.layout?.width === 77 && client.layout?.height === 33, 6000, 'reconnect resync frame')
+    expect(client.layout?.width).toBe(77)
+    expect(client.layout?.height).toBe(33)
+    expect(renders).toHaveLength(2)
 
     client.close()
-  }, 20000)
+  })
 })
