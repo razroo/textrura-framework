@@ -108,6 +108,20 @@ describe('trapFocusStep', () => {
     expect(trapFocusStep(tree, layout, [0], 'next')).toBe(false)
   })
 
+  it('returns false when root layout bounds are corrupt (whole-tree scope skips descendants)', () => {
+    const inner = box({ onKeyDown: () => undefined }, [])
+    const tree = box({}, [inner])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: Number.NaN,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 100, height: 40, children: [] }],
+    }
+    expect(trapFocusStep(tree, layout, [], 'next')).toBe(false)
+    expect(trapFocusStep(tree, layout, [], 'prev')).toBe(false)
+  })
+
   it('cycles backward with prev', () => {
     const a = box({ onKeyDown: () => undefined }, [])
     const b = box({ onKeyDown: () => undefined }, [])
