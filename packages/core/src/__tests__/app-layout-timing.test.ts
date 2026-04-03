@@ -350,6 +350,30 @@ describe('createApp dispatch guards', () => {
     expect(app.dispatch('onClick', 5, 5)).toBe(true)
   })
 
+  it('returns false from dispatch when root layout fails layoutBoundsAreFinite (corrupt geometry)', async () => {
+    const renderer: Renderer = {
+      render: vi.fn(),
+      destroy: vi.fn(),
+    }
+    const app = await createApp(
+      () => box({ width: 10, height: 10, onClick: () => {} }, []),
+      renderer,
+      { width: 100, height: 100 },
+    )
+
+    const savedLayout = app.layout!
+    expect(savedLayout).not.toBeNull()
+
+    app.layout = { ...savedLayout, width: -1 }
+    expect(app.dispatch('onClick', 5, 5)).toBe(false)
+
+    app.layout = { ...savedLayout, height: -0.001 }
+    expect(app.dispatch('onClick', 5, 5)).toBe(false)
+
+    app.layout = savedLayout
+    expect(app.dispatch('onClick', 5, 5)).toBe(true)
+  })
+
   it('returns false from dispatchKey and dispatchComposition when tree or layout is null', async () => {
     const renderer: Renderer = {
       render: vi.fn(),
