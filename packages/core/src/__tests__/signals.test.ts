@@ -35,6 +35,21 @@ describe('signal', () => {
     expect(runs).toBe(1)
   })
 
+  it('treats +0 and -0 as distinct for set (Object.is)', () => {
+    const s = signal(0)
+    let runs = 0
+    effect(() => {
+      void s.value
+      runs++
+    })
+    expect(runs).toBe(1)
+    s.set(-0)
+    expect(runs).toBe(2)
+    expect(Object.is(s.peek(), -0)).toBe(true)
+    s.set(-0)
+    expect(runs).toBe(2)
+  })
+
   it('drops stale signal subscriptions when the effect branch changes', () => {
     const gate = signal(true)
     const a = signal(0)
