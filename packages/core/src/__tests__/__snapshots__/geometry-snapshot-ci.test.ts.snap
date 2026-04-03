@@ -35,6 +35,31 @@ exports[`geometry snapshot CI > stable column flex with gap and two text childre
 }
 `;
 
+exports[`geometry snapshot CI > stable row with fixed-width text and flexGrow sibling (rounded) 1`] = `
+{
+  "children": [
+    {
+      "children": [],
+      "height": 20,
+      "width": 28,
+      "x": 8,
+      "y": 8,
+    },
+    {
+      "children": [],
+      "height": 20,
+      "width": 132,
+      "x": 40,
+      "y": 8,
+    },
+  ],
+  "height": 60,
+  "width": 180,
+  "x": 0,
+  "y": 0,
+}
+`;
+
 exports[`geometry snapshot CI > stable row with gap and two text children (rounded) 1`] = `
 {
   "children": [

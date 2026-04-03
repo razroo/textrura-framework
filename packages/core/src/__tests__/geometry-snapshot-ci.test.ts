@@ -123,4 +123,18 @@ describe('geometry snapshot CI', () => {
     const layout = computeLayout(toLayoutTree(tree), { width: 100, height: 120 })
     expect(roundLayout(layout)).toMatchSnapshot()
   })
+
+  it('stable row with fixed-width text and flexGrow sibling (rounded)', async () => {
+    await init()
+    const item = { font: '16px sans-serif', lineHeight: 20, height: 20 } as const
+    const tree = box(
+      { width: 180, height: 60, padding: 8, flexDirection: 'row', gap: 4 },
+      [
+        text({ text: 'Fix', ...item, width: 28 }),
+        text({ text: 'Grow', ...item, flexGrow: 1 }),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 180, height: 60 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
 })
