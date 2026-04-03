@@ -77,6 +77,28 @@ function findTargetIndex(targets: FocusTarget[], current: FocusTarget): number {
   return targets.findIndex(t => sameBounds(t.layout, current.layout))
 }
 
+/**
+ * Prefer stored `focusIndex` when it still lines up with the focused target:
+ * same element reference (stable across pure reorder), or same layout bounds (new box() at the same
+ * slot after a rerender). If the index points at a different sibling with different bounds (e.g. Tab
+ * order changed), fall back to identity/bounds search.
+ */
+function stableFocusIndex(targets: FocusTarget[], current: FocusTarget): number {
+  const indexed = current.focusIndex
+  if (indexed !== undefined && indexed >= 0 && indexed < targets.length) {
+    const at = targets[indexed]!
+    if (at.element === current.element || sameBounds(at.layout, current.layout)) {
+      return indexed
+    }
+  }
+  const found = findTargetIndex(targets, current)
+  if (found !== -1) return found
+  if (indexed !== undefined && indexed >= 0 && indexed < targets.length) {
+    return indexed
+  }
+  return -1
+}
+
 /** Resolve currently focused target against the latest tree/layout after rerenders. */
 export function resolveFocusedTarget(tree: UIElement, layout: ComputedLayout): FocusTarget | null {
   const current = focusedElement.peek()
@@ -86,10 +108,7 @@ export function resolveFocusedTarget(tree: UIElement, layout: ComputedLayout): F
   collectFocusable(tree, layout, targets)
   if (targets.length === 0) return null
 
-  const indexed = current.focusIndex
-  const idx = indexed !== undefined && indexed >= 0 && indexed < targets.length
-    ? indexed
-    : findTargetIndex(targets, current)
+  const idx = stableFocusIndex(targets, current)
   if (idx === -1) return null
 
   const resolved = { ...targets[idx]!, focusIndex: idx }
@@ -111,7 +130,7 @@ export function focusNext(tree: UIElement, layout: ComputedLayout): void {
     return
   }
 
-  const idx = current.focusIndex ?? findTargetIndex(targets, current)
+  const idx = stableFocusIndex(targets, current)
   const safeIdx = idx >= 0 ? idx : 0
   const nextIndex = (safeIdx + 1) % targets.length
   const next = targets[nextIndex]!
@@ -131,7 +150,7 @@ export function focusPrev(tree: UIElement, layout: ComputedLayout): void {
     return
   }
 
-  const idx = current.focusIndex ?? findTargetIndex(targets, current)
+  const idx = stableFocusIndex(targets, current)
   const safeIdx = idx >= 0 ? idx : 0
   const prevIndex = (safeIdx - 1 + targets.length) % targets.length
   const prev = targets[prevIndex]!

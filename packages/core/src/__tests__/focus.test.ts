@@ -389,6 +389,41 @@ describe('resolveFocusedTarget', () => {
     expect(resolved!.focusIndex).toBe(1)
   })
 
+  it('ignores focusIndex when tab order changes but the focus list length stays the same', () => {
+    const a = box({ width: 10, height: 10, onClick: () => {} })
+    const b = box({ width: 10, height: 10, onClick: () => {} })
+    const root = box({ width: 100, height: 100 }, [b, a])
+    const layoutA = makeLayout({ width: 10, height: 10 })
+    const layoutB = makeLayout({ x: 20, width: 10, height: 10 })
+    const layoutSwapped = {
+      ...makeLayout(),
+      children: [layoutB, layoutA],
+    }
+
+    focusedElement.set({ element: b, layout: layoutB, focusIndex: 1 })
+    const resolved = resolveFocusedTarget(root, layoutSwapped)
+    expect(resolved).not.toBeNull()
+    expect(resolved!.element).toBe(b)
+    expect(resolved!.focusIndex).toBe(0)
+  })
+
+  it('focusNext falls back from stale focusIndex after sibling reorder', () => {
+    const a = box({ width: 10, height: 10, onClick: () => {} })
+    const b = box({ width: 10, height: 10, onClick: () => {} })
+    const root = box({ width: 100, height: 100 }, [b, a])
+    const layoutA = makeLayout({ width: 10, height: 10 })
+    const layoutB = makeLayout({ x: 20, width: 10, height: 10 })
+    const layoutSwapped = {
+      ...makeLayout(),
+      children: [layoutB, layoutA],
+    }
+
+    focusedElement.set({ element: b, layout: layoutB, focusIndex: 1 })
+    focusNext(root, layoutSwapped)
+    expect(focusedElement.peek()!.element).toBe(a)
+    expect(focusedElement.peek()!.focusIndex).toBe(1)
+  })
+
   it('updates focusedElement signal when resolved target differs', () => {
     const oldBtn = box({ width: 50, height: 30, onClick: () => {} })
     setFocus(oldBtn, makeLayout({ x: 10, y: 20, width: 50, height: 30 }))
