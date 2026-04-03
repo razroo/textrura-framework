@@ -47,6 +47,25 @@ interface ServerError {
 
 type ServerMessage = ServerFrame | ServerPatch | ServerError
 
+function isPlainLayoutTreeValue(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v)
+}
+
+/** Reject malformed payloads that JSON.parse can produce without throwing. */
+function isWellFormedGeomV1Message(msg: Record<string, unknown>): boolean {
+  const t = msg.type
+  if (t === 'frame') {
+    return isPlainLayoutTreeValue(msg.layout) && isPlainLayoutTreeValue(msg.tree)
+  }
+  if (t === 'patch') {
+    return Array.isArray(msg.patches)
+  }
+  if (t === 'error') {
+    return typeof msg.message === 'string'
+  }
+  return false
+}
+
 export interface ServerMessageDecodeMeta {
   decodeMs: number
   encoding?: 'json' | 'binary'
@@ -131,6 +150,10 @@ function applyPatches(layout: ComputedLayout, patches: ServerPatch['patches']): 
  * patches, and calls {@link Renderer.render} when a frame is applied or a patch runs against current
  * state. Patches received before the first frame are ignored (no state change, no render).
  *
+ * When the payload is not a plain object, or is missing a well-formed `type` (`frame` with object
+ * `layout`/`tree`, `patch` with array `patches`, or `error` with string `message`), calls `onError`
+ * and returns without mutating state or invoking `onMetrics`.
+ *
  * When `msg.protocolVersion` is present and greater than the client’s supported version, calls
  * `onError` and returns without mutating state or invoking `onMetrics`.
  *
@@ -152,10 +175,24 @@ export function applyServerMessage(
   const applyStart = performance.now()
   let renderMs = 0
   let didRender = false
+  if (msg === null || typeof msg !== 'object') {
+    onError?.(new Error('Invalid server message: expected a JSON object'))
+    return
+  }
+  const record = msg as Record<string, unknown>
   if (msg.protocolVersion && msg.protocolVersion > PROTOCOL_VERSION) {
     onError?.(
       new Error(
         `Server protocol ${msg.protocolVersion} is newer than client protocol ${PROTOCOL_VERSION}`,
+      ),
+    )
+    return
+  }
+  if (!isWellFormedGeomV1Message(record)) {
+    const t = record.type
+    onError?.(
+      new Error(
+        `Invalid server message: expected type frame (layout+tree), patch (patches array), or error (message string); got ${String(t)}`,
       ),
     )
     return

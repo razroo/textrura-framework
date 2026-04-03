@@ -264,4 +264,75 @@ describe('applyServerMessage', () => {
     expect(metrics[1]?.encoding).toBe('binary')
     expect(metrics[1]?.bytesReceived).toBe(64)
   })
+
+  it('rejects non-object, incomplete frame, and bad patch shape without render or metrics', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const errors: string[] = []
+    const metrics: unknown[] = []
+    type Msg = Parameters<typeof applyServerMessage>[2]
+
+    const onErr = (e: unknown) => errors.push(String(e))
+    const onMetrics = () => metrics.push(1)
+
+    applyServerMessage(state, renderer, null as unknown as Msg, onErr, onMetrics)
+    expect(errors[0]).toContain('expected a JSON object')
+    expect(renders).toHaveLength(0)
+    expect(metrics).toHaveLength(0)
+
+    applyServerMessage(state, renderer, {} as unknown as Msg, onErr, onMetrics)
+    expect(errors[1]).toContain('Invalid server message')
+    expect(renders).toHaveLength(0)
+    expect(metrics).toHaveLength(0)
+
+    applyServerMessage(
+      state,
+      renderer,
+      { type: 'frame', layout: layout(), protocolVersion: 1 } as unknown as Msg,
+      onErr,
+      onMetrics,
+    )
+    expect(errors[2]).toContain('Invalid server message')
+    expect(renders).toHaveLength(0)
+    expect(metrics).toHaveLength(0)
+
+    applyServerMessage(
+      state,
+      renderer,
+      { type: 'patch', patches: 'nope', protocolVersion: 1 } as unknown as Msg,
+      onErr,
+      onMetrics,
+    )
+    expect(errors[3]).toContain('Invalid server message')
+    expect(renders).toHaveLength(0)
+    expect(metrics).toHaveLength(0)
+
+    applyServerMessage(
+      state,
+      renderer,
+      { type: 'error', message: 1 as unknown as string, protocolVersion: 1 } as unknown as Msg,
+      onErr,
+      onMetrics,
+    )
+    expect(errors[4]).toContain('Invalid server message')
+    expect(renders).toHaveLength(0)
+    expect(metrics).toHaveLength(0)
+  })
+
+  it('recovers with a valid frame after a malformed JSON object message', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const errors: string[] = []
+    type Msg = Parameters<typeof applyServerMessage>[2]
+
+    applyServerMessage(state, renderer, { type: 'nope' } as unknown as Msg, e => errors.push(String(e)))
+    expect(errors).toHaveLength(1)
+
+    const nextLayout = layout(1, 2, 80, 90)
+    const nextTree = tree()
+    applyServerMessage(state, renderer, { type: 'frame', layout: nextLayout, tree: nextTree })
+
+    expect(state.layout).toEqual(nextLayout)
+    expect(renders).toHaveLength(1)
+  })
 })
