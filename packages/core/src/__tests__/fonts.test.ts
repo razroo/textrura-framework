@@ -449,6 +449,11 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('12px "A\\",B", "Second", serif')).toEqual(['A",B', 'Second'])
   })
 
+  it('treats backslash-escaped comma inside quotes as part of one family name', () => {
+    expect(extractFontFamiliesFromCSSFont('14px "Foo\\, Bar", serif')).toEqual(['Foo, Bar'])
+    expect(extractFontFamiliesFromCSSFont("12px 'Acme\\, LLC', monospace")).toEqual(['Acme, LLC'])
+  })
+
   it('parses line-height keyword normal between size and family', () => {
     expect(extractFontFamiliesFromCSSFont('600 14px / normal Inter, sans-serif')).toEqual(['Inter'])
     expect(extractFontFamiliesFromCSSFont('italic 12px / normal Georgia, serif')).toEqual(['Georgia'])
