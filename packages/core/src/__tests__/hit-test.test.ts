@@ -2651,6 +2651,30 @@ describe('overflow hidden clipping', () => {
     expect(getCursorAtPoint(parent, layout, 150, 50)).toBeNull()
   })
 
+  it('overflow scroll: pointer outside parent bounds hits nothing (same clip gate as hidden)', () => {
+    let childFired = false
+    let parentFired = false
+    const child = box({ width: 50, height: 50, onClick: () => { childFired = true } })
+    const parent = box(
+      { width: 100, height: 100, overflow: 'scroll', onClick: () => { parentFired = true } },
+      [child],
+    )
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 50, height: 50, children: [] }],
+    }
+
+    dispatchHit(parent, layout, 'onClick', 150, 50)
+    expect(childFired).toBe(false)
+    expect(parentFired).toBe(false)
+    expect(hitPathAtPoint(parent, layout, 150, 50)).toBe(null)
+    expect(hasInteractiveHitAtPoint(parent, layout, 150, 50)).toBe(false)
+    expect(getCursorAtPoint(parent, layout, 150, 50)).toBeNull()
+  })
+
   it('overflow hidden: pointer inside parent still hits children', () => {
     let childFired = false
     const child = box({ width: 50, height: 50, onClick: () => { childFired = true } })
