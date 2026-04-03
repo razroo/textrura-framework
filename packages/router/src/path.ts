@@ -43,6 +43,7 @@ function stringifyParam(value: string | number): string {
 /** True when a param value should participate in the path (non-finite numbers omitted; mirrors `stringifyQuery` in `query.ts`). */
 function paramValuePresent(value: string | number | null | undefined): boolean {
   if (value == null || value === '') return false
+  if (typeof value === 'bigint') return false
   if (typeof value === 'number' && !Number.isFinite(value)) return false
   return true
 }
@@ -51,8 +52,8 @@ function paramValuePresent(value: string | number | null | undefined): boolean {
  * Build a pathname from a route pattern and {@link PathParams}. Static segments are copied as-is;
  * dynamic `:id` and optional `:id?` are filled from `params`; splat `*rest` (or a lone `*`, key `'*'`)
  * inserts the remainder with internal slashes preserved. For optional segments, `null`, `undefined`,
- * empty string, or a non-finite number (`NaN`, `±Infinity`) omits the segment (same as leaving the key unset).
- * Required dynamic and splat params throw when missing, empty, or non-finite numeric. `:param` values are
+ * empty string, a non-finite number (`NaN`, `±Infinity`), or a `BigInt` omits the segment (same as leaving the key unset).
+ * Required dynamic and splat params throw when missing, empty, non-finite numeric, or `BigInt`. `:param` values are
  * percent-encoded after `String.prototype.toWellFormed` (parity with `stringifyQuery` in `query.ts`).
  * Leading and trailing slashes on `pattern` are trimmed before building.
  */

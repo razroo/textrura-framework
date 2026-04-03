@@ -81,6 +81,26 @@ describe('path generation', () => {
     ).toThrow('Missing required splat param: *')
   })
 
+  it('omits optional path params when the value is a bigint (corrupt runtime / bad serialization)', () => {
+    expect(buildPath('/users/:id?', { id: 99n as unknown as number })).toBe('/users')
+    expect(buildPath('/a/:seg?/c', { seg: 1n as unknown as number })).toBe('/a/c')
+  })
+
+  it('throws for required path params when the value is a bigint', () => {
+    expect(() =>
+      buildPath('/users/:id', { id: 42n as unknown as number } as PathParams<'/users/:id'>),
+    ).toThrow('Missing required path param: id')
+  })
+
+  it('throws for splat params when the value is a bigint', () => {
+    expect(() =>
+      buildPath('/docs/*rest', { rest: 1n as unknown as string } as PathParams<'/docs/*rest'>),
+    ).toThrow('Missing required splat param: rest')
+    expect(() => buildPath('/*', { '*': 0n as unknown as string } as PathParams<'/*'>)).toThrow(
+      'Missing required splat param: *',
+    )
+  })
+
   it('builds path with multiple dynamic segments', () => {
     expect(buildPath('/users/:userId/posts/:postId', { userId: 'a', postId: 2 })).toBe(
       '/users/a/posts/2',
