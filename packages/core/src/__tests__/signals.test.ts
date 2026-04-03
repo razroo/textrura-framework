@@ -111,6 +111,21 @@ describe('computed', () => {
     expect(evalCount).toBe(2)
   })
 
+  it('notifies subscribers when a dependency changes even if the recomputed value is unchanged', () => {
+    const s = signal(1)
+    const c = computed(() => s.value * 0)
+    let evalCount = 0
+    const stable = computed(() => {
+      evalCount++
+      return c.value
+    })
+    expect(stable.value).toBe(0)
+    expect(evalCount).toBe(1)
+    s.set(2)
+    expect(stable.value).toBe(0)
+    expect(evalCount).toBe(2)
+  })
+
   it('drops inner signal deps when the computed branch changes', () => {
     const gate = signal(true)
     const x = signal(1)
@@ -149,6 +164,18 @@ describe('effect', () => {
     expect(seen).toEqual([2])
     s.set(5)
     expect(seen).toEqual([2, 6])
+  })
+
+  it('re-runs when a computed notifies even if the derived value is still equal', () => {
+    const s = signal(1)
+    const c = computed(() => s.value * 0)
+    const seen: number[] = []
+    effect(() => {
+      seen.push(c.value)
+    })
+    expect(seen).toEqual([0])
+    s.set(2)
+    expect(seen).toEqual([0, 0])
   })
 
   it('drops stale computed subscription when the effect stops reading it', () => {
@@ -201,6 +228,18 @@ describe('effect', () => {
 })
 
 describe('batch', () => {
+  it('empty batch does not flush subscribers', () => {
+    const a = signal(1)
+    let runs = 0
+    effect(() => {
+      void a.value
+      runs++
+    })
+    expect(runs).toBe(1)
+    batch(() => {})
+    expect(runs).toBe(1)
+  })
+
   it('defers notifications until flush', () => {
     const a = signal(1)
     const b = signal(2)
