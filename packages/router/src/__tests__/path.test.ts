@@ -109,4 +109,9 @@ describe('path generation', () => {
     expect(buildPath('/a/:seg?/c', {})).toBe('/a/c')
     expect(buildPath('/a/:seg?/c', { seg: 'b' })).toBe('/a/b/c')
   })
+
+  it('builds path for lone colon segment (empty param key; parity with matchPath)', () => {
+    expect(buildPath('/:/x', { '': 'a' } as PathParams<'/:/x'>)).toBe('/a/x')
+    expect(buildPath('/:/x', { '': 'alice bob' } as PathParams<'/:/x'>)).toBe('/alice%20bob/x')
+  })
 })
