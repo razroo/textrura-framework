@@ -118,6 +118,72 @@ describe('createApp layout timing', () => {
   })
 })
 
+describe('createApp dispatch guards', () => {
+  const tabDown = {
+    key: 'Tab',
+    code: 'Tab',
+    shiftKey: false,
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+  } as const
+
+  it('returns false from dispatch when tree or layout is null', async () => {
+    const renderer: Renderer = {
+      render: vi.fn(),
+      destroy: vi.fn(),
+    }
+    const app = await createApp(
+      () => box({ width: 10, height: 10, onClick: () => {} }, []),
+      renderer,
+      { width: 100, height: 100 },
+    )
+
+    const savedTree = app.tree
+    const savedLayout = app.layout
+    expect(savedTree).not.toBeNull()
+    expect(savedLayout).not.toBeNull()
+
+    app.layout = null
+    expect(app.dispatch('onClick', 5, 5)).toBe(false)
+
+    app.layout = savedLayout
+    app.tree = null
+    expect(app.dispatch('onClick', 5, 5)).toBe(false)
+
+    app.tree = savedTree
+    app.layout = savedLayout
+    expect(app.dispatch('onClick', 5, 5)).toBe(true)
+  })
+
+  it('returns false from dispatchKey and dispatchComposition when tree or layout is null', async () => {
+    const renderer: Renderer = {
+      render: vi.fn(),
+      destroy: vi.fn(),
+    }
+    const app = await createApp(
+      () =>
+        box({ width: 10, height: 10, onClick: () => {}, onKeyDown: () => {}, onCompositionStart: () => {} }, []),
+      renderer,
+      { width: 100, height: 100 },
+    )
+
+    const savedTree = app.tree
+    const savedLayout = app.layout
+    expect(savedTree).not.toBeNull()
+    expect(savedLayout).not.toBeNull()
+
+    app.layout = null
+    expect(app.dispatchKey('onKeyDown', tabDown)).toBe(false)
+    expect(app.dispatchComposition('onCompositionStart', { data: '' })).toBe(false)
+
+    app.layout = savedLayout
+    app.tree = null
+    expect(app.dispatchKey('onKeyDown', tabDown)).toBe(false)
+    expect(app.dispatchComposition('onCompositionStart', { data: '' })).toBe(false)
+  })
+})
+
 describe('createApp destroy', () => {
   it('stops reactive re-layout after destroy so signal updates do not render', async () => {
     const setFrameTimings = vi.fn()
