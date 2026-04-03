@@ -177,6 +177,59 @@ describe('createClient WebSocket message parse errors', () => {
     expect(errors).toHaveLength(1)
   })
 
+  it('invokes onError when binary frame declares zero-length payload (JSON.parse of empty string)', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+    const renders: ComputedLayout[] = []
+    const renderer: Renderer = {
+      render: (layout: ComputedLayout) => {
+        renders.push({ ...layout, children: layout.children })
+      },
+      destroy: () => {},
+    }
+
+    const client = createClient({
+      url: 'ws://mock.test',
+      renderer,
+      binaryFraming: true,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    const emptyJsonPayload = new ArrayBuffer(9)
+    const u8 = new Uint8Array(emptyJsonPayload)
+    u8.set([0x47, 0x45, 0x4f, 0x4d, 1], 0)
+    new DataView(emptyJsonPayload).setUint32(5, 0, true)
+
+    sockets[0]!.emit('message', { data: emptyJsonPayload })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(SyntaxError)
+
+    const valid = encodeGeomV1JsonPayload(
+      JSON.stringify({
+        type: 'frame',
+        layout: { x: 0, y: 0, width: 3, height: 4, children: [] },
+        tree: { kind: 'box', props: {}, children: [] },
+        protocolVersion: 1,
+      }),
+    )
+    sockets[0]!.emit('message', { data: valid })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
+    expect(renders).toHaveLength(1)
+    expect(renders[0]?.width).toBe(3)
+    expect(client.layout?.width).toBe(3)
+  })
+
   it('decodes GEOM v1 binary frames when event.data is a DataView into a larger backing buffer', async () => {
     const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
     installMockWebSocket(sockets)
