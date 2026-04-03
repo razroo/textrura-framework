@@ -35,4 +35,13 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ ...base, width: '10' as unknown as number })).toBe(false)
     expect(layoutBoundsAreFinite({ ...base, height: true as unknown as number })).toBe(false)
   })
+
+  it('rejects BigInt on any axis without throwing (Number.isFinite would throw)', () => {
+    const base = { x: 0, y: 0, width: 10, height: 10, children: [] as [] }
+    const b = 1n as unknown as number
+    expect(layoutBoundsAreFinite({ ...base, x: b })).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, y: b })).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, width: b })).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, height: b })).toBe(false)
+  })
 })
