@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { decodeBinaryFrameJson, encodeBinaryFrameJson, isBinaryFrameBuffer } from '../binary-frame.js'
 
+/** v1 envelope with arbitrary bytes (including invalid UTF-8 for decode policy tests). */
+function encodeBinaryFrameRawV1(payload: Uint8Array): Buffer {
+  const header = Buffer.alloc(9)
+  header.set([0x47, 0x45, 0x4f, 0x4d, 1], 0)
+  header.writeUInt32LE(payload.length, 5)
+  return Buffer.concat([header, Buffer.from(payload)])
+}
+
 describe('isBinaryFrameBuffer', () => {
   it('returns false when buffer is shorter than the v1 header', () => {
     expect(isBinaryFrameBuffer(Buffer.alloc(0))).toBe(false)
@@ -94,5 +102,10 @@ describe('binary frame envelope', () => {
     const buf = encodeBinaryFrameJson(json)
     expect(buf.length).toBe(10)
     expect(decodeBinaryFrameJson(buf)).toBe(json)
+  })
+
+  it('decodes malformed UTF-8 payload with U+FFFD replacements (WHATWG TextDecoder)', () => {
+    const raw = new Uint8Array([0xff, 0xfe, 0xfd])
+    expect(decodeBinaryFrameJson(encodeBinaryFrameRawV1(raw))).toBe('\uFFFD\uFFFD\uFFFD')
   })
 })

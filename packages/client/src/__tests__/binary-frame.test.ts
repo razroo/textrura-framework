@@ -11,6 +11,15 @@ function encodeBinaryFrameJsonV1(jsonUtf8: string): ArrayBuffer {
   return out.buffer
 }
 
+/** v1 envelope with arbitrary UTF-8 bytes (including invalid sequences for decode policy tests). */
+function encodeBinaryFrameRawV1(payload: Uint8Array): ArrayBuffer {
+  const out = new Uint8Array(9 + payload.length)
+  out.set([0x47, 0x45, 0x4f, 0x4d, 1], 0)
+  new DataView(out.buffer).setUint32(5, payload.length, true)
+  out.set(payload, 9)
+  return out.buffer
+}
+
 describe('isBinaryFrameArrayBuffer', () => {
   it('returns false when buffer is shorter than the v1 header', () => {
     expect(isBinaryFrameArrayBuffer(new ArrayBuffer(0))).toBe(false)
@@ -132,5 +141,10 @@ describe('client binary frame decode', () => {
     const buf = encodeBinaryFrameJsonV1(json)
     expect(buf.byteLength).toBe(10)
     expect(decodeBinaryFrameJson(buf)).toBe(json)
+  })
+
+  it('decodes malformed UTF-8 payload with U+FFFD replacements (WHATWG TextDecoder)', () => {
+    const raw = new Uint8Array([0xff, 0xfe, 0xfd])
+    expect(decodeBinaryFrameJson(encodeBinaryFrameRawV1(raw))).toBe('\uFFFD\uFFFD\uFFFD')
   })
 })
