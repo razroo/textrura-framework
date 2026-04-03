@@ -174,6 +174,42 @@ describe('computed', () => {
       void a.value
     }).toThrow()
   })
+
+  it('propagates errors from the derivation fn on first read', () => {
+    const c = computed(() => {
+      throw new Error('first-eval')
+    })
+    expect(() => {
+      void c.value
+    }).toThrow('first-eval')
+  })
+
+  it('propagates errors on recompute and allows recovery after deps change', () => {
+    const s = signal(1)
+    const c = computed(() => {
+      if (s.value > 1) throw new Error('bad-branch')
+      return s.value
+    })
+    expect(c.value).toBe(1)
+    s.set(2)
+    expect(() => {
+      void c.value
+    }).toThrow('bad-branch')
+    s.set(1)
+    expect(c.value).toBe(1)
+  })
+
+  it('propagates recompute errors to the code that triggered the flush', () => {
+    const s = signal(1)
+    const c = computed(() => {
+      if (s.value === 2) throw new Error('from-computed')
+      return s.value
+    })
+    effect(() => {
+      void c.value
+    })
+    expect(() => s.set(2)).toThrow('from-computed')
+  })
 })
 
 describe('effect', () => {
