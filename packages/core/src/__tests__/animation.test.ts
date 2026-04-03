@@ -8,6 +8,32 @@ import {
   transition,
 } from '../animation.js'
 
+describe('easing presets', () => {
+  it('maps t=0 to 0 and t=1 to 1 for bundled easing curves', () => {
+    for (const fn of [easing.linear, easing.easeIn, easing.easeOut, easing.easeInOut] as const) {
+      expect(fn(0)).toBe(0)
+      expect(fn(1)).toBe(1)
+    }
+  })
+
+  it('keeps easeInOut monotone on [0, 1]', () => {
+    let prev = easing.easeInOut(0)
+    for (let i = 1; i <= 100; i++) {
+      const t = i / 100
+      const next = easing.easeInOut(t)
+      expect(next).toBeGreaterThanOrEqual(prev)
+      prev = next
+    }
+  })
+
+  it('easeInOut is symmetric: f(t) + f(1 - t) === 1', () => {
+    for (let i = 0; i <= 50; i++) {
+      const t = i / 50
+      expect(easing.easeInOut(t) + easing.easeInOut(1 - t)).toBeCloseTo(1, 12)
+    }
+  })
+})
+
 describe('motion preference', () => {
   it('normalizes non-reduced runtime values to full', () => {
     setMotionPreference('reduced')
