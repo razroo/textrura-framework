@@ -13,9 +13,13 @@ fi
 # release polish, and next frontier all use the same checkbox pattern) and grep ROUTING_COMPETITIVENESS_CHECKLIST.md.
 # Many sections may already be all `[x]` — that only means unchecked roadmap boxes are exhausted,
 # not that the repo is "done". ROADMAP "Deferred / research" uses plain bullets (no `- [ ]`), so an empty
-# grep does not mean no roadmap-backed themes — read that subsection when casting next work. Otherwise prefer
-# one scoped change under packages/ (tests, perf in hit-test/text/layout paths, types, public JSDoc, or
-# `rg 'TODO|FIXME|HACK' packages`). Ignore `[ ]` in RELEASE_CHECKLIST.md / v1-release-checklist.md
+# grep does not mean no roadmap-backed themes — read that subsection when casting next work (RTL through
+# Textura, animation beyond helpers, extra render targets). Otherwise prefer one scoped change under
+# packages/ (tests, perf in hit-test/text/layout paths, types, public JSDoc, or
+# `rg 'TODO|FIXME|HACK' packages`; a clean TODO grep is normal — pick a north-star bucket anyway).
+# When adding tests without a targeted bugfix, extend files already listed in root package.json
+# `release:gate` so CI sees the new coverage without widening the gate ad hoc.
+# Ignore `[ ]` in RELEASE_CHECKLIST.md / v1-release-checklist.md
 # (maintainer release steps, not framework backlog).
 #
 # Prerequisites:
@@ -119,6 +123,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
       - Add small, useful features that fit the framework's philosophy
       - Improve the demo site or starter templates
       Prefer one primary subsystem or package per iteration (e.g. core hit-test, fonts, server protocol); avoid wide drive-by refactors unless the task truly spans boundaries.
+      When adding tests without a specific bugfix, prefer extending files already run by root \`package.json\` \`release:gate\` (keeps new coverage in the vetted CI path; only widen the gate when the suite is release-critical).
       Pick something concrete and high-value. Do NOT say there is nothing to do — there is always room to improve a codebase.
 
    c) Self-improve this loop: when scripts/cursor-agent-loop.sh — the prompt you are reading or the script's header comments — is stale, misleading, too vague, or omits heuristics that would help later runs pick better tasks and scope work smarter, prefer a minimal, accurate edit to that script if that is higher leverage right now than the next item in (a)/(b). Goal: successive iterations should get better at deciding what to work on and how.
