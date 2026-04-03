@@ -360,6 +360,25 @@ describe('geometry snapshot CI', () => {
     expect(roundLayout(layout)).toMatchSnapshot()
   })
 
+  it('stable column with in-flow text and absolutely positioned box via right/bottom (rounded)', async () => {
+    await init()
+    const tree = box(
+      { width: 200, height: 100, padding: 6, flexDirection: 'column', gap: 4 },
+      [
+        text({ text: 'Hello', font: '14px sans-serif', lineHeight: 18, width: 80, height: 18 }),
+        box({
+          position: 'absolute',
+          right: 12,
+          bottom: 10,
+          width: 48,
+          height: 26,
+        }),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 100 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
+
   it('stable row with alignItems flex-end and mixed-height text children (rounded)', async () => {
     await init()
     const base = { font: '16px sans-serif', lineHeight: 20, width: 32, height: 20 } as const
