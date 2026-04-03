@@ -10,6 +10,19 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ x: -10, y: 3.5, width: 0, height: 0, children: [] })).toBe(true)
   })
 
+  it('accepts extreme finite coordinates and subnormal positive width/height (still Number.isFinite)', () => {
+    const children = [] as const
+    expect(
+      layoutBoundsAreFinite({
+        x: Number.MAX_SAFE_INTEGER,
+        y: Number.MIN_SAFE_INTEGER,
+        width: Number.MAX_VALUE,
+        height: Number.MIN_VALUE,
+        children,
+      }),
+    ).toBe(true)
+  })
+
   it('accepts IEEE negative zero width/height (still satisfies >= 0 in JS)', () => {
     expect(layoutBoundsAreFinite({ x: 0, y: 0, width: -0, height: -0, children: [] })).toBe(true)
   })
