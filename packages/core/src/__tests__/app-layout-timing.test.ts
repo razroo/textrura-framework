@@ -283,6 +283,21 @@ describe('createApp layout timing', () => {
         spy.mockRestore()
       }
     }
+
+    {
+      let step = 0
+      const spy = vi.spyOn(performance, 'now').mockImplementation(() => {
+        step++
+        return step === 1 ? 0 : Number.POSITIVE_INFINITY
+      })
+      try {
+        const renderer = mkRenderer()
+        await createApp(() => box({ width: 40, height: 20 }, []), renderer, { width: 100, height: 50 })
+        expect(renderer.setFrameTimings).toHaveBeenCalledWith({ layoutMs: 0 })
+      } finally {
+        spy.mockRestore()
+      }
+    }
   })
 
   it('invokes setFrameTimings on each reactive re-layout when the view depends on a signal', async () => {
