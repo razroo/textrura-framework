@@ -71,6 +71,16 @@ describe('binary frame envelope', () => {
     expect(decodeBinaryFrameJson(view)).toBe(json)
   })
 
+  it('returns false when GEOM magic is only present before the view offset (Buffer subarray)', () => {
+    const json = '{"a":1}'
+    const frame = encodeBinaryFrameJson(json)
+    const combined = Buffer.alloc(frame.length + 3)
+    frame.copy(combined, 3)
+    const missesMagic = combined.subarray(0, frame.length)
+    expect(isBinaryFrameBuffer(missesMagic)).toBe(false)
+    expect(() => decodeBinaryFrameJson(missesMagic)).toThrow('Not a GEOM binary frame')
+  })
+
   it('throws truncated payload when length exceeds the view (not the whole ArrayBuffer)', () => {
     const headerOnly = Buffer.from([0x47, 0x45, 0x4f, 0x4d, 1, 4, 0, 0, 0])
     const padded = new Uint8Array(headerOnly.length + 20)
