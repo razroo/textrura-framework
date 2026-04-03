@@ -472,6 +472,17 @@ describe('dispatchHit', () => {
 
     expect(hasInteractiveHitAtPoint(parent, layout, 70, 30, 'oops' as unknown as number, 0)).toBe(false)
     expect(getCursorAtPoint(parent, layout, 70, 30, 50, Number.NaN)).toBe('pointer')
+
+    // BigInt offsets are non-numbers → treated as 0 (same as corrupt scroll props); must not throw.
+    expect(dispatchHit(parent, layout, 'onClick', 70, 30, undefined, 50n as unknown as number, 0).handled).toBe(
+      false,
+    )
+    expect(dispatchHit(parent, layout, 'onClick', 20, 30, undefined, 50n as unknown as number, 0).handled).toBe(
+      true,
+    )
+    expect(hitPathAtPoint(parent, layout, 70, 30, 50n as unknown as number, 0)).toEqual([])
+    expect(hasInteractiveHitAtPoint(parent, layout, 20, 30, 0n as unknown as number, 0)).toBe(true)
+    expect(hasInteractiveHitAtPoint(parent, layout, 70, 30, 0n as unknown as number, 0)).toBe(false)
   })
 
   it('merges extra onto the event when offsetX and offsetY are provided', () => {
