@@ -138,6 +138,10 @@ describe('isProtocolCompatible', () => {
   it('rejects positive Infinity peer version (non-finite wire values)', () => {
     expect(isProtocolCompatible(Number.POSITIVE_INFINITY, 1)).toBe(false)
   })
+
+  it('rejects negative Infinity peer version (non-finite wire values; not confused with legacy ordering)', () => {
+    expect(isProtocolCompatible(Number.NEGATIVE_INFINITY, 1)).toBe(false)
+  })
 })
 
 describe('coalescePatches', () => {

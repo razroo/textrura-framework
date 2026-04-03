@@ -24,6 +24,7 @@ export function isProtocolCompatible(
   currentVersion = PROTOCOL_VERSION,
 ): boolean {
   if (peerVersion === undefined) return true
+  if (!Number.isFinite(peerVersion)) return false
   return peerVersion <= currentVersion
 }
 
