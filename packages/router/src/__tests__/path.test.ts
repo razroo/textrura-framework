@@ -89,6 +89,11 @@ describe('path generation', () => {
     expect(buildPath('/items/:id', { id: 0 })).toBe('/items/0')
   })
 
+  it('includes numeric zero as a splat remainder (not treated as missing via falsy checks)', () => {
+    expect(buildPath('/docs/*rest', { rest: 0 })).toBe('/docs/0')
+    expect(buildPath('/*', { '*': 0 })).toBe('/0')
+  })
+
   it('encodes reserved URI characters in param values', () => {
     expect(buildPath('/search/:q', { q: 'a/b?c' })).toBe('/search/a%2Fb%3Fc')
   })
