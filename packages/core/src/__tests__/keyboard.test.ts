@@ -350,6 +350,62 @@ describe('dispatchKeyboardEvent', () => {
     expect(focused?.layout.x).toBe(120)
   })
 
+  it('Tab keydown returns true without throwing when root layout fails layoutBoundsAreFinite (no focusables)', () => {
+    const tree = box({ onClick: () => undefined }, [])
+    const corruptRoot = { x: 0, y: 0, width: -1, height: 100, children: [] }
+    expect(
+      dispatchKeyboardEvent(tree, corruptRoot, 'onKeyDown', {
+        key: 'Tab',
+        code: 'Tab',
+        shiftKey: false,
+        ctrlKey: false,
+        metaKey: false,
+        altKey: false,
+      }),
+    ).toBe(true)
+    expect(focusedElement.peek()).toBeNull()
+  })
+
+  it('Shift+Tab keydown returns true when root layout is corrupt (same as forward Tab)', () => {
+    const tree = box({ onClick: () => undefined }, [])
+    const corruptRoot = { x: 0, y: 0, width: 50, height: -1, children: [] }
+    expect(
+      dispatchKeyboardEvent(tree, corruptRoot, 'onKeyDown', {
+        key: 'Tab',
+        code: 'Tab',
+        shiftKey: true,
+        ctrlKey: false,
+        metaKey: false,
+        altKey: false,
+      }),
+    ).toBe(true)
+    expect(focusedElement.peek()).toBeNull()
+  })
+
+  it('non-Tab keydown returns false when root layout is corrupt (no resolved focus target)', () => {
+    let pressed = ''
+    const tree = box({ onKeyDown: e => { pressed = e.key } }, [])
+    const corruptRoot = { x: 0, y: 0, width: 10, height: -2, children: [] }
+    const handled = dispatchKeyboardEvent(tree, corruptRoot, 'onKeyDown', {
+      key: 'a',
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    expect(handled).toBe(false)
+    expect(pressed).toBe('')
+  })
+
+  it('composition dispatch returns false when root layout is corrupt', () => {
+    const tree = box({ onCompositionUpdate: () => undefined }, [])
+    const corruptRoot = { x: 0, y: 0, width: 1, height: -1, children: [] }
+    expect(
+      dispatchCompositionEvent(tree, corruptRoot, 'onCompositionUpdate', { data: 'x' }),
+    ).toBe(false)
+  })
+
   it('dispatches composition events to focused element', () => {
     let value = ''
     const tree = box({ onCompositionUpdate: (e) => { value = e.data } }, [])
