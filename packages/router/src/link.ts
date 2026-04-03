@@ -17,6 +17,16 @@ function isActivationKey(key: string): boolean {
   return key === 'Enter' || key === ' ' || key === 'Spacebar'
 }
 
+/**
+ * Declarative navigation target: a focusable box with link semantics (`role: link`, `tag: a`) and
+ * `cursor: pointer` unless overridden.
+ *
+ * - **Pointer**: `onClick` calls your handler first, then `router.navigate(to, { replace })`.
+ * - **Keyboard**: `onKeyDown` runs first; **Enter**, **Space** (`' '`), and legacy **Spacebar**
+ *   then navigate the same way.
+ *
+ * Layout and style props are forwarded to {@link import('@geometra/core').box} like any other box element.
+ */
 export function link(props: LinkProps, children: UIElement[] = []): BoxElement {
   const {
     to,

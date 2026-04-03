@@ -94,6 +94,54 @@ describe('declarative link primitive', () => {
     expect(router.getState().location.pathname).toBe('/')
   })
 
+  it('invokes user onClick before navigate and still changes location', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/'] })
+    const router = createRouter({ routes, history })
+    router.start()
+
+    const order: string[] = []
+    const node = link({
+      to: '/about',
+      router,
+      onClick: () => {
+        order.push('user')
+      },
+    })
+    node.handlers?.onClick?.({ x: 0, y: 0, target })
+    await Promise.resolve()
+
+    expect(order).toEqual(['user'])
+    expect(router.getState().location.pathname).toBe('/about')
+  })
+
+  it('invokes user onKeyDown before activation navigation', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/'] })
+    const router = createRouter({ routes, history })
+    router.start()
+
+    const order: string[] = []
+    const node = link({
+      to: '/about',
+      router,
+      onKeyDown: () => {
+        order.push('user')
+      },
+    })
+    node.handlers?.onKeyDown?.({
+      key: 'Enter',
+      code: 'Enter',
+      shiftKey: false,
+      ctrlKey: false,
+      altKey: false,
+      metaKey: false,
+      target,
+    })
+    await Promise.resolve()
+
+    expect(order).toEqual(['user'])
+    expect(router.getState().location.pathname).toBe('/about')
+  })
+
   it('uses history replace when the link sets replace: true (click and keyboard)', async () => {
     const history = createMemoryHistory({ initialEntries: ['/'] })
     const actions: HistoryUpdate['action'][] = []
