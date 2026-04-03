@@ -58,4 +58,17 @@ describe('direction model', () => {
     const el = box({ width: 1, height: 1 })
     expect(resolveElementDirection(el, 'sideways' as never)).toBe('ltr')
   })
+
+  it('nested auto inherits rtl through a depth-first parent chain (selection-style walk)', () => {
+    const root = box({ width: 200, height: 100, dir: 'rtl' })
+    const middle = box({ width: 180, height: 80, dir: 'auto' })
+    const leaf = text({ text: 'x', font: '14px Inter', lineHeight: 20, dir: 'auto' })
+
+    let d = resolveElementDirection(root, 'ltr')
+    expect(d).toBe('rtl')
+    d = resolveElementDirection(middle, d)
+    expect(d).toBe('rtl')
+    d = resolveElementDirection(leaf, d)
+    expect(d).toBe('rtl')
+  })
 })
