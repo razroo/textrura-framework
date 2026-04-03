@@ -247,6 +247,118 @@ describe('createClient WebSocket message parse errors', () => {
     expect(client.layout?.width).toBe(50)
   })
 
+  it('invokes onError when JSON protocolVersion is newer than client, then accepts a valid frame', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+    const renders: ComputedLayout[] = []
+    const renderer: Renderer = {
+      render: (layout: ComputedLayout) => {
+        renders.push({ ...layout, children: layout.children })
+      },
+      destroy: () => {},
+    }
+
+    const client = createClient({
+      url: 'ws://mock.test',
+      renderer,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    sockets[0]!.emit('message', {
+      data: JSON.stringify({
+        type: 'frame',
+        layout: { x: 0, y: 0, width: 1, height: 1, children: [] },
+        tree: { kind: 'box', props: {}, children: [] },
+        protocolVersion: 999,
+      }),
+    })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(Error)
+    expect(String((errors[0] as Error).message)).toContain('newer than client protocol')
+    expect(renders).toHaveLength(0)
+    expect(client.layout).toBeNull()
+
+    const validFrame = {
+      type: 'frame',
+      layout: { x: 0, y: 0, width: 50, height: 51, children: [] },
+      tree: { kind: 'box', props: {}, children: [] } satisfies UIElement,
+      protocolVersion: 1,
+    }
+    sockets[0]!.emit('message', { data: JSON.stringify(validFrame) })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(renders).toHaveLength(1)
+    expect(renders[0]?.width).toBe(50)
+    expect(client.layout?.width).toBe(50)
+  })
+
+  it('invokes onError when binary payload protocolVersion is newer than client, then accepts a valid frame', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+    const renders: ComputedLayout[] = []
+    const renderer: Renderer = {
+      render: (layout: ComputedLayout) => {
+        renders.push({ ...layout, children: layout.children })
+      },
+      destroy: () => {},
+    }
+
+    const client = createClient({
+      url: 'ws://mock.test',
+      renderer,
+      binaryFraming: true,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    const tooNew = encodeGeomV1JsonPayload(
+      JSON.stringify({
+        type: 'frame',
+        layout: { x: 0, y: 0, width: 2, height: 3, children: [] },
+        tree: { kind: 'box', props: {}, children: [] },
+        protocolVersion: 999,
+      }),
+    )
+    sockets[0]!.emit('message', { data: tooNew })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(Error)
+    expect(String((errors[0] as Error).message)).toContain('newer than client protocol')
+    expect(renders).toHaveLength(0)
+    expect(client.layout).toBeNull()
+
+    const valid = encodeGeomV1JsonPayload(
+      JSON.stringify({
+        type: 'frame',
+        layout: { x: 0, y: 0, width: 60, height: 61, children: [] },
+        tree: { kind: 'box', props: {}, children: [] },
+        protocolVersion: 1,
+      }),
+    )
+    sockets[0]!.emit('message', { data: valid })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(renders).toHaveLength(1)
+    expect(renders[0]?.width).toBe(60)
+    expect(client.layout?.width).toBe(60)
+  })
+
   it('invokes onError for malformed patch messages (non-array patches or negative path index)', async () => {
     const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
     installMockWebSocket(sockets)
