@@ -21,6 +21,17 @@ describe('route matcher', () => {
     expect(matchPath('/project/archive?/:id', '/project/1')).toEqual({ params: { id: '1' } })
   })
 
+  it('matches optional static segment when present or skipped (including alone or before more path)', () => {
+    expect(matchPath('/v1?', '/v1')).toEqual({ params: {} })
+    expect(matchPath('/v1?', '/')).toEqual({ params: {} })
+    expect(matchPath('/v1?', '')).toEqual({ params: {} })
+    expect(matchPath('v1?', 'v1')).toEqual({ params: {} })
+    expect(matchPath('/v1?', '/v1/extra')).toBeNull()
+    expect(matchPath('/foo/api?/bar', '/foo/bar')).toEqual({ params: {} })
+    expect(matchPath('/foo/api?/bar', '/foo/api/bar')).toEqual({ params: {} })
+    expect(matchPath('/foo/api?/bar', '/foo/baz/bar')).toBeNull()
+  })
+
   it('matches splat segment and captures rest', () => {
     expect(matchPath('/docs/*', '/docs/guides/routing/intro')).toEqual({
       params: { '*': 'guides/routing/intro' },

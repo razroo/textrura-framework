@@ -186,4 +186,9 @@ describe('path generation', () => {
     expect(buildPath('/:/x', { '': 'a' } as PathParams<'/:/x'>)).toBe('/a/x')
     expect(buildPath('/:/x', { '': 'alice bob' } as PathParams<'/:/x'>)).toBe('/alice%20bob/x')
   })
+
+  it('always emits optional static segments in buildPath (optionality applies to matching, not omission here)', () => {
+    expect(buildPath('/v1?', {} as PathParams<'/v1?'>)).toBe('/v1')
+    expect(buildPath('/foo/api?/bar', {} as PathParams<'/foo/api?/bar'>)).toBe('/foo/api/bar')
+  })
 })
