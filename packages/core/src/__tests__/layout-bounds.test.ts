@@ -98,4 +98,11 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ ...base, width: [] as unknown as number })).toBe(false)
     expect(layoutBoundsAreFinite({ ...base, height: {} as unknown as number })).toBe(false)
   })
+
+  it('rejects objects with valueOf returning a finite number (typeof must be number)', () => {
+    const base = { x: 0, y: 0, width: 10, height: 10, children: [] as [] }
+    const coercible = { valueOf: () => 42 } as unknown as number
+    expect(layoutBoundsAreFinite({ ...base, x: coercible })).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, width: coercible })).toBe(false)
+  })
 })
