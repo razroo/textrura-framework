@@ -35,7 +35,9 @@ function trimSlashes(value: string): string {
 }
 
 function stringifyParam(value: string | number): string {
-  return encodeURIComponent(String(value))
+  // Lone surrogates make encodeURIComponent throw URIError; normalize first (parity with query.ts).
+  const s = typeof value === 'string' ? value.toWellFormed() : String(value)
+  return encodeURIComponent(s)
 }
 
 /** True when a param value should participate in the path (non-finite numbers omitted; mirrors `stringifyQuery` in `query.ts`). */
@@ -50,8 +52,9 @@ function paramValuePresent(value: string | number | null | undefined): boolean {
  * dynamic `:id` and optional `:id?` are filled from `params`; splat `*rest` (or a lone `*`, key `'*'`)
  * inserts the remainder with internal slashes preserved. For optional segments, `null`, `undefined`,
  * empty string, or a non-finite number (`NaN`, `±Infinity`) omits the segment (same as leaving the key unset).
- * Required dynamic and splat params throw when missing, empty, or non-finite numeric. Leading and trailing
- * slashes on `pattern` are trimmed before building.
+ * Required dynamic and splat params throw when missing, empty, or non-finite numeric. `:param` values are
+ * percent-encoded after `String.prototype.toWellFormed` (parity with `stringifyQuery` in `query.ts`).
+ * Leading and trailing slashes on `pattern` are trimmed before building.
  */
 export function buildPath<Path extends string>(pattern: Path, params: PathParams<Path>): string {
   const trimmed = trimSlashes(pattern)

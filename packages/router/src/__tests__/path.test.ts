@@ -135,6 +135,15 @@ describe('path generation', () => {
     expect(buildPath('/wiki/:title', { title: '日本語' })).toBe('/wiki/%E6%97%A5%E6%9C%AC%E8%AA%9E')
   })
 
+  it('normalizes ill-formed UTF-16 in path params without throwing (parity with query stringify)', () => {
+    const loneHigh = '\uD800'
+    const loneLow = '\uDC00'
+    expect(() => buildPath('/p/:x', { x: loneHigh } as PathParams<'/p/:x'>)).not.toThrow()
+    expect(() => buildPath('/p/:x', { x: loneLow } as PathParams<'/p/:x'>)).not.toThrow()
+    expect(buildPath('/p/:x', { x: loneHigh } as PathParams<'/p/:x'>)).toBe('/p/%EF%BF%BD')
+    expect(buildPath('/p/:x', { x: loneLow } as PathParams<'/p/:x'>)).toBe('/p/%EF%BF%BD')
+  })
+
   it('normalizes redundant slashes in the pattern before building', () => {
     expect(buildPath('//users/:id/', { id: 7 })).toBe('/users/7')
   })
