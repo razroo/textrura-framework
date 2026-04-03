@@ -89,6 +89,21 @@ describe('collectFocusOrder', () => {
     expect(order[0]!.element).toBe(el)
   })
 
+  it('includes pointerEvents none boxes (Tab order is not filtered like pointer hit-testing)', () => {
+    const kb = box({ width: 10, height: 10, pointerEvents: 'none', onKeyDown: () => {} })
+    const clickOnly = box({ width: 10, height: 10, pointerEvents: 'none', onClick: () => {} })
+    const root = box({ width: 100, height: 100 }, [kb, clickOnly])
+    const layout = {
+      ...makeLayout(),
+      children: [
+        makeLayout({ width: 10, height: 10 }),
+        makeLayout({ x: 20, width: 10, height: 10 }),
+      ],
+    }
+    const order = collectFocusOrder(root, layout)
+    expect(order.map(t => t.element)).toEqual([kb, clickOnly])
+  })
+
   it('returns elements in document order (depth-first)', () => {
     const deepChild = box({ width: 10, height: 10, onClick: () => {} })
     const mid = box({ width: 40, height: 40 }, [deepChild])

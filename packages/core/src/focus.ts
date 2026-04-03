@@ -30,6 +30,10 @@ export function clearFocus(): void {
  * `onCompositionStart`, `onCompositionUpdate`, or `onCompositionEnd`.
  * Skips boxes whose layout bounds are non-finite or have negative width/height, and does not walk
  * their subtrees — same rule as hit-testing so corrupt geometry cannot enter focus order.
+ *
+ * Unlike pointer hit-testing (`dispatchHit`, `hasInteractiveHitAtPoint` in `hit-test.ts`),
+ * `pointerEvents: 'none'` does not exclude a box here: keyboard/composition targets may still belong in
+ * Tab order when pointer hits pass through the box.
  */
 export function collectFocusOrder(
   element: UIElement,
