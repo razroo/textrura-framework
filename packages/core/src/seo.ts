@@ -34,7 +34,11 @@ export interface SemanticHTMLOptions {
     description?: string
     image?: string
   }
-  /** Additional <head> content (raw HTML string). */
+  /**
+   * Additional `<head>` markup appended verbatim (unlike `title`, meta `content`, and body text,
+   * this string is not HTML-escaped).
+   * Treat as trusted, pre-sanitized HTML only; never pass end-user strings here without escaping.
+   */
   headExtra?: string
 }
 
@@ -318,6 +322,8 @@ function elementToHTML(element: UIElement, indent: number): string {
  *
  * Default box tags: `onClick` maps to `<button>` only for an empty box or a box whose sole child is
  * `text()`; otherwise `div` (compound click targets should use `semantic.tag` / roles when needed).
+ *
+ * `options.headExtra` is concatenated raw; all other string options and tree text are escaped.
  */
 export function toSemanticHTML(
   tree: UIElement,

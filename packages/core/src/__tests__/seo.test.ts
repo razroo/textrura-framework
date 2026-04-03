@@ -150,6 +150,15 @@ describe('toSemanticHTML', () => {
     expect(extraIdx).toBeGreaterThan(viewportIdx)
   })
 
+  it('does not escape headExtra so integrators can emit literal entities or structured tags', () => {
+    const el = box({ width: 100, height: 100 })
+    const html = toSemanticHTML(el, {
+      headExtra: '<meta name="app:note" content="A & B <not escaped>">',
+    })
+    expect(html).toContain('content="A & B <not escaped>"')
+    expect(html).not.toContain('content="A &amp; B')
+  })
+
   it('infers h1 from numeric font-weight 800 and 900 without the bold keyword', () => {
     const heavy = box({ width: 200, height: 50 }, [
       text({ text: 'ExtraBold', font: '800 32px Inter, sans-serif', lineHeight: 40 }),
