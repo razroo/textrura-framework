@@ -121,6 +121,20 @@ describe('animation timeline', () => {
     setMotionPreference('full')
   })
 
+  it('clamps non-positive duration to 1ms so step() always has a defined progress scale', () => {
+    const timeline = createTweenTimeline(0)
+    timeline.to(100, 0, easing.linear)
+    expect(timeline.step(0)).toBe(0)
+    expect(timeline.step(1)).toBe(100)
+    expect(timeline.state()).toBe('finished')
+
+    const timelineNeg = createTweenTimeline(0)
+    timelineNeg.to(50, -200, easing.linear)
+    expect(timelineNeg.step(0)).toBe(0)
+    expect(timelineNeg.step(1)).toBe(50)
+    expect(timelineNeg.state()).toBe('finished')
+  })
+
   it('steps deterministically to completion', () => {
     const timeline = createTweenTimeline(0)
     timeline.to(100, 1000, easing.linear)
@@ -163,6 +177,21 @@ describe('animation timeline', () => {
     expect(timeline.state()).toBe('cancelled')
     timeline.step(100)
     expect(timeline.value.peek()).toBe(15)
+  })
+
+  it('lazily adds properties at 0 when first targeted in to()', () => {
+    const props = createPropertyTimeline({ x: 0 })
+    props.to({ x: 100, z: 50 }, 200, easing.linear)
+    expect(props.values.z.peek()).toBe(0)
+
+    let next = props.step(100)
+    expect(next.x).toBe(50)
+    expect(next.z).toBe(25)
+
+    next = props.step(100)
+    expect(next.x).toBe(100)
+    expect(next.z).toBe(50)
+    expect(props.state()).toBe('finished')
   })
 
   it('animates multiple geometry/paint properties deterministically', () => {
