@@ -108,7 +108,14 @@ function collectTextNodesWalk(
   }
 }
 
-/** Get the selected text from a selection range and text node info list. */
+/**
+ * Get the selected text from a selection range and text node info list.
+ *
+ * Node indices are clamped to existing `textNodes` so corrupt or deserialized ranges cannot walk
+ * millions of empty indices. When `focusNode` lies past the last node, the range end is treated as
+ * that last node so `focusOffset` still applies. When the normalized range lies entirely outside
+ * `[0, textNodes.length - 1]`, returns an empty string.
+ */
 export function getSelectedText(
   range: SelectionRange,
   textNodes: TextNodeInfo[],
@@ -126,16 +133,28 @@ export function getSelectedText(
     ;[startOffset, endOffset] = [endOffset, startOffset]
   }
 
+  const maxIdx = textNodes.length - 1
+  if (endNode < 0 || startNode > maxIdx) return ''
+
+  const lo = Math.max(0, startNode)
+  const hi = Math.min(endNode, maxIdx)
+  if (lo > hi) return ''
+
+  const startClipped = startNode < 0
+  const endClipped = endNode > maxIdx
+
   const parts: string[] = []
-  for (let i = startNode; i <= endNode; i++) {
+  for (let i = lo; i <= hi; i++) {
     const node = textNodes[i]
     if (!node) continue
     const fullText = node.element.props.text
-    if (i === startNode && i === endNode) {
+    const atStart = i === startNode || (startClipped && i === lo)
+    const atEnd = i === endNode || (endClipped && i === hi)
+    if (atStart && atEnd) {
       parts.push(fullText.slice(startOffset, endOffset))
-    } else if (i === startNode) {
+    } else if (atStart) {
       parts.push(fullText.slice(startOffset))
-    } else if (i === endNode) {
+    } else if (atEnd) {
       parts.push(fullText.slice(0, endOffset))
     } else {
       parts.push(fullText)

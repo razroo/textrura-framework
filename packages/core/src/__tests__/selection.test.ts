@@ -204,6 +204,34 @@ describe('getSelectedText', () => {
       getSelectedText({ anchorNode: 0, anchorOffset: 2, focusNode: 0, focusOffset: 10 }, nodes),
     ).toBe('')
   })
+
+  it('treats focusNode past the last text node as ending on the last node (respects focusOffset)', () => {
+    const nodes = makeNodes()
+    const sane = getSelectedText(
+      { anchorNode: 0, anchorOffset: 0, focusNode: 1, focusOffset: 3 },
+      nodes,
+    )
+    const corruptEndIndex = getSelectedText(
+      { anchorNode: 0, anchorOffset: 0, focusNode: 9_000_000, focusOffset: 3 },
+      nodes,
+    )
+    expect(corruptEndIndex).toBe(sane)
+    expect(sane).toBe('Hello World\nSec')
+  })
+
+  it('returns empty when the normalized range lies entirely past existing nodes', () => {
+    const nodes = makeNodes()
+    expect(
+      getSelectedText({ anchorNode: 5, anchorOffset: 0, focusNode: 5, focusOffset: 1 }, nodes),
+    ).toBe('')
+  })
+
+  it('returns empty when the normalized range lies entirely before the first node', () => {
+    const nodes = makeNodes()
+    expect(
+      getSelectedText({ anchorNode: -3, anchorOffset: 0, focusNode: -1, focusOffset: 1 }, nodes),
+    ).toBe('')
+  })
 })
 
 describe('hitTestText', () => {
