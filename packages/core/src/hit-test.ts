@@ -245,6 +245,8 @@ function dispatchHitRecursive(
  * (including click-to-focus when there is no `onClick` handler).
  * Layout bounds must be finite and non-negative on `width` and `height`; otherwise the node is
  * skipped for hit-testing (corrupt geometry from Yoga or a bad snapshot).
+ *
+ * @see {@link getCursorAtPoint} for resolving `cursor` at the same logical hit region.
  */
 export function dispatchHit(
   element: UIElement,
@@ -343,7 +345,10 @@ export function hitPathAtPoint(
   return []
 }
 
-/** Get the cursor style at a given point by walking the tree. Returns the deepest element's cursor prop. */
+/**
+ * Resolve the deepest `cursor` style at `(x, y)` (boxes only; skips `pointerEvents: 'none'` the same way as
+ * {@link hitPathAtPoint}). Scroll containers use the same clipping rules as {@link dispatchHit}.
+ */
 export function getCursorAtPoint(
   element: UIElement,
   layout: ComputedLayout,
