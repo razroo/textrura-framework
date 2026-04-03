@@ -356,6 +356,42 @@ describe('createClient WebSocket message parse errors', () => {
     expect(String((errors[0] as Error).message)).toMatch(/binaryType/)
   })
 
+  it('invokes onError when binary framing receives a non-buffer payload (not string, not ArrayBufferView)', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+    const renderer: Renderer = {
+      render: () => {},
+      destroy: () => {},
+    }
+
+    createClient({
+      url: 'ws://mock.test',
+      renderer,
+      binaryFraming: true,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    sockets[0]!.emit('message', { data: null })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(Error)
+    expect(String((errors[0] as Error).message)).toMatch(/arraybuffer/i)
+
+    sockets[0]!.emit('message', { data: new Uint8Array([1, 2, 3]) })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(2)
+    expect(String((errors[1] as Error).message)).toContain('GEOM')
+  })
+
   it('invokes onError when binary data is not a GEOM v1 frame', async () => {
     const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
     installMockWebSocket(sockets)
