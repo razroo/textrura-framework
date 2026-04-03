@@ -196,6 +196,20 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<h2>Section</h2>')
   })
 
+  it('infers heading tiers from calc(), min(), max(), and clamp() using the first font-size length token', () => {
+    const el = box({ width: 400, height: 220 }, [
+      text({ text: 'Calc hero', font: 'bold calc(1.75rem + 2px) sans-serif', lineHeight: 40 }),
+      text({ text: 'Min section', font: 'bold min(22px, 2rem) sans-serif', lineHeight: 32 }),
+      text({ text: 'Max sub', font: 'bold max(19px, 1rem) sans-serif', lineHeight: 28 }),
+      text({ text: 'Clamp h4', font: 'bold clamp(15px, 2vw, 20px) sans-serif', lineHeight: 20 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<h1>Calc hero</h1>')
+    expect(html).toContain('<h2>Min section</h2>')
+    expect(html).toContain('<h3>Max sub</h3>')
+    expect(html).toContain('<h4>Clamp h4</h4>')
+  })
+
   it('infers h1 from numeric font-weight 700 without the bold keyword', () => {
     const el = box({ width: 200, height: 50 }, [
       text({ text: 'Hero', font: 'italic 700 32px/40px Inter, sans-serif', lineHeight: 40 }),
