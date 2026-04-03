@@ -155,4 +155,14 @@ describe('coalescePatches', () => {
     ])
     expect(merged).toEqual([{ path: [], x: 1, y: 2, height: 99 }])
   })
+
+  it('treats numeric zero as a real field value (last write wins; not "unset")', () => {
+    expect(coalescePatches([{ path: [0], x: 10 }, { path: [0], x: 0 }])).toEqual([{ path: [0], x: 0 }])
+    expect(
+      coalescePatches([
+        { path: [1], width: 100, height: 50 },
+        { path: [1], width: 0, height: 0 },
+      ]),
+    ).toEqual([{ path: [1], width: 0, height: 0 }])
+  })
 })
