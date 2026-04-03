@@ -13,6 +13,19 @@ describe('route ranking', () => {
     expect(comparePatternSpecificity('/users/:id', '/users/*')).toBeLessThan(0)
   })
 
+  it('tie-breaks equal scores by preferring deeper patterns', () => {
+    expect(scorePathPattern('/a/:b')).toBe(scorePathPattern('/x?/y?/z?'))
+    expect(comparePatternSpecificity('/a/:b', '/x?/y?/z?')).toBeGreaterThan(0)
+    expect(comparePatternSpecificity('/x?/y?/z?', '/a/:b')).toBeLessThan(0)
+  })
+
+  it('scores optional dynamic and static segments below required counterparts', () => {
+    expect(scorePathPattern('/users/:id')).toBeGreaterThan(scorePathPattern('/users/:id?'))
+    expect(scorePathPattern('/project/archive/:id')).toBeGreaterThan(
+      scorePathPattern('/project/archive?/:id'),
+    )
+  })
+
   it('uses deterministic ranking for ambiguous tree matches', () => {
     const routes: RouteNode[] = [
       { id: 'fallback', path: '/users/*' },
