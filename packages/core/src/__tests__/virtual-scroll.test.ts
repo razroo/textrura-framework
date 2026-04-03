@@ -80,6 +80,16 @@ describe('syncVirtualWindow', () => {
     expect(syncVirtualWindow(8, Number.NEGATIVE_INFINITY, 1, 0)).toEqual({ start: 1, end: 1, selected: 1 })
   })
 
+  it('treats non-number arguments as non-finite (defensive against bad serialized props)', () => {
+    // Number.isFinite does not coerce; strings and objects never count as finite numbers.
+    expect(syncVirtualWindow('10' as unknown as number, 3, 2, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+    expect(syncVirtualWindow(8, '3' as unknown as number, 2, 0)).toEqual({ start: 2, end: 2, selected: 2 })
+    expect(syncVirtualWindow(8, 3, '2' as unknown as number, 0)).toEqual({ start: 0, end: 2, selected: 0 })
+    expect(syncVirtualWindow(8, 3, 2, '1' as unknown as number)).toEqual({ start: 0, end: 2, selected: 2 })
+    expect(syncVirtualWindow({} as unknown as number, 5, 2, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+    expect(syncVirtualWindow(8, 3, 2, null as unknown as number)).toEqual({ start: 0, end: 2, selected: 2 })
+  })
+
   it(
     'keeps selection inside the visible window and bounds visible span for a grid of small inputs',
     () => {
