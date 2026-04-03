@@ -189,6 +189,64 @@ describe('createClient WebSocket message parse errors', () => {
     expect(renders[0]?.width).toBe(12)
   })
 
+  it('invokes onError when binary frame declares a payload longer than the buffer', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+    const renders: ComputedLayout[] = []
+    const renderer: Renderer = {
+      render: (layout: ComputedLayout) => {
+        renders.push({ ...layout, children: layout.children })
+      },
+      destroy: () => {},
+    }
+
+    const client = createClient({
+      url: 'ws://mock.test',
+      renderer,
+      binaryFraming: true,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    const buf = new ArrayBuffer(9)
+    const u8 = new Uint8Array(buf)
+    u8[0] = 0x47
+    u8[1] = 0x45
+    u8[2] = 0x4f
+    u8[3] = 0x4d
+    u8[4] = 1
+    new DataView(buf).setUint32(5, 1, true)
+
+    sockets[0]!.emit('message', { data: buf })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(Error)
+    expect(String((errors[0] as Error).message)).toContain('Truncated')
+
+    const valid = encodeGeomV1JsonPayload(
+      JSON.stringify({
+        type: 'frame',
+        layout: { x: 0, y: 0, width: 7, height: 8, children: [] },
+        tree: { kind: 'box', props: {}, children: [] },
+        protocolVersion: 1,
+      }),
+    )
+    sockets[0]!.emit('message', { data: valid })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(renders).toHaveLength(1)
+    expect(renders[0]?.width).toBe(7)
+    expect(errors).toHaveLength(1)
+    expect(client.layout?.width).toBe(7)
+  })
+
   it('invokes onError when binary data is not a GEOM v1 frame', async () => {
     const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
     installMockWebSocket(sockets)
