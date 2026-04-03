@@ -1762,6 +1762,28 @@ describe('getCursorAtPoint', () => {
     expect(getCursorAtPoint(parent, layout, 20, 20)).toBe('pointer')
   })
 
+  it('empty-string cursor on a deep chain falls through to the first non-empty ancestor', () => {
+    const leaf = box({ width: 20, height: 20, cursor: '' })
+    const mid = box({ width: 50, height: 50, cursor: '' }, [leaf])
+    const root = box({ width: 100, height: 100, cursor: 'help' }, [mid])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        {
+          x: 10,
+          y: 10,
+          width: 50,
+          height: 50,
+          children: [{ x: 5, y: 5, width: 20, height: 20, children: [] }],
+        },
+      ],
+    }
+    expect(getCursorAtPoint(root, layout, 20, 20)).toBe('help')
+  })
+
   it('returns empty string when the hit target is the root box and cursor is explicitly empty', () => {
     const el = box({ width: 100, height: 50, cursor: '' })
     const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
