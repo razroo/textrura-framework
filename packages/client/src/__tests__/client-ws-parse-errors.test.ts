@@ -382,6 +382,48 @@ describe('createClient WebSocket message parse errors', () => {
     expect(renders[0]?.width).toBe(12)
   })
 
+  it('decodes GEOM v1 binary frames when event.data is Int8Array (ArrayBufferView parity)', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+    const renders: ComputedLayout[] = []
+    const renderer: Renderer = {
+      render: (layout: ComputedLayout) => {
+        renders.push({ ...layout, children: layout.children })
+      },
+      destroy: () => {},
+    }
+
+    createClient({
+      url: 'ws://mock.test',
+      renderer,
+      binaryFraming: true,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    const buf = encodeGeomV1JsonPayload(
+      JSON.stringify({
+        type: 'frame',
+        layout: { x: 0, y: 0, width: 88, height: 99, children: [] },
+        tree: { kind: 'box', props: {}, children: [] },
+        protocolVersion: 1,
+      }),
+    )
+    sockets[0]!.emit('message', { data: new Int8Array(buf) })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(0)
+    expect(renders).toHaveLength(1)
+    expect(renders[0]?.width).toBe(88)
+  })
+
   it('invokes onError when binary frame declares a payload longer than the buffer', async () => {
     const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
     installMockWebSocket(sockets)
