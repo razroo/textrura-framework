@@ -134,6 +134,32 @@ describe('transition()', () => {
     }
     expect(s.peek()).toBe(100)
   })
+
+  it('still schedules RAF under reduced motion unless respectReducedMotion is true', async () => {
+    vi.resetModules()
+    const pending: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      pending.push(cb)
+      return pending.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    const anim = await import('../animation.js')
+    anim.setMotionPreference('reduced')
+
+    const animated = anim.transition(0, 200, 400, anim.easing.linear)
+    expect(animated.peek()).toBe(0)
+    expect(pending.length).toBeGreaterThan(0)
+
+    const jumped = anim.transition(0, 99, 400, anim.easing.linear, { respectReducedMotion: true })
+    expect(jumped.peek()).toBe(99)
+
+    const explicitOff = anim.transition(0, 50, 200, anim.easing.linear, { respectReducedMotion: false })
+    expect(explicitOff.peek()).toBe(0)
+    expect(pending.length).toBeGreaterThan(1)
+
+    anim.setMotionPreference('full')
+  })
 })
 
 describe('animation timeline', () => {
