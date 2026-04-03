@@ -110,6 +110,7 @@ export type {
   TextElement,
   ImageElement,
   StyleProps,
+  CursorProp,
   Direction,
   DirectionProps,
   SemanticProps,

@@ -7,6 +7,23 @@ import type { FlexProps, ComputedLayout } from 'textura'
  */
 export type Direction = 'ltr' | 'rtl' | 'auto'
 
+/**
+ * CSS `cursor` keyword for box props (canvas hosts assign it to `canvas.style.cursor` when supported).
+ * Use `''` so {@link import('./hit-test.js').getCursorAtPoint} can fall through to an ancestor cursor.
+ */
+export type CursorProp =
+  | ''
+  | 'default'
+  | 'pointer'
+  | 'grab'
+  | 'grabbing'
+  | 'text'
+  | 'not-allowed'
+  | 'crosshair'
+  | 'move'
+  | 'help'
+  | 'cell'
+
 /** Optional direction metadata carried on UI props (see {@link Direction}). */
 export interface DirectionProps {
   /** When omitted or `auto`, inherits the parent’s resolved `ltr` / `rtl`. */
@@ -22,7 +39,7 @@ export interface StyleProps {
   borderWidth?: number
   opacity?: number
   /** Cursor to show when hovering this element. */
-  cursor?: 'default' | 'pointer' | 'grab' | 'grabbing' | 'text' | 'not-allowed' | 'crosshair' | 'move'
+  cursor?: CursorProp
   /**
    * Z-index for paint ordering among siblings. Higher values paint on top.
    * Non-finite values (`NaN`, `±Infinity`) are treated as `0` for hit-testing and renderer paint order.
