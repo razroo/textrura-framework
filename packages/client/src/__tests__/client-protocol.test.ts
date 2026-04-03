@@ -184,6 +184,27 @@ describe('applyServerMessage', () => {
     expect(renders.length).toBe(1)
   })
 
+  it('re-renders on a well-formed patch with an empty patches array (no geometry mutation)', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+
+    applyServerMessage(state, renderer, {
+      type: 'frame',
+      layout: layout(0, 0, 100, 50),
+      tree: tree(),
+      protocolVersion: 1,
+    })
+    expect(renders).toHaveLength(1)
+
+    applyServerMessage(state, renderer, {
+      type: 'patch',
+      patches: [],
+      protocolVersion: 1,
+    })
+    expect(renders).toHaveLength(2)
+    expect(state.layout?.width).toBe(100)
+  })
+
   it('still emits onFrameMetrics for a patch before the first frame (no render, patchCount set)', () => {
     const { renderer, renders } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
