@@ -1,10 +1,15 @@
 import type { FlexProps, ComputedLayout } from 'textura'
 
-/** Text direction model used by UI elements. */
+/**
+ * Text direction model used by UI elements.
+ * `auto` inherits the resolved direction of the parent (see {@link resolveDirectionValue} in `direction.js`);
+ * unknown serialized values behave like `auto` at runtime.
+ */
 export type Direction = 'ltr' | 'rtl' | 'auto'
 
-/** Optional direction metadata carried on UI props. */
+/** Optional direction metadata carried on UI props (see {@link Direction}). */
 export interface DirectionProps {
+  /** When omitted or `auto`, inherits the parent’s resolved `ltr` / `rtl`. */
   dir?: Direction
 }
 
@@ -28,7 +33,11 @@ export interface StyleProps {
    * hits pass through to geometry behind it. Descendants still receive hits unless they also set `'none'`.
    */
   pointerEvents?: 'auto' | 'none'
-  /** Overflow behavior for children. */
+  /**
+   * Overflow behavior for children. `hidden` and `scroll` clip hit-testing to the parent rect before
+   * descending; `visible` (or omitted) still requires the pointer to lie inside the parent’s layout bounds
+   * to reach descendants — geometry that paints outside the parent is not hit-tested from this ancestor.
+   */
   overflow?: 'visible' | 'hidden' | 'scroll'
   /** Horizontal scroll offset (used with overflow: 'scroll'). */
   scrollX?: number

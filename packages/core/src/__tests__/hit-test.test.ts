@@ -2372,6 +2372,27 @@ describe('overflow hidden clipping', () => {
   })
 })
 
+describe('overflow visible', () => {
+  it('pointer over child geometry outside parent bounds does not hit child (parent inside gate)', () => {
+    let childFired = false
+    const child = box({ width: 80, height: 40, onClick: () => { childFired = true } })
+    const parent = box({ width: 100, height: 100, overflow: 'visible' }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 50, y: 30, width: 80, height: 40, children: [] }],
+    }
+    // Child spans x ≈ 50..130 in root space; (110, 50) is inside the child but outside the parent width.
+    dispatchHit(parent, layout, 'onClick', 110, 50)
+    expect(childFired).toBe(false)
+    expect(hitPathAtPoint(parent, layout, 110, 50)).toBeNull()
+    expect(hasInteractiveHitAtPoint(parent, layout, 110, 50)).toBe(false)
+    expect(getCursorAtPoint(parent, layout, 110, 50)).toBeNull()
+  })
+})
+
 describe('hasInteractiveHitAtPoint', () => {
   it('detects interactive containers at pointer position', () => {
     const interactive = box({ width: 120, height: 40, onClick: () => undefined })
