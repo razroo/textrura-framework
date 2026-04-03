@@ -46,9 +46,13 @@ export type MotionPreference = 'full' | 'reduced'
 
 const motionPreference = signal<MotionPreference>('full')
 
-/** Set global motion preference for animation helpers. */
+/**
+ * Set global motion preference for animation helpers.
+ * Runtime values other than `'reduced'` normalize to `'full'` so bad serialized or plain-JS callers
+ * cannot leave the module in an unexpected state.
+ */
 export function setMotionPreference(preference: MotionPreference): void {
-  motionPreference.set(preference)
+  motionPreference.set(preference === 'reduced' ? 'reduced' : 'full')
 }
 
 /** Read current global motion preference. */

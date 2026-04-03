@@ -8,6 +8,21 @@ import {
   transition,
 } from '../animation.js'
 
+describe('motion preference', () => {
+  it('normalizes non-reduced runtime values to full', () => {
+    setMotionPreference('reduced')
+    expect(getMotionPreference()).toBe('reduced')
+    setMotionPreference('' as never)
+    expect(getMotionPreference()).toBe('full')
+    setMotionPreference('reduced')
+    setMotionPreference(undefined as never)
+    expect(getMotionPreference()).toBe('full')
+    setMotionPreference('bogus' as never)
+    expect(getMotionPreference()).toBe('full')
+    setMotionPreference('full')
+  })
+})
+
 describe('animation timeline', () => {
   it('supports reduced-motion policy for transition and timeline helpers', () => {
     setMotionPreference('reduced')
