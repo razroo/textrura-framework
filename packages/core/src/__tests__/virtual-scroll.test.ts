@@ -93,6 +93,13 @@ describe('syncVirtualWindow', () => {
     expect(syncVirtualWindow(8, 3, 2, null as unknown as number)).toEqual({ start: 0, end: 2, selected: 2 })
   })
 
+  it('treats explicit undefined on any axis like a non-number (optional-arg / loose calls)', () => {
+    expect(syncVirtualWindow(undefined as unknown as number, 5, 2, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+    expect(syncVirtualWindow(8, undefined as unknown as number, 2, 0)).toEqual({ start: 2, end: 2, selected: 2 })
+    expect(syncVirtualWindow(8, 3, undefined as unknown as number, 0)).toEqual({ start: 0, end: 2, selected: 0 })
+    expect(syncVirtualWindow(8, 3, 2, undefined as unknown as number)).toEqual({ start: 0, end: 2, selected: 2 })
+  })
+
   it('treats BigInt arguments like non-numbers on every axis (aligned with layoutBoundsAreFinite)', () => {
     const z = 0n as unknown as number
     expect(syncVirtualWindow(z, 3, 2, 0)).toEqual({ start: 0, end: 0, selected: 0 })
