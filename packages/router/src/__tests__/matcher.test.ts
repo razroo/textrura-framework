@@ -92,4 +92,18 @@ describe('route matcher', () => {
       params: { id: '2' },
     })
   })
+
+  it('lone colon segment uses empty string as param name', () => {
+    expect(matchPath('/:/x', '/a/x')).toEqual({ params: { '': 'a' } })
+    expect(matchPath('/:/x', '/a/y')).toBeNull()
+  })
+
+  it('splat consumes the entire remainder; pattern segments after the splat are ignored', () => {
+    expect(matchPath('/docs/*/:id', '/docs/foo/bar')).toEqual({
+      params: { '*': 'foo/bar' },
+    })
+    expect(matchPath('/docs/*/tail', '/docs/a/b/c')).toEqual({
+      params: { '*': 'a/b/c' },
+    })
+  })
 })

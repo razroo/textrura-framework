@@ -118,6 +118,10 @@ function matchRecursive(
  * - Static segments must match exactly.
  * - `:name` captures one path segment; `:name?` is optional (segment may be absent).
  * - `*` or `*rest` is a splat: it greedily captures the rest of the path, including internal slashes.
+ *   Only one splat is meaningful: it consumes **all** remaining pathname segments, so any static or param
+ *   segments that appear **after** the splat in the pattern are never consulted (do not rely on a splat
+ *   with more pattern segments after it).
+ * - A segment that is only a colon (no param name) yields an empty-string key in `params`.
  * - `?` query and `#` hash are stripped from `pathname` before matching.
  * - Each captured segment is passed through `decodeURIComponent`; invalid `%` sequences are left as-is.
  *
