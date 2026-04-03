@@ -78,4 +78,11 @@ describe('binary frame envelope', () => {
     const view = padded.subarray(0, 9)
     expect(() => decodeBinaryFrameJson(view)).toThrow('Truncated binary frame payload')
   })
+
+  it('accepts payload length exactly equal to bytes after header (buffer fits, no slack)', () => {
+    const json = 'x'
+    const buf = encodeBinaryFrameJson(json)
+    expect(buf.length).toBe(10)
+    expect(decodeBinaryFrameJson(buf)).toBe(json)
+  })
 })

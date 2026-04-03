@@ -42,7 +42,8 @@ export function decodeBinaryFrameJson(data: Buffer | Uint8Array): string {
   }
   const dv = new DataView(data.buffer, data.byteOffset, data.byteLength)
   const len = dv.getUint32(5, true)
-  if (HEADER_BYTES + len > data.length) {
+  const maxPayload = data.byteLength - HEADER_BYTES
+  if (len > maxPayload) {
     throw new Error('Truncated binary frame payload')
   }
   return new TextDecoder('utf-8').decode(data.subarray(HEADER_BYTES, HEADER_BYTES + len))

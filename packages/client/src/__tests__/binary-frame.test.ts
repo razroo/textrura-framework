@@ -126,4 +126,11 @@ describe('client binary frame decode', () => {
     const view = padded.subarray(0, 9)
     expect(() => decodeBinaryFrameJson(view)).toThrow('Truncated binary frame payload')
   })
+
+  it('accepts payload length exactly equal to bytes after header (buffer fits, no slack)', () => {
+    const json = 'x'
+    const buf = encodeBinaryFrameJsonV1(json)
+    expect(buf.byteLength).toBe(10)
+    expect(decodeBinaryFrameJson(buf)).toBe(json)
+  })
 })
