@@ -3058,4 +3058,43 @@ describe('pointerEvents', () => {
     expect(log).toEqual(['back'])
     expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(true)
   })
+
+  it('only pointerEvents none is pass-through; unknown strings and non-strings keep the box in the hit stack', () => {
+    const log: string[] = []
+    const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } })
+    const bogus = box({
+      width: 50,
+      height: 50,
+      zIndex: 1,
+      pointerEvents: 'bogus' as never,
+      onClick: () => { log.push('bogus') },
+    })
+    const root = box({ width: 100, height: 100 }, [back, bogus])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['bogus'])
+
+    const log2: string[] = []
+    const back2 = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log2.push('back') } })
+    const corrupt = box({
+      width: 50,
+      height: 50,
+      zIndex: 1,
+      pointerEvents: 0 as never,
+      onClick: () => { log2.push('corrupt') },
+    })
+    const root2 = box({ width: 100, height: 100 }, [back2, corrupt])
+    dispatchHit(root2, layout, 'onClick', 10, 10)
+    expect(log2).toEqual(['corrupt'])
+  })
 })
