@@ -50,6 +50,19 @@ describe('signal', () => {
     expect(runs).toBe(2)
   })
 
+  it('set with NaN equal to current NaN (Object.is) is a no-op', () => {
+    const s = signal(Number.NaN)
+    let runs = 0
+    effect(() => {
+      void s.value
+      runs++
+    })
+    expect(runs).toBe(1)
+    s.set(Number.NaN)
+    expect(runs).toBe(1)
+    expect(Number.isNaN(s.peek())).toBe(true)
+  })
+
   it('drops stale signal subscriptions when the effect branch changes', () => {
     const gate = signal(true)
     const a = signal(0)
@@ -255,6 +268,23 @@ describe('effect', () => {
     })
     expect(() => s.set(1)).toThrow('re-run')
   })
+
+  it('skips later subscribers in the same synchronous flush when an earlier effect throws', () => {
+    const s = signal(0)
+    const seen: string[] = []
+    effect(() => {
+      void s.value
+      seen.push('first')
+      if (s.peek() === 1) throw new Error('first-effect')
+    })
+    effect(() => {
+      void s.value
+      seen.push('second')
+    })
+    expect(seen).toEqual(['first', 'second'])
+    expect(() => s.set(1)).toThrow('first-effect')
+    expect(seen).toEqual(['first', 'second', 'first'])
+  })
 })
 
 describe('batch', () => {
@@ -390,5 +420,26 @@ describe('batch', () => {
       a.set(1)
     })
     expect(steps).toEqual(['a:0', 'a:1', 'a:2'])
+  })
+
+  it('batch flush skips subscribers after one throws', () => {
+    const s = signal(0)
+    const seen: string[] = []
+    effect(() => {
+      void s.value
+      seen.push('a')
+      if (s.peek() === 1) throw new Error('a')
+    })
+    effect(() => {
+      void s.value
+      seen.push('b')
+    })
+    expect(seen).toEqual(['a', 'b'])
+    expect(() =>
+      batch(() => {
+        s.set(1)
+      }),
+    ).toThrow('a')
+    expect(seen).toEqual(['a', 'b', 'a'])
   })
 })
