@@ -1,6 +1,7 @@
 import { afterEach, describe, it, expect, vi } from 'vitest'
 import { createApp } from '../app.js'
 import { box, text } from '../elements.js'
+import { clearFocus, focusedElement } from '../focus.js'
 import { signal } from '../signals.js'
 import type { Renderer } from '../types.js'
 
@@ -387,6 +388,32 @@ describe('createApp dispatch guards', () => {
 
     app.layout = savedLayout
     expect(app.dispatch('onClick', 5, 5)).toBe(true)
+  })
+
+  it('returns false from dispatch when pointer coordinates are non-finite without click-to-focus', async () => {
+    const renderer: Renderer = {
+      render: vi.fn(),
+      destroy: vi.fn(),
+    }
+    const app = await createApp(
+      () => box({ width: 100, height: 100, onKeyDown: () => {}, onClick: () => {} }, []),
+      renderer,
+      { width: 100, height: 100 },
+    )
+
+    clearFocus()
+    expect(focusedElement.value).toBeNull()
+
+    expect(app.dispatch('onClick', Number.NaN, 50)).toBe(false)
+    expect(focusedElement.value).toBeNull()
+
+    expect(app.dispatch('onClick', 50, Number.POSITIVE_INFINITY)).toBe(false)
+    expect(focusedElement.value).toBeNull()
+
+    expect(app.dispatch('onPointerDown', Number.NEGATIVE_INFINITY, 50)).toBe(false)
+
+    expect(app.dispatch('onClick', 50, 50)).toBe(true)
+    expect(focusedElement.value).not.toBeNull()
   })
 
   it('returns false from dispatchKey and dispatchComposition when tree or layout is null', async () => {
