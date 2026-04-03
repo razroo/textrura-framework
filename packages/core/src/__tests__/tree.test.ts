@@ -41,6 +41,26 @@ describe('toLayoutTree', () => {
     expect(layout).not.toHaveProperty('selectable')
   })
 
+  it('preserves whiteSpace on text for Yoga/Textura layout', () => {
+    const el = text({
+      text: 'a\nb',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      whiteSpace: 'pre-wrap',
+      width: 100,
+      height: 36,
+    })
+    const layout = toLayoutTree(el)
+    expect(layout).toMatchObject({
+      text: 'a\nb',
+      whiteSpace: 'pre-wrap',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      width: 100,
+      height: 36,
+    })
+  })
+
   it('strips paint and hit-target style props from text leaves (same strip list as boxes)', () => {
     const el = text({
       text: 'Hi',
