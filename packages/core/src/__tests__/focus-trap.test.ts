@@ -165,6 +165,31 @@ describe('trapFocusStep', () => {
     expect(trapFocusStep(tree, layout, [], 'prev')).toBe(false)
   })
 
+  it('does not descend past an intermediate box with corrupt layout (nested focusables are unreachable)', () => {
+    const inner = box({ onKeyDown: () => undefined }, [])
+    const mid = box({}, [inner])
+    const tree = box({}, [mid])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: [
+        {
+          x: 0,
+          y: 0,
+          width: Number.NaN,
+          height: 60,
+          children: [{ x: 0, y: 0, width: 100, height: 40, children: [] }],
+        },
+      ],
+    }
+    expect(trapFocusStep(tree, layout, [], 'next')).toBe(false)
+    expect(trapFocusStep(tree, layout, [], 'prev')).toBe(false)
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(false)
+    expect(trapFocusStep(tree, layout, [0], 'prev')).toBe(false)
+  })
+
   it('cycles backward with prev', () => {
     const a = box({ onKeyDown: () => undefined }, [])
     const b = box({ onKeyDown: () => undefined }, [])
