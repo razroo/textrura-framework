@@ -1,6 +1,7 @@
 import { WebSocketServer } from 'ws'
 import type { WebSocket } from 'ws'
-import type { IncomingMessage } from 'http'
+import type { IncomingMessage, Server as HttpServer } from 'node:http'
+import type { Duplex } from 'node:stream'
 import { init, computeLayout } from 'textura'
 import type { ComputedLayout } from 'textura'
 import {
@@ -15,8 +16,22 @@ import { diffLayout, coalescePatches, PROTOCOL_VERSION, isProtocolCompatible, CL
 import type { ServerMessage, ClientMessage } from './protocol.js'
 import { encodeBinaryFrameJson } from './binary-frame.js'
 
+/** Default WebSocket pathname when attaching to an existing HTTP server. */
+export const DEFAULT_GEOMETRA_WS_PATH = '/geometra-ws'
+
 export interface TexturaServerOptions {
-  /** Port to listen on. Default: 3100. */
+  /**
+   * Existing Node HTTP server to attach the Geometra WebSocket to (via `upgrade`).
+   * When set, do not pass `port` — the WS endpoint listens on `wsPath` only.
+   * Use this to serve static files, REST APIs, and Geometra on one TCP port.
+   */
+  httpServer?: HttpServer
+  /**
+   * URL pathname for WebSocket upgrades when `httpServer` is set.
+   * Default {@link DEFAULT_GEOMETRA_WS_PATH}.
+   */
+  wsPath?: string
+  /** Port to listen on when `httpServer` is omitted. Default: 3100. */
   port?: number
   /** Root width. Default: 800. */
   width?: number
@@ -73,6 +88,29 @@ export function shouldDeferClientSend(
   return bufferedAmount > backpressureBytes
 }
 
+function normalizeWsPath(pathname: string): string {
+  let p = pathname.trim()
+  if (!p.startsWith('/')) {
+    p = `/${p}`
+  }
+  if (p.length > 1 && p.endsWith('/')) {
+    p = p.slice(0, -1)
+  }
+  return p
+}
+
+function upgradePathMatches(request: IncomingMessage, wsPath: string): boolean {
+  const host = request.headers.host ?? 'localhost'
+  try {
+    const pathname = new URL(request.url ?? '/', `http://${host}`).pathname
+    const norm = normalizeWsPath(wsPath)
+    const reqPath = normalizeWsPath(pathname)
+    return reqPath === norm
+  } catch {
+    return false
+  }
+}
+
 /**
  * Create a Textura server that computes layout and streams geometry to clients.
  *
@@ -85,7 +123,12 @@ export async function createServer(
 ): Promise<TexturaServer> {
   await init()
 
+  if (options.httpServer != null && options.port !== undefined) {
+    throw new Error('createServer: pass either httpServer (attach mode) or port (standalone), not both')
+  }
+
   const port = options.port ?? 3100
+  const wsPathNormalized = normalizeWsPath(options.wsPath ?? DEFAULT_GEOMETRA_WS_PATH)
   let width = options.width ?? 800
   let height = options.height ?? 600
 
@@ -174,7 +217,26 @@ export async function createServer(
     }
   }
 
-  const wss = new WebSocketServer({ port })
+  const wss =
+    options.httpServer != null
+      ? new WebSocketServer({ noServer: true })
+      : new WebSocketServer({ port })
+
+  let upgradeHandler:
+    | ((request: IncomingMessage, socket: Duplex, head: Buffer) => void)
+    | null = null
+
+  if (options.httpServer != null) {
+    upgradeHandler = (request: IncomingMessage, socket: Duplex, head: Buffer) => {
+      if (!upgradePathMatches(request, wsPathNormalized)) {
+        return
+      }
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request)
+      })
+    }
+    options.httpServer.on('upgrade', upgradeHandler)
+  }
 
   function acceptConnection(ws: WebSocket): void {
     clients.add(ws)
@@ -301,6 +363,10 @@ export async function createServer(
       computeAndBroadcast()
     },
     close() {
+      if (options.httpServer != null && upgradeHandler != null) {
+        options.httpServer.off('upgrade', upgradeHandler)
+        upgradeHandler = null
+      }
       wss.close()
       clients.clear()
       needsResync.clear()
