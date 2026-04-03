@@ -45,6 +45,8 @@ function stripStyleProps(props: Record<string, unknown>): Record<string, unknown
  * `computeLayout`, while per-node text, focus, and hit-testing resolve direction on the live
  * {@link UIElement} tree with {@link import('./direction.js').resolveElementDirection}.
  *
+ * Does not mutate the source element or its `props` (strip list is applied to a shallow copy).
+ *
  * Runtime fields on boxes (`handlers`, `semantic`, `key`) are not part of `element.props` and
  * are unchanged on the live tree — they are not copied into the layout snapshot.
  */

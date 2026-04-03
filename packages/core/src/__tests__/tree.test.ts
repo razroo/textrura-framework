@@ -253,6 +253,38 @@ describe('toLayoutTree', () => {
     expect(toLayoutTree(img)).not.toHaveProperty('dir')
   })
 
+  it('does not mutate live element.props when building the layout snapshot', () => {
+    const root = box(
+      {
+        width: 200,
+        height: 200,
+        backgroundColor: '#111',
+        dir: 'rtl',
+      },
+      [
+        text({
+          text: 'Hi',
+          font: '14px sans-serif',
+          lineHeight: 18,
+          width: 20,
+          height: 18,
+          color: '#eee',
+          dir: 'ltr',
+        }),
+      ],
+    )
+    const rootPropsBefore = { ...root.props }
+    const childPropsBefore = { ...(root.children[0]!.props as Record<string, unknown>) }
+
+    toLayoutTree(root)
+
+    expect(root.props).toEqual(rootPropsBefore)
+    expect(root.children[0]!.props as Record<string, unknown>).toEqual(childPropsBefore)
+    expect(root.props).toHaveProperty('backgroundColor', '#111')
+    expect(root.props).toHaveProperty('dir', 'rtl')
+    expect(root.children[0]!.props).toMatchObject({ color: '#eee', dir: 'ltr' })
+  })
+
   it('omits runtime box metadata (handlers, key, semantic) from the layout snapshot', () => {
     const child = text({
       text: 'Hi',
