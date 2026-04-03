@@ -40,6 +40,22 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ x: 0, y: 0, width: -0, height: -0, children: [] })).toBe(true)
   })
 
+  it('accepts IEEE negative zero for x and y (finite origin; serializers may emit -0)', () => {
+    expect(layoutBoundsAreFinite({ x: -0, y: -0, width: 10, height: 10, children: [] })).toBe(true)
+  })
+
+  it('accepts subnormal positive width and height (Number.isFinite; must not require width > 0)', () => {
+    expect(
+      layoutBoundsAreFinite({
+        x: 0,
+        y: 0,
+        width: Number.MIN_VALUE,
+        height: Number.MIN_VALUE,
+        children: [],
+      }),
+    ).toBe(true)
+  })
+
   it('rejects negative width or height', () => {
     expect(layoutBoundsAreFinite({ x: 0, y: 0, width: -1, height: 10, children: [] })).toBe(false)
     expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 10, height: -0.001, children: [] })).toBe(false)
