@@ -138,6 +138,16 @@ describe('collectFocusOrder', () => {
     }
   })
 
+  it('skips focusables when root layout has BigInt bounds without throwing (layoutBoundsAreFinite parity)', () => {
+    const el = box({ width: 10, height: 10, onClick: () => {} })
+    const base = makeLayout({ width: 10, height: 10 })
+    const b = BigInt(0)
+    expect(collectFocusOrder(el, { ...base, x: b } as unknown as ComputedLayout)).toEqual([])
+    expect(collectFocusOrder(el, { ...base, y: b } as unknown as ComputedLayout)).toEqual([])
+    expect(collectFocusOrder(el, { ...base, width: b } as unknown as ComputedLayout)).toEqual([])
+    expect(collectFocusOrder(el, { ...base, height: b } as unknown as ComputedLayout)).toEqual([])
+  })
+
   it('does not descend into children when parent layout bounds are corrupt', () => {
     const child = box({ width: 10, height: 10, onClick: () => {} })
     const root = box({ width: 100, height: 100 }, [child])
@@ -214,6 +224,18 @@ describe('focusNext', () => {
     const root = box({ width: 100, height: 100 })
     const layout = makeLayout()
     focusNext(root, layout)
+    expect(focusedElement.peek()).toBeNull()
+  })
+
+  it('is a no-op when root layout has BigInt bounds (no valid focus order)', () => {
+    const a = box({ width: 10, height: 10, onClick: () => {} })
+    const root = box({ width: 100, height: 100 }, [a])
+    const layout = {
+      ...makeLayout({ width: 100, height: 100 }),
+      children: [makeLayout({ width: 10, height: 10 })],
+    }
+    const badRoot = { ...layout, width: BigInt(100) } as unknown as ComputedLayout
+    focusNext(root, badRoot)
     expect(focusedElement.peek()).toBeNull()
   })
 
@@ -342,6 +364,20 @@ describe('resolveFocusedTarget', () => {
     const root = box({ width: 100, height: 100 })
     const layout = makeLayout()
     expect(resolveFocusedTarget(root, layout)).toBeNull()
+  })
+
+  it('returns null when current layout yields no focusables due to BigInt root bounds without throwing', () => {
+    const el = box({ width: 10, height: 10, onClick: () => {} })
+    setFocus(el, makeLayout({ width: 10, height: 10 }))
+    const root = box({ width: 10, height: 10, onClick: () => {} })
+    const badLayout = {
+      x: BigInt(0),
+      y: 0,
+      width: 10,
+      height: 10,
+      children: [],
+    } as unknown as ComputedLayout
+    expect(resolveFocusedTarget(root, badLayout)).toBeNull()
   })
 
   it('resolves by element identity when same reference persists', () => {
