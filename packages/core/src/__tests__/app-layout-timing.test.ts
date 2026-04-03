@@ -417,6 +417,32 @@ describe('createApp dispatch guards', () => {
     expect(app.dispatch('onClick', 5, 5)).toBe(true)
   })
 
+  it('forwards optional offsetX and offsetY to dispatchHit for nested surface coordinates', async () => {
+    let fired = false
+    const renderer: Renderer = {
+      render: vi.fn(),
+      destroy: vi.fn(),
+    }
+    const child = box({
+      width: 40,
+      height: 40,
+      onClick: () => {
+        fired = true
+      },
+    })
+    const app = await createApp(() => box({ width: 100, height: 100 }, [child]), renderer, {
+      width: 200,
+      height: 200,
+    })
+
+    expect(app.dispatch('onClick', 70, 30, undefined, 50, 0)).toBe(true)
+    expect(fired).toBe(true)
+
+    fired = false
+    expect(app.dispatch('onClick', 70, 30)).toBe(false)
+    expect(fired).toBe(false)
+  })
+
   it('returns false from dispatch when pointer coordinates are non-finite without click-to-focus', async () => {
     const renderer: Renderer = {
       render: vi.fn(),

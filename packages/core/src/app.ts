@@ -57,8 +57,19 @@ export interface App {
   tree: UIElement | null
   /** Manually trigger a re-render. */
   update(): void
-  /** Dispatch a pointer event at (x, y). */
-  dispatch(eventType: keyof EventHandlers, x: number, y: number, extra?: Record<string, unknown>): boolean
+  /**
+   * Dispatch a pointer event at `(x, y)` using the same coordinate space and optional root offsets as
+   * `dispatchHit` in `hit-test.js` (nested canvas surfaces, CSS transforms).
+   * Non-finite or non-number offsets are treated as `0`.
+   */
+  dispatch(
+    eventType: keyof EventHandlers,
+    x: number,
+    y: number,
+    extra?: Record<string, unknown>,
+    offsetX?: number,
+    offsetY?: number,
+  ): boolean
   /** Dispatch a keyboard event to the focused element. */
   dispatchKey(eventType: 'onKeyDown' | 'onKeyUp', event: Omit<KeyboardHitEvent, 'target'>): boolean
   /** Dispatch an IME composition event to the focused element. */
@@ -127,9 +138,9 @@ export async function createApp(
         }
       }
     },
-    dispatch(eventType, x, y, extra) {
+    dispatch(eventType, x, y, extra, offsetX, offsetY) {
       if (!app.tree || !app.layout) return false
-      const { handled, focusTarget } = dispatchHit(app.tree, app.layout, eventType, x, y, extra)
+      const { handled, focusTarget } = dispatchHit(app.tree, app.layout, eventType, x, y, extra, offsetX, offsetY)
       if (eventType === 'onClick' && focusTarget) {
         setFocus(focusTarget.element, focusTarget.layout)
       }
