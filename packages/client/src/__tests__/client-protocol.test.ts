@@ -459,6 +459,52 @@ describe('applyServerMessage', () => {
     expect(metrics).toHaveLength(0)
   })
 
+  it('rejects patch entries with bad path or geometry fields after a frame (no render, layout unchanged)', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const errors: string[] = []
+    const metrics: unknown[] = []
+    type Msg = Parameters<typeof applyServerMessage>[2]
+    const onErr = (e: unknown) => errors.push(String(e))
+    const onMetrics = () => metrics.push(1)
+
+    const initialLayout = layout(0, 0, 100, 50)
+    const initialTree = tree()
+    applyServerMessage(
+      state,
+      renderer,
+      { type: 'frame', layout: initialLayout, tree: initialTree, protocolVersion: 1 },
+      onErr,
+      onMetrics,
+    )
+    expect(renders).toHaveLength(1)
+    expect(metrics).toHaveLength(1)
+    const layoutRef = state.layout
+
+    const badPatches: Msg[] = [
+      { type: 'patch', patches: [{}], protocolVersion: 1 } as unknown as Msg,
+      { type: 'patch', patches: [{ path: null }], protocolVersion: 1 } as unknown as Msg,
+      { type: 'patch', patches: [{ path: '0' }], protocolVersion: 1 } as unknown as Msg,
+      { type: 'patch', patches: [{ path: [0, Number.NaN] }], protocolVersion: 1 } as unknown as Msg,
+      { type: 'patch', patches: [{ path: [], width: Number.NaN }], protocolVersion: 1 } as unknown as Msg,
+      { type: 'patch', patches: [{ path: [], x: Number.POSITIVE_INFINITY }], protocolVersion: 1 } as unknown as Msg,
+      { type: 'patch', patches: [[{ path: [] }]], protocolVersion: 1 } as unknown as Msg,
+    ]
+
+    for (const msg of badPatches) {
+      applyServerMessage(state, renderer, msg, onErr, onMetrics)
+    }
+
+    expect(errors).toHaveLength(badPatches.length)
+    for (const err of errors) {
+      expect(err).toContain('Invalid server message')
+    }
+    expect(renders).toHaveLength(1)
+    expect(metrics).toHaveLength(1)
+    expect(state.layout).toBe(layoutRef)
+    expect(state.layout?.width).toBe(100)
+  })
+
   it('recovers with a valid frame after a malformed JSON object message', () => {
     const { renderer, renders } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }

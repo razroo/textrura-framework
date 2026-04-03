@@ -51,6 +51,37 @@ function isPlainLayoutTreeValue(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v)
 }
 
+function isOptionalFiniteNumberField(record: Record<string, unknown>, key: string): boolean {
+  if (!Object.prototype.hasOwnProperty.call(record, key)) return true
+  const v = record[key]
+  return typeof v === 'number' && Number.isFinite(v)
+}
+
+/** Each patch must be a plain object with an array `path` of non-negative integer indices. */
+function isWellFormedPatchList(patches: unknown): boolean {
+  if (!Array.isArray(patches)) return false
+  for (const raw of patches) {
+    if (!isPlainLayoutTreeValue(raw)) return false
+    const patch = raw as Record<string, unknown>
+    if (!Array.isArray(patch.path)) return false
+    for (const step of patch.path) {
+      if (
+        typeof step !== 'number' ||
+        !Number.isFinite(step) ||
+        !Number.isInteger(step) ||
+        step < 0
+      ) {
+        return false
+      }
+    }
+    if (!isOptionalFiniteNumberField(patch, 'x')) return false
+    if (!isOptionalFiniteNumberField(patch, 'y')) return false
+    if (!isOptionalFiniteNumberField(patch, 'width')) return false
+    if (!isOptionalFiniteNumberField(patch, 'height')) return false
+  }
+  return true
+}
+
 /** Reject malformed payloads that JSON.parse can produce without throwing. */
 function isWellFormedGeomV1Message(msg: Record<string, unknown>): boolean {
   const t = msg.type
@@ -58,7 +89,7 @@ function isWellFormedGeomV1Message(msg: Record<string, unknown>): boolean {
     return isPlainLayoutTreeValue(msg.layout) && isPlainLayoutTreeValue(msg.tree)
   }
   if (t === 'patch') {
-    return Array.isArray(msg.patches)
+    return isWellFormedPatchList(msg.patches)
   }
   if (t === 'error') {
     return typeof msg.message === 'string'
@@ -154,8 +185,9 @@ function applyPatches(layout: ComputedLayout, patches: ServerPatch['patches']): 
  * state. Patches received before the first frame are ignored (no state change, no render).
  *
  * When the payload is not a plain object, or is missing a well-formed `type` (`frame` with object
- * `layout`/`tree`, `patch` with array `patches`, or `error` with string `message`), calls `onError`
- * and returns without mutating state or invoking `onMetrics`.
+ * `layout`/`tree`, `patch` with a `patches` array of objects that each include an integer `path` and
+ * only finite numeric geometry fields, or `error` with string `message`), calls `onError` and returns
+ * without mutating state or invoking `onMetrics`.
  *
  * When `msg.protocolVersion` is present but not a finite number, or is greater than the client’s
  * supported version, calls `onError` and returns without mutating state or invoking `onMetrics`.
