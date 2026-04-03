@@ -17,6 +17,12 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<html lang="fr-CA">')
   })
 
+  it('falls back to en when lang is empty or whitespace-only', () => {
+    const el = box({ width: 100, height: 100 })
+    expect(toSemanticHTML(el, { lang: '' })).toContain('<html lang="en">')
+    expect(toSemanticHTML(el, { lang: '   \t' })).toContain('<html lang="en">')
+  })
+
   it('emits HTML dir on boxes and text when props.dir is ltr, rtl, or auto', () => {
     const el = box({ width: 200, height: 80, dir: 'rtl' }, [
       text({ text: 'mixed', font: '14px sans-serif', lineHeight: 18, dir: 'ltr' }),
