@@ -241,6 +241,71 @@ describe('createClient WebSocket message parse errors', () => {
     expect(errors).toHaveLength(1)
   })
 
+  it('invokes onError when binary envelope decodes to JSON null, primitives, or arrays (parity with text frames)', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+    const renders: ComputedLayout[] = []
+    const renderer: Renderer = {
+      render: (layout: ComputedLayout) => {
+        renders.push({ ...layout, children: layout.children })
+      },
+      destroy: () => {},
+    }
+
+    const client = createClient({
+      url: 'ws://mock.test',
+      renderer,
+      binaryFraming: true,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    sockets[0]!.emit('message', { data: encodeGeomV1JsonPayload('null') })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
+    expect(String((errors[0] as Error).message)).toContain('expected a JSON object')
+
+    sockets[0]!.emit('message', { data: encodeGeomV1JsonPayload('true') })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(2)
+    expect(String((errors[1] as Error).message)).toContain('expected a JSON object')
+
+    sockets[0]!.emit('message', { data: encodeGeomV1JsonPayload('42') })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(3)
+    expect(String((errors[2] as Error).message)).toContain('expected a JSON object')
+
+    sockets[0]!.emit('message', { data: encodeGeomV1JsonPayload('"literal"') })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(4)
+    expect(String((errors[3] as Error).message)).toContain('expected a JSON object')
+
+    sockets[0]!.emit('message', { data: encodeGeomV1JsonPayload('[]') })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(5)
+    expect(String((errors[4] as Error).message)).toMatch(/Invalid server message/)
+
+    const validFrame = {
+      type: 'frame',
+      layout: { x: 0, y: 0, width: 20, height: 21, children: [] },
+      tree: { kind: 'box', props: {}, children: [] } satisfies UIElement,
+      protocolVersion: 1,
+    }
+    sockets[0]!.emit('message', { data: encodeGeomV1JsonPayload(JSON.stringify(validFrame)) })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(renders).toHaveLength(1)
+    expect(renders[0]?.width).toBe(20)
+    expect(client.layout?.width).toBe(20)
+  })
+
   it('invokes onError when binary frame declares zero-length payload (JSON.parse of empty string)', async () => {
     const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
     installMockWebSocket(sockets)
