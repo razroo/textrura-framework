@@ -49,6 +49,13 @@ describe('binary frame envelope', () => {
     expect(() => decodeBinaryFrameJson(headerOnly)).toThrow('Truncated binary frame payload')
   })
 
+  it('throws when declared payload length is uint32 max with header-only buffer', () => {
+    const headerOnly = Buffer.alloc(9)
+    headerOnly.set([0x47, 0x45, 0x4f, 0x4d, 1], 0)
+    headerOnly.writeUInt32LE(0xffff_ffff, 5)
+    expect(() => decodeBinaryFrameJson(headerOnly)).toThrow('Truncated binary frame payload')
+  })
+
   it('decodes zero-length JSON payload when length field is zero', () => {
     const emptyPayload = Buffer.from([0x47, 0x45, 0x4f, 0x4d, 1, 0, 0, 0, 0])
     expect(decodeBinaryFrameJson(emptyPayload)).toBe('')

@@ -54,6 +54,13 @@ describe('client binary frame decode', () => {
     expect(() => decodeBinaryFrameJson(headerOnly.buffer)).toThrow('Truncated binary frame payload')
   })
 
+  it('throws when declared payload length is uint32 max with header-only buffer', () => {
+    const headerOnly = new Uint8Array(9)
+    headerOnly.set([0x47, 0x45, 0x4f, 0x4d, 1], 0)
+    new DataView(headerOnly.buffer).setUint32(5, 0xffff_ffff, true)
+    expect(() => decodeBinaryFrameJson(headerOnly.buffer)).toThrow('Truncated binary frame payload')
+  })
+
   it('decodes zero-length JSON payload when length field is zero', () => {
     const emptyPayload = new Uint8Array(9)
     emptyPayload.set([0x47, 0x45, 0x4f, 0x4d, 1], 0)
