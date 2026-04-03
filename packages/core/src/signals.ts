@@ -128,7 +128,12 @@ export function computed<T>(fn: () => T): Computed<T> {
   }
 }
 
-/** Run a side effect whenever its signal dependencies change. Returns a dispose function. */
+/**
+ * Run a side effect whenever its signal dependencies change. Returns a dispose function.
+ * If `fn` throws on the **first** run, the error propagates and no dispose function is returned.
+ * If `fn` throws on a later run (after a dependency update), the error propagates to the code
+ * that triggered the flush (e.g. `signal.set`); remaining subscribers in the same flush are skipped.
+ */
 export function effect(fn: () => void): () => void {
   let disposed = false
 

@@ -225,6 +225,23 @@ describe('effect', () => {
     s.set(1)
     expect(runs).toBe(1)
   })
+
+  it('propagates synchronous errors from the initial run (no dispose returned)', () => {
+    expect(() =>
+      effect(() => {
+        throw new Error('first-run')
+      }),
+    ).toThrow('first-run')
+  })
+
+  it('propagates errors from a re-run to the dependency update caller', () => {
+    const s = signal(0)
+    effect(() => {
+      if (s.value > 0) throw new Error('re-run')
+      void s.value
+    })
+    expect(() => s.set(1)).toThrow('re-run')
+  })
 })
 
 describe('batch', () => {
