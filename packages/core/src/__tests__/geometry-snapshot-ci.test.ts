@@ -180,6 +180,19 @@ describe('geometry snapshot CI', () => {
     expect(roundLayout(layout)).toMatchSnapshot()
   })
 
+  it('stable column-reverse flex with gap and two text children (rounded)', async () => {
+    await init()
+    const tree = box(
+      { width: 160, height: 120, padding: 10, flexDirection: 'column-reverse', gap: 6 },
+      [
+        text({ text: 'Top', font: '14px sans-serif', lineHeight: 18 }),
+        text({ text: 'Bottom', font: '14px sans-serif', lineHeight: 18 }),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 160, height: 120 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
+
   it('stable column with mixed alignSelf on fixed-width text children (rounded)', async () => {
     await init()
     const item = { font: '14px sans-serif', lineHeight: 18, width: 60, height: 18 } as const

@@ -92,6 +92,31 @@ exports[`geometry snapshot CI > stable column with mixed alignSelf on fixed-widt
 }
 `;
 
+exports[`geometry snapshot CI > stable column-reverse flex with gap and two text children (rounded) 1`] = `
+{
+  "children": [
+    {
+      "children": [],
+      "height": 18,
+      "width": 140,
+      "x": 10,
+      "y": 92,
+    },
+    {
+      "children": [],
+      "height": 18,
+      "width": 140,
+      "x": 10,
+      "y": 68,
+    },
+  ],
+  "height": 120,
+  "width": 160,
+  "x": 0,
+  "y": 0,
+}
+`;
+
 exports[`geometry snapshot CI > stable ltr row with per-node rtl and ltr text dir (rounded) 1`] = `
 {
   "children": [
