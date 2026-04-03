@@ -118,4 +118,24 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ ...base, x: coercible })).toBe(false)
     expect(layoutBoundsAreFinite({ ...base, width: coercible })).toBe(false)
   })
+
+  it('validates only the root node (does not recurse into children)', () => {
+    const corruptChild = {
+      x: NaN,
+      y: 0,
+      width: 1,
+      height: 1,
+      children: [],
+    } as unknown as ComputedLayout
+    expect(layoutBoundsAreFinite(corruptChild)).toBe(false)
+
+    const root = {
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+      children: [corruptChild],
+    } as unknown as ComputedLayout
+    expect(layoutBoundsAreFinite(root)).toBe(true)
+  })
 })

@@ -17,6 +17,9 @@ function isFiniteLayoutNumber(value: unknown): value is number {
  *
  * @param layout — Bounds from Textura/Yoga {@link ComputedLayout} output.
  * @returns `true` when `x`, `y`, `width`, and `height` are finite and both dimensions are `>= 0`.
+ *
+ * Only this node's own fields are inspected; {@link ComputedLayout.children} entries are not
+ * validated recursively. Callers walking a tree should check each visited layout when needed.
  */
 export function layoutBoundsAreFinite(layout: ComputedLayout): boolean {
   const { x, y, width, height } = layout
