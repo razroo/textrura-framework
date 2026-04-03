@@ -511,6 +511,44 @@ describe('applyServerMessage', () => {
     expect(metrics).toHaveLength(0)
   })
 
+  it('rejects frame when root layout.children is missing or not an array, or tree is not a plain object', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const errors: string[] = []
+    const metrics: unknown[] = []
+    type Msg = Parameters<typeof applyServerMessage>[2]
+    const onErr = (e: unknown) => errors.push(String(e))
+    const onMetrics = () => metrics.push(1)
+
+    const layoutNoChildren = { x: 0, y: 0, width: 10, height: 10 } as unknown as ComputedLayout
+    const layoutChildrenObject = {
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+      children: {} as unknown as ComputedLayout[],
+    } as unknown as ComputedLayout
+
+    const badFrames: Msg[] = [
+      { type: 'frame', layout: layoutNoChildren, tree: tree(), protocolVersion: 1 } as Msg,
+      { type: 'frame', layout: layoutChildrenObject, tree: tree(), protocolVersion: 1 } as Msg,
+      { type: 'frame', layout: layout(), tree: [] as unknown as UIElement, protocolVersion: 1 } as Msg,
+      { type: 'frame', layout: layout(), tree: null as unknown as UIElement, protocolVersion: 1 } as Msg,
+    ]
+
+    for (const msg of badFrames) {
+      applyServerMessage(state, renderer, msg, onErr, onMetrics)
+    }
+
+    expect(errors).toHaveLength(badFrames.length)
+    for (const err of errors) {
+      expect(err).toContain('Invalid server message')
+    }
+    expect(renders).toHaveLength(0)
+    expect(metrics).toHaveLength(0)
+    expect(state.layout).toBeNull()
+  })
+
   it('rejects patch entries with bad path or geometry fields after a frame (no render, layout unchanged)', () => {
     const { renderer, renders } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
