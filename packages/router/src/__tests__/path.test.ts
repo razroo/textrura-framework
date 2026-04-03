@@ -38,6 +38,10 @@ describe('path generation', () => {
     expect(buildPath('/', {})).toBe('/')
   })
 
+  it('treats an empty pattern string as root', () => {
+    expect(buildPath('' as const, {} as PathParams<''>)).toBe('/')
+  })
+
   it('normalizes patterns that are only slashes to root', () => {
     expect(buildPath('//', {})).toBe('/')
     expect(buildPath('///', {})).toBe('/')
