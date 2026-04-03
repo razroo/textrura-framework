@@ -85,6 +85,15 @@ describe('path generation', () => {
     )
   })
 
+  it('throws when a required path param is null or undefined at runtime', () => {
+    expect(() =>
+      buildPath('/users/:id', { id: null as unknown as string } as PathParams<'/users/:id'>),
+    ).toThrow('Missing required path param: id')
+    expect(() =>
+      buildPath('/users/:id', { id: undefined as unknown as string } as PathParams<'/users/:id'>),
+    ).toThrow('Missing required path param: id')
+  })
+
   it('includes numeric zero as a path segment (not treated as empty)', () => {
     expect(buildPath('/items/:id', { id: 0 })).toBe('/items/0')
   })
