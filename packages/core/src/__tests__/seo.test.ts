@@ -449,6 +449,24 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<p>Body text</p>')
   })
 
+  it('does not promote headings when the first font-size token parses to non-finite values', () => {
+    const el = box({ width: 200, height: 80 }, [
+      text({ text: 'Overflow', font: 'bold 1e400px sans-serif', lineHeight: 40 }),
+      text({ text: 'Also overflow', font: 'bold 2e308px sans-serif', lineHeight: 40 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<p>Overflow</p>')
+    expect(html).toContain('<p>Also overflow</p>')
+    expect(html).not.toMatch(/<h[1-6]>/)
+  })
+
+  it('does not promote headings when computed px from the size token is negative', () => {
+    const el = box({ width: 200, height: 50 }, [
+      text({ text: 'Degenerate', font: 'bold -32px sans-serif', lineHeight: 40 }),
+    ])
+    expect(toSemanticHTML(el)).toContain('<p>Degenerate</p>')
+  })
+
   it('uses explicit semantic tag when provided', () => {
     const el = box({ width: 200, height: 50 }, [
       text({
