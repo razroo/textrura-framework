@@ -66,6 +66,33 @@ describe('CanvasRenderer.setFrameTimings', () => {
     renderer.setFrameTimings({ layoutMs: 4.25 })
     expect(renderer.lastLayoutWallMs).toBe(4.25)
   })
+
+  it('treats non-number layoutMs (bigint, string, boolean) as 0 without throwing', () => {
+    Object.defineProperty(globalThis, 'window', {
+      value: { devicePixelRatio: 1 },
+      configurable: true,
+      writable: true,
+    })
+    const ctx = new FakeCtx()
+    const canvas = {
+      style: {} as Record<string, string>,
+      getContext: () => ctx,
+    } as unknown as HTMLCanvasElement
+
+    const renderer = new CanvasRenderer({ canvas })
+    expect(() =>
+      renderer.setFrameTimings({ layoutMs: 99n as unknown as number }),
+    ).not.toThrow()
+    expect(renderer.lastLayoutWallMs).toBe(0)
+    expect(() =>
+      renderer.setFrameTimings({ layoutMs: '12' as unknown as number }),
+    ).not.toThrow()
+    expect(renderer.lastLayoutWallMs).toBe(0)
+    expect(() =>
+      renderer.setFrameTimings({ layoutMs: true as unknown as number }),
+    ).not.toThrow()
+    expect(renderer.lastLayoutWallMs).toBe(0)
+  })
 })
 
 describe('CanvasRenderer.render wall time', () => {
