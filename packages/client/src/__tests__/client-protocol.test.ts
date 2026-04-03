@@ -176,6 +176,35 @@ describe('applyServerMessage', () => {
     expect(state.layout!.width).toBe(200)
   })
 
+  it('when an intermediate path exists but a deeper segment is missing, applies to the deepest resolved node', () => {
+    const { renderer } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const deepLayout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 50,
+      children: [{ x: 1, y: 2, width: 10, height: 20, children: [] }],
+    } as ComputedLayout
+
+    applyServerMessage(state, renderer, {
+      type: 'frame',
+      layout: deepLayout,
+      tree: tree(),
+      protocolVersion: 1,
+    })
+
+    applyServerMessage(state, renderer, {
+      type: 'patch',
+      patches: [{ path: [0, 5], x: 99, width: 55 }],
+      protocolVersion: 1,
+    })
+
+    expect(state.layout!.x).toBe(0)
+    expect(state.layout!.children[0]!.x).toBe(99)
+    expect(state.layout!.children[0]!.width).toBe(55)
+  })
+
   it('handles duplicate frames idempotently and applies duplicate patches deterministically', () => {
     const { renderer, renders } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
