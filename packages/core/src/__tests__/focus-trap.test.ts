@@ -56,6 +56,13 @@ describe('trapFocusStep', () => {
     expect(trapFocusStep(tree, layout, [0, 1], 'next')).toBe(false)
   })
 
+  it('returns false when the tree root is not a box', () => {
+    const tree = text({ text: 'x', font: '14px sans-serif', lineHeight: 20 })
+    const layout: ComputedLayout = { x: 0, y: 0, width: 50, height: 20, children: [] }
+    expect(trapFocusStep(tree, layout, [], 'next')).toBe(false)
+    expect(trapFocusStep(tree, layout, [], 'prev')).toBe(false)
+  })
+
   it('returns false when scope resolves to a non-box node', () => {
     const tree = box({}, [text({ text: 'x', font: '14px sans-serif', lineHeight: 20 })])
     const layout: ComputedLayout = {
