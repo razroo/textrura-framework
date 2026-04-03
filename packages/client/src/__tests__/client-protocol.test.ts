@@ -86,6 +86,65 @@ describe('applyServerMessage', () => {
     expect(renders.length).toBe(1)
   })
 
+  it('applies patches along a path into nested layout nodes', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const deepLayout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 50,
+      children: [
+        {
+          x: 1,
+          y: 2,
+          width: 10,
+          height: 20,
+          children: [{ x: 3, y: 4, width: 5, height: 6, children: [] }],
+        },
+      ],
+    } as ComputedLayout
+
+    applyServerMessage(state, renderer, {
+      type: 'frame',
+      layout: deepLayout,
+      tree: tree(),
+      protocolVersion: 1,
+    })
+
+    applyServerMessage(state, renderer, {
+      type: 'patch',
+      patches: [{ path: [0, 0], width: 99, height: 88 }],
+      protocolVersion: 1,
+    })
+
+    expect(renders.length).toBe(2)
+    const inner = state.layout!.children[0]!.children[0]!
+    expect(inner.width).toBe(99)
+    expect(inner.height).toBe(88)
+    expect(state.layout!.children[0]!.width).toBe(10)
+  })
+
+  it('when a path segment is missing, applies geometry fields to the last resolved node (often root)', () => {
+    const { renderer } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    applyServerMessage(state, renderer, {
+      type: 'frame',
+      layout: layout(0, 0, 100, 50),
+      tree: tree(),
+      protocolVersion: 1,
+    })
+
+    applyServerMessage(state, renderer, {
+      type: 'patch',
+      patches: [{ path: [99], x: 7, width: 200 }],
+      protocolVersion: 1,
+    })
+
+    expect(state.layout!.x).toBe(7)
+    expect(state.layout!.width).toBe(200)
+  })
+
   it('handles duplicate frames idempotently and applies duplicate patches deterministically', () => {
     const { renderer, renders } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
