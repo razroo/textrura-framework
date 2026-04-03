@@ -122,6 +122,24 @@ describe('trapFocusStep', () => {
     expect(trapFocusStep(tree, layout, [], 'prev')).toBe(false)
   })
 
+  it('skips focusables with negative width or height (same layoutBoundsAreFinite rule as hit-test)', () => {
+    const badW = box({ onKeyDown: () => undefined }, [])
+    const badH = box({ onKeyDown: () => undefined }, [])
+    const tree = box({}, [badW, badH])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: -1, height: 40, children: [] },
+        { x: 100, y: 0, width: 40, height: -0.01, children: [] },
+      ],
+    }
+    expect(trapFocusStep(tree, layout, [], 'next')).toBe(false)
+    expect(trapFocusStep(tree, layout, [], 'prev')).toBe(false)
+  })
+
   it('cycles backward with prev', () => {
     const a = box({ onKeyDown: () => undefined }, [])
     const b = box({ onKeyDown: () => undefined }, [])
