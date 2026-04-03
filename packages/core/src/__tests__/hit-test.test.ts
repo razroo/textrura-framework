@@ -464,7 +464,6 @@ describe('dispatchHit', () => {
     expect(leftFired).toBe(false)
     expect(rightFired).toBe(true)
 
-    rightFired = false
     expect(hitPathAtPoint(parent, layout, 60, 20)).toEqual([1])
     expect(hasInteractiveHitAtPoint(parent, layout, 60, 20)).toBe(true)
     expect(getCursorAtPoint(parent, layout, 60, 20)).toBe('crosshair')
@@ -1741,6 +1740,12 @@ describe('hitPathAtPoint', () => {
     const el = box({ width: 50, height: 50 })
     const layout = { x: 0, y: 0, width: 50, height: 50, children: [] }
     expect(hitPathAtPoint(el, layout, 10, 10)).toEqual([])
+  })
+
+  it('returns null when the deepest hit is pointer-events-none with no deeper boxes (pass-through leaf)', () => {
+    const el = box({ width: 50, height: 50, pointerEvents: 'none' })
+    const layout = { x: 0, y: 0, width: 50, height: 50, children: [] }
+    expect(hitPathAtPoint(el, layout, 10, 10)).toBeNull()
   })
 
   it('overlapping siblings: path prefers higher z-index child', () => {
