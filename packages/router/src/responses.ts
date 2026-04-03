@@ -40,10 +40,12 @@ export function json<T>(
   })
 }
 
+/** Narrow unknown loader/action results to {@link RedirectResult} (shape check on `kind`). */
 export function isRedirectResult(value: unknown): value is RedirectResult {
   return typeof value === 'object' && value !== null && (value as { kind?: unknown }).kind === 'redirect'
 }
 
+/** Narrow unknown loader/action results to {@link ResponseResult} (shape check on `kind`). */
 export function isResponseResult(value: unknown): value is ResponseResult<unknown> {
   return typeof value === 'object' && value !== null && (value as { kind?: unknown }).kind === 'response'
 }

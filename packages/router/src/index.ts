@@ -4,7 +4,8 @@
  * query helpers ({@link parseQuery}, {@link stringifyQuery}), browser and memory history adapters, the {@link link}
  * primitive, loader/action response helpers ({@link redirect}, {@link response}, {@link json}), route pattern ranking,
  * {@link createRouter} with navigation, data loading, and error boundaries, plus outlet rendering utilities ({@link matchRouteTree},
- * {@link renderMatchedOutlet}). All routing state stays compatible with Geometra’s declarative tree across canvas,
+ * {@link renderMatchedOutlet}), and {@link isRedirectResult} / {@link isResponseResult} for narrowing custom loaders.
+ * All routing state stays compatible with Geometra’s declarative tree across canvas,
  * terminal, and server-driven clients.
  */
 
@@ -19,7 +20,7 @@ export { createBrowserHistory } from './history.js'
 export type { RouterLocation, HistoryUpdate, HistoryAdapter, BrowserHistoryOptions } from './history.js'
 export { link } from './link.js'
 export type { LinkProps } from './link.js'
-export { redirect, response, json } from './responses.js'
+export { redirect, response, json, isRedirectResult, isResponseResult } from './responses.js'
 export type { RedirectResult, ResponseResult } from './responses.js'
 export { scorePathPattern, comparePatternSpecificity } from './ranking.js'
 export { createRouter } from './router.js'
