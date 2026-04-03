@@ -101,6 +101,31 @@ describe('dispatchHit', () => {
     expect(fired).toBe(false)
   })
 
+  it('missing earlier child layout (sparse children array) still hit-tests later siblings', () => {
+    let fired = false
+    const opaque = box({ width: 40, height: 40 })
+    const target = box({ width: 40, height: 40, onClick: () => { fired = true } })
+    const root = box({ width: 100, height: 100 }, [opaque, target])
+    const sparseChildren: Array<{ x: number; y: number; width: number; height: number; children: readonly [] }> =
+      []
+    sparseChildren[1] = { x: 50, y: 0, width: 40, height: 40, children: [] }
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: sparseChildren,
+    }
+    expect(layout.children).toHaveLength(2)
+    expect(layout.children[0]).toBeUndefined()
+
+    expect(() => dispatchHit(root, layout, 'onClick', 70, 20)).not.toThrow()
+    expect(dispatchHit(root, layout, 'onClick', 70, 20).handled).toBe(true)
+    expect(fired).toBe(true)
+
+    expect(hitPathAtPoint(root, layout, 70, 20)).toEqual([1])
+  })
+
   it('non-finite pointer coordinates miss dispatch and hit queries', () => {
     let fired = false
     const el = box({ width: 100, height: 50, onClick: () => { fired = true }, cursor: 'pointer' })

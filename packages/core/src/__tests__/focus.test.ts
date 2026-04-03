@@ -188,6 +188,25 @@ describe('collectFocusOrder', () => {
     expect(order).toHaveLength(1)
     expect(order[0]!.element).toBe(good)
   })
+
+  it('skips a missing child layout slot (sparse children array) but still collects a later sibling', () => {
+    const first = box({ width: 40, height: 40, onClick: () => {} })
+    const second = box({ width: 40, height: 40, onClick: () => {} })
+    const root = box({ width: 100, height: 100 }, [first, second])
+    const sparseChildren: ComputedLayout[] = []
+    sparseChildren[1] = makeLayout({ x: 50, width: 40, height: 40 })
+    const layout: ComputedLayout = {
+      ...makeLayout({ width: 100, height: 100 }),
+      children: sparseChildren,
+    }
+    expect(layout.children).toHaveLength(2)
+    expect(layout.children[0]).toBeUndefined()
+
+    expect(() => collectFocusOrder(root, layout)).not.toThrow()
+    const order = collectFocusOrder(root, layout)
+    expect(order).toHaveLength(1)
+    expect(order[0]!.element).toBe(second)
+  })
 })
 
 describe('focusNext', () => {
