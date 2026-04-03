@@ -2506,6 +2506,65 @@ describe('overflow visible', () => {
     expect(hasInteractiveHitAtPoint(parent, layout, 110, 50)).toBe(false)
     expect(getCursorAtPoint(parent, layout, 110, 50)).toBeNull()
   })
+
+  it('scrollY still shifts child hit geometry (offsets apply for any box; only hidden/scroll add clip)', () => {
+    let localY = -1
+    const child = box({
+      width: 100,
+      height: 50,
+      cursor: 'text',
+      onClick: e => {
+        localY = e.localY ?? -999
+      },
+    })
+    const parent = box({ width: 100, height: 100, overflow: 'visible', scrollY: 40 }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 80, width: 100, height: 50, children: [] }],
+    }
+
+    dispatchHit(parent, layout, 'onClick', 50, 45)
+    expect(localY).toBe(5)
+    expect(hitPathAtPoint(parent, layout, 50, 45)).toEqual([0])
+    expect(getCursorAtPoint(parent, layout, 50, 45)).toBe('text')
+  })
+
+  it('runtime overflow not hidden/scroll does not clip children early; scrollY still offsets like visible', () => {
+    let localY = -1
+    const child = box({
+      width: 100,
+      height: 50,
+      cursor: 'text',
+      onClick: e => {
+        localY = e.localY ?? -999
+      },
+    })
+    const parent = box(
+      {
+        width: 100,
+        height: 100,
+        scrollY: 40,
+        ...({ overflow: 'auto' } as { overflow: 'visible' }),
+      },
+      [child],
+    )
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 80, width: 100, height: 50, children: [] }],
+    }
+
+    expect(parent.props.overflow).toBe('auto')
+    dispatchHit(parent, layout, 'onClick', 50, 45)
+    expect(localY).toBe(5)
+    expect(hitPathAtPoint(parent, layout, 50, 45)).toEqual([0])
+    expect(getCursorAtPoint(parent, layout, 50, 45)).toBe('text')
+  })
 })
 
 describe('hasInteractiveHitAtPoint', () => {
