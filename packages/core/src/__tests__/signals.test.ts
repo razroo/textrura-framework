@@ -274,4 +274,37 @@ describe('batch', () => {
     b.set(21)
     expect(sums).toEqual([3, 30, 31])
   })
+
+  it('dedupes the same subscriber when multiple deps update in one batch', () => {
+    const a = signal(1)
+    const b = signal(2)
+    let runs = 0
+    effect(() => {
+      void a.value
+      void b.value
+      runs++
+    })
+    expect(runs).toBe(1)
+    batch(() => {
+      a.set(10)
+      b.set(20)
+    })
+    expect(runs).toBe(2)
+  })
+
+  it('signal set from a flushing subscriber runs nested subscribers synchronously (outside batch queue)', () => {
+    const a = signal(0)
+    const steps: string[] = []
+    effect(() => {
+      steps.push(`a:${a.value}`)
+      if (a.peek() === 1) {
+        a.set(2)
+      }
+    })
+    expect(steps).toEqual(['a:0'])
+    batch(() => {
+      a.set(1)
+    })
+    expect(steps).toEqual(['a:0', 'a:1', 'a:2'])
+  })
 })
