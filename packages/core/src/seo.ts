@@ -285,7 +285,13 @@ function elementToHTML(element: UIElement, indent: number): string {
     if (element.semantic?.role) attrs.push(`role="${escapeHTML(element.semantic.role)}"`)
     if (element.semantic?.ariaLabel) attrs.push(`aria-label="${escapeHTML(element.semantic.ariaLabel)}"`)
     const attrStr = attrs.length ? ' ' + attrs.join(' ') : ''
-    return `${pad}<${tag}${attrStr}>${escapeHTML(element.props.text)}</${tag}>`
+    const body = escapeHTML(element.props.text)
+    if (VOID_HTML_TAGS.has(tag.toLowerCase())) {
+      const voidOpen = `${pad}<${tag}${attrStr}>`
+      if (body === '') return voidOpen
+      return `${voidOpen}\n${pad}${body}`
+    }
+    return `${pad}<${tag}${attrStr}>${body}</${tag}>`
   }
 
   const tag = sanitizeHtmlTagName(element.semantic?.tag, inferBoxTag(element))
@@ -300,10 +306,14 @@ function elementToHTML(element: UIElement, indent: number): string {
   }
   const attrStr = attrs.length ? ' ' + attrs.join(' ') : ''
 
+  if (VOID_HTML_TAGS.has(tag.toLowerCase())) {
+    const voidOpen = `${pad}<${tag}${attrStr}>`
+    if (element.children.length === 0) return voidOpen
+    const childLines = element.children.map(c => elementToHTML(c, indent + 1)).join('\n')
+    return `${voidOpen}\n${childLines}`
+  }
+
   if (element.children.length === 0) {
-    if (VOID_HTML_TAGS.has(tag.toLowerCase())) {
-      return `${pad}<${tag}${attrStr}>`
-    }
     return `${pad}<${tag}${attrStr}></${tag}>`
   }
 
@@ -326,6 +336,9 @@ function elementToHTML(element: UIElement, indent: number): string {
  *
  * Default box tags: `onClick` maps to `<button>` only for an empty box or a box whose sole child is
  * `text()`; otherwise `div` (compound click targets should use `semantic.tag` / roles when needed).
+ *
+ * HTML5 void elements (`input`, `br`, `img`, …) never get a closing tag; if a void `semantic.tag`
+ * has text content or box children, that content is serialized as following siblings (valid markup).
  *
  * `options.headExtra` is concatenated raw; all other string options and tree text are escaped.
  */

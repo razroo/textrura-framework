@@ -702,6 +702,33 @@ describe('toSemanticHTML', () => {
     expect(html).not.toContain('</br>')
   })
 
+  it('serializes children after a void box tag instead of emitting a bogus closing tag', () => {
+    const el = box({ width: 200, height: 80 }, [
+      box({ semantic: { tag: 'input', ariaLabel: 'q', role: 'searchbox' } }, [
+        text({ text: 'nested mistake', font: '14px sans-serif', lineHeight: 18 }),
+      ]),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<input role="searchbox" aria-label="q">')
+    expect(html).not.toContain('</input>')
+    expect(html).toContain('nested mistake')
+  })
+
+  it('emits void text tags without a closing tag and places text as a following sibling', () => {
+    const el = box({ width: 200, height: 80 }, [
+      text({
+        text: 'Line two',
+        font: '14px sans-serif',
+        lineHeight: 18,
+        semantic: { tag: 'br' },
+      }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<br>')
+    expect(html).not.toContain('</br>')
+    expect(html).toContain('Line two')
+  })
+
   it('infers button for onClick with a single text child or empty box', () => {
     const leaf = box({ width: 80, height: 32, onClick: () => {} }, [
       text({ text: 'OK', font: '14px sans-serif', lineHeight: 18 }),
