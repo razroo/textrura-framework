@@ -133,6 +133,15 @@ describe('transition()', () => {
       pending.shift()!(0)
     }
     expect(s.peek()).toBe(100)
+
+    const sNeg = transitionFresh(100, 0, -50, easing.linear)
+    expect(sNeg.peek()).toBe(100)
+    expect(pending.length).toBeGreaterThanOrEqual(1)
+    while (pending.length) {
+      mockNow += 1
+      pending.shift()!(0)
+    }
+    expect(sNeg.peek()).toBe(0)
   })
 
   it('still schedules RAF under reduced motion unless respectReducedMotion is true', async () => {
