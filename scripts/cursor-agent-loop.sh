@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# Re-exec under bash when invoked as `sh` (often dash on Linux). This script uses
+# bash-only syntax ([[, arrays, PIPESTATUS, BASH_SOURCE).
+if [ -z "${BASH_VERSION+x}" ]; then
+  exec /usr/bin/env bash "$0" "$@"
+fi
+
 # Drive Cursor Agent CLI in a loop (non-interactive). Each iteration is one agent
 # session that explores the codebase, picks the next best improvement, implements
 # it, runs the release gate, commits, and pushes.

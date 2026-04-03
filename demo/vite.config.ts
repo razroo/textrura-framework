@@ -7,6 +7,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@geometra/core': path.resolve(import.meta.dirname, '../packages/core/src/index.ts'),
+      '@geometra/client': path.resolve(import.meta.dirname, '../packages/client/src/index.ts'),
       '@geometra/renderer-canvas': path.resolve(import.meta.dirname, '../packages/renderer-canvas/src/index.ts'),
       '@geometra/ui': path.resolve(import.meta.dirname, '../packages/ui/src/index.ts'),
       '@geometra/router': path.resolve(import.meta.dirname, '../packages/router/src/index.ts'),

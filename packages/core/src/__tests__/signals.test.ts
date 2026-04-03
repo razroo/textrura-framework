@@ -167,9 +167,9 @@ describe('computed', () => {
   })
 
   it('throws when two computeds depend on each other (unsupported circular derivation)', () => {
-    let b!: Computed<number>
-    const a = computed(() => b.value)
-    b = computed(() => a.value)
+    const bRef: { current?: Computed<number> } = {}
+    const a = computed(() => bRef.current!.value)
+    bRef.current = computed(() => a.value)
     expect(() => {
       void a.value
     }).toThrow()
