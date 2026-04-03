@@ -24,12 +24,14 @@
     "examples:check": "tsc -p tsconfig.examples.json --noEmit",
     "examples:build": "node scripts/examples/build-workspace-demos.mjs",
     "examples:smoke": "bun run examples:check && bun run examples:build && bun run create:app:smoke",
+    "e2e:demo": "playwright test --config playwright.config.ts",
     "lint": "eslint packages/*/src",
     "format": "prettier --write 'packages/*/src/**/*.ts'",
     "demo:dev": "vite --config demo/vite.config.ts",
     "demo:build": "vite build --config demo/vite.config.ts"
   },
   "devDependencies": {
+    "@playwright/test": "^1.54.2",
     "@eslint/js": "^10.0.1",
     "eslint": "^10.1.0",
     "eslint-config-prettier": "^10.1.8",

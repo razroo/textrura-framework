@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "server": "tsx server.ts",
+    "server": "tsx --tsconfig ../../tsconfig.examples.json server.ts",
     "client": "vite --config vite.config.ts",
     "dev": "echo 'Run: npm run server  (terminal 1)  &&  npm run client  (terminal 2), then open http://localhost:5173/'",
     "build": "vite build --config vite.config.ts"

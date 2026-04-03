@@ -10,6 +10,7 @@ npm install @geometra/renderer-canvas
 
 ## Key exports
 
+- `createBrowserCanvasClient` — official browser bootstrap for thin-client canvas apps (`createClient` + `CanvasRenderer` + selection + accessibility mirror + focus wiring)
 - `CanvasRenderer` — renders Geometra element trees to a canvas context
 - `layoutInspector` — optional HUD (frame counter, **render ms** before HUD, node count, depth, root size, focus + Tab order, optional hit path when `inspectorProbe` is set); off by default
 - `lastRenderWallMs` — wall time of the last full `render()` (ms), including overlays; readable for HUDs / metrics
@@ -21,14 +22,21 @@ npm install @geometra/renderer-canvas
 ## Usage
 
 ```ts
-import { CanvasRenderer, enableSelection } from '@geometra/renderer-canvas'
+import { createBrowserCanvasClient } from '@geometra/renderer-canvas'
 
 const canvas = document.getElementById('app') as HTMLCanvasElement
-const renderer = new CanvasRenderer(canvas)
-
-enableSelection(renderer)
-renderer.render(tree, layout)
+createBrowserCanvasClient({
+  canvas,
+  url: 'ws://localhost:3200',
+  binaryFraming: true,
+  autoFocus: true,
+  rendererOptions: {
+    background: '#08111f',
+  },
+})
 ```
+
+If you need lower-level control, the renderer package still exposes `CanvasRenderer`, `enableSelection`, and `enableAccessibilityMirror` directly.
 
 ## Links
 

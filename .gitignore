@@ -3,6 +3,10 @@ dist
 dist-demo
 demos/*/dist
 *.tsbuildinfo
+playwright-report
+test-results
+.playwright
+.playwright-mcp
 
 # Accidental tsc emit beside sources (build output belongs in dist/)
 packages/*/src/**/*.js

@@ -18,13 +18,27 @@ import {
 
 type ThemeKey = 'midnight' | 'ember' | 'frost'
 
+type ReleaseRow = {
+  service: string
+  channel: string
+  latency: string
+  status: string
+}
+
+type QueueRow = {
+  service: string
+  severity: string
+  owner: string
+  status: string
+}
+
 type OverviewData = {
-  releases: Array<Record<string, string>>
+  releases: ReleaseRow[]
 }
 
 type QueueData = {
   commands: Array<{ id: string; label: string; shortcut?: string }>
-  rows: Array<Record<string, string>>
+  rows: QueueRow[]
 }
 
 type SettingsData = {
@@ -123,6 +137,8 @@ const approvalQueue = signal([
 const history = createMemoryHistory({ initialEntries: ['/'] })
 let server: TexturaServer | null = null
 let lastPathname = history.location.pathname
+const serverPort = Number.parseInt(process.env.GEOMETRA_FULL_STACK_PORT ?? '3200', 10)
+const clientOrigin = process.env.GEOMETRA_FULL_STACK_CLIENT_ORIGIN ?? 'http://localhost:5173/'
 
 function palette() {
   return THEMES[savedTheme.value]
@@ -384,8 +400,6 @@ function approvalQueueTable(rows: QueueData['rows']): UIElement {
             paddingRight: 14,
             paddingTop: 10,
             paddingBottom: 10,
-            borderTopWidth: 1,
-            borderTopColor: theme.border,
             cursor: 'pointer',
             onClick: () => {
               announce(`Selected ${row.service} (${row.severity}) routed to ${row.owner}.`)
@@ -1117,7 +1131,7 @@ function view(): UIElement {
 }
 
 server = await createServer(view, {
-  port: 3200,
+  port: serverPort,
   width: 1280,
   height: 820,
   onConnection: () => {
@@ -1136,8 +1150,8 @@ router.start()
 console.log(`
   Geometra Full-Stack Dashboard
   ─────────────────────────────
-  Server: ws://localhost:3200
-  Client: http://localhost:5173/
+  Server: ws://localhost:${serverPort}
+  Client: ${clientOrigin}
 
   Run the client with:
     cd demos/full-stack-dashboard

@@ -230,6 +230,7 @@ For full routing details, see `packages/router/README.md` and `ROUTER_DELIVERY_R
 Geometra now exposes runtime primitives so non-DOM renderers can still provide accessibility and editing behavior:
 
 - `toAccessibilityTree(tree, layout)` in `@geometra/core` maps UI + geometry to role/name/bounds/focusable nodes.
+- `createBrowserCanvasClient(...)` in `@geometra/renderer-canvas` is the official browser host bootstrap for thin-client canvas apps.
 - `enableAccessibilityMirror(host, renderer)` in `@geometra/renderer-canvas` syncs a hidden DOM mirror for assistive tech.
 - `insertInputText`, `replaceInputSelection`, `backspaceInput`, `deleteInput`, `moveInputCaret` in `@geometra/core` provide selection-aware text editing logic you can wire to keyboard handlers.
 
