@@ -21,7 +21,8 @@ fi
 # `packages/*/src/__tests__/**/*.test.ts` that `npm run test` / vitest.fast.config.ts includes — a file
 # passing `vitest.fast` does not imply it runs in CI gate; check package.json before assuming coverage ships.
 # Before appending a path to the gate script, confirm it is not already listed (duplicate paths make
-# vitest run the same file twice). The allowlist evolves; read package.json instead of copying examples
+# vitest run the same file twice). `npm run release:gate` runs `scripts/release/verify-release-gate.mjs`
+# first to fail fast on duplicates or missing paths. The allowlist evolves; read package.json instead of copying examples
 # from older prompts or transcripts.
 # Extend an allowlisted file when adding release-critical tests unless you intentionally widen the gate.
 # Layout/Yoga geometry regression: use `packages/core/src/__tests__/geometry-snapshot-ci.test.ts` (gate-listed)
