@@ -218,6 +218,7 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont(undefined as unknown as string)).toEqual([])
     expect(extractFontFamiliesFromCSSFont(14 as unknown as string)).toEqual([])
     expect(extractFontFamiliesFromCSSFont({} as unknown as string)).toEqual([])
+    expect(extractFontFamiliesFromCSSFont(Object('14px Inter') as unknown as string)).toEqual([])
   })
 
   it('parses CSS-wide font-style keyword before size', () => {
