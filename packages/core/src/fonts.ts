@@ -194,15 +194,20 @@ function splitFontFamilyList(tail: string): string[] {
  * inside quotes is kept (CSS requires quoting when a family name matches a keyword).
  * Broken `calc()`/`min()`/… values (unclosed parentheses) and stray `+` tails after a matched size
  * token yield no families so {@link waitForFonts} is not called with math remnants.
- * Unquoted `url(...)` and `format(...)` segments (e.g. mistaken `@font-face` `src` paste) are not
- * concrete family names and are skipped so {@link waitForFonts} does not call `load` with them.
+ * Unquoted `url(...)` and `format(...)` segments (e.g. mistaken `@font-face` `src` paste) are not concrete
+ * family names and are skipped so {@link waitForFonts} does not call `load` with them.
+ * The same applies to unquoted `local(...)` only when it appears **after** the first comma-separated family
+ * segment (a common `src:` list paste into a fallback list); a leading `local(...)` after the size is kept
+ * for callers that forward tokens to `document.fonts.load`.
  * The same spellings inside quotes are kept as literal family names (CSS `font-family` rules).
  */
 export function extractFontFamiliesFromCSSFont(font: string): string[] {
   function filterFamilies(tail: string): string[] {
     const out: string[] = []
     const seen = new Set<string>()
-    for (const seg of splitFontFamilyList(tail)) {
+    const segments = splitFontFamilyList(tail)
+    for (let si = 0; si < segments.length; si++) {
+      const seg = segments[si]!
       const t = seg.trim()
       if (t.length === 0) continue
       const doubleQuoted = t.length >= 2 && t.startsWith('"') && t.endsWith('"')
@@ -213,6 +218,7 @@ export function extractFontFamiliesFromCSSFont(font: string): string[] {
       const lead = inner.trimStart()
       if (!quoted && /^\+/.test(lead)) continue
       if (!quoted && /^url\s*\(/i.test(lead)) continue
+      if (!quoted && si > 0 && /^local\s*\(/i.test(lead)) continue
       if (!quoted && /^format\s*\(/i.test(lead)) continue
       if (!quoted && ABSOLUTE_FONT_SIZE_KEYWORDS.has(inner.toLowerCase())) continue
       if (

@@ -535,6 +535,20 @@ describe('extractFontFamiliesFromCSSFont', () => {
     ])
   })
 
+  it('drops local() only in comma-list continuations (mistaken @font-face src after a real family)', () => {
+    expect(extractFontFamiliesFromCSSFont('14px Inter, local("My Font"), sans-serif')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('16px LOCAL( "System UI" ) , serif')).toEqual(['LOCAL( "System UI" )'])
+    expect(extractFontFamiliesFromCSSFont('600 16px Literata, local(Fallback), monospace')).toEqual([
+      'Literata',
+    ])
+  })
+
+  it('keeps quoted family names that look like local() syntax', () => {
+    expect(extractFontFamiliesFromCSSFont('14px "local(Not a function)", serif')).toEqual([
+      'local(Not a function)',
+    ])
+  })
+
   it('skips unquoted url() and format() with case and internal whitespace (src paste hardening)', () => {
     expect(extractFontFamiliesFromCSSFont('14px Inter, Url ( "./a.woff2" ), serif')).toEqual(['Inter'])
     expect(
