@@ -60,6 +60,31 @@ exports[`geometry snapshot CI > stable column with in-flow text and absolutely p
 }
 `;
 
+exports[`geometry snapshot CI > stable row with alignItems flex-end and mixed-height text children (rounded) 1`] = `
+{
+  "children": [
+    {
+      "children": [],
+      "height": 20,
+      "width": 32,
+      "x": 8,
+      "y": 52,
+    },
+    {
+      "children": [],
+      "height": 40,
+      "width": 32,
+      "x": 46,
+      "y": 32,
+    },
+  ],
+  "height": 80,
+  "width": 200,
+  "x": 0,
+  "y": 0,
+}
+`;
+
 exports[`geometry snapshot CI > stable row with fixed-width text and flexGrow sibling (rounded) 1`] = `
 {
   "children": [

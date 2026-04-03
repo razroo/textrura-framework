@@ -192,4 +192,25 @@ describe('geometry snapshot CI', () => {
     const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 100 })
     expect(roundLayout(layout)).toMatchSnapshot()
   })
+
+  it('stable row with alignItems flex-end and mixed-height text children (rounded)', async () => {
+    await init()
+    const base = { font: '16px sans-serif', lineHeight: 20, width: 32, height: 20 } as const
+    const tree = box(
+      {
+        width: 200,
+        height: 80,
+        padding: 8,
+        flexDirection: 'row',
+        gap: 6,
+        alignItems: 'flex-end',
+      },
+      [
+        text({ text: 'Lo', ...base }),
+        text({ text: 'Tall', ...base, height: 40 }),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 80 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
 })
