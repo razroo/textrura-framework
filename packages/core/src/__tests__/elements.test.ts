@@ -63,6 +63,11 @@ describe('box', () => {
     expect((el.props as { dir?: string }).dir).toBe('rtl')
   })
 
+  it('preserves dir auto on props (inherits resolved direction from parent context)', () => {
+    const el = box({ width: 1, height: 1, dir: 'auto' })
+    expect((el.props as { dir?: string }).dir).toBe('auto')
+  })
+
   it('preserves pointer/hit and scroll style props on props (layout snapshot strips them for Yoga)', () => {
     const el = box({
       width: 1,
@@ -115,6 +120,16 @@ describe('text', () => {
     expect((el.props as { dir?: string }).dir).toBe('ltr')
   })
 
+  it('preserves dir auto on props (inherits resolved direction from parent context)', () => {
+    const el = text({
+      text: 'x',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      dir: 'auto',
+    })
+    expect((el.props as { dir?: string }).dir).toBe('auto')
+  })
+
   it('preserves cursor and selectable on props for renderers and pointer metadata', () => {
     const el = text({
       text: 'x',
@@ -154,6 +169,16 @@ describe('image', () => {
   it('preserves dir on props for runtime direction resolution (toLayoutTree strips dir from Yoga input)', () => {
     const el = image({ src: '/a.png', width: 8, height: 8, dir: 'rtl' })
     expect((el.props as { dir?: string }).dir).toBe('rtl')
+  })
+
+  it('preserves dir auto on props (inherits resolved direction from parent context)', () => {
+    const el = image({ src: '/a.png', width: 8, height: 8, dir: 'auto' })
+    expect((el.props as { dir?: string }).dir).toBe('auto')
+  })
+
+  it('preserves objectFit on props for renderers', () => {
+    const el = image({ src: '/a.png', width: 8, height: 8, objectFit: 'cover' })
+    expect((el.props as { objectFit?: string }).objectFit).toBe('cover')
   })
 
   it('preserves pointer style props on props for hit-test and paint', () => {
