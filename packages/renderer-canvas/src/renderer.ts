@@ -224,8 +224,13 @@ export class CanvasRenderer implements Renderer {
     this.ctx = ctx
   }
 
+  /**
+   * Same clamping as `createApp` after Yoga: non-finite or negative `layoutMs` become `0` so the
+   * inspector HUD and telemetry never observe NaN/negative layout times.
+   */
   setFrameTimings(timings: FrameTimings): void {
-    this.lastLayoutWallMs = timings.layoutMs
+    const raw = timings.layoutMs
+    this.lastLayoutWallMs = Math.max(0, Number.isFinite(raw) ? raw : 0)
   }
 
   render(layout: ComputedLayout, tree: UIElement): void {

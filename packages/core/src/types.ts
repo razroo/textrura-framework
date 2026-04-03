@@ -153,7 +153,11 @@ export type Component<P = Record<string, never>> = (props: P) => UIElement
 
 /** Optional per-frame timings supplied by the host (e.g. `createApp` after Yoga). */
 export interface FrameTimings {
-  /** Wall time for `computeLayout` (or equivalent) in milliseconds. */
+  /**
+   * Wall time for `computeLayout` (or equivalent) in milliseconds.
+   * `createApp` passes a finite, non-negative value; renderers that implement optional `setFrameTimings`
+   * may clamp similarly when invoked outside `createApp`.
+   */
   layoutMs: number
 }
 
