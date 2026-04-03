@@ -27,4 +27,12 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ ...base, width: Infinity })).toBe(false)
     expect(layoutBoundsAreFinite({ ...base, height: -Infinity })).toBe(false)
   })
+
+  it('rejects non-number values (corrupt runtime / bad deserialization)', () => {
+    const base = { x: 0, y: 0, width: 10, height: 10, children: [] as [] }
+    expect(layoutBoundsAreFinite({ ...base, x: undefined as unknown as number })).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, y: null as unknown as number })).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, width: '10' as unknown as number })).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, height: true as unknown as number })).toBe(false)
+  })
 })
