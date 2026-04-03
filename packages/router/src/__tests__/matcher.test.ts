@@ -65,6 +65,16 @@ describe('route matcher', () => {
     expect(matchPath('/raw/:token', '/raw/%')).toEqual({ params: { token: '%' } })
   })
 
+  it('decodes splat remainder per segment and leaves invalid percent sequences as-is', () => {
+    expect(matchPath('/docs/*', '/docs/guides%2Fintro')).toEqual({
+      params: { '*': 'guides/intro' },
+    })
+    expect(matchPath('/docs/*', '/docs/foo%')).toEqual({ params: { '*': 'foo%' } })
+    expect(matchPath('/docs/*rest', '/docs/a%20b/c')).toEqual({
+      params: { rest: 'a b/c' },
+    })
+  })
+
   it('does not collapse empty pathname segments: single-slash pattern misses double-slash URL', () => {
     expect(matchPath('/foo/bar', '/foo//bar')).toBeNull()
     expect(matchPath('/users/:id', '/users//42')).toBeNull()
