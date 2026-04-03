@@ -9,6 +9,11 @@ const cancelRaf = typeof cancelAnimationFrame !== 'undefined'
   ? cancelAnimationFrame
   : (id: number) => clearTimeout(id)
 
+/** Same finite guard as layout/hit paths: NaN and ±Infinity become `0` so stepping never propagates poisoned floats. */
+function finiteTimelineNumber(value: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
 /** Common easing functions. */
 export const easing = {
   linear: (t: number) => t,
@@ -104,11 +109,14 @@ export function transition(
  *
  * Non-finite `durationMs` (NaN, ±Infinity) jumps immediately to the target and ends in `finished`,
  * matching {@link transition} so corrupt or serialized values never leave `step()` dividing by NaN.
+ *
+ * Non-finite `initialValue` normalizes to `0` so a corrupt starting pose cannot freeze timelines in NaN.
  */
 export function createTweenTimeline(initialValue: number): TweenTimeline {
-  const value = signal(initialValue)
-  let from = initialValue
-  let to = initialValue
+  const initial = finiteTimelineNumber(initialValue)
+  const value = signal(initial)
+  let from = initial
+  let to = initial
   let elapsed = 0
   let duration = 0
   let easingFn: EasingFn = easing.linear
@@ -183,6 +191,7 @@ export function createTweenTimeline(initialValue: number): TweenTimeline {
 /**
  * Multi-property deterministic timeline for geometry/paint numeric fields.
  * Typical usage includes x/y/width/height/opacity style numeric transitions.
+ * Per-key initial values use the same non-finite normalization as {@link createTweenTimeline}.
  */
 export function createPropertyTimeline(initialValues: Record<string, number>): PropertyTimeline {
   const timelines = new Map<string, TweenTimeline>()

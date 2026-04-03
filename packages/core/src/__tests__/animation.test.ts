@@ -233,6 +233,20 @@ describe('animation timeline', () => {
     expect(props.state()).toBe('finished')
   })
 
+  it('normalizes non-finite initial values to 0 so interpolation stays finite', () => {
+    const nan = createTweenTimeline(Number.NaN)
+    expect(nan.value.peek()).toBe(0)
+    nan.to(10, 100, easing.linear)
+    expect(nan.step(50)).toBe(5)
+
+    const negInf = createTweenTimeline(Number.NEGATIVE_INFINITY)
+    expect(negInf.value.peek()).toBe(0)
+
+    const props = createPropertyTimeline({ x: Number.NaN, y: 1 })
+    expect(props.values.x.peek()).toBe(0)
+    expect(props.values.y.peek()).toBe(1)
+  })
+
   it('steps deterministically to completion', () => {
     const timeline = createTweenTimeline(0)
     timeline.to(100, 1000, easing.linear)
