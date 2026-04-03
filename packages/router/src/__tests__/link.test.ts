@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ComputedLayout } from 'textura'
-import { createMemoryHistory } from '../history.js'
+import { createMemoryHistory, type HistoryUpdate } from '../history.js'
 import { link } from '../link.js'
 import { createRouter } from '../router.js'
 import type { RouteNode } from '../tree.js'
@@ -92,5 +92,35 @@ describe('declarative link primitive', () => {
     })
 
     expect(router.getState().location.pathname).toBe('/')
+  })
+
+  it('uses history replace when the link sets replace: true (click and keyboard)', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/'] })
+    const actions: HistoryUpdate['action'][] = []
+    history.listen(u => actions.push(u.action))
+    const router = createRouter({ routes, history })
+    router.start()
+
+    const node = link({ to: '/about', router, replace: true })
+    node.handlers?.onClick?.({ x: 0, y: 0, target })
+    await Promise.resolve()
+    expect(actions).toEqual(['replace'])
+    expect(router.getState().location.pathname).toBe('/about')
+
+    await router.navigate('/', { replace: true })
+    expect(router.getState().location.pathname).toBe('/')
+
+    node.handlers?.onKeyDown?.({
+      key: 'Enter',
+      code: 'Enter',
+      shiftKey: false,
+      ctrlKey: false,
+      altKey: false,
+      metaKey: false,
+      target,
+    })
+    await Promise.resolve()
+    expect(actions).toEqual(['replace', 'replace', 'replace'])
+    expect(router.getState().location.pathname).toBe('/about')
   })
 })
