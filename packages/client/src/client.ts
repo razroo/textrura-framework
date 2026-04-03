@@ -1,6 +1,19 @@
 import type { ComputedLayout } from 'textura'
 import type { Renderer, UIElement } from '@geometra/core'
-import { decodeBinaryFrameJson } from './binary-frame.js'
+import { decodeBinaryFrameJson, type BinaryFrameBytes } from './binary-frame.js'
+
+function asBinaryFrameBytes(data: unknown): BinaryFrameBytes {
+  if (data instanceof ArrayBuffer) return data
+  if (typeof SharedArrayBuffer !== 'undefined' && data instanceof SharedArrayBuffer) {
+    return data
+  }
+  if (ArrayBuffer.isView(data)) {
+    return data
+  }
+  throw new Error(
+    'WebSocket binary message is not ArrayBuffer or ArrayBufferView; with binaryFraming, ensure binaryType is "arraybuffer" (default when enabled).',
+  )
+}
 
 const PROTOCOL_VERSION = 1
 
@@ -241,13 +254,13 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
             bytesReceived: new TextEncoder().encode(text).length,
           }
         } else {
-          const buf = event.data as ArrayBuffer
-          const json = decodeBinaryFrameJson(buf)
+          const bytes = asBinaryFrameBytes(event.data)
+          const json = decodeBinaryFrameJson(bytes)
           msg = JSON.parse(json) as ServerMessage
           decodeMeta = {
             decodeMs: performance.now() - parseStart,
             encoding: 'binary',
-            bytesReceived: buf.byteLength,
+            bytesReceived: bytes.byteLength,
           }
         }
         applyServerMessage(state, renderer, msg, onError, onFrameMetrics, decodeMeta)
