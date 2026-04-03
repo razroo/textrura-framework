@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { decodeBinaryFrameJson as decodeBinaryFrameJsonClient } from '../../../client/src/binary-frame.js'
 import { encodeBinaryFrameJson, decodeBinaryFrameJson } from '../binary-frame.js'
 
 const V1_FIXTURES = ['frame.json', 'patch.json', 'error.json'] as const
@@ -12,5 +13,7 @@ describe('protocol binary conformance', () => {
     const asText = JSON.stringify(frame)
     const buf = encodeBinaryFrameJson(asText)
     expect(decodeBinaryFrameJson(buf)).toBe(asText)
+    // Server (Node Buffer) and client (ArrayBuffer / view) decoders must agree on the v1 envelope.
+    expect(decodeBinaryFrameJsonClient(buf)).toBe(asText)
   })
 })
