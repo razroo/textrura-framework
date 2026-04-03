@@ -1,6 +1,6 @@
 import type { ComputedLayout } from 'textura'
 
-/** `Number.isFinite` throws on BigInt; gate with `typeof` so corrupt layout never crashes callers. */
+/** True only for finite primitive numbers: `typeof` rejects `BigInt`, boxed numbers, and objects before `Number.isFinite`. */
 function isFiniteLayoutNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
 }
@@ -12,8 +12,8 @@ function isFiniteLayoutNumber(value: unknown): value is number {
  * Degenerate rects (`width` / `height` of `0`) are accepted; they still yield a well-defined
  * inclusive hit-test edge at the origin corner.
  *
- * Non-number fields (including BigInt) are rejected without throwing — `Number.isFinite` would
- * throw on BigInt, which would otherwise take down pointer dispatch.
+ * Non-number fields (including `BigInt` and boxed `Number`) are rejected without coercion — global
+ * `isFinite` would coerce operands and throws on `BigInt`, which would otherwise take down pointer dispatch.
  *
  * @param layout — Bounds from Textura/Yoga {@link ComputedLayout} output.
  * @returns `true` when `x`, `y`, `width`, and `height` are finite and both dimensions are `>= 0`.

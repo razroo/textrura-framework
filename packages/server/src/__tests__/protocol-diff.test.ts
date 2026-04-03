@@ -143,7 +143,7 @@ describe('isProtocolCompatible', () => {
     expect(isProtocolCompatible(Number.NEGATIVE_INFINITY, 1)).toBe(false)
   })
 
-  it('rejects BigInt peer version without throwing (Number.isFinite throws on BigInt)', () => {
+  it('rejects BigInt peer version without throwing (typeof gate before Number.isFinite)', () => {
     expect(isProtocolCompatible(1n as unknown as number, 1)).toBe(false)
   })
 

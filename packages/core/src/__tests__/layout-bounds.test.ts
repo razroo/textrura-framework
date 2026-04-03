@@ -116,7 +116,7 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ ...base, height: true as unknown as number })).toBe(false)
   })
 
-  it('rejects BigInt on any axis without throwing (Number.isFinite would throw)', () => {
+  it('rejects BigInt on any axis without throwing (typeof gate; BigInt is not a number)', () => {
     const base = { x: 0, y: 0, width: 10, height: 10, children: [] as [] }
     const b = 1n as unknown as number
     expect(layoutBoundsAreFinite({ ...base, x: b })).toBe(false)

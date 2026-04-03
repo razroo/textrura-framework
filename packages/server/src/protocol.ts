@@ -19,8 +19,8 @@ export const CLOSE_FORBIDDEN = 4003
  * Non-finite numeric `peerVersion` values (`NaN`, `±Infinity`) yield `false` — they are not treated as legacy
  * — so corrupt wire numbers fail closed instead of connecting.
  *
- * Non-number runtime values (e.g. `BigInt` from a malformed decoder) are rejected without throwing:
- * `Number.isFinite` throws on `BigInt`, which would otherwise take down the connection handler.
+ * Non-number runtime values (e.g. `BigInt` from a malformed decoder) are rejected via the `typeof`
+ * check before `Number.isFinite` — we never coerce wire values (global `isFinite` throws on `BigInt`).
  */
 export function isProtocolCompatible(
   peerVersion: number | undefined,
