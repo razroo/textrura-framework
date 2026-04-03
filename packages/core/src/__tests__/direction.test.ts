@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { box, image, text } from '../elements.js'
 import { resolveDirectionValue, resolveElementDirection } from '../direction.js'
+import { toLayoutTree } from '../tree.js'
 
 describe('direction model', () => {
   it('defaults to parent direction when dir is undefined or auto', () => {
@@ -93,5 +94,18 @@ describe('direction model', () => {
     expect(d).toBe('rtl')
     d = resolveElementDirection(leaf, d)
     expect(d).toBe('rtl')
+  })
+
+  it('keeps dir on the live element for resolveElementDirection while toLayoutTree omits it for Textura', () => {
+    const el = text({
+      text: 'a',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      width: 50,
+      height: 18,
+      dir: 'rtl',
+    })
+    expect(resolveElementDirection(el, 'ltr')).toBe('rtl')
+    expect(toLayoutTree(el)).not.toHaveProperty('dir')
   })
 })

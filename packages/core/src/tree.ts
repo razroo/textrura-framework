@@ -40,6 +40,11 @@ function stripStyleProps(props: Record<string, unknown>): Record<string, unknown
  * `selectable`, `dir`, and image `src` / `alt` / `objectFit`. Remaining props are flex and
  * sizing fields that belong in the layout pipeline.
  *
+ * `dir` is omitted because upstream Textura {@link LayoutNode} types do not carry direction yet;
+ * Yoga sees one document direction via {@link import('./app.js').createApp}'s `layoutDirection` /
+ * `computeLayout`, while per-node text, focus, and hit-testing resolve direction on the live
+ * {@link UIElement} tree with {@link import('./direction.js').resolveElementDirection}.
+ *
  * Runtime fields on boxes (`handlers`, `semantic`, `key`) are not part of `element.props` and
  * are unchanged on the live tree — they are not copied into the layout snapshot.
  */
