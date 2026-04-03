@@ -108,4 +108,32 @@ describe('direction model', () => {
     expect(resolveElementDirection(el, 'ltr')).toBe('rtl')
     expect(toLayoutTree(el)).not.toHaveProperty('dir')
   })
+
+  it('toLayoutTree omits dir recursively; live tree still resolves mixed rtl/auto/ltr per node', () => {
+    const leaf = text({
+      text: 'a',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      width: 10,
+      height: 18,
+      dir: 'ltr',
+    })
+    const inner = box({ width: 50, height: 20, dir: 'auto' }, [leaf])
+    const root = box({ width: 100, height: 100, dir: 'rtl' }, [inner])
+
+    const layout = toLayoutTree(root) as { children: unknown[] }
+    expect(layout).not.toHaveProperty('dir')
+    expect(layout.children).toHaveLength(1)
+    const innerLayout = layout.children[0] as { children: unknown[] }
+    expect(innerLayout).not.toHaveProperty('dir')
+    const textLayout = innerLayout.children[0] as Record<string, unknown>
+    expect(textLayout).not.toHaveProperty('dir')
+
+    let d = resolveElementDirection(root, 'ltr')
+    expect(d).toBe('rtl')
+    d = resolveElementDirection(inner, d)
+    expect(d).toBe('rtl')
+    d = resolveElementDirection(leaf, d)
+    expect(d).toBe('ltr')
+  })
 })
