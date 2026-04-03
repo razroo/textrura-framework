@@ -1612,7 +1612,7 @@ describe('scroll and overflow clipping', () => {
       height: 100,
       children: [{ x: 80, y: 0, width: 50, height: 100, children: [] as const }],
     }
-    const childX = box({ width: 50, height: 100, onClick: () => {} })
+    const childX = box({ width: 50, height: 100, cursor: 'grab', onClick: () => {} })
     const parentNegInfX = box(
       { width: 100, height: 100, overflow: 'scroll', scrollX: Number.NEGATIVE_INFINITY },
       [childX],
@@ -1620,6 +1620,7 @@ describe('scroll and overflow clipping', () => {
     expect(dispatchHit(parentNegInfX, layoutX, 'onClick', 45, 50).handled).toBe(false)
     expect(dispatchHit(parentNegInfX, layoutX, 'onClick', 85, 50).handled).toBe(true)
     expect(hitPathAtPoint(parentNegInfX, layoutX, 85, 50)).toEqual([0])
+    expect(getCursorAtPoint(parentNegInfX, layoutX, 85, 50)).toBe('grab')
   })
 
   it('overflow scroll: pointer outside parent bounds hits nothing', () => {
