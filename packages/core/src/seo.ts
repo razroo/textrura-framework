@@ -384,8 +384,8 @@ export function toSemanticHTML(
   if (options.headExtra) meta.push(options.headExtra)
 
   const body = elementToHTML(tree, 2)
-  const rawLang =
-    typeof options.lang === 'string' ? options.lang.trim() : options.lang ?? ''
+  // Only accept string lang; ignore other runtime shapes so malformed options never reach escapeHTML.
+  const rawLang = typeof options.lang === 'string' ? options.lang.trim() : ''
   const lang = escapeHTML(rawLang || 'en')
 
   return `<!DOCTYPE html>
