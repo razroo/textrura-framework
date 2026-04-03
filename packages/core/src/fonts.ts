@@ -380,6 +380,8 @@ export function extractFontFamiliesFromCSSFont(font: string): string[] {
  * Collect unique font families referenced by text nodes in a UI tree.
  * Order is first-seen in a depth-first preorder walk (later duplicates are skipped).
  * Image leaves carry no `font` shorthand and are skipped.
+ * Boxes with a missing or non-array `children` field are treated as empty (no throw) so bad
+ * deserialization cannot take down font collection.
  */
 export function collectFontFamiliesFromTree(root: UIElement): string[] {
   const out = new Set<string>()
@@ -393,7 +395,9 @@ export function collectFontFamiliesFromTree(root: UIElement): string[] {
     if (el.kind === 'image') {
       return
     }
-    for (const c of el.children) walk(c)
+    const { children } = el
+    if (!Array.isArray(children)) return
+    for (const c of children) walk(c)
   }
   walk(root)
   return [...out]

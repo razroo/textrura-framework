@@ -791,6 +791,20 @@ describe('collectFontFamiliesFromTree', () => {
     Object.assign(node.props, { font: null as unknown as string })
     expect(collectFontFamiliesFromTree(box({}, [node]))).toEqual([])
   })
+
+  it('does not throw when a box has undefined children (skips subtree)', () => {
+    const parent = box({}, [
+      text({ text: 'a', font: '14px Inter', lineHeight: 20 }),
+    ])
+    Object.assign(parent, { children: undefined as unknown as typeof parent.children })
+    expect(collectFontFamiliesFromTree(parent)).toEqual([])
+  })
+
+  it('does not throw when a box has a non-array children value', () => {
+    const parent = box({}, [])
+    Object.assign(parent, { children: {} as unknown as typeof parent.children })
+    expect(collectFontFamiliesFromTree(parent)).toEqual([])
+  })
 })
 
 describe('waitForFonts', () => {
