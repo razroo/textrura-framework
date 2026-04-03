@@ -321,6 +321,46 @@ describe('dispatchHit', () => {
     expect(hasInteractiveHitAtPoint(parent, layout, 5, 5)).toBe(false)
   })
 
+  it('sibling with corrupt layout does not block hits on a valid sibling', () => {
+    let leftFired = false
+    let rightFired = false
+    const left = box({
+      width: 40,
+      height: 40,
+      onClick: () => {
+        leftFired = true
+      },
+    })
+    const right = box({
+      width: 40,
+      height: 40,
+      cursor: 'crosshair',
+      onClick: () => {
+        rightFired = true
+      },
+    })
+    const parent = box({ width: 100, height: 100 }, [left, right])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: Number.NaN, height: 40, children: [] as const },
+        { x: 50, y: 0, width: 40, height: 40, children: [] as const },
+      ],
+    }
+
+    expect(dispatchHit(parent, layout, 'onClick', 60, 20).handled).toBe(true)
+    expect(leftFired).toBe(false)
+    expect(rightFired).toBe(true)
+
+    rightFired = false
+    expect(hitPathAtPoint(parent, layout, 60, 20)).toEqual([1])
+    expect(hasInteractiveHitAtPoint(parent, layout, 60, 20)).toBe(true)
+    expect(getCursorAtPoint(parent, layout, 60, 20)).toBe('crosshair')
+  })
+
   it('nested boxes: deepest handler fires first', () => {
     const log: string[] = []
     const child = box(
