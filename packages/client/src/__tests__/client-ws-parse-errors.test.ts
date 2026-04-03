@@ -874,6 +874,60 @@ describe('createClient WebSocket message parse errors', () => {
     expect(client.layout?.width).toBe(7)
   })
 
+  it('invokes onError when binary frame declares uint32 max payload length (truncated), then accepts a valid frame', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+    const renders: ComputedLayout[] = []
+    const renderer: Renderer = {
+      render: (layout: ComputedLayout) => {
+        renders.push({ ...layout, children: layout.children })
+      },
+      destroy: () => {},
+    }
+
+    const client = createClient({
+      url: 'ws://mock.test',
+      renderer,
+      binaryFraming: true,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    const malicious = new ArrayBuffer(9)
+    const u8 = new Uint8Array(malicious)
+    u8.set([0x47, 0x45, 0x4f, 0x4d, 1], 0)
+    new DataView(malicious).setUint32(5, 0xffff_ffff, true)
+
+    sockets[0]!.emit('message', { data: malicious })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(Error)
+    expect(String((errors[0] as Error).message)).toContain('Truncated')
+
+    const valid = encodeGeomV1JsonPayload(
+      JSON.stringify({
+        type: 'frame',
+        layout: { x: 0, y: 0, width: 11, height: 12, children: [] },
+        tree: { kind: 'box', props: {}, children: [] },
+        protocolVersion: 1,
+      }),
+    )
+    sockets[0]!.emit('message', { data: valid })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(renders).toHaveLength(1)
+    expect(renders[0]?.width).toBe(11)
+    expect(errors).toHaveLength(1)
+    expect(client.layout?.width).toBe(11)
+  })
+
   it('invokes onError when binary event.data is a Blob (wrong binaryType / unexpected payload)', async () => {
     if (typeof Blob === 'undefined') return
 
