@@ -81,6 +81,25 @@ describe('client binary frame decode', () => {
     expect(decodeBinaryFrameJson(view)).toBe(json)
   })
 
+  it('accepts a DataView over the whole frame (ArrayBufferView parity)', () => {
+    const json = '{"type":"patch","patches":[]}'
+    const bytes = new Uint8Array(encodeBinaryFrameJsonV1(json))
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+    expect(isBinaryFrameArrayBuffer(dv)).toBe(true)
+    expect(decodeBinaryFrameJson(dv)).toBe(json)
+  })
+
+  it('decodes a DataView with non-zero byteOffset into a larger ArrayBuffer', () => {
+    const json = '{"a":1}'
+    const frame = new Uint8Array(encodeBinaryFrameJsonV1(json))
+    const prefix = 13
+    const combined = new Uint8Array(prefix + frame.length + 4)
+    combined.set(frame, prefix)
+    const dv = new DataView(combined.buffer, combined.byteOffset + prefix, frame.length)
+    expect(isBinaryFrameArrayBuffer(dv)).toBe(true)
+    expect(decodeBinaryFrameJson(dv)).toBe(json)
+  })
+
   it('returns false when GEOM magic is only present before the view offset', () => {
     const json = '{"a":1}'
     const frame = new Uint8Array(encodeBinaryFrameJsonV1(json))
