@@ -149,11 +149,13 @@ function textNodeBoundsAreFinite(node: TextNodeInfo): boolean {
     Number.isFinite(node.x) &&
     Number.isFinite(node.y) &&
     Number.isFinite(node.width) &&
-    Number.isFinite(node.height)
+    Number.isFinite(node.height) &&
+    node.width >= 0 &&
+    node.height >= 0
   )
 }
 
-/** Find which text node and character offset is at a given (x, y) point. Non-finite pointer coordinates return `null`; nodes with non-finite bounds are skipped (same invariant as pointer hit-testing). */
+/** Find which text node and character offset is at a given (x, y) point. Non-finite pointer coordinates return `null`; nodes with non-finite or negative-size bounds are skipped (aligned with {@link import('./layout-bounds.js').layoutBoundsAreFinite}). */
 export function hitTestText(
   textNodes: TextNodeInfo[],
   px: number,

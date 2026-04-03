@@ -256,6 +256,36 @@ describe('hitTestText', () => {
     expect(hitTestText(badHeight, 5, 5)).toBeNull()
   })
 
+  it('skips nodes with negative width or height (matches layout bounds invariants)', () => {
+    const badW: TextNodeInfo[] = [
+      {
+        element: { kind: 'text' as const, props: { text: 'x', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: -1,
+        height: 18,
+        index: 0,
+        lines: [{ text: 'x', x: 0, y: 0, charOffsets: [0], charWidths: [10] }],
+      },
+    ]
+    expect(hitTestText(badW, 5, 5)).toBeNull()
+
+    const badH: TextNodeInfo[] = [
+      {
+        element: { kind: 'text' as const, props: { text: 'x', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 40,
+        height: -0.001,
+        index: 0,
+        lines: [{ text: 'x', x: 0, y: 0, charOffsets: [0], charWidths: [10] }],
+      },
+    ]
+    expect(hitTestText(badH, 5, 5)).toBeNull()
+  })
+
   it('skips a bad-bounds node and still hits a later node with finite geometry', () => {
     const textNodes: TextNodeInfo[] = [
       {
