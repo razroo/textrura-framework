@@ -522,6 +522,14 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('600 16px Inter, url(font.ttf), monospace')).toEqual(['Inter'])
   })
 
+  it('drops leading url() or format() when they are the first segment after size (src list pasted as whole font value)', () => {
+    expect(extractFontFamiliesFromCSSFont('14px url("./font.woff2"), Inter, sans-serif')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('600 16px url(font.ttf), JetBrains Mono, monospace')).toEqual([
+      'JetBrains Mono',
+    ])
+    expect(extractFontFamiliesFromCSSFont('14px format("woff2"), Literata, serif')).toEqual(['Literata'])
+  })
+
   it('keeps quoted family names that look like url() or format() (literal CSS family tokens)', () => {
     expect(extractFontFamiliesFromCSSFont('14px "url(Brand Face)", serif')).toEqual(['url(Brand Face)'])
     expect(extractFontFamiliesFromCSSFont("12px 'format(Legacy)', monospace")).toEqual(['format(Legacy)'])
