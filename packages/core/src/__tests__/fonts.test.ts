@@ -649,6 +649,24 @@ describe('resolveFontLoadTimeoutMs', () => {
     expect(resolveFontLoadTimeoutMs(-0)).toBe(0)
     expect(Object.is(resolveFontLoadTimeoutMs(-0), -0)).toBe(false)
   })
+
+  it('falls back to 10_000 when defaultMs is NaN, non-finite, negative, or non-number', () => {
+    for (const badDefault of [
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      -1,
+      '5000' as unknown as number,
+      null as unknown as number,
+    ] as const) {
+      expect(resolveFontLoadTimeoutMs(undefined, badDefault)).toBe(10_000)
+      expect(resolveFontLoadTimeoutMs(Number.NaN, badDefault)).toBe(10_000)
+    }
+  })
+
+  it('uses a finite non-negative defaultMs when timeout is invalid', () => {
+    expect(resolveFontLoadTimeoutMs(Number.NaN, 3_000)).toBe(3_000)
+    expect(resolveFontLoadTimeoutMs(undefined, 2500)).toBe(2500)
+  })
 })
 
 describe('collectFontFamiliesFromTree', () => {
