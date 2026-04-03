@@ -153,6 +153,23 @@ describe('geometry snapshot CI', () => {
     expect(roundLayout(layout)).toMatchSnapshot()
   })
 
+  it('stable rtl root column stacks two text children (rounded)', async () => {
+    await init()
+    const tree = box(
+      { width: 160, height: 120, padding: 10, flexDirection: 'column', gap: 6 },
+      [
+        text({ text: 'Top', font: '14px sans-serif', lineHeight: 18 }),
+        text({ text: 'Bottom', font: '14px sans-serif', lineHeight: 18 }),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), {
+      width: 160,
+      height: 120,
+      direction: 'rtl',
+    })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
+
   it('stable wrapped row with three fixed-width text children (rounded)', async () => {
     await init()
     const item = { font: '16px sans-serif', lineHeight: 20, width: 40, height: 20 } as const

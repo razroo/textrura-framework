@@ -210,6 +210,31 @@ exports[`geometry snapshot CI > stable row with text and image siblings (rounded
 }
 `;
 
+exports[`geometry snapshot CI > stable rtl root column stacks two text children (rounded) 1`] = `
+{
+  "children": [
+    {
+      "children": [],
+      "height": 18,
+      "width": 140,
+      "x": 10,
+      "y": 10,
+    },
+    {
+      "children": [],
+      "height": 18,
+      "width": 140,
+      "x": 10,
+      "y": 34,
+    },
+  ],
+  "height": 120,
+  "width": 160,
+  "x": 0,
+  "y": 0,
+}
+`;
+
 exports[`geometry snapshot CI > stable rtl root row mirrors two text children (rounded) 1`] = `
 {
   "children": [
