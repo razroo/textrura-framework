@@ -57,6 +57,11 @@ describe('box', () => {
   it('defaults children to an empty array', () => {
     expect(box({ width: 1, height: 1 }).children).toEqual([])
   })
+
+  it('preserves dir on props for runtime direction resolution (toLayoutTree strips dir from Yoga input)', () => {
+    const el = box({ width: 1, height: 1, dir: 'rtl' })
+    expect((el.props as { dir?: string }).dir).toBe('rtl')
+  })
 })
 
 describe('text', () => {
@@ -78,6 +83,16 @@ describe('text', () => {
     })
     expect((el.props as Record<string, unknown>).key).toBeUndefined()
     expect((el.props as Record<string, unknown>).semantic).toBeUndefined()
+  })
+
+  it('preserves dir on props for runtime direction resolution (toLayoutTree strips dir from Yoga input)', () => {
+    const el = text({
+      text: 'x',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      dir: 'ltr',
+    })
+    expect((el.props as { dir?: string }).dir).toBe('ltr')
   })
 })
 
@@ -102,5 +117,10 @@ describe('image', () => {
     })
     expect((el.props as Record<string, unknown>).key).toBeUndefined()
     expect((el.props as Record<string, unknown>).semantic).toBeUndefined()
+  })
+
+  it('preserves dir on props for runtime direction resolution (toLayoutTree strips dir from Yoga input)', () => {
+    const el = image({ src: '/a.png', width: 8, height: 8, dir: 'rtl' })
+    expect((el.props as { dir?: string }).dir).toBe('rtl')
   })
 })
