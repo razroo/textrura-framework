@@ -56,6 +56,25 @@ describe('declarative link primitive', () => {
     expect(router.getState().location.pathname).toBe('/about')
   })
 
+  it('navigates on legacy Spacebar key value (older browsers)', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/'] })
+    const router = createRouter({ routes, history })
+    router.start()
+
+    const node = link({ to: '/about', router })
+    node.handlers?.onKeyDown?.({
+      key: 'Spacebar',
+      code: 'Space',
+      shiftKey: false,
+      ctrlKey: false,
+      altKey: false,
+      metaKey: false,
+      target,
+    })
+    await Promise.resolve()
+    expect(router.getState().location.pathname).toBe('/about')
+  })
+
   it('does not navigate for non-activation keys', () => {
     const history = createMemoryHistory({ initialEntries: ['/'] })
     const router = createRouter({ routes, history })
