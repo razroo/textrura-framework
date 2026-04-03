@@ -124,6 +124,8 @@ function matchRecursive(
  * - A segment that is only a colon (no param name) yields an empty-string key in `params`.
  * - `?` query and `#` hash are stripped from `pathname` before matching.
  * - Each captured segment is passed through `decodeURIComponent`; invalid `%` sequences are left as-is.
+ * - An empty `pattern` (`''`) parses to zero segments and matches only the root pathname (`/` or `''` after
+ *   normalization), with empty `params`. Any non-root path misses.
  *
  * @returns `{ params }` on success, or `null` when the pathname does not match.
  */

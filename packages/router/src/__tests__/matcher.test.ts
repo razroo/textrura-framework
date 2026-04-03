@@ -87,6 +87,14 @@ describe('route matcher', () => {
     expect(matchPath('/home', '')).toBeNull()
   })
 
+  it('empty pattern string matches only root pathnames', () => {
+    expect(matchPath('', '/')).toEqual({ params: {} })
+    expect(matchPath('', '')).toEqual({ params: {} })
+    expect(matchPath('', '/?ref=1')).toEqual({ params: {} })
+    expect(matchPath('', '/foo')).toBeNull()
+    expect(matchPath('', 'nested')).toBeNull()
+  })
+
   it('when the same param name appears twice, the later capture wins', () => {
     expect(matchPath('/users/:id/posts/:id', '/users/1/posts/2')).toEqual({
       params: { id: '2' },
