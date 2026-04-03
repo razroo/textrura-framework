@@ -226,6 +226,19 @@ describe('effect', () => {
     expect(runs).toBe(1)
   })
 
+  it('dispose is idempotent', () => {
+    const s = signal(0)
+    let runs = 0
+    const dispose = effect(() => {
+      void s.value
+      runs++
+    })
+    dispose()
+    dispose()
+    s.set(1)
+    expect(runs).toBe(1)
+  })
+
   it('propagates synchronous errors from the initial run (no dispose returned)', () => {
     expect(() =>
       effect(() => {

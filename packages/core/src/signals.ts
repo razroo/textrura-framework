@@ -1,4 +1,10 @@
-/** Minimal signals-based reactivity system. */
+/**
+ * Minimal signals-based reactivity for Geometra trees and apps.
+ *
+ * Reading `signal` / `computed` `.value` inside an active `effect` or `computed`
+ * registers a dependency; `peek()` reads without subscribing. `batch` defers
+ * subscriber flushes so multiple writes coalesce into one downstream pass.
+ */
 
 type Subscriber = () => void
 
@@ -26,7 +32,11 @@ function releaseSubscriber(sub: Subscriber): void {
   cleanups.clear()
 }
 
-/** Batch multiple signal updates into a single flush. */
+/**
+ * Run `fn` while deferring subscriber notifications. Updates flush once the
+ * outermost `batch` ends (including after `fn` throws). Nested `batch` calls
+ * share the same deferral depth.
+ */
 export function batch(fn: () => void): void {
   batchDepth++
   try {
@@ -41,13 +51,22 @@ export function batch(fn: () => void): void {
   }
 }
 
+/** Writable reactive cell. */
 export interface Signal<T> {
+  /** Current value; subscribes the active `effect` / `computed` when read. */
   readonly value: T
+  /**
+   * Replace the stored value. Notifies dependents when the next value is not
+   * `Object.is`-equal to the current one (so `NaN` is stable; `+0` and `-0` differ).
+   */
   set(value: T): void
+  /** Read the value without registering a dependency. */
   peek(): T
 }
 
-/** Create a reactive signal. */
+/**
+ * Create a signal with initial value `initial`.
+ */
 export function signal<T>(initial: T): Signal<T> {
   let value = initial
   const subscribers = new Set<Subscriber>()
@@ -82,11 +101,20 @@ export function signal<T>(initial: T): Signal<T> {
   }
 }
 
+/** Read-only derived value; recomputes when dependencies used in the last run change. */
 export interface Computed<T> {
+  /**
+   * Current derived value. Recomputes lazily when dirty; subscribes the active
+   * subscriber when read (except while the computed body is running).
+   */
   readonly value: T
 }
 
-/** Create a derived computation that re-runs when dependencies change. */
+/**
+ * Create a memoized computation from `fn`. Dependencies are the signals and
+ * computeds read while `fn` ran on the last evaluation; conditional reads drop
+ * stale edges on the next run.
+ */
 export function computed<T>(fn: () => T): Computed<T> {
   let cached: T
   let dirty = true
