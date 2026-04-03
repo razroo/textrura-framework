@@ -1,5 +1,6 @@
 import type { ComputedLayout } from 'textura'
 import type { UIElement, BoxElement, EventHandlers, HitEvent } from './types.js'
+import { layoutBoundsAreFinite } from './layout-bounds.js'
 
 interface HitTarget {
   layout: ComputedLayout
@@ -16,21 +17,6 @@ interface ZIndexCacheEntry {
 }
 
 const zIndexOrderCache = new WeakMap<BoxElement, ZIndexCacheEntry>()
-
-/**
- * Reject NaN, ±Infinity, and negative sizes so corrupt layout cannot invert the hit rect or make
- * `x <= absX + width` match unbounded spans when width is infinite.
- */
-function layoutBoundsAreFinite(layout: ComputedLayout): boolean {
-  return (
-    Number.isFinite(layout.x) &&
-    Number.isFinite(layout.y) &&
-    Number.isFinite(layout.width) &&
-    Number.isFinite(layout.height) &&
-    layout.width >= 0 &&
-    layout.height >= 0
-  )
-}
 
 /** Ignore non-finite and non-number values so derived coordinates stay finite (±Infinity/NaN cannot poison abs coords). */
 function finiteNumber(value: unknown): number {

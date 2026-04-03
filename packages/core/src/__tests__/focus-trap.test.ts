@@ -95,6 +95,19 @@ describe('trapFocusStep', () => {
     expect(trapFocusStep(tree, layout, [0], 'next')).toBe(false)
   })
 
+  it('returns false when trap scope layout bounds are corrupt (matches collectFocusOrder)', () => {
+    const modal = box({ onKeyDown: () => undefined }, [])
+    const tree = box({}, [modal])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: Number.NaN, height: 40, children: [] }],
+    }
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(false)
+  })
+
   it('cycles backward with prev', () => {
     const a = box({ onKeyDown: () => undefined }, [])
     const b = box({ onKeyDown: () => undefined }, [])

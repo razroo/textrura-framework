@@ -1,5 +1,6 @@
 import type { ComputedLayout } from 'textura'
 import type { UIElement, BoxElement } from './types.js'
+import { layoutBoundsAreFinite } from './layout-bounds.js'
 import { signal } from './signals.js'
 import type { Signal } from './signals.js'
 
@@ -22,7 +23,11 @@ export function clearFocus(): void {
   focusedElement.set(null)
 }
 
-/** Document-order focusable elements (Tab order). Useful for inspector overlays. */
+/**
+ * Document-order focusable elements (Tab order). Useful for inspector overlays.
+ * Skips boxes whose layout bounds are non-finite or have negative width/height, and does not walk
+ * their subtrees — same rule as hit-testing so corrupt geometry cannot enter focus order.
+ */
 export function collectFocusOrder(
   element: UIElement,
   layout: ComputedLayout,
@@ -38,6 +43,7 @@ function collectFocusable(
   layout: ComputedLayout,
   results: FocusTarget[],
 ): void {
+  if (!layoutBoundsAreFinite(layout)) return
   if (element.kind === 'box') {
     if (
       element.handlers?.onKeyDown ||

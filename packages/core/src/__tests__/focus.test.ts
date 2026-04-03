@@ -124,6 +124,29 @@ describe('collectFocusOrder', () => {
     expect(order).toHaveLength(1)
     expect(order[0]!.element).toBe(btn)
   })
+
+  it('skips focusables when root layout bounds are corrupt (non-finite or negative size)', () => {
+    const el = box({ width: 10, height: 10, onClick: () => {} })
+    const base = makeLayout({ width: 10, height: 10 })
+    for (const bad of [
+      { ...base, x: Number.NaN },
+      { ...base, width: Number.POSITIVE_INFINITY },
+      { ...base, width: -1 },
+      { ...base, height: Number.NEGATIVE_INFINITY },
+    ] as const) {
+      expect(collectFocusOrder(el, bad)).toEqual([])
+    }
+  })
+
+  it('does not descend into children when parent layout bounds are corrupt', () => {
+    const child = box({ width: 10, height: 10, onClick: () => {} })
+    const root = box({ width: 100, height: 100 }, [child])
+    const layout = {
+      ...makeLayout({ width: Number.NaN, height: 100 }),
+      children: [makeLayout({ width: 10, height: 10 })],
+    }
+    expect(collectFocusOrder(root, layout)).toEqual([])
+  })
 })
 
 describe('focusNext', () => {
