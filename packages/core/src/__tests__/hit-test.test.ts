@@ -850,6 +850,40 @@ describe('dispatchHit', () => {
     expect(hitPathAtPoint(root, layoutThree, 10, 10)).toEqual([2])
   })
 
+  it('overlapping siblings: removing a child invalidates z-order cache so the survivor receives hits', () => {
+    const log: string[] = []
+    const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } })
+    const front = box({ width: 50, height: 50, zIndex: 10, onClick: () => { log.push('front') } })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layoutTwo = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layoutTwo, 'onClick', 10, 10)
+    expect(log).toEqual(['front'])
+
+    root.children = [back]
+    const layoutOne = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 50, height: 50, children: [] }],
+    }
+
+    log.length = 0
+    dispatchHit(root, layoutOne, 'onClick', 10, 10)
+    expect(log).toEqual(['back'])
+    expect(hitPathAtPoint(root, layoutOne, 10, 10)).toEqual([0])
+  })
+
   it('overlapping siblings: fractional z-index sorts numerically for dispatch', () => {
     const log: string[] = []
     const low = box({ width: 50, height: 50, zIndex: 1, onClick: () => { log.push('low') } })
