@@ -202,6 +202,15 @@ describe('query helpers', () => {
     expect(stringifyQuery({ x: Number.NEGATIVE_INFINITY, y: 2 })).toBe('?y=2')
   })
 
+  it('stringifies bigint values without throwing (runtime input; not part of QueryValue typing)', () => {
+    const solo = { n: BigInt(42) } as unknown as QueryInput
+    expect(stringifyQuery(solo)).toBe('?n=42')
+    const mixed = { a: 1, b: BigInt(2) } as unknown as QueryInput
+    expect(stringifyQuery(mixed)).toBe('?a=1&b=2')
+    const inArray = { tag: [BigInt(0), 'x'] } as unknown as QueryInput
+    expect(stringifyQuery(inArray)).toBe('?tag=0&tag=x')
+  })
+
   it('omits non-finite entries inside arrays while preserving finite values', () => {
     expect(stringifyQuery({ mix: [Number.NaN, 'a', Number.POSITIVE_INFINITY, 3] })).toBe('?mix=a&mix=3')
   })
