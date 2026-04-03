@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { init, computeLayout } from 'textura'
 import type { ComputedLayout } from 'textura'
-import { box, text } from '../elements.js'
+import { box, image, text } from '../elements.js'
 import { toLayoutTree } from '../tree.js'
 
 if (typeof globalThis.OffscreenCanvas === 'undefined') {
@@ -158,6 +158,19 @@ describe('geometry snapshot CI', () => {
       ],
     )
     const layout = computeLayout(toLayoutTree(tree), { width: 180, height: 60 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
+
+  it('stable row with text and image siblings (rounded)', async () => {
+    await init()
+    const tree = box(
+      { width: 200, height: 80, padding: 8, flexDirection: 'row', gap: 8, alignItems: 'center' },
+      [
+        text({ text: 'Pic', font: '16px sans-serif', lineHeight: 20, width: 36, height: 20 }),
+        image({ src: '/a.png', width: 48, height: 48 }),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 80 })
     expect(roundLayout(layout)).toMatchSnapshot()
   })
 })
