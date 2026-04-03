@@ -159,6 +159,20 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ ...base, height: {} as unknown as number })).toBe(false)
   })
 
+  it('rejects Date and RegExp values on bounds without throwing (typeof object, not plain numbers)', () => {
+    const base = { x: 0, y: 0, width: 10, height: 10, children: [] as [] }
+    const d = new Date(0) as unknown as number
+    const r = /./ as unknown as number
+    expect(() => layoutBoundsAreFinite({ ...base, x: d })).not.toThrow()
+    expect(layoutBoundsAreFinite({ ...base, x: d })).toBe(false)
+    expect(() => layoutBoundsAreFinite({ ...base, y: r })).not.toThrow()
+    expect(layoutBoundsAreFinite({ ...base, y: r })).toBe(false)
+    expect(() => layoutBoundsAreFinite({ ...base, width: d })).not.toThrow()
+    expect(layoutBoundsAreFinite({ ...base, width: d })).toBe(false)
+    expect(() => layoutBoundsAreFinite({ ...base, height: r })).not.toThrow()
+    expect(layoutBoundsAreFinite({ ...base, height: r })).toBe(false)
+  })
+
   it('rejects objects with valueOf returning a finite number (typeof must be number)', () => {
     const base = { x: 0, y: 0, width: 10, height: 10, children: [] as [] }
     const coercible = { valueOf: () => 42 } as unknown as number
