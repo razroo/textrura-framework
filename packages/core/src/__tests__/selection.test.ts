@@ -116,6 +116,30 @@ describe('collectTextNodes', () => {
     expect(results[0].element.props.text).toBe('Only')
   })
 
+  it('sparse layout children array: still collects a later text node when an earlier slot is missing', () => {
+    const el = box({ width: 200, height: 100 }, [
+      text({ text: 'NoLayout', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
+      text({ text: 'Kept', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
+    ])
+    const sparse: ComputedLayout[] = []
+    sparse[1] = { x: 0, y: 40, width: 100, height: 18, children: [] }
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: sparse as unknown as ComputedLayout['children'],
+    }
+    expect(layout.children).toHaveLength(2)
+    expect(layout.children[0]).toBeUndefined()
+
+    const results: TextNodeInfo[] = []
+    collectTextNodes(el, layout, 0, 0, results)
+    expect(results).toHaveLength(1)
+    expect(results[0].element.props.text).toBe('Kept')
+    expect(results[0].y).toBe(40)
+  })
+
   it('treats non-finite root offsetX/Y as zero (aligned with pointer hit-test root offsets)', () => {
     const el = box({ width: 200, height: 100 }, [
       text({ text: 'Hi', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
