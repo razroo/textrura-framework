@@ -154,8 +154,8 @@ function applyPatches(layout: ComputedLayout, patches: ServerPatch['patches']): 
  * `layout`/`tree`, `patch` with array `patches`, or `error` with string `message`), calls `onError`
  * and returns without mutating state or invoking `onMetrics`.
  *
- * When `msg.protocolVersion` is present and greater than the client’s supported version, calls
- * `onError` and returns without mutating state or invoking `onMetrics`.
+ * When `msg.protocolVersion` is present but not a finite number, or is greater than the client’s
+ * supported version, calls `onError` and returns without mutating state or invoking `onMetrics`.
  *
  * @param state — Mutable `{ layout, tree }` (same fields as {@link TexturaClient}).
  * @param renderer — Receives `render` after successful frame or patch application.
@@ -180,13 +180,24 @@ export function applyServerMessage(
     return
   }
   const record = msg as Record<string, unknown>
-  if (msg.protocolVersion && msg.protocolVersion > PROTOCOL_VERSION) {
-    onError?.(
-      new Error(
-        `Server protocol ${msg.protocolVersion} is newer than client protocol ${PROTOCOL_VERSION}`,
-      ),
-    )
-    return
+  const protocolVersion = record.protocolVersion as unknown
+  if (protocolVersion !== undefined) {
+    if (typeof protocolVersion !== 'number' || !Number.isFinite(protocolVersion)) {
+      onError?.(
+        new Error(
+          'Invalid server message: protocolVersion must be a finite number when present',
+        ),
+      )
+      return
+    }
+    if (protocolVersion > PROTOCOL_VERSION) {
+      onError?.(
+        new Error(
+          `Server protocol ${protocolVersion} is newer than client protocol ${PROTOCOL_VERSION}`,
+        ),
+      )
+      return
+    }
   }
   if (!isWellFormedGeomV1Message(record)) {
     const t = record.type

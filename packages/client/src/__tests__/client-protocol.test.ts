@@ -64,6 +64,37 @@ describe('applyServerMessage', () => {
     expect(renders.length).toBe(0)
   })
 
+  it('rejects non-finite protocolVersion on frame (fail closed; no render)', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const errors: string[] = []
+    type Msg = Parameters<typeof applyServerMessage>[2]
+
+    applyServerMessage(
+      state,
+      renderer,
+      { type: 'frame', layout: layout(), tree: tree(), protocolVersion: Number.NaN } as unknown as Msg,
+      (err) => errors.push(String(err)),
+    )
+    expect(errors[0]).toContain('protocolVersion must be a finite number')
+    expect(state.layout).toBeNull()
+    expect(renders.length).toBe(0)
+
+    applyServerMessage(
+      state,
+      renderer,
+      {
+        type: 'frame',
+        layout: layout(),
+        tree: tree(),
+        protocolVersion: Number.POSITIVE_INFINITY,
+      } as unknown as Msg,
+      (err) => errors.push(String(err)),
+    )
+    expect(errors[1]).toContain('protocolVersion must be a finite number')
+    expect(renders.length).toBe(0)
+  })
+
   it('surfaces protocol mismatch on patch and leaves layout untouched (no extra render)', () => {
     const { renderer, renders } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
