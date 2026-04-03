@@ -221,6 +221,58 @@ describe('trapFocusStep', () => {
     expect(focusedElement.peek()?.element).toBe(updateOnly)
   })
 
+  it('treats empty scopePath as the tree root box (whole-tree trap)', () => {
+    const a = box({ onKeyDown: () => undefined }, [])
+    const b = box({ onKeyDown: () => undefined }, [])
+    const tree = box({}, [a, b])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 100, height: 40, children: [] },
+        { x: 0, y: 50, width: 100, height: 40, children: [] },
+      ],
+    }
+
+    expect(trapFocusStep(tree, layout, [], 'next')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(a)
+
+    expect(trapFocusStep(tree, layout, [], 'next')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(b)
+  })
+
+  it('includes onKeyUp-only boxes in trap order (same rule as collectFocusOrder)', () => {
+    const upOnly = box({ onKeyUp: () => undefined }, [])
+    const keyOnly = box({ onKeyDown: () => undefined }, [])
+    const tree = box({}, [box({}, [upOnly, keyOnly])])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: [
+        {
+          x: 0,
+          y: 0,
+          width: 200,
+          height: 100,
+          children: [
+            { x: 0, y: 0, width: 100, height: 40, children: [] },
+            { x: 0, y: 50, width: 100, height: 40, children: [] },
+          ],
+        },
+      ],
+    }
+
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(upOnly)
+
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(keyOnly)
+  })
+
   it('includes composition-only boxes in trap order (same rule as collectFocusOrder)', () => {
     const compOnly = box({ onCompositionStart: () => undefined }, [])
     const keyOnly = box({ onKeyDown: () => undefined }, [])
