@@ -61,6 +61,13 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 10, height: -0.001, children: [] })).toBe(false)
   })
 
+  it('rejects negative subnormal width or height (still < 0 despite tiny magnitude)', () => {
+    const negSub = -Number.MIN_VALUE
+    expect(negSub).toBeLessThan(0)
+    expect(layoutBoundsAreFinite({ x: 0, y: 0, width: negSub, height: 10, children: [] })).toBe(false)
+    expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 10, height: negSub, children: [] })).toBe(false)
+  })
+
   it('rejects NaN on any axis or dimension', () => {
     const base = { x: 0, y: 0, width: 10, height: 10, children: [] as [] }
     expect(layoutBoundsAreFinite({ ...base, x: NaN })).toBe(false)
