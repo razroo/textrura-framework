@@ -114,6 +114,8 @@ export interface Computed<T> {
  * Create a memoized computation from `fn`. Dependencies are the signals and
  * computeds read while `fn` ran on the last evaluation; conditional reads drop
  * stale edges on the next run.
+ *
+ * @throws If two or more computeds depend on each other in a cycle (unsupported).
  */
 export function computed<T>(fn: () => T): Computed<T> {
   let cached: T

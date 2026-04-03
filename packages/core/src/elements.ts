@@ -28,7 +28,10 @@ type ImageProps = FlexProps & StyleProps & DirectionProps & {
   semantic?: SemanticProps
 }
 
-/** Create a box (container) element. */
+/**
+ * Create a box (container) element.
+ * Handlers, `semantic`, and `key` are runtime metadata; flex and layout fields are consumed by `toLayoutTree()`.
+ */
 export function box(props: BoxProps, children: UIElement[] = []): BoxElement {
   const {
     onClick,
@@ -67,13 +70,19 @@ export function box(props: BoxProps, children: UIElement[] = []): BoxElement {
   }
 }
 
-/** Create a text leaf element. */
+/**
+ * Create a text leaf element.
+ * `selectable` and `semantic` are runtime/rendering concerns; remaining props feed `toLayoutTree()` and Textura.
+ */
 export function text(props: TextProps): TextElement {
   const { key, semantic, ...rest } = props
   return { kind: 'text', props: rest, key, semantic }
 }
 
-/** Create an image element. */
+/**
+ * Create an image element.
+ * `semantic` and `key` are runtime metadata; layout and `src`/`alt` flow through `toLayoutTree()`.
+ */
 export function image(props: ImageProps): ImageElement {
   const { key, semantic, ...rest } = props
   return { kind: 'image', props: rest, key, semantic }
