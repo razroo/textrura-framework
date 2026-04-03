@@ -246,6 +246,16 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<p>Subheading</p>')
   })
 
+  it('treats numeric weight 701+ as bold for heading tiers but not 699 at the same px size', () => {
+    const el = box({ width: 200, height: 80 }, [
+      text({ text: 'Almost bold', font: '699 32px sans-serif', lineHeight: 40 }),
+      text({ text: 'Heavy', font: '701 32px sans-serif', lineHeight: 40 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<p>Almost bold</p>')
+    expect(html).toContain('<h1>Heavy</h1>')
+  })
+
   it('does not treat bold keyword or large digits in the family list (after size) as bold weight', () => {
     const el = box({ width: 200, height: 120 }, [
       text({ text: 'Brand', font: '32px Bold Display, sans-serif', lineHeight: 40 }),
