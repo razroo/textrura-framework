@@ -329,6 +329,59 @@ describe('dispatchHit', () => {
     expect(localY).toBe(11)
   })
 
+  it('applies offsetX and offsetY like hitPathAtPoint and getCursorAtPoint', () => {
+    let localX = -1
+    let localY = -1
+    let evtX = -1
+    const child = box({
+      width: 40,
+      height: 40,
+      onClick: e => {
+        localX = e.localX ?? -999
+        localY = e.localY ?? -999
+        evtX = e.x
+      },
+    })
+    const parent = box({ width: 100, height: 100 }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 10, y: 20, width: 40, height: 40, children: [] as const }],
+    }
+    const result = dispatchHit(parent, layout, 'onClick', 70, 30, undefined, 50, 0)
+    expect(result.handled).toBe(true)
+    expect(evtX).toBe(70)
+    expect(localX).toBe(10)
+    expect(localY).toBe(10)
+    expect(hitPathAtPoint(parent, layout, 70, 30, 50, 0)).toEqual([0])
+    expect(hasInteractiveHitAtPoint(parent, layout, 70, 30, 50, 0)).toBe(true)
+    expect(dispatchHit(parent, layout, 'onClick', 70, 30).handled).toBe(false)
+    expect(hasInteractiveHitAtPoint(parent, layout, 70, 30)).toBe(false)
+  })
+
+  it('merges extra onto the event when offsetX and offsetY are provided', () => {
+    let shift = false
+    const child = box({
+      width: 40,
+      height: 40,
+      onClick: e => {
+        shift = !!(e as HitEvent & { shiftKey?: boolean }).shiftKey
+      },
+    })
+    const parent = box({ width: 100, height: 100 }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 10, y: 20, width: 40, height: 40, children: [] as const }],
+    }
+    dispatchHit(parent, layout, 'onClick', 70, 30, { shiftKey: true }, 50, 0)
+    expect(shift).toBe(true)
+  })
+
   it('fractional pointer coords and subpixel layout hit-test with precise localX/localY', () => {
     let localX = -1
     let localY = -1

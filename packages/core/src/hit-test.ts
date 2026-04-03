@@ -246,6 +246,11 @@ function dispatchHitRecursive(
  * Layout bounds must be finite and non-negative on `width` and `height`; otherwise the node is
  * skipped for hit-testing (corrupt geometry from Yoga or a bad snapshot).
  *
+ * Optional `offsetX` / `offsetY` shift the root layout origin in the same coordinate space as `(x, y)` —
+ * use the same values as {@link hitPathAtPoint} and {@link getCursorAtPoint} when the tree is painted
+ * inside a translated or clipped surface (e.g. nested canvas, CSS transform). Defaults are `0`.
+ * Event `x` / `y` remain the caller coordinates; `localX` / `localY` are relative to the hit target’s abs rect.
+ *
  * @see {@link getCursorAtPoint} for resolving `cursor` at the same logical hit region.
  */
 export function dispatchHit(
@@ -255,23 +260,29 @@ export function dispatchHit(
   x: number,
   y: number,
   extra?: Record<string, unknown>,
+  offsetX = 0,
+  offsetY = 0,
 ): HitDispatchResult {
-  return dispatchHitRecursive(element, layout, eventType, x, y, 0, 0, extra)
+  return dispatchHitRecursive(element, layout, eventType, x, y, offsetX, offsetY, extra)
 }
 
 /**
  * True when the point is over an element that participates in pointer hit-testing
  * (`onClick`, `onPointerDown` / `Up` / `Move`, `onWheel`). Keyboard and composition
  * handlers alone do not count — use this for hover / pointer-capture style checks.
+ *
+ * Optional `offsetX` / `offsetY` match {@link hitPathAtPoint} / {@link dispatchHit} for rooted coordinate transforms.
  */
 export function hasInteractiveHitAtPoint(
   element: UIElement,
   layout: ComputedLayout,
   x: number,
   y: number,
+  offsetX = 0,
+  offsetY = 0,
 ): boolean {
   const hits: HitTarget[] = []
-  collectHits(element, layout, x, y, 0, 0, hits)
+  collectHits(element, layout, x, y, offsetX, offsetY, hits)
   for (let i = hits.length - 1; i >= 0; i--) {
     const handlers = hits[i]!.handlers
     if (
