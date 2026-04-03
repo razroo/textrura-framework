@@ -56,6 +56,21 @@ describe('text-input foundation', () => {
     expect(result.selection.anchorOffset).toBe(6)
   })
 
+  it('treats BigInt selection fields as zero so clamping never throws', () => {
+    const state: TextInputState = {
+      nodes: ['ab'],
+      selection: {
+        anchorNode: 1n as unknown as number,
+        anchorOffset: 2n as unknown as number,
+        focusNode: 0n as unknown as number,
+        focusOffset: 1n as unknown as number,
+      },
+    }
+    const result = insertInputText(state, '!')
+    expect(result.nodes).toEqual(['!ab'])
+    expect(result.selection).toEqual({ anchorNode: 0, anchorOffset: 1, focusNode: 0, focusOffset: 1 })
+  })
+
   it('backspace deletes previous character', () => {
     const state: TextInputState = {
       nodes: ['Hello'],
@@ -325,6 +340,30 @@ describe('text-input foundation', () => {
     expect(atStart?.x).toBe(50)
     expect(atMiddle?.x).toBe(30)
     expect(atEnd?.x).toBe(10)
+  })
+
+  it('getInputCaretGeometry tolerates BigInt focus offset without throwing', () => {
+    const textNodes: TextNodeInfo[] = [
+      {
+        element: { kind: 'text', props: { text: 'ab', font: '14px Inter', lineHeight: 18 } },
+        direction: 'ltr',
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 18,
+        index: 0,
+        lines: [{ text: 'ab', x: 10, y: 20, charOffsets: [0, 5], charWidths: [5, 5] }],
+      },
+    ]
+    const caret = getInputCaretGeometry(textNodes, {
+      anchorNode: 0,
+      anchorOffset: 1n as unknown as number,
+      focusNode: 0,
+      focusOffset: 1n as unknown as number,
+    })
+    expect(caret).not.toBeNull()
+    expect(caret?.offset).toBe(0)
+    expect(caret?.x).toBe(10)
   })
 
   it('supports undo/redo history for edits', () => {

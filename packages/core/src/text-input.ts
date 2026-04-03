@@ -27,6 +27,11 @@ function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n))
 }
 
+/** Finite numbers only; `Math.min`/`Math.max` throw on BigInt and propagate NaN through caret math. */
+function finiteSelectionNumber(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
 function normalizeSelection(selection: SelectionRange): SelectionRange {
   const {
     anchorNode,
@@ -53,10 +58,17 @@ function clampSelection(nodes: string[], selection: SelectionRange): SelectionRa
     return { anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 0 }
   }
   const maxNode = nodes.length - 1
-  const aNode = clamp(selection.anchorNode, 0, maxNode)
-  const fNode = clamp(selection.focusNode, 0, maxNode)
-  const aOffset = clamp(selection.anchorOffset, 0, nodes[aNode]!.length)
-  const fOffset = clamp(selection.focusOffset, 0, nodes[fNode]!.length)
+  const sanitized: SelectionRange = {
+    anchorNode: finiteSelectionNumber(selection.anchorNode),
+    anchorOffset: finiteSelectionNumber(selection.anchorOffset),
+    focusNode: finiteSelectionNumber(selection.focusNode),
+    focusOffset: finiteSelectionNumber(selection.focusOffset),
+  }
+  const normalized = normalizeSelection(sanitized)
+  const aNode = clamp(normalized.anchorNode, 0, maxNode)
+  const fNode = clamp(normalized.focusNode, 0, maxNode)
+  const aOffset = clamp(normalized.anchorOffset, 0, nodes[aNode]!.length)
+  const fOffset = clamp(normalized.focusOffset, 0, nodes[fNode]!.length)
   return { anchorNode: aNode, anchorOffset: aOffset, focusNode: fNode, focusOffset: fOffset }
 }
 
@@ -425,7 +437,7 @@ export function getInputCaretGeometry(
   if (!node || node.lines.length === 0) return null
 
   const maxOffset = node.element.props.text.length
-  const targetOffset = clamp(selection.focusOffset, 0, maxOffset)
+  const targetOffset = clamp(finiteSelectionNumber(selection.focusOffset), 0, maxOffset)
   let traversed = 0
 
   for (const line of node.lines) {
