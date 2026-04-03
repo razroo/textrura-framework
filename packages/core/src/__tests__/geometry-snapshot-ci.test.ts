@@ -77,6 +77,20 @@ describe('geometry snapshot CI', () => {
     expect(roundLayout(layout)).toMatchSnapshot()
   })
 
+  it('stable ltr row with per-node rtl and ltr text dir (rounded)', async () => {
+    await init()
+    const item = { font: '16px sans-serif', lineHeight: 20, width: 40, height: 20 } as const
+    const tree = box(
+      { width: 200, height: 80, padding: 12, flexDirection: 'row', gap: 8 },
+      [
+        text({ text: 'L', ...item, dir: 'ltr' }),
+        text({ text: 'R', ...item, dir: 'rtl' }),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 80 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
+
   it('stable row with space-between and two text children (rounded)', async () => {
     await init()
     const tree = box(
