@@ -240,6 +240,30 @@ describe('createApp onError', () => {
     expect(setFrameTimings).not.toHaveBeenCalled()
   })
 
+  it('invokes onError when render throws after layout; setFrameTimings runs before render', async () => {
+    const onError = vi.fn()
+    const err = new Error('render failed')
+    const setFrameTimings = vi.fn()
+    const renderer: Renderer = {
+      setFrameTimings,
+      render() {
+        throw err
+      },
+      destroy: vi.fn(),
+    }
+
+    await createApp(() => box({ width: 10, height: 10 }, []), renderer, {
+      width: 100,
+      height: 50,
+      onError,
+    })
+
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(onError).toHaveBeenCalledWith(err)
+    expect(setFrameTimings).toHaveBeenCalledTimes(1)
+    expect(setFrameTimings).toHaveBeenCalledWith({ layoutMs: expect.any(Number) })
+  })
+
   it('allows a later manual update after the view first throws', async () => {
     const onError = vi.fn()
     const render = vi.fn()
