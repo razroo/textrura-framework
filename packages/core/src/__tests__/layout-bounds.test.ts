@@ -1,5 +1,8 @@
+import type { ComputedLayout } from 'textura'
 import { describe, it, expect } from 'vitest'
 import { layoutBoundsAreFinite } from '../layout-bounds.js'
+
+const emptyChildren = [] as const
 
 describe('layoutBoundsAreFinite', () => {
   it('accepts a normal finite rect with non-negative size', () => {
@@ -47,5 +50,21 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ ...base, y: b })).toBe(false)
     expect(layoutBoundsAreFinite({ ...base, width: b })).toBe(false)
     expect(layoutBoundsAreFinite({ ...base, height: b })).toBe(false)
+  })
+
+  it('rejects sparse or empty layout objects (undefined bounds from corrupt trees)', () => {
+    expect(layoutBoundsAreFinite({} as unknown as ComputedLayout)).toBe(false)
+    expect(
+      layoutBoundsAreFinite({ x: 0, y: 0, width: 1, children: emptyChildren } as unknown as ComputedLayout),
+    ).toBe(false)
+    expect(
+      layoutBoundsAreFinite({ x: 0, y: 0, height: 1, children: emptyChildren } as unknown as ComputedLayout),
+    ).toBe(false)
+  })
+
+  it('rejects boxed Number primitives (typeof object, not plain numbers)', () => {
+    const base = { x: 0, y: 0, width: 10, height: 10, children: emptyChildren }
+    expect(layoutBoundsAreFinite({ ...base, x: Object(0) as unknown as number })).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, width: Object(10) as unknown as number })).toBe(false)
   })
 })
