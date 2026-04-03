@@ -9,11 +9,11 @@
 #   - For push: a configured remote; new branches may need `git push -u origin HEAD` once so `git push` succeeds
 #
 # Environment (optional):
-#   CURSOR_AGENT_ITERATIONS   Max agent runs (default: 1). Use a higher number for a batch.
-#   CURSOR_AGENT_PUSH         If 1, agent is told to push and this script runs git push after each iteration (default: 1). Set to 0 to skip pushing.
-#   CURSOR_AGENT_FORCE_SHELL  If 1, pass --force so the agent can run shell commands without per-command approval (default: 1). Set to 0 for safer, interactive-style approval. --force allows arbitrary commands in the repo: use a dedicated branch and review diffs.
+#   CURSOR_AGENT_ITERATIONS   Max agent runs (default: 100). Lower for a short run, e.g. CURSOR_AGENT_ITERATIONS=1.
+#   CURSOR_AGENT_PUSH         If 1, agent commits and this script runs git push after each iteration (default: 1). Set to 0 to skip pushing.
+#   CURSOR_AGENT_FORCE_SHELL  If 1, pass --force so the agent can run shell without per-command approval (default: 1). Set to 0 for safer approval prompts. --force allows arbitrary commands: use a dedicated branch and review diffs.
 #   CURSOR_AGENT_WORKSPACE    Repo root (default: git top-level from current directory).
-#   CURSOR_AGENT_MODEL        If set, passed as --model to agent.
+#   CURSOR_AGENT_MODEL        Passed as --model to agent (default: composer-2). Override e.g. composer-2-fast or auto.
 #   CURSOR_AGENT_EXTRA        Extra instructions appended to the built-in prompt.
 #   CURSOR_AGENT_VERBOSE      If 1, stream agent progress (tools, partial text) to the terminal via stream-json (default: 1). Set to 0 for final text only.
 #
@@ -29,12 +29,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STREAM_FORMATTER="${SCRIPT_DIR}/cursor-agent-stream-format.py"
 
-ITERATIONS="${CURSOR_AGENT_ITERATIONS:-1}"
+ITERATIONS="${CURSOR_AGENT_ITERATIONS:-100}"
 PUSH="${CURSOR_AGENT_PUSH:-1}"
 FORCE_SHELL="${CURSOR_AGENT_FORCE_SHELL:-1}"
 VERBOSE="${CURSOR_AGENT_VERBOSE:-1}"
 WORKSPACE="${CURSOR_AGENT_WORKSPACE:-}"
-MODEL="${CURSOR_AGENT_MODEL:-}"
+MODEL="${CURSOR_AGENT_MODEL:-composer-2}"
 EXTRA="${CURSOR_AGENT_EXTRA:-}"
 
 if ! command -v agent >/dev/null 2>&1; then
@@ -105,6 +105,8 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
       - Improve the demo site or starter templates
       Pick something concrete and high-value. Do NOT say there is nothing to do — there is always room to improve a codebase.
 
+   c) Self-improve this loop: when scripts/cursor-agent-loop.sh — the prompt you are reading or the script's header comments — is stale, misleading, too vague, or omits heuristics that would help later runs pick better tasks and scope work smarter, prefer a minimal, accurate edit to that script if that is higher leverage right now than the next item in (a)/(b). Goal: successive iterations should get better at deciding what to work on and how.
+
 3. Implement with minimal scope: only files and changes required for this one task. Match existing naming, imports (.js extensions), and patterns.
 
 4. Run the repo release gate from the repo root:
@@ -131,9 +133,7 @@ fi
 if [[ "$FORCE_SHELL" == "1" ]]; then
   agent_cmd+=(--force)
 fi
-if [[ -n "$MODEL" ]]; then
-  agent_cmd+=(--model "$MODEL")
-fi
+agent_cmd+=(--model "$MODEL")
 
 i=1
 while true; do
