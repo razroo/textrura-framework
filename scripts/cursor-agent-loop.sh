@@ -92,8 +92,8 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
 1. Explore the codebase. Read ROADMAP.md, CLAUDE.md, and browse the source in packages/. Understand the architecture and what already exists.
 
 2. Decide what to work on. Use this priority order:
-   a) Unchecked items in ROADMAP.md (if any remain).
-   b) If the roadmap is fully checked, improve the framework on your own initiative. Examples of valuable work:
+   a) Unchecked items in ROADMAP.md (if any remain). When roadmap tracking boxes are all done, still grep ROADMAP.md Phase A–C bullets and ROUTING_COMPETITIVENESS_CHECKLIST.md for any remaining \`[ ]\` lines; use those sections for thematic priorities (fonts/metrics, hit-test and input, protocol, renderers, demos).
+   b) If nothing is unchecked there either, improve the framework on your own initiative. Examples of valuable work:
       - Add or expand test coverage (unit tests, edge cases, integration tests)
       - Improve performance in hot paths (hit-testing, text measurement, layout, repaint)
       - Harden error handling and edge cases
@@ -103,6 +103,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
       - Fix any TODO/FIXME/HACK comments in the source
       - Add small, useful features that fit the framework's philosophy
       - Improve the demo site or starter templates
+      Prefer one primary subsystem or package per iteration (e.g. core hit-test, fonts, server protocol); avoid wide drive-by refactors unless the task truly spans boundaries.
       Pick something concrete and high-value. Do NOT say there is nothing to do — there is always room to improve a codebase.
 
    c) Self-improve this loop: when scripts/cursor-agent-loop.sh — the prompt you are reading or the script's header comments — is stale, misleading, too vague, or omits heuristics that would help later runs pick better tasks and scope work smarter, prefer a minimal, accurate edit to that script if that is higher leverage right now than the next item in (a)/(b). Goal: successive iterations should get better at deciding what to work on and how.
