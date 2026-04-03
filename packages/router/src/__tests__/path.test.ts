@@ -26,6 +26,11 @@ describe('path generation', () => {
     ).toThrow('Missing required splat param: rest')
   })
 
+  it('throws when anonymous splat (* or /*) is missing the * param', () => {
+    expect(() => buildPath('*', {} as PathParams<'*'>)).toThrow('Missing required splat param: *')
+    expect(() => buildPath('/*', {} as PathParams<'/*'>)).toThrow('Missing required splat param: *')
+  })
+
   it('includes optional params when provided', () => {
     expect(buildPath('/users/:id?', { id: 7 })).toBe('/users/7')
   })
