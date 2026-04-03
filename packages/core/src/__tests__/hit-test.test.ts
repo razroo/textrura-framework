@@ -219,6 +219,90 @@ describe('dispatchHit', () => {
     expect(childFired).toBe(false)
   })
 
+  it('skips a corrupt child layout and still hits a finite sibling without throwing', () => {
+    let goodFired = false
+    let rootFired = false
+    const badChild = box({ width: 10, height: 10 })
+    const goodChild = box({
+      width: 10,
+      height: 10,
+      onClick: () => {
+        goodFired = true
+      },
+      cursor: 'text',
+    })
+    const root = box(
+      {
+        width: 100,
+        height: 50,
+        onClick: () => {
+          rootFired = true
+        },
+        cursor: 'pointer',
+      },
+      [badChild, goodChild],
+    )
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 50,
+      children: [
+        { x: 0, y: 0, width: Number.NaN, height: 10, children: [] as const },
+        { x: 20, y: 0, width: 10, height: 10, children: [] as const },
+      ],
+    }
+
+    expect(() => dispatchHit(root, layout, 'onClick', 25, 5)).not.toThrow()
+    expect(dispatchHit(root, layout, 'onClick', 25, 5).handled).toBe(true)
+    expect(goodFired).toBe(true)
+    expect(rootFired).toBe(false)
+
+    expect(() => hitPathAtPoint(root, layout, 25, 5)).not.toThrow()
+    expect(hitPathAtPoint(root, layout, 25, 5)).toEqual([1])
+
+    expect(() => hasInteractiveHitAtPoint(root, layout, 25, 5)).not.toThrow()
+    expect(hasInteractiveHitAtPoint(root, layout, 25, 5)).toBe(true)
+
+    expect(() => getCursorAtPoint(root, layout, 25, 5)).not.toThrow()
+    expect(getCursorAtPoint(root, layout, 25, 5)).toBe('text')
+  })
+
+  it('single corrupt child layout still allows parent pointer handlers at points missing the child', () => {
+    let rootFired = false
+    let childFired = false
+    const child = box({
+      width: 10,
+      height: 10,
+      onClick: () => {
+        childFired = true
+      },
+    })
+    const root = box(
+      {
+        width: 100,
+        height: 50,
+        onClick: () => {
+          rootFired = true
+        },
+      },
+      [child],
+    )
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 50,
+      children: [{ x: 0, y: 0, width: Number.NaN, height: 10, children: [] as const }],
+    }
+
+    expect(() => dispatchHit(root, layout, 'onClick', 80, 25)).not.toThrow()
+    expect(dispatchHit(root, layout, 'onClick', 80, 25).handled).toBe(true)
+    expect(rootFired).toBe(true)
+    expect(childFired).toBe(false)
+    expect(hitPathAtPoint(root, layout, 80, 25)).toEqual([])
+  })
+
   it('negative finite layout dimensions are a miss for dispatch and hit queries', () => {
     let fired: boolean
     const el = box({
