@@ -349,7 +349,9 @@ function elementToHTML(element: UIElement, indent: number): string {
  * HTML5 void elements (`input`, `br`, `img`, …) never get a closing tag; if a void `semantic.tag`
  * has text content or box children, that content is serialized as following siblings (valid markup).
  *
- * `options.headExtra` is concatenated raw; all other string options and tree text are escaped.
+ * `options.headExtra` is concatenated raw when it is a non-empty string; all other string options and
+ * tree text are escaped. Non-string option values (e.g. corrupt deserialization) are ignored, matching
+ * the `lang` guard, so `escapeHTML` never receives non-strings.
  */
 export function toSemanticHTML(
   tree: UIElement,
@@ -360,37 +362,55 @@ export function toSemanticHTML(
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
   ]
 
-  if (options.title) meta.push(`<title>${escapeHTML(options.title)}</title>`)
-  if (options.description) meta.push(`<meta name="description" content="${escapeHTML(options.description)}">`)
-  if (options.canonical) meta.push(`<link rel="canonical" href="${escapeHTML(options.canonical)}">`)
+  if (typeof options.title === 'string' && options.title) {
+    meta.push(`<title>${escapeHTML(options.title)}</title>`)
+  }
+  if (typeof options.description === 'string' && options.description) {
+    meta.push(`<meta name="description" content="${escapeHTML(options.description)}">`)
+  }
+  if (typeof options.canonical === 'string' && options.canonical) {
+    meta.push(`<link rel="canonical" href="${escapeHTML(options.canonical)}">`)
+  }
 
   if (options.og) {
-    if (options.og.title) meta.push(`<meta property="og:title" content="${escapeHTML(options.og.title)}">`)
-    if (options.og.description) meta.push(`<meta property="og:description" content="${escapeHTML(options.og.description)}">`)
-    if (options.og.image) meta.push(`<meta property="og:image" content="${escapeHTML(options.og.image)}">`)
-    if (options.og.url) meta.push(`<meta property="og:url" content="${escapeHTML(options.og.url)}">`)
-    if (options.og.type) meta.push(`<meta property="og:type" content="${escapeHTML(options.og.type)}">`)
+    const og = options.og
+    if (typeof og.title === 'string' && og.title) {
+      meta.push(`<meta property="og:title" content="${escapeHTML(og.title)}">`)
+    }
+    if (typeof og.description === 'string' && og.description) {
+      meta.push(`<meta property="og:description" content="${escapeHTML(og.description)}">`)
+    }
+    if (typeof og.image === 'string' && og.image) {
+      meta.push(`<meta property="og:image" content="${escapeHTML(og.image)}">`)
+    }
+    if (typeof og.url === 'string' && og.url) {
+      meta.push(`<meta property="og:url" content="${escapeHTML(og.url)}">`)
+    }
+    if (typeof og.type === 'string' && og.type) {
+      meta.push(`<meta property="og:type" content="${escapeHTML(og.type)}">`)
+    }
   }
 
   if (options.twitter) {
-    if (options.twitter.card) {
-      meta.push(`<meta name="twitter:card" content="${escapeHTML(options.twitter.card)}">`)
+    const tw = options.twitter
+    if (typeof tw.card === 'string' && tw.card) {
+      meta.push(`<meta name="twitter:card" content="${escapeHTML(tw.card)}">`)
     }
-    if (options.twitter.site) {
-      meta.push(`<meta name="twitter:site" content="${escapeHTML(options.twitter.site)}">`)
+    if (typeof tw.site === 'string' && tw.site) {
+      meta.push(`<meta name="twitter:site" content="${escapeHTML(tw.site)}">`)
     }
-    if (options.twitter.title) {
-      meta.push(`<meta name="twitter:title" content="${escapeHTML(options.twitter.title)}">`)
+    if (typeof tw.title === 'string' && tw.title) {
+      meta.push(`<meta name="twitter:title" content="${escapeHTML(tw.title)}">`)
     }
-    if (options.twitter.description) {
-      meta.push(`<meta name="twitter:description" content="${escapeHTML(options.twitter.description)}">`)
+    if (typeof tw.description === 'string' && tw.description) {
+      meta.push(`<meta name="twitter:description" content="${escapeHTML(tw.description)}">`)
     }
-    if (options.twitter.image) {
-      meta.push(`<meta name="twitter:image" content="${escapeHTML(options.twitter.image)}">`)
+    if (typeof tw.image === 'string' && tw.image) {
+      meta.push(`<meta name="twitter:image" content="${escapeHTML(tw.image)}">`)
     }
   }
 
-  if (options.headExtra) meta.push(options.headExtra)
+  if (typeof options.headExtra === 'string' && options.headExtra) meta.push(options.headExtra)
 
   const body = elementToHTML(tree, 2)
   // Only accept string lang; ignore other runtime shapes so malformed options never reach escapeHTML.

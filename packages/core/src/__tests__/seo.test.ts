@@ -29,6 +29,59 @@ describe('toSemanticHTML', () => {
     expect(toSemanticHTML(el, { lang: true as never })).toContain('<html lang="en">')
   })
 
+  it('ignores non-string head/meta option values at runtime (no throw; matches lang guard)', () => {
+    const el = box({ width: 100, height: 100 })
+    expect(() =>
+      toSemanticHTML(el, {
+        title: 1 as never,
+        description: true as never,
+        canonical: [] as never,
+        og: {
+          title: {} as never,
+          description: 2 as never,
+          image: null as never,
+          url: 3 as never,
+          type: Symbol('t') as never,
+        },
+        twitter: {
+          card: 1 as never,
+          site: 2 as never,
+          title: 3 as never,
+          description: 4 as never,
+          image: 5 as never,
+        },
+        headExtra: { not: 'html' } as never,
+      }),
+    ).not.toThrow()
+    const html = toSemanticHTML(el, {
+      title: 1 as never,
+      description: true as never,
+      canonical: [] as never,
+      og: {
+        title: {} as never,
+        description: 2 as never,
+        image: null as never,
+        url: 3 as never,
+        type: Symbol('t') as never,
+      },
+      twitter: {
+        card: 1 as never,
+        site: 2 as never,
+        title: 3 as never,
+        description: 4 as never,
+        image: 5 as never,
+      },
+      headExtra: { not: 'html' } as never,
+    })
+    expect(html).toContain('<!DOCTYPE html>')
+    expect(html).not.toContain('<title>')
+    expect(html).not.toContain('name="description"')
+    expect(html).not.toContain('rel="canonical"')
+    expect(html).not.toContain('property="og:')
+    expect(html).not.toContain('name="twitter:')
+    expect(html).not.toContain('not:')
+  })
+
   it('emits HTML dir on boxes and text when props.dir is ltr, rtl, or auto', () => {
     const el = box({ width: 200, height: 80, dir: 'rtl' }, [
       text({ text: 'mixed', font: '14px sans-serif', lineHeight: 18, dir: 'ltr' }),
