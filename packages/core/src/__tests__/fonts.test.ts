@@ -613,6 +613,15 @@ describe('resolveFontLoadTimeoutMs', () => {
     expect(resolveFontLoadTimeoutMs({} as unknown as number, fallback)).toBe(fallback)
   })
 
+  it('returns defaultMs for boxed numbers and symbols (typeof is not number)', () => {
+    const fallback = 3333
+    expect(resolveFontLoadTimeoutMs(Object(100) as unknown as number)).toBe(10_000)
+    expect(resolveFontLoadTimeoutMs(Object(100) as unknown as number, fallback)).toBe(fallback)
+    expect(resolveFontLoadTimeoutMs(Object(0) as unknown as number)).toBe(10_000)
+    expect(resolveFontLoadTimeoutMs(Symbol('t') as unknown as number)).toBe(10_000)
+    expect(resolveFontLoadTimeoutMs(Symbol('t') as unknown as number, fallback)).toBe(fallback)
+  })
+
   it('preserves finite non-negative timeouts', () => {
     expect(resolveFontLoadTimeoutMs(0)).toBe(0)
     expect(resolveFontLoadTimeoutMs(80)).toBe(80)
