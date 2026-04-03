@@ -363,6 +363,15 @@ export function getCursorAtPoint(
   const absX = offsetX + layout.x
   const absY = offsetY + layout.y
 
+  if (element.kind === 'box') {
+    const { overflow } = element.props
+    if (overflow === 'hidden' || overflow === 'scroll') {
+      if (x < absX || x > absX + layout.width || y < absY || y > absY + layout.height) {
+        return null
+      }
+    }
+  }
+
   const inside =
     x >= absX && x <= absX + layout.width &&
     y >= absY && y <= absY + layout.height
