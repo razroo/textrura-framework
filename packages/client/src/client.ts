@@ -184,6 +184,10 @@ function applyPatches(layout: ComputedLayout, patches: ServerPatch['patches']): 
  * patches, and calls {@link Renderer.render} when a frame is applied or a patch runs against current
  * state. Patches received before the first frame are ignored (no state change, no render).
  *
+ * For `patch` messages, each entry walks `path` into `layout.children`; if an index is missing, the
+ * walk stops and any `x` / `y` / `width` / `height` fields apply to that last resolved node (often the
+ * root). This is intentional lenient behavior and does not call `onError`.
+ *
  * When the payload is not a plain object, or is missing a well-formed `type` (`frame` with object
  * `layout`/`tree`, `patch` with a `patches` array of objects that each include an integer `path` and
  * only finite numeric geometry fields, or `error` with string `message`), calls `onError` and returns
