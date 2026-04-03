@@ -108,6 +108,20 @@ describe('query helpers', () => {
     expect(stringifyQuery(query)).toBe('?visible=yes')
   })
 
+  it('ignores symbol keys (Object.keys does not enumerate them)', () => {
+    const sym = Symbol('meta')
+    const raw: Record<PropertyKey, unknown> = { route: '/home' }
+    raw[sym] = 'hidden'
+    expect(stringifyQuery(raw as QueryInput)).toBe('?route=%2Fhome')
+  })
+
+  it('returns empty string when the only enumerable keys are symbols', () => {
+    const sym = Symbol('only')
+    const raw: Record<PropertyKey, unknown> = {}
+    raw[sym] = 'x'
+    expect(stringifyQuery(raw as QueryInput)).toBe('')
+  })
+
   it('parses single query values', () => {
     expect(parseQuery('?page=2&sort=asc')).toEqual({ page: '2', sort: 'asc' })
   })
