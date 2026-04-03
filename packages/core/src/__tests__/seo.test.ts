@@ -473,6 +473,29 @@ describe('toSemanticHTML', () => {
     expect(toSemanticHTML(el)).toContain('<p>Degenerate</p>')
   })
 
+  it('does not infer headings when the first font-size resolves to zero effective px', () => {
+    const el = box({ width: 200, height: 80 }, [
+      text({ text: 'Zero px', font: 'bold 0px sans-serif', lineHeight: 18 }),
+      text({ text: 'Zero rem', font: 'bold 0rem sans-serif', lineHeight: 18 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<p>Zero px</p>')
+    expect(html).toContain('<p>Zero rem</p>')
+    expect(html).not.toMatch(/<h[1-6]>Zero/)
+  })
+
+  it('treats whitespace-only semantic.tag as missing and falls back to inference', () => {
+    const el = box({ width: 200, height: 50 }, [
+      text({
+        text: 'Heading',
+        font: 'bold 32px sans-serif',
+        lineHeight: 40,
+        semantic: { tag: '   \t' },
+      }),
+    ])
+    expect(toSemanticHTML(el)).toContain('<h1>Heading</h1>')
+  })
+
   it('uses explicit semantic tag when provided', () => {
     const el = box({ width: 200, height: 50 }, [
       text({
