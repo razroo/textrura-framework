@@ -179,6 +179,57 @@ describe('createClient WebSocket message parse errors', () => {
     expect(String((errors[0] as Error).message)).toContain('Invalid server message')
   })
 
+  it('invokes onError when type is frame but layout or tree is a JSON array (not a plain object)', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+    const renderer: Renderer = {
+      render: () => {},
+      destroy: () => {},
+    }
+
+    createClient({
+      url: 'ws://mock.test',
+      renderer,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    sockets[0]!.emit('message', {
+      data: JSON.stringify({
+        type: 'frame',
+        layout: [],
+        tree: { kind: 'box', props: {}, children: [] },
+        protocolVersion: 1,
+      }),
+    })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(Error)
+    expect(String((errors[0] as Error).message)).toContain('frame')
+
+    errors.length = 0
+    sockets[0]!.emit('message', {
+      data: JSON.stringify({
+        type: 'frame',
+        layout: { x: 0, y: 0, width: 1, height: 1, children: [] },
+        tree: [],
+        protocolVersion: 1,
+      }),
+    })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(Error)
+    expect(String((errors[0] as Error).message)).toContain('frame')
+  })
+
   it('invokes onError when type is error but message is not a string, then accepts a valid frame', async () => {
     const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
     installMockWebSocket(sockets)
