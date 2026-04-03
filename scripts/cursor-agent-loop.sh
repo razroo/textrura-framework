@@ -3,9 +3,12 @@
 # session that explores the codebase, picks the next best improvement, implements
 # it, runs the release gate, commits, and pushes.
 #
-# Task selection: ROADMAP.md uses `- [x]` / `- [ ]` in the post-1.0 sections and in Phase A–C.
-# Grep for remaining `- [ ]` there plus ROUTING_COMPETITIVENESS_CHECKLIST.md. Do not treat
-# unchecked items in RELEASE_CHECKLIST.md / v1-release-checklist.md as agent work (human release steps).
+# Task selection (humans/agents): grep ROADMAP.md and ROUTING_COMPETITIVENESS_CHECKLIST.md for `- [ ]`.
+# Many sections may already be all `[x]` — that only means unchecked roadmap boxes are exhausted,
+# not that the repo is "done". Then prefer ROADMAP "Deferred / research" themes, or one scoped change
+# under packages/ (tests, perf in hit-test/text/layout paths, types, public JSDoc, or
+# `rg 'TODO|FIXME|HACK' packages`). Ignore `[ ]` in RELEASE_CHECKLIST.md / v1-release-checklist.md
+# (maintainer release steps, not framework backlog).
 #
 # Prerequisites:
 #   - Cursor Agent CLI: https://cursor.com/install (`agent` on PATH)
