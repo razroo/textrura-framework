@@ -548,4 +548,51 @@ describe('@geometra/ui input', () => {
     )
     expect(hasHighlight).toBe(false)
   })
+
+  it('treats non-finite caretOffset like missing (defaults to end of value)', () => {
+    const el = input('Hi', '', { focused: true, caretOffset: Number.NaN })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    // Caret after full string: trailing segment empty, no left text before caret in split mode
+    const texts = el.children.filter((c) => c.kind === 'text')
+    expect(texts.some((c) => c.kind === 'text' && c.props.text === 'Hi')).toBe(true)
+    expect(
+      el.children.some(
+        (c) => c.kind === 'box' && c.props.backgroundColor === '#38bdf8' && c.props.width === 1.5,
+      ),
+    ).toBe(true)
+  })
+
+  it('clamps non-finite selection indices to caret semantics (no spurious selection highlight)', () => {
+    const el = input('abc', '', {
+      focused: true,
+      caretOffset: 1,
+      selectionStart: Number.NaN,
+      selectionEnd: Number.POSITIVE_INFINITY,
+    })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    const hasHighlight = el.children.some(
+      (child) => child.kind === 'box' && child.props.backgroundColor === 'rgba(56, 189, 248, 0.3)',
+    )
+    expect(hasHighlight).toBe(false)
+  })
+
+  it('uses offset 0 for onCaretOffsetChange when pointer localX is non-finite', () => {
+    let seen = -1
+    const el = input('ab', '', {
+      onCaretOffsetChange: (o) => {
+        seen = o
+      },
+    })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    el.handlers?.onClick?.({
+      x: Number.NaN,
+      y: 0,
+      localX: Number.NaN,
+      target: { x: 0, y: 0, width: 200, height: 30, children: [] } as HitEvent['target'],
+    })
+    expect(seen).toBe(0)
+  })
 })

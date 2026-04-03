@@ -13,7 +13,7 @@ function getInputMeasureCtx(): CanvasRenderingContext2D | null {
 
 function getCaretOffsetFromLocalX(textValue: string, localX: number): number {
   if (textValue.length === 0) return 0
-  const clampedX = Math.max(0, localX)
+  const clampedX = Number.isFinite(localX) ? Math.max(0, localX) : 0
   const ctx = getInputMeasureCtx()
   if (!ctx) {
     const approxCharWidth = 8
@@ -63,14 +63,19 @@ export interface InputOptions {
 export function input(value: string, placeholder = '', options: InputOptions = {}): UIElement {
   const focused = options.focused === true
   const maxOffset = value.length
-  const requestedOffset = options.caretOffset ?? maxOffset
-  const caretOffset = Math.max(0, Math.min(requestedOffset, maxOffset))
+  const requestedCaret = options.caretOffset
+  const caretBase =
+    requestedCaret === undefined || !Number.isFinite(requestedCaret) ? maxOffset : requestedCaret
+  const caretOffset = Math.max(0, Math.min(caretBase, maxOffset))
   const showPlaceholder = value.length === 0
 
-  const rawSelStart = options.selectionStart ?? caretOffset
-  const rawSelEnd = options.selectionEnd ?? caretOffset
-  const selStart = Math.max(0, Math.min(Math.min(rawSelStart, rawSelEnd), maxOffset))
-  const selEnd = Math.max(0, Math.min(Math.max(rawSelStart, rawSelEnd), maxOffset))
+  const rawSelStart = options.selectionStart
+  const rawSelEnd = options.selectionEnd
+  const s0 =
+    rawSelStart === undefined || !Number.isFinite(rawSelStart) ? caretOffset : rawSelStart
+  const s1 = rawSelEnd === undefined || !Number.isFinite(rawSelEnd) ? caretOffset : rawSelEnd
+  const selStart = Math.max(0, Math.min(Math.min(s0, s1), maxOffset))
+  const selEnd = Math.max(0, Math.min(Math.max(s0, s1), maxOffset))
   const hasSelection = focused && selStart !== selEnd
 
   const children: UIElement[] = []
