@@ -614,6 +614,11 @@ describe('resolveFontLoadTimeoutMs', () => {
     expect(resolveFontLoadTimeoutMs(2500)).toBe(2500)
     expect(resolveFontLoadTimeoutMs(2500, 999)).toBe(2500)
   })
+
+  it('canonicalizes -0 to positive zero', () => {
+    expect(resolveFontLoadTimeoutMs(-0)).toBe(0)
+    expect(Object.is(resolveFontLoadTimeoutMs(-0), -0)).toBe(false)
+  })
 })
 
 describe('collectFontFamiliesFromTree', () => {
