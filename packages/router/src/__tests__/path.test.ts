@@ -164,6 +164,20 @@ describe('path generation', () => {
     expect(buildPath('/p/:x', { x: loneLow } as PathParams<'/p/:x'>)).toBe('/p/%EF%BF%BD')
   })
 
+  it('normalizes ill-formed UTF-16 in splat remainders without throwing (toWellFormed parity with dynamic segments)', () => {
+    const loneHigh = '\uD800'
+    const loneLow = '\uDC00'
+    const replacement = '\uFFFD'
+    expect(() => buildPath('/docs/*rest', { rest: loneHigh } as PathParams<'/docs/*rest'>)).not.toThrow()
+    expect(() => buildPath('/docs/*rest', { rest: loneLow } as PathParams<'/docs/*rest'>)).not.toThrow()
+    expect(buildPath('/docs/*rest', { rest: loneHigh } as PathParams<'/docs/*rest'>)).toBe(`/docs/${replacement}`)
+    expect(buildPath('/docs/*rest', { rest: loneLow } as PathParams<'/docs/*rest'>)).toBe(`/docs/${replacement}`)
+    expect(buildPath('/*', { '*': loneHigh } as PathParams<'/*'>)).toBe(`/${replacement}`)
+    expect(buildPath('/a/*rest/c', { rest: `x/${loneLow}/y` } as PathParams<'/a/*rest/c'>)).toBe(
+      `/a/x/${replacement}/y/c`,
+    )
+  })
+
   it('normalizes redundant slashes in the pattern before building', () => {
     expect(buildPath('//users/:id/', { id: 7 })).toBe('/users/7')
   })

@@ -40,6 +40,12 @@ function stringifyParam(value: string | number): string {
   return encodeURIComponent(s)
 }
 
+/** Splat remainders preserve internal slashes; still normalize ill-formed UTF-16 (parity with {@link stringifyParam}). */
+function wellFormedSplatRemainder(value: string | number): string {
+  const raw = typeof value === 'string' ? value.toWellFormed() : String(value)
+  return trimSlashes(raw)
+}
+
 /** True when a param value should participate in the path (non-finite numbers omitted; mirrors `stringifyQuery` in `query.ts`). */
 function paramValuePresent(value: string | number | null | undefined): boolean {
   if (value == null || value === '') return false
@@ -51,7 +57,8 @@ function paramValuePresent(value: string | number | null | undefined): boolean {
 /**
  * Build a pathname from a route pattern and {@link PathParams}. Static segments are copied as-is;
  * dynamic `:id` and optional `:id?` are filled from `params`; splat `*rest` (or a lone `*`, key `'*'`)
- * inserts the remainder with internal slashes preserved. For optional segments, `null`, `undefined`,
+ * inserts the remainder with internal slashes preserved (slashes are not percent-encoded; string values are still
+ * passed through `String.prototype.toWellFormed` so lone surrogates match `:param` / query parity). For optional segments, `null`, `undefined`,
  * empty string, a non-finite number (`NaN`, `±Infinity`), or a `BigInt` omits the segment (same as leaving the key unset).
  * Required dynamic and splat params throw when missing, empty, non-finite numeric, or `BigInt`. `:param` values are
  * percent-encoded after `String.prototype.toWellFormed` (parity with `stringifyQuery` in `query.ts`).
@@ -71,7 +78,7 @@ export function buildPath<Path extends string>(pattern: Path, params: PathParams
       if (!paramValuePresent(value)) {
         throw new Error(`Missing required splat param: ${key}`)
       }
-      out.push(trimSlashes(String(value)))
+      out.push(wellFormedSplatRemainder(value))
       continue
     }
 
