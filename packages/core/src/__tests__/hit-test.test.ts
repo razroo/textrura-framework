@@ -1562,6 +1562,22 @@ describe('dispatchHit', () => {
     expect(result.focusTarget?.element).toBe(child)
   })
 
+  it('onClick: pointerEvents none wrapper still propagates click-to-focus to key-only descendant', () => {
+    const inner = box({ width: 40, height: 40, onKeyDown: () => undefined })
+    const overlay = box({ width: 40, height: 40, pointerEvents: 'none' }, [inner])
+    const parent = box({ width: 100, height: 100 }, [overlay])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }] }],
+    }
+    const result = dispatchHit(parent, layout, 'onClick', 20, 20)
+    expect(result.handled).toBe(false)
+    expect(result.focusTarget?.element).toBe(inner)
+  })
+
   it('onKeyDown: deepest handler runs first; no focusTarget', () => {
     const log: string[] = []
     const child = box({ width: 40, height: 40, onKeyDown: () => { log.push('child') } })
