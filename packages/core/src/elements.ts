@@ -81,7 +81,9 @@ export function text(props: TextProps): TextElement {
 
 /**
  * Create an image element.
- * `semantic` and `key` are runtime metadata; layout and `src`/`alt` flow through `toLayoutTree()`.
+ * `semantic` and `key` are runtime metadata. Flex and sizing props feed {@link import('./tree.js').toLayoutTree}
+ * for Yoga/Textura; `src`, `alt`, and `objectFit` remain on the live element for renderers and a11y but are
+ * stripped from the layout snapshot (Textura measures boxes from width/height, not bitmaps).
  */
 export function image(props: ImageProps): ImageElement {
   const { key, semantic, ...rest } = props

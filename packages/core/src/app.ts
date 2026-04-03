@@ -29,6 +29,10 @@ export interface AppOptions {
   /**
    * Yoga / Textura root layout direction. When omitted, derived from the root element’s resolved
    * `dir` prop (parent context defaults to `ltr`), so RTL roots mirror flex rows correctly.
+   *
+   * Nested `dir` on descendants still drives text, focus, and selection, but does not set a separate
+   * flex direction per subtree: `computeLayout` receives one document direction and
+   * {@link import('./tree.js').toLayoutTree} strips `dir` from layout nodes.
    */
   layoutDirection?: 'ltr' | 'rtl'
 }
