@@ -727,6 +727,29 @@ describe('dispatchHit', () => {
     expect(getCursorAtPoint(root, layout, 10, 10)).toBeNull()
   })
 
+  it('overlapping siblings: corrupt layout on higher z-index still dispatches to valid sibling behind', () => {
+    const log: string[] = []
+    const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } })
+    const front = box({ width: 50, height: 50, zIndex: 10, onClick: () => { log.push('front') } })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: NaN, height: 50, children: [] },
+      ],
+    }
+
+    expect(() => dispatchHit(root, layout, 'onClick', 10, 10)).not.toThrow()
+    expect(log).toEqual(['back'])
+    expect(dispatchHit(root, layout, 'onClick', 10, 10).handled).toBe(true)
+    expect(hitPathAtPoint(root, layout, 10, 10)).toEqual([0])
+    expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(true)
+  })
+
   it('overlapping siblings: negative z-index still stacks below a higher sibling', () => {
     const log: string[] = []
     const back = box(
