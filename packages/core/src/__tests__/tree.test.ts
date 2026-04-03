@@ -142,6 +142,55 @@ describe('toLayoutTree', () => {
     expect(layout).not.toHaveProperty('objectFit')
   })
 
+  it('strips paint and hit-target style props from image leaves (same strip list as text)', () => {
+    const el = image({
+      src: 'https://example.com/x.png',
+      alt: 'x',
+      width: 40,
+      height: 40,
+      objectFit: 'contain',
+      color: '#333',
+      backgroundColor: '#eee',
+      borderColor: '#ccc',
+      borderRadius: 2,
+      borderWidth: 1,
+      opacity: 0.9,
+      cursor: 'text',
+      pointerEvents: 'none',
+      zIndex: 3,
+      overflow: 'hidden',
+      scrollX: 1,
+      scrollY: 2,
+      boxShadow: { offsetX: 0, offsetY: 1, blur: 2, color: '#000' },
+      gradient: { type: 'linear', stops: [{ offset: 0, color: '#fff' }] },
+      dir: 'rtl',
+    })
+    const layout = toLayoutTree(el)
+    expect(layout).toMatchObject({ width: 40, height: 40 })
+    for (const k of [
+      'src',
+      'alt',
+      'objectFit',
+      'color',
+      'backgroundColor',
+      'borderColor',
+      'borderRadius',
+      'borderWidth',
+      'opacity',
+      'cursor',
+      'pointerEvents',
+      'zIndex',
+      'overflow',
+      'scrollX',
+      'scrollY',
+      'boxShadow',
+      'gradient',
+      'dir',
+    ] as const) {
+      expect(layout).not.toHaveProperty(k)
+    }
+  })
+
   it('recurses children', () => {
     const el = box({ width: 200, height: 200 }, [
       box({ width: 100, height: 100, backgroundColor: '#f00' }),
