@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { ComputedLayout } from 'textura'
 import type { Renderer, UIElement } from '@geometra/core'
-import { applyServerMessage } from '../client.js'
+import { applyServerMessage, type ClientFrameMetrics } from '../client.js'
 
 function layout(x = 0, y = 0, width = 100, height = 50): ComputedLayout {
   return { x, y, width, height, children: [] } as ComputedLayout
@@ -115,6 +115,31 @@ describe('applyServerMessage', () => {
     })
     expect(state.layout?.x).toBe(1)
     expect(renders.length).toBe(1)
+  })
+
+  it('still emits onFrameMetrics for a patch before the first frame (no render, patchCount set)', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const metrics: ClientFrameMetrics[] = []
+
+    applyServerMessage(
+      state,
+      renderer,
+      {
+        type: 'patch',
+        patches: [{ path: [], x: 1 }],
+        protocolVersion: 1,
+      },
+      undefined,
+      m => metrics.push(m),
+    )
+
+    expect(state.layout).toBeNull()
+    expect(renders).toHaveLength(0)
+    expect(metrics).toHaveLength(1)
+    expect(metrics[0]?.messageType).toBe('patch')
+    expect(metrics[0]?.patchCount).toBe(1)
+    expect(metrics[0]?.renderMs).toBe(0)
   })
 
   it('applies patches along a path into nested layout nodes', () => {
