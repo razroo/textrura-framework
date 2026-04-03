@@ -1,6 +1,6 @@
 {
   "name": "@geometra/renderer-terminal",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Terminal/TUI renderer for Geometra — the singularity frontend framework",
   "license": "MIT",
   "type": "module",
