@@ -138,4 +138,10 @@ describe('layoutBoundsAreFinite', () => {
     } as unknown as ComputedLayout
     expect(layoutBoundsAreFinite(root)).toBe(true)
   })
+
+  it('rejects null-prototype layout objects (no own x/y/width/height) without throwing', () => {
+    const bare = Object.create(null) as unknown as ComputedLayout
+    expect(() => layoutBoundsAreFinite(bare)).not.toThrow()
+    expect(layoutBoundsAreFinite(bare)).toBe(false)
+  })
 })
