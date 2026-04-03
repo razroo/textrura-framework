@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { signal, computed, effect, batch } from '../signals.js'
+import type { Computed } from '../signals.js'
 
 describe('signal', () => {
   it('get/set works', () => {
@@ -163,6 +164,15 @@ describe('computed', () => {
     y.set(11)
     expect(c.value).toBe(11)
     expect(evalCount).toBe(4)
+  })
+
+  it('throws when two computeds depend on each other (unsupported circular derivation)', () => {
+    let b!: Computed<number>
+    const a = computed(() => b.value)
+    b = computed(() => a.value)
+    expect(() => {
+      void a.value
+    }).toThrow()
   })
 })
 
