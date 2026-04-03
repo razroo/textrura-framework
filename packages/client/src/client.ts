@@ -194,8 +194,9 @@ function applyPatches(layout: ComputedLayout, patches: ServerPatch['patches']): 
  * without mutating state or invoking `onMetrics`. Full `frame` messages additionally require root `layout`
  * bounds that satisfy {@link layoutBoundsAreFinite} (finite `x`/`y`, non-negative finite `width`/`height`).
  *
- * When `msg.protocolVersion` is present but not a finite number, or is greater than the client’s
- * supported version, calls `onError` and returns without mutating state or invoking `onMetrics`.
+ * When `msg.protocolVersion` is omitted, no version check runs (message is treated as compatible).
+ * When it is present but not a finite number, or is greater than the client’s supported version,
+ * calls `onError` and returns without mutating state or invoking `onMetrics`.
  *
  * Well-formed `error` messages call `onError` with the server message and still invoke `onMetrics`
  * once with `messageType: 'error'` (no render; `renderMs` is zero).

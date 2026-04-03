@@ -64,6 +64,32 @@ describe('applyServerMessage', () => {
     expect(renders.length).toBe(0)
   })
 
+  it('accepts frame and patch when protocolVersion is omitted (optional on the wire)', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const errors: string[] = []
+
+    applyServerMessage(
+      state,
+      renderer,
+      { type: 'frame', layout: layout(5, 6, 80, 90), tree: tree() },
+      err => errors.push(String(err)),
+    )
+    expect(errors).toHaveLength(0)
+    expect(renders).toHaveLength(1)
+    expect(state.layout?.width).toBe(80)
+
+    applyServerMessage(
+      state,
+      renderer,
+      { type: 'patch', patches: [{ path: [], width: 77 }] },
+      err => errors.push(String(err)),
+    )
+    expect(errors).toHaveLength(0)
+    expect(renders).toHaveLength(2)
+    expect(state.layout?.width).toBe(77)
+  })
+
   it('rejects non-finite protocolVersion on frame (fail closed; no render)', () => {
     const { renderer, renders } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
