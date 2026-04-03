@@ -423,6 +423,26 @@ describe('geometry snapshot CI', () => {
     expect(roundLayout(layout)).toMatchSnapshot()
   })
 
+  it('stable row with alignItems baseline and mixed font sizes (rounded)', async () => {
+    await init()
+    const tree = box(
+      {
+        width: 200,
+        height: 80,
+        padding: 8,
+        flexDirection: 'row',
+        gap: 8,
+        alignItems: 'baseline',
+      },
+      [
+        text({ text: 'Ab', font: '14px sans-serif', lineHeight: 18, width: 40, height: 18 }),
+        text({ text: 'Cd', font: '20px sans-serif', lineHeight: 24, width: 48, height: 24 }),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 80 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
+
   it('stable row with horizontal margin on fixed-width text children (rounded)', async () => {
     await init()
     const item = { font: '16px sans-serif', lineHeight: 20, width: 24, height: 20, marginHorizontal: 6 } as const

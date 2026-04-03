@@ -250,6 +250,31 @@ exports[`geometry snapshot CI > stable ltr row with per-node rtl and ltr text di
 }
 `;
 
+exports[`geometry snapshot CI > stable row with alignItems baseline and mixed font sizes (rounded) 1`] = `
+{
+  "children": [
+    {
+      "children": [],
+      "height": 18,
+      "width": 40,
+      "x": 8,
+      "y": 14,
+    },
+    {
+      "children": [],
+      "height": 24,
+      "width": 48,
+      "x": 56,
+      "y": 8,
+    },
+  ],
+  "height": 80,
+  "width": 200,
+  "x": 0,
+  "y": 0,
+}
+`;
+
 exports[`geometry snapshot CI > stable row with alignItems flex-end and mixed-height text children (rounded) 1`] = `
 {
   "children": [
