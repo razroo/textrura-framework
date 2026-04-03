@@ -16,6 +16,15 @@ describe('direction model', () => {
     expect(resolveDirectionValue('bogus' as never, 'rtl')).toBe('rtl')
   })
 
+  it('falls back to ltr when parentDirection is not a concrete ltr/rtl at runtime', () => {
+    expect(resolveDirectionValue(undefined, 'auto' as never)).toBe('ltr')
+    expect(resolveDirectionValue('auto', '' as never)).toBe('ltr')
+    expect(resolveDirectionValue(undefined, 0 as never)).toBe('ltr')
+    expect(resolveDirectionValue('auto', null as never)).toBe('ltr')
+    // Explicit dir still wins even if parent is garbage
+    expect(resolveDirectionValue('rtl', 'nope' as never)).toBe('rtl')
+  })
+
   it('respects explicit ltr/rtl values', () => {
     expect(resolveDirectionValue('ltr', 'rtl')).toBe('ltr')
     expect(resolveDirectionValue('rtl', 'ltr')).toBe('rtl')
@@ -43,5 +52,10 @@ describe('direction model', () => {
   it('resolveElementDirection inherits parent for unknown dir on element props', () => {
     const weird = box({ width: 1, height: 1, dir: 'not-a-dir' as never })
     expect(resolveElementDirection(weird, 'rtl')).toBe('rtl')
+  })
+
+  it('resolveElementDirection treats invalid parent context as ltr', () => {
+    const el = box({ width: 1, height: 1 })
+    expect(resolveElementDirection(el, 'sideways' as never)).toBe('ltr')
   })
 })
