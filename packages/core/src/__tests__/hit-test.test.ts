@@ -1995,11 +1995,12 @@ describe('overflow hidden clipping', () => {
     expect(hitPathAtPoint(parent, layout, 25, 25)).toEqual([0])
   })
 
-  it('overflow hidden: scrollY applies content offset for hit dispatch and path', () => {
+  it('overflow hidden: scrollY applies content offset for hit dispatch, path, and cursor', () => {
     let localY = -1
     const child = box({
       width: 100,
       height: 50,
+      cursor: 'text',
       onClick: (e) => { localY = e.localY ?? -999 },
     })
     const parent = box({ width: 100, height: 100, overflow: 'hidden', scrollY: 40 }, [child])
@@ -2014,13 +2015,15 @@ describe('overflow hidden clipping', () => {
     dispatchHit(parent, layout, 'onClick', 50, 45)
     expect(localY).toBe(5)
     expect(hitPathAtPoint(parent, layout, 50, 45)).toEqual([0])
+    expect(getCursorAtPoint(parent, layout, 50, 45)).toBe('text')
   })
 
-  it('overflow hidden: scrollX applies content offset for hit dispatch and path', () => {
+  it('overflow hidden: scrollX applies content offset for hit dispatch, path, and cursor', () => {
     let localX = -1
     const child = box({
       width: 50,
       height: 100,
+      cursor: 'grab',
       onClick: (e) => { localX = e.localX ?? -999 },
     })
     const parent = box({ width: 100, height: 100, overflow: 'hidden', scrollX: 40 }, [child])
@@ -2035,6 +2038,7 @@ describe('overflow hidden clipping', () => {
     dispatchHit(parent, layout, 'onClick', 45, 50)
     expect(localX).toBe(5)
     expect(hitPathAtPoint(parent, layout, 45, 50)).toEqual([0])
+    expect(getCursorAtPoint(parent, layout, 45, 50)).toBe('grab')
   })
 })
 
