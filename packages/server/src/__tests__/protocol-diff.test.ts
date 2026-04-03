@@ -142,6 +142,14 @@ describe('isProtocolCompatible', () => {
   it('rejects negative Infinity peer version (non-finite wire values; not confused with legacy ordering)', () => {
     expect(isProtocolCompatible(Number.NEGATIVE_INFINITY, 1)).toBe(false)
   })
+
+  it('rejects BigInt peer version without throwing (Number.isFinite throws on BigInt)', () => {
+    expect(isProtocolCompatible(1n as unknown as number, 1)).toBe(false)
+  })
+
+  it('rejects non-number peer versions from malformed wire decode (e.g. string)', () => {
+    expect(isProtocolCompatible('1' as unknown as number, 1)).toBe(false)
+  })
 })
 
 describe('coalescePatches', () => {

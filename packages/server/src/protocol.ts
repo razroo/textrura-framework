@@ -16,15 +16,18 @@ export const CLOSE_FORBIDDEN = 4003
  * - newer peer versions are rejected explicitly (`peerVersion > currentVersion`).
  * - equal/older finite versions are accepted for backward compatibility.
  *
- * Non-finite `peerVersion` values (`NaN`, `±Infinity`) yield `false` — they are not treated as legacy
+ * Non-finite numeric `peerVersion` values (`NaN`, `±Infinity`) yield `false` — they are not treated as legacy
  * — so corrupt wire numbers fail closed instead of connecting.
+ *
+ * Non-number runtime values (e.g. `BigInt` from a malformed decoder) are rejected without throwing:
+ * `Number.isFinite` throws on `BigInt`, which would otherwise take down the connection handler.
  */
 export function isProtocolCompatible(
   peerVersion: number | undefined,
   currentVersion = PROTOCOL_VERSION,
 ): boolean {
   if (peerVersion === undefined) return true
-  if (!Number.isFinite(peerVersion)) return false
+  if (typeof peerVersion !== 'number' || !Number.isFinite(peerVersion)) return false
   return peerVersion <= currentVersion
 }
 
