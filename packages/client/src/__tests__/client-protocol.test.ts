@@ -90,6 +90,32 @@ describe('applyServerMessage', () => {
     expect(state.layout?.width).toBe(77)
   })
 
+  it('accepts finite protocolVersion at or below client (including 0 and negative)', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const errors: string[] = []
+
+    applyServerMessage(
+      state,
+      renderer,
+      { type: 'frame', layout: layout(1, 2, 33, 44), tree: tree(), protocolVersion: 0 },
+      err => errors.push(String(err)),
+    )
+    expect(errors).toHaveLength(0)
+    expect(renders).toHaveLength(1)
+    expect(state.layout?.width).toBe(33)
+
+    applyServerMessage(
+      state,
+      renderer,
+      { type: 'frame', layout: layout(0, 0, 55, 66), tree: tree(), protocolVersion: -42 },
+      err => errors.push(String(err)),
+    )
+    expect(errors).toHaveLength(0)
+    expect(renders).toHaveLength(2)
+    expect(state.layout?.width).toBe(55)
+  })
+
   it('rejects non-finite protocolVersion on frame (fail closed; no render)', () => {
     const { renderer, renders } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
