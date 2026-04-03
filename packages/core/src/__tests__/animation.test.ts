@@ -24,6 +24,20 @@ describe('animation timeline', () => {
     setMotionPreference('full')
   })
 
+  it('jumps createPropertyTimeline targets immediately under reduced motion', () => {
+    setMotionPreference('reduced')
+    const props = createPropertyTimeline({ x: 0, y: 0, opacity: 0 })
+    props.to({ x: 100, y: 50, opacity: 1 }, 800, easing.linear)
+    expect(props.values.x.peek()).toBe(100)
+    expect(props.values.y.peek()).toBe(50)
+    expect(props.values.opacity.peek()).toBe(1)
+    expect(props.state()).toBe('finished')
+    props.step(200)
+    expect(props.values.x.peek()).toBe(100)
+    expect(props.values.y.peek()).toBe(50)
+    setMotionPreference('full')
+  })
+
   it('steps deterministically to completion', () => {
     const timeline = createTweenTimeline(0)
     timeline.to(100, 1000, easing.linear)
