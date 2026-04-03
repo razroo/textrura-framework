@@ -23,6 +23,9 @@ describe('direction model', () => {
     expect(resolveDirectionValue(true as never, 'ltr')).toBe('ltr')
     expect(resolveDirectionValue(Number.NaN as never, 'rtl')).toBe('rtl')
     expect(resolveDirectionValue({} as never, 'ltr')).toBe('ltr')
+    // BigInt must not throw on strict equality checks and should inherit like other non-ltr/rtl values
+    expect(resolveDirectionValue(0n as never, 'rtl')).toBe('rtl')
+    expect(resolveDirectionValue(1n as never, 'ltr')).toBe('ltr')
   })
 
   it('falls back to ltr when parentDirection is not a concrete ltr/rtl at runtime', () => {
@@ -61,6 +64,11 @@ describe('direction model', () => {
   it('resolveElementDirection inherits parent for unknown dir on element props', () => {
     const weird = box({ width: 1, height: 1, dir: 'not-a-dir' as never })
     expect(resolveElementDirection(weird, 'rtl')).toBe('rtl')
+  })
+
+  it('resolveElementDirection inherits parent when dir is BigInt (corrupt props)', () => {
+    const el = box({ width: 1, height: 1, dir: 2n as never })
+    expect(resolveElementDirection(el, 'rtl')).toBe('rtl')
   })
 
   it('resolveElementDirection treats invalid parent context as ltr', () => {
