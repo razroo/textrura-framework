@@ -632,6 +632,45 @@ describe('dispatchHit', () => {
     expect(hitPathAtPoint(root, layoutAfter, 10, 10)).toEqual([1])
   })
 
+  it('overlapping siblings: appending a child recomputes z-order so the new topmost receives hits', () => {
+    const log: string[] = []
+    const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } })
+    const mid = box({ width: 50, height: 50, zIndex: 5, onClick: () => { log.push('mid') } })
+    const root = box({ width: 100, height: 100 }, [back, mid])
+    const layoutTwo = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layoutTwo, 'onClick', 10, 10)
+    expect(log).toEqual(['mid'])
+
+    const top = box({ width: 50, height: 50, zIndex: 10, onClick: () => { log.push('top') } })
+    root.children.push(top)
+    const layoutThree = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    log.length = 0
+    dispatchHit(root, layoutThree, 'onClick', 10, 10)
+    expect(log).toEqual(['top'])
+    expect(hitPathAtPoint(root, layoutThree, 10, 10)).toEqual([2])
+  })
+
   it('overlapping siblings: fractional z-index sorts numerically for dispatch', () => {
     const log: string[] = []
     const low = box({ width: 50, height: 50, zIndex: 1, onClick: () => { log.push('low') } })
