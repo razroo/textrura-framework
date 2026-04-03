@@ -3,10 +3,9 @@
 # session that explores the codebase, picks the next best improvement, implements
 # it, runs the release gate, commits, and pushes.
 #
-# Task selection: when ROADMAP.md tracked boxes are all [x], Phase A–C bullets and
-# ROUTING_COMPETITIVENESS_CHECKLIST.md still describe themes — but do not treat unchecked
-# items in RELEASE_CHECKLIST.md / v1-release-checklist.md as agent work (those are human
-# release steps).
+# Task selection: ROADMAP.md uses `- [x]` / `- [ ]` in the post-1.0 sections and in Phase A–C.
+# Grep for remaining `- [ ]` there plus ROUTING_COMPETITIVENESS_CHECKLIST.md. Do not treat
+# unchecked items in RELEASE_CHECKLIST.md / v1-release-checklist.md as agent work (human release steps).
 #
 # Prerequisites:
 #   - Cursor Agent CLI: https://cursor.com/install (`agent` on PATH)

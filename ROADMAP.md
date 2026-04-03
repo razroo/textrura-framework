@@ -6,24 +6,24 @@ Routing competitiveness work is tracked in `ROUTING_COMPETITIVENESS_CHECKLIST.md
 
 ## Phase A — Foundation (shipping now)
 
-- Web font readiness before first paint (`waitForFonts` + tree collection).
-- Keyboard focus that repaints when focus changes; click-to-focus for focusable boxes.
-- Canvas debug overlay for layout bounds; optional focus ring styling.
-- Harden tests around hit dispatch and font family parsing.
+- [x] Web font readiness before first paint (`waitForFonts` + tree collection).
+- [x] Keyboard focus that repaints when focus changes; click-to-focus for focusable boxes.
+- [x] Canvas debug overlay for layout bounds; optional focus ring styling.
+- [x] Harden tests around hit dispatch and font family parsing.
 
 ## Phase B — Apps that feel “real”
 
-- **Text input**: caret, IME/composition, selection, undo baseline; align Pretext metrics with canvas paint.
-- **Font policy**: document generic families, variable fonts, and server/client metric parity.
-- **Runtime accessibility**: hidden DOM mirror or accessibility tree API + docs for canvas mode.
-- **Protocol**: versioned WS frames; compatibility notes.
+- [x] **Text input**: caret, IME/composition, selection, undo baseline; align Pretext metrics with canvas paint.
+- [x] **Font policy**: document generic families, variable fonts, and server/client metric parity.
+- [x] **Runtime accessibility**: hidden DOM mirror or accessibility tree API + docs for canvas mode.
+- [x] **Protocol**: versioned WS frames; compatibility notes.
 
 ## Phase C — Platform & ecosystem
 
-- Virtualized lists / large scroll regions; focus trap for overlays.
-- Dev overlay (layout time, node count, hit targets).
-- Visual/regression and geometry snapshot testing in CI.
-- Optional component layer (`@geometra/ui`) built only on core primitives.
+- [x] Virtualized lists / large scroll regions; focus trap for overlays.
+- [x] Dev overlay (layout time, node count, hit targets).
+- [x] Visual/regression and geometry snapshot testing in CI.
+- [x] Optional component layer (`@geometra/ui`) built only on core primitives.
 
 ## Deferred / research
 
