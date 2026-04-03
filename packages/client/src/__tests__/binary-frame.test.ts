@@ -69,4 +69,35 @@ describe('client binary frame decode', () => {
     for (let i = base.length; i < extended.length; i++) extended[i] = 0xff
     expect(decodeBinaryFrameJson(extended.buffer)).toBe(json)
   })
+
+  it('detects a v1 header on a Uint8Array subarray (non-zero byteOffset)', () => {
+    const json = '{"type":"patch","patches":[]}'
+    const frame = new Uint8Array(encodeBinaryFrameJsonV1(json))
+    const prefix = 11
+    const combined = new Uint8Array(prefix + frame.length + 5)
+    combined.set(frame, prefix)
+    const view = combined.subarray(prefix, prefix + frame.length)
+    expect(isBinaryFrameArrayBuffer(view)).toBe(true)
+    expect(decodeBinaryFrameJson(view)).toBe(json)
+  })
+
+  it('returns false when GEOM magic is only present before the view offset', () => {
+    const json = '{"a":1}'
+    const frame = new Uint8Array(encodeBinaryFrameJsonV1(json))
+    const combined = new Uint8Array(frame.length + 3)
+    combined.set(frame, 3)
+    const missesMagic = combined.subarray(0, frame.length)
+    expect(isBinaryFrameArrayBuffer(missesMagic)).toBe(false)
+    expect(() => decodeBinaryFrameJson(missesMagic)).toThrow('Not a GEOM binary frame')
+  })
+
+  it('throws truncated payload when length exceeds the view (not the whole ArrayBuffer)', () => {
+    const headerOnly = new Uint8Array(9)
+    headerOnly.set([0x47, 0x45, 0x4f, 0x4d, 1], 0)
+    new DataView(headerOnly.buffer).setUint32(5, 4, true)
+    const padded = new Uint8Array(headerOnly.length + 20)
+    padded.set(headerOnly, 0)
+    const view = padded.subarray(0, 9)
+    expect(() => decodeBinaryFrameJson(view)).toThrow('Truncated binary frame payload')
+  })
 })

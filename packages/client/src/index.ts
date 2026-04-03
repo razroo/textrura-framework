@@ -12,3 +12,4 @@ export type {
   ServerMessageDecodeMeta,
 } from './client.js'
 export { decodeBinaryFrameJson, isBinaryFrameArrayBuffer } from './binary-frame.js'
+export type { BinaryFrameBytes } from './binary-frame.js'
