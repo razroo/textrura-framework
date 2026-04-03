@@ -117,6 +117,31 @@ exports[`geometry snapshot CI > stable column with mixed alignSelf on fixed-widt
 }
 `;
 
+exports[`geometry snapshot CI > stable column with vertical margin on fixed-width text children (rounded) 1`] = `
+{
+  "children": [
+    {
+      "children": [],
+      "height": 20,
+      "width": 24,
+      "x": 8,
+      "y": 13,
+    },
+    {
+      "children": [],
+      "height": 20,
+      "width": 24,
+      "x": 8,
+      "y": 47,
+    },
+  ],
+  "height": 140,
+  "width": 200,
+  "x": 0,
+  "y": 0,
+}
+`;
+
 exports[`geometry snapshot CI > stable column-reverse flex with gap and two text children (rounded) 1`] = `
 {
   "children": [
