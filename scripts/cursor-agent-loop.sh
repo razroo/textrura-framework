@@ -18,8 +18,9 @@ fi
 # packages/ (tests, perf in hit-test/text/layout paths, types, public JSDoc, or
 # `rg 'TODO|FIXME|HACK' packages`; a clean TODO grep is normal — pick a north-star bucket anyway).
 # Root `npm run release:gate` allowlists specific vitest entry files (see package.json), not every
-# `packages/*/src/__tests__/**/*.test.ts` that `vitest.fast` includes — extend an allowlisted file when
-# adding release-critical tests unless you intentionally widen the gate.
+# `packages/*/src/__tests__/**/*.test.ts` that `npm run test` / vitest.fast.config.ts includes — a file
+# passing `vitest.fast` does not imply it runs in CI gate; check package.json before assuming coverage ships.
+# Extend an allowlisted file when adding release-critical tests unless you intentionally widen the gate.
 # Ignore `[ ]` in RELEASE_CHECKLIST.md / v1-release-checklist.md
 # (maintainer release steps, not framework backlog).
 #
@@ -124,7 +125,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
       - Add small, useful features that fit the framework's philosophy
       - Improve the demo site or starter templates
       Prefer one primary subsystem or package per iteration (e.g. core hit-test, fonts, server protocol); avoid wide drive-by refactors unless the task truly spans boundaries.
-      When adding tests without a specific bugfix, prefer extending files already run by root \`package.json\` \`release:gate\` (keeps new coverage in the vetted CI path; only widen the gate when the suite is release-critical). The gate is an explicit file allowlist — not every workspace test file is in it.
+      When adding tests without a specific bugfix, prefer extending files already run by root \`package.json\` \`release:gate\` (keeps new coverage in the vetted CI path; only widen the gate when the suite is release-critical). The gate is an explicit file allowlist — \`npm run test\` (vitest.fast) may run additional files that the gate does not; confirm in \`package.json\` rather than assuming.
       When both roadmap checklists are fully checked, re-read ROADMAP "Deferred / research" for themes, or target north-star hot paths (hit-test, text measurement, protocol encode/decode, layout/repaint).
       Pick something concrete and high-value. Do NOT say there is nothing to do — there is always room to improve a codebase.
 
