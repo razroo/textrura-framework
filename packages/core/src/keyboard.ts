@@ -4,7 +4,13 @@ import { focusNext, focusPrev, resolveFocusedTarget } from './focus.js'
 
 /**
  * Dispatch keyboard events to the focused element.
- * Tab / Shift+Tab focus traversal runs only for `'onKeyDown'` (not `'onKeyUp'`).
+ *
+ * Tab / Shift+Tab runs only on `'onKeyDown'` (not `'onKeyUp'`). On keydown, Tab always returns
+ * `true` and runs focus traversal (`focusNext` / `focusPrev` from `./focus.js`); when the tree has
+ * no focusable boxes, those calls no-op and focus stays unset.
+ *
+ * For other keys, returns `true` only when a resolved focus target exists and its handler for
+ * `eventType` runs; otherwise `false`.
  */
 export function dispatchKeyboardEvent(
   tree: UIElement,
@@ -36,7 +42,9 @@ export function dispatchKeyboardEvent(
 
 /**
  * Dispatch IME composition events to the focused element.
- * Returns `false` when there is no resolved focus target or the target has no handler for `eventType`.
+ *
+ * @returns `true` when the focused target has a handler for `eventType` and it runs; `false` when
+ * there is no resolved focus target or no matching composition handler.
  */
 export function dispatchCompositionEvent(
   tree: UIElement,

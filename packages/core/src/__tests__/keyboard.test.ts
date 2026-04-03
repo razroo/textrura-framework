@@ -123,6 +123,22 @@ describe('dispatchKeyboardEvent', () => {
     expect(back?.element).toBe(first?.element)
   })
 
+  it('tab keydown returns true when no focusable targets exist (traversal is a no-op)', () => {
+    clearFocus()
+    const tree = box({}, [])
+    const layout = { x: 0, y: 0, width: 100, height: 100, children: [] }
+    const handled = dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    expect(handled).toBe(true)
+    expect(focusedElement.peek()).toBeNull()
+  })
+
   it('tab on keyup does not traverse focus (only keydown moves)', () => {
     const tree = box({}, [
       box({ onClick: () => undefined }, []),
