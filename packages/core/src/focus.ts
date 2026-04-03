@@ -25,6 +25,9 @@ export function clearFocus(): void {
 
 /**
  * Document-order focusable elements (Tab order). Useful for inspector overlays.
+ *
+ * A box is focusable when it defines any of `onClick`, `onKeyDown`, `onKeyUp`,
+ * `onCompositionStart`, `onCompositionUpdate`, or `onCompositionEnd`.
  * Skips boxes whose layout bounds are non-finite or have negative width/height, and does not walk
  * their subtrees — same rule as hit-testing so corrupt geometry cannot enter focus order.
  */
@@ -37,7 +40,7 @@ export function collectFocusOrder(
   return results
 }
 
-/** Collect all focusable elements (those with keyboard or click handlers) in document order. */
+/** Collect all focusable elements (click, key, or composition handlers) in document order. */
 function collectFocusable(
   element: UIElement,
   layout: ComputedLayout,

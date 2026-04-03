@@ -50,8 +50,9 @@ function resolveSubtree(
 /**
  * Move focus to the next or previous focusable box inside a subtree (modal / overlay trap).
  *
- * Focusables are boxes with any of `onClick`, `onKeyDown`, `onKeyUp`, or composition handlers,
- * in tree order (same rule as {@link collectFocusOrder}, including skipping corrupt layout bounds).
+ * Focusables are boxes with any of `onClick`, `onKeyDown`, `onKeyUp`,
+ * `onCompositionStart`, `onCompositionUpdate`, or `onCompositionEnd`, in tree order (same rule as
+ * {@link collectFocusOrder}, including skipping corrupt layout bounds).
  *
  * When the current {@link focusedElement} is missing or not inside the trap list, `'next'`
  * jumps to the first focusable and `'prev'` to the last — so focus can enter the trap from
