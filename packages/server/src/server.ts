@@ -5,6 +5,7 @@ import { init, computeLayout } from 'textura'
 import type { ComputedLayout } from 'textura'
 import {
   toLayoutTree,
+  resolveElementDirection,
   dispatchHit,
   dispatchKeyboardEvent,
   dispatchCompositionEvent,
@@ -42,6 +43,11 @@ export interface TexturaServerOptions {
   backpressureBytes?: number
   /** Per-broadcast transport telemetry (backpressure, coalescing, binary outbound). */
   onTransportMetrics?: (metrics: ServerTransportMetrics) => void
+  /**
+   * Yoga / Textura root layout direction. When omitted, derived from the view root’s resolved `dir`
+   * (parent context defaults to `ltr`).
+   */
+  layoutDirection?: 'ltr' | 'rtl'
 }
 
 /** Emitted after each successful broadcast (not on early no-op returns). */
@@ -92,13 +98,16 @@ export async function createServer(
   let currentTree: UIElement | null = null
   let prevSerializedTree: string | null = null
   const backpressureBytes = Math.max(1024, options.backpressureBytes ?? 512 * 1024)
+  const layoutDirectionOption = options.layoutDirection
 
   function computeAndBroadcast(): void {
     try {
       currentTree = view()
       const serializedTree = JSON.stringify(currentTree)
       const layoutTree = toLayoutTree(currentTree)
-      const layout = computeLayout(layoutTree, { width, height })
+      const direction =
+        layoutDirectionOption ?? resolveElementDirection(currentTree, 'ltr')
+      const layout = computeLayout(layoutTree, { width, height, direction })
 
       let msg: ServerMessage
       let coalescedPatchDelta = 0

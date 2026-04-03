@@ -2,6 +2,7 @@ import { init, computeLayout } from 'textura'
 import type { ComputedLayout } from 'textura'
 import type { UIElement, Renderer, EventHandlers, KeyboardHitEvent } from './types.js'
 import { toLayoutTree } from './tree.js'
+import { resolveElementDirection } from './direction.js'
 import { dispatchHit } from './hit-test.js'
 import { effect } from './signals.js'
 import { focusedElement, setFocus } from './focus.js'
@@ -25,6 +26,11 @@ export interface AppOptions {
    * Non-finite or negative values fall back to the default (same rules as `waitForFonts` in `fonts.js`).
    */
   fontLoadTimeoutMs?: number
+  /**
+   * Yoga / Textura root layout direction. When omitted, derived from the root element’s resolved
+   * `dir` prop (parent context defaults to `ltr`), so RTL roots mirror flex rows correctly.
+   */
+  layoutDirection?: 'ltr' | 'rtl'
 }
 
 export interface App {
@@ -84,10 +90,13 @@ export async function createApp(
       try {
         app.tree = view()
         const layoutTree = toLayoutTree(app.tree)
+        const direction =
+          options.layoutDirection ?? resolveElementDirection(app.tree, 'ltr')
         const layoutStart = typeof performance !== 'undefined' ? performance.now() : 0
         app.layout = computeLayout(layoutTree, {
           width: options.width,
           height: options.height,
+          direction,
         })
         const rawLayoutMs =
           typeof performance !== 'undefined' ? performance.now() - layoutStart : 0
