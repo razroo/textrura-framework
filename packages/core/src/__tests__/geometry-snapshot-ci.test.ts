@@ -91,4 +91,19 @@ describe('geometry snapshot CI', () => {
     const layout = computeLayout(toLayoutTree(tree), { width: 160, height: 120 })
     expect(roundLayout(layout)).toMatchSnapshot()
   })
+
+  it('stable wrapped row with three fixed-width text children (rounded)', async () => {
+    await init()
+    const item = { font: '16px sans-serif', lineHeight: 20, width: 40, height: 20 } as const
+    const tree = box(
+      { width: 100, height: 120, flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+      [
+        text({ text: 'One', ...item }),
+        text({ text: 'Two', ...item }),
+        text({ text: 'Thr', ...item }),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 100, height: 120 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
 })
