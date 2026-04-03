@@ -550,6 +550,15 @@ describe('resolveFontLoadTimeoutMs', () => {
     expect(resolveFontLoadTimeoutMs('500' as unknown as number, fallback)).toBe(fallback)
   })
 
+  it('returns defaultMs for null, bigint, or object values (invalid timeout shapes)', () => {
+    const fallback = 4242
+    expect(resolveFontLoadTimeoutMs(null as unknown as number)).toBe(10_000)
+    expect(resolveFontLoadTimeoutMs(null as unknown as number, fallback)).toBe(fallback)
+    expect(resolveFontLoadTimeoutMs(0n as unknown as number)).toBe(10_000)
+    expect(resolveFontLoadTimeoutMs(0n as unknown as number, fallback)).toBe(fallback)
+    expect(resolveFontLoadTimeoutMs({} as unknown as number, fallback)).toBe(fallback)
+  })
+
   it('preserves finite non-negative timeouts', () => {
     expect(resolveFontLoadTimeoutMs(0)).toBe(0)
     expect(resolveFontLoadTimeoutMs(80)).toBe(80)
@@ -771,6 +780,25 @@ describe('waitForFonts', () => {
     vi.stubGlobal('document', { fonts: { load, ready } })
     try {
       const p = waitForFonts(['Slow'], '500' as unknown as number)
+      await vi.advanceTimersByTimeAsync(9_999)
+      await expect(
+        Promise.race([p, new Promise<string>(resolve => queueMicrotask(() => resolve('not-yet')))]),
+      ).resolves.toBe('not-yet')
+      await vi.advanceTimersByTimeAsync(1)
+      await expect(p).resolves.toBeUndefined()
+    } finally {
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('uses the default 10_000ms timeout when timeoutMs is bigint', async () => {
+    vi.useFakeTimers()
+    const load = vi.fn(() => new Promise<void>(() => {}))
+    const ready = new Promise<void>(() => {})
+    vi.stubGlobal('document', { fonts: { load, ready } })
+    try {
+      const p = waitForFonts(['Slow'], 5000n as unknown as number)
       await vi.advanceTimersByTimeAsync(9_999)
       await expect(
         Promise.race([p, new Promise<string>(resolve => queueMicrotask(() => resolve('not-yet')))]),

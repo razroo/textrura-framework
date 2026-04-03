@@ -379,8 +379,8 @@ export function collectFontFamiliesFromTree(root: UIElement): string[] {
 
 /**
  * Resolve a font-load timeout in milliseconds. Used by {@link waitForFonts} and `createApp`'s
- * `fontLoadTimeoutMs` so `NaN`, `±Infinity`, negative values, and non-numbers all fall back to
- * `defaultMs` (avoids `??` missing `NaN` and odd `setTimeout` coercion).
+ * `fontLoadTimeoutMs` so `NaN`, `±Infinity`, negative values, and non-numbers (`null`, `bigint`,
+ * objects, strings, …) all fall back to `defaultMs` (avoids `??` missing `NaN` and odd `setTimeout` coercion).
  */
 export function resolveFontLoadTimeoutMs(timeoutMs: number | undefined, defaultMs = 10_000): number {
   return typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs >= 0 ? timeoutMs : defaultMs
