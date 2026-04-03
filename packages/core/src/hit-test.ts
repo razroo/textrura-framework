@@ -32,8 +32,8 @@ function layoutBoundsAreFinite(layout: ComputedLayout): boolean {
   )
 }
 
-/** Ignore non-finite and non-number scroll props so child offsets stay finite (±Infinity would poison abs coords). */
-function finiteScrollOffset(value: unknown): number {
+/** Ignore non-finite and non-number values so derived coordinates stay finite (±Infinity/NaN cannot poison abs coords). */
+function finiteNumber(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
 
@@ -117,8 +117,8 @@ function collectHits(
         return
       }
     }
-    childOffsetX -= finiteScrollOffset(scrollX)
-    childOffsetY -= finiteScrollOffset(scrollY)
+    childOffsetX -= finiteNumber(scrollX)
+    childOffsetY -= finiteNumber(scrollY)
   }
 
   const inside =
@@ -179,8 +179,8 @@ function dispatchHitRecursive(
   if (!inside) return { handled: false }
 
   let focusTarget: HitDispatchResult['focusTarget']
-  const childOffsetX = absX - finiteScrollOffset(scrollX)
-  const childOffsetY = absY - finiteScrollOffset(scrollY)
+  const childOffsetX = absX - finiteNumber(scrollX)
+  const childOffsetY = absY - finiteNumber(scrollY)
   const asc = getChildrenByZAsc(boxEl)
 
   for (let k = asc.length - 1; k >= 0; k--) {
@@ -249,6 +249,7 @@ function dispatchHitRecursive(
  * Optional `offsetX` / `offsetY` shift the root layout origin in the same coordinate space as `(x, y)` —
  * use the same values as {@link hitPathAtPoint} and {@link getCursorAtPoint} when the tree is painted
  * inside a translated or clipped surface (e.g. nested canvas, CSS transform). Defaults are `0`.
+ * Non-finite or non-number offsets are treated as `0` (same rule as scroll offsets on boxes).
  * Event `x` / `y` remain the caller coordinates; `localX` / `localY` are relative to the hit target’s abs rect.
  *
  * @see {@link getCursorAtPoint} for resolving `cursor` at the same logical hit region.
@@ -263,7 +264,16 @@ export function dispatchHit(
   offsetX = 0,
   offsetY = 0,
 ): HitDispatchResult {
-  return dispatchHitRecursive(element, layout, eventType, x, y, offsetX, offsetY, extra)
+  return dispatchHitRecursive(
+    element,
+    layout,
+    eventType,
+    x,
+    y,
+    finiteNumber(offsetX),
+    finiteNumber(offsetY),
+    extra,
+  )
 }
 
 /**
@@ -272,6 +282,7 @@ export function dispatchHit(
  * handlers alone do not count — use this for hover / pointer-capture style checks.
  *
  * Optional `offsetX` / `offsetY` match {@link hitPathAtPoint} / {@link dispatchHit} for rooted coordinate transforms.
+ * Non-finite or non-number offsets are treated as `0`.
  */
 export function hasInteractiveHitAtPoint(
   element: UIElement,
@@ -282,7 +293,7 @@ export function hasInteractiveHitAtPoint(
   offsetY = 0,
 ): boolean {
   const hits: HitTarget[] = []
-  collectHits(element, layout, x, y, offsetX, offsetY, hits)
+  collectHits(element, layout, x, y, finiteNumber(offsetX), finiteNumber(offsetY), hits)
   for (let i = hits.length - 1; i >= 0; i--) {
     const handlers = hits[i]!.handlers
     if (
@@ -304,6 +315,7 @@ export function hasInteractiveHitAtPoint(
  * Boxes with `pointerEvents: 'none'` do not terminate the path when they have no deeper hit (same idea as `getCursorAtPoint` and `collectHits`).
  * Returns `null` when the point misses the tree. Returns `[]` when the point hits the
  * root (or a leaf box) with no deeper box hit.
+ * Root `offsetX` / `offsetY` follow {@link dispatchHit}: non-finite or non-number values are treated as `0`.
  */
 export function hitPathAtPoint(
   element: UIElement,
@@ -316,8 +328,10 @@ export function hitPathAtPoint(
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null
   if (!layoutBoundsAreFinite(layout)) return null
 
-  const absX = offsetX + layout.x
-  const absY = offsetY + layout.y
+  const ox = finiteNumber(offsetX)
+  const oy = finiteNumber(offsetY)
+  const absX = ox + layout.x
+  const absY = oy + layout.y
 
   if (element.kind === 'box') {
     const { overflow } = element.props
@@ -341,8 +355,8 @@ export function hitPathAtPoint(
   const boxEl = element as BoxElement
   let childOffsetX = absX
   let childOffsetY = absY
-  childOffsetX -= finiteScrollOffset(boxEl.props.scrollX)
-  childOffsetY -= finiteScrollOffset(boxEl.props.scrollY)
+  childOffsetX -= finiteNumber(boxEl.props.scrollX)
+  childOffsetY -= finiteNumber(boxEl.props.scrollY)
 
   const asc = getChildrenByZAsc(boxEl)
   for (let k = asc.length - 1; k >= 0; k--) {
@@ -359,6 +373,7 @@ export function hitPathAtPoint(
 /**
  * Resolve the deepest `cursor` style at `(x, y)` (boxes only; skips `pointerEvents: 'none'` the same way as
  * {@link hitPathAtPoint}). Scroll containers use the same clipping rules as {@link dispatchHit}.
+ * Root `offsetX` / `offsetY` follow {@link dispatchHit}: non-finite or non-number values are treated as `0`.
  */
 export function getCursorAtPoint(
   element: UIElement,
@@ -371,8 +386,10 @@ export function getCursorAtPoint(
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null
   if (!layoutBoundsAreFinite(layout)) return null
 
-  const absX = offsetX + layout.x
-  const absY = offsetY + layout.y
+  const ox = finiteNumber(offsetX)
+  const oy = finiteNumber(offsetY)
+  const absX = ox + layout.x
+  const absY = oy + layout.y
 
   if (element.kind === 'box') {
     const { overflow } = element.props
@@ -393,8 +410,8 @@ export function getCursorAtPoint(
   if (element.kind === 'box') {
     let childOffX = absX
     let childOffY = absY
-    childOffX -= finiteScrollOffset(element.props.scrollX)
-    childOffY -= finiteScrollOffset(element.props.scrollY)
+    childOffX -= finiteNumber(element.props.scrollX)
+    childOffY -= finiteNumber(element.props.scrollY)
 
     const asc = getChildrenByZAsc(element)
     for (let k = asc.length - 1; k >= 0; k--) {

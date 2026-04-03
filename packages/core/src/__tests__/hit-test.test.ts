@@ -361,6 +361,42 @@ describe('dispatchHit', () => {
     expect(hasInteractiveHitAtPoint(parent, layout, 70, 30)).toBe(false)
   })
 
+  it('non-finite or non-number root offsetX/offsetY are treated as zero (matches scroll offset rules)', () => {
+    const child = box({
+      width: 40,
+      height: 40,
+      cursor: 'pointer',
+      onClick: () => {},
+    })
+    const parent = box({ width: 100, height: 100 }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 10, y: 20, width: 40, height: 40, children: [] as const }],
+    }
+    expect(dispatchHit(parent, layout, 'onClick', 70, 30, undefined, 50, 0).handled).toBe(true)
+    expect(hitPathAtPoint(parent, layout, 70, 30, 50, 0)).toEqual([0])
+    expect(hasInteractiveHitAtPoint(parent, layout, 70, 30, 50, 0)).toBe(true)
+    expect(getCursorAtPoint(parent, layout, 70, 30, 50, 0)).toBe('pointer')
+
+    // NaN offsetX → 0: (70, 30) misses the child (same as no root offset); a point inside the child still hits.
+    expect(dispatchHit(parent, layout, 'onClick', 70, 30, undefined, Number.NaN, 0).handled).toBe(false)
+    expect(dispatchHit(parent, layout, 'onClick', 20, 30, undefined, Number.NaN, 0).handled).toBe(true)
+    expect(hitPathAtPoint(parent, layout, 70, 30, Number.NaN, 0)).toEqual([])
+    expect(hasInteractiveHitAtPoint(parent, layout, 70, 30, Number.NaN, 0)).toBe(false)
+
+    // Non-finite offset on one axis only: bad Y is dropped so X offset still applies.
+    expect(dispatchHit(parent, layout, 'onClick', 70, 30, undefined, 50, Number.POSITIVE_INFINITY).handled).toBe(
+      true,
+    )
+    expect(hitPathAtPoint(parent, layout, 70, 30, 50, Number.NEGATIVE_INFINITY)).toEqual([0])
+
+    expect(hasInteractiveHitAtPoint(parent, layout, 70, 30, 'oops' as unknown as number, 0)).toBe(false)
+    expect(getCursorAtPoint(parent, layout, 70, 30, 50, Number.NaN)).toBe('pointer')
+  })
+
   it('merges extra onto the event when offsetX and offsetY are provided', () => {
     let shift = false
     const child = box({
