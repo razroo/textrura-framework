@@ -147,7 +147,7 @@ describe('applyServerMessage', () => {
     expect(renders.length).toBe(0)
   })
 
-  it('rejects protocolVersion when JSON provides a non-number (string, bigint)', () => {
+  it('rejects protocolVersion when value is not a plain finite number (string, bigint, boxed Number)', () => {
     const { renderer, renders } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
     const errors: string[] = []
@@ -180,6 +180,22 @@ describe('applyServerMessage', () => {
       (err) => errors.push(String(err)),
     )
     expect(errors[1]).toContain('protocolVersion must be a finite number')
+    expect(renders.length).toBe(0)
+
+    const boxed = Object(1)
+    expect(typeof boxed).toBe('object')
+    applyServerMessage(
+      state,
+      renderer,
+      {
+        type: 'frame',
+        layout: layout(),
+        tree: tree(),
+        protocolVersion: boxed as unknown as number,
+      } as unknown as Msg,
+      (err) => errors.push(String(err)),
+    )
+    expect(errors[2]).toContain('protocolVersion must be a finite number')
     expect(renders.length).toBe(0)
   })
 
