@@ -197,6 +197,33 @@ describe('createApp layout direction (Textura computeLayout)', () => {
     const [a, b] = layouts[0]!.children
     expect(a!.x).toBeGreaterThan(b!.x)
   })
+
+  it('does not mirror nested flex rows from dir:rtl on a descendant — document direction stays ltr', async () => {
+    const layouts: Array<{ children: Array<{ children: Array<{ x: number }> }> }> = []
+    const renderer: Renderer = {
+      render(layout) {
+        layouts.push(layout as { children: Array<{ children: Array<{ x: number }> }> })
+      },
+      destroy: vi.fn(),
+    }
+
+    await createApp(
+      () =>
+        box({ width: 100, height: 60, flexDirection: 'column' }, [
+          box({ width: 100, height: 40, flexDirection: 'row', dir: 'rtl' }, [
+            box({ width: 30, height: 20 }),
+            box({ width: 30, height: 20 }),
+          ]),
+        ]),
+      renderer,
+      { width: 100, height: 80 },
+    )
+
+    expect(layouts).toHaveLength(1)
+    const row = layouts[0]!.children[0]!
+    const [a, b] = row.children
+    expect(a!.x).toBeLessThan(b!.x)
+  })
 })
 
 describe('createApp layout timing', () => {
