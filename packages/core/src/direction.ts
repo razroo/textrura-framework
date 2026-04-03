@@ -22,11 +22,17 @@ export function resolveDirectionValue(
   return parent
 }
 
-/** Resolve concrete direction for a UI element from its own `dir` and parent context. */
+/**
+ * Resolve concrete direction for a UI element from its own `dir` and parent context.
+ *
+ * @param element Any {@link UIElement}; `dir` is read from {@link UIElement.props} when present.
+ * @param parentDirection Resolved direction of the visual parent (default `'ltr'`). Invalid values are normalized like {@link resolveDirectionValue}.
+ * @returns Concrete `ltr` or `rtl` for layout, text, and hit-testing.
+ */
 export function resolveElementDirection(
   element: UIElement,
   parentDirection: ResolvedDirection = 'ltr',
 ): ResolvedDirection {
-  const dir = (element.props as { dir?: Direction }).dir
+  const dir = element.props.dir
   return resolveDirectionValue(dir, parentDirection)
 }
