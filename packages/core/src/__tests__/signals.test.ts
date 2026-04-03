@@ -549,6 +549,31 @@ describe('batch', () => {
     })
     expect(runs).toBe(1)
   })
+
+  it('nested batch from a flushing subscriber runs and completes before that subscriber returns', () => {
+    const a = signal(0)
+    const b = signal(0)
+    const steps: string[] = []
+    effect(() => {
+      steps.push(`a:${a.value}`)
+      if (a.peek() === 1) {
+        batch(() => {
+          b.set(5)
+        })
+        steps.push('after-inner-batch')
+      }
+    })
+    effect(() => {
+      steps.push(`b:${b.value}`)
+    })
+
+    steps.length = 0
+    batch(() => {
+      a.set(1)
+    })
+
+    expect(steps).toEqual(['a:1', 'b:5', 'after-inner-batch'])
+  })
 })
 
 describe('@geometra/core/node subpath entry', () => {
