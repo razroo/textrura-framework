@@ -133,4 +133,17 @@ describe('binary frame envelope', () => {
     new Uint8Array(sab).set(buf)
     expect(decodeBinaryFrameJson(new Uint8Array(sab))).toBe(json)
   })
+
+  it('decodes a v1 frame from a Uint8Array subview backed by SharedArrayBuffer (non-zero byteOffset)', () => {
+    if (typeof SharedArrayBuffer === 'undefined') return
+    const json = '{"sab":"slice"}'
+    const frame = encodeBinaryFrameJson(json)
+    const prefix = 7
+    const sab = new SharedArrayBuffer(prefix + frame.byteLength + 6)
+    const whole = new Uint8Array(sab)
+    whole.set(frame, prefix)
+    const view = whole.subarray(prefix, prefix + frame.byteLength)
+    expect(isBinaryFrameBuffer(view)).toBe(true)
+    expect(decodeBinaryFrameJson(view)).toBe(json)
+  })
 })
