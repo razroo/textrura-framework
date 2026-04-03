@@ -114,6 +114,15 @@ function collectTextNodesWalk(
   }
 }
 
+/** Clamp a selection offset to `[0, textLength]`; non-finite / non-number → `0` (no `slice` negative-index semantics). */
+function clampCharIndex(offset: unknown, textLength: number): number {
+  if (typeof offset !== 'number' || !Number.isFinite(offset)) return 0
+  const t = Math.trunc(offset)
+  if (t < 0) return 0
+  if (t > textLength) return textLength
+  return t
+}
+
 /**
  * Get the selected text from a selection range and text node info list.
  *
@@ -121,6 +130,9 @@ function collectTextNodesWalk(
  * millions of empty indices. When `focusNode` lies past the last node, the range end is treated as
  * that last node so `focusOffset` still applies. When the normalized range lies entirely outside
  * `[0, textNodes.length - 1]`, returns an empty string.
+ *
+ * Per-node character offsets are clamped to `[0, text.length]` and truncated toward zero so corrupt
+ * ranges cannot use `String.prototype.slice` negative indices or fractional positions.
  */
 export function getSelectedText(
   range: SelectionRange,
@@ -154,14 +166,15 @@ export function getSelectedText(
     const node = textNodes[i]
     if (!node) continue
     const fullText = node.element.props.text
+    const len = fullText.length
     const atStart = i === startNode || (startClipped && i === lo)
     const atEnd = i === endNode || (endClipped && i === hi)
     if (atStart && atEnd) {
-      parts.push(fullText.slice(startOffset, endOffset))
+      parts.push(fullText.slice(clampCharIndex(startOffset, len), clampCharIndex(endOffset, len)))
     } else if (atStart) {
-      parts.push(fullText.slice(startOffset))
+      parts.push(fullText.slice(clampCharIndex(startOffset, len)))
     } else if (atEnd) {
-      parts.push(fullText.slice(0, endOffset))
+      parts.push(fullText.slice(0, clampCharIndex(endOffset, len)))
     } else {
       parts.push(fullText)
     }

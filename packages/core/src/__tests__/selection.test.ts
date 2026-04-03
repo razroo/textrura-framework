@@ -285,6 +285,64 @@ describe('getSelectedText', () => {
       getSelectedText({ anchorNode: -3, anchorOffset: 0, focusNode: -1, focusOffset: 1 }, nodes),
     ).toBe('')
   })
+
+  it('clamps negative offsets to zero (no String.slice negative-index semantics)', () => {
+    const nodes = makeNodes()
+    expect(
+      getSelectedText({ anchorNode: 0, anchorOffset: -50, focusNode: 0, focusOffset: 5 }, nodes),
+    ).toBe('Hello')
+  })
+
+  it('clamps non-finite offsets to zero before applying slice bounds', () => {
+    const nodes: TextNodeInfo[] = [
+      {
+        element: { kind: 'text' as const, props: { text: 'hello', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 18,
+        lines: [],
+        index: 0,
+      },
+    ]
+    expect(
+      getSelectedText(
+        { anchorNode: 0, anchorOffset: Number.NaN, focusNode: 0, focusOffset: 3 },
+        nodes,
+      ),
+    ).toBe('hel')
+    expect(
+      getSelectedText(
+        { anchorNode: 0, anchorOffset: 1, focusNode: 0, focusOffset: 999 },
+        nodes,
+      ),
+    ).toBe('ello')
+    expect(
+      getSelectedText(
+        { anchorNode: 0, anchorOffset: 0n as unknown as number, focusNode: 0, focusOffset: 2 },
+        nodes,
+      ),
+    ).toBe('he')
+  })
+
+  it('truncates fractional offsets toward zero', () => {
+    const nodes: TextNodeInfo[] = [
+      {
+        element: { kind: 'text' as const, props: { text: 'hello', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 18,
+        lines: [],
+        index: 0,
+      },
+    ]
+    expect(
+      getSelectedText({ anchorNode: 0, anchorOffset: 1.9, focusNode: 0, focusOffset: 3.9 }, nodes),
+    ).toBe('el')
+  })
 })
 
 describe('hitTestText', () => {
