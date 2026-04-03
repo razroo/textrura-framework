@@ -1,5 +1,5 @@
 import type { ComputedLayout } from 'textura'
-import type { Renderer, UIElement } from '@geometra/core'
+import { layoutBoundsAreFinite, type Renderer, type UIElement } from '@geometra/core'
 import { decodeBinaryFrameJson, type BinaryFrameBytes } from './binary-frame.js'
 
 function asBinaryFrameBytes(data: unknown): BinaryFrameBytes {
@@ -187,7 +187,8 @@ function applyPatches(layout: ComputedLayout, patches: ServerPatch['patches']): 
  * When the payload is not a plain object, or is missing a well-formed `type` (`frame` with object
  * `layout`/`tree`, `patch` with a `patches` array of objects that each include an integer `path` and
  * only finite numeric geometry fields, or `error` with string `message`), calls `onError` and returns
- * without mutating state or invoking `onMetrics`.
+ * without mutating state or invoking `onMetrics`. Full `frame` messages additionally require root `layout`
+ * bounds that satisfy {@link layoutBoundsAreFinite} (finite `x`/`y`, non-negative finite `width`/`height`).
  *
  * When `msg.protocolVersion` is present but not a finite number, or is greater than the client’s
  * supported version, calls `onError` and returns without mutating state or invoking `onMetrics`.
@@ -247,6 +248,14 @@ export function applyServerMessage(
     return
   }
   if (msg.type === 'frame') {
+    if (!layoutBoundsAreFinite(msg.layout)) {
+      onError?.(
+        new Error(
+          'Invalid server message: frame root layout must have finite x/y and non-negative finite width/height',
+        ),
+      )
+      return
+    }
     state.layout = msg.layout
     state.tree = msg.tree
     const renderStart = performance.now()

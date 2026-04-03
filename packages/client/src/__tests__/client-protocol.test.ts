@@ -505,6 +505,38 @@ describe('applyServerMessage', () => {
     expect(state.layout?.width).toBe(100)
   })
 
+  it('rejects frame when root layout bounds fail layoutBoundsAreFinite (no state, render, or metrics)', () => {
+    type Msg = Parameters<typeof applyServerMessage>[2]
+    const b = 1n as unknown as number
+    const badLayouts = [
+      { x: Number.NaN, y: 0, width: 10, height: 10, children: [] },
+      { x: 0, y: 0, width: Number.POSITIVE_INFINITY, height: 10, children: [] },
+      { x: 0, y: 0, width: 10, height: -1, children: [] },
+      { x: 0, y: 0, width: b, height: 10, children: [] },
+    ] as unknown as ComputedLayout[]
+
+    for (const badLayout of badLayouts) {
+      const { renderer, renders } = createRendererSpy()
+      const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+      const errors: string[] = []
+      const metrics: ClientFrameMetrics[] = []
+
+      applyServerMessage(
+        state,
+        renderer,
+        { type: 'frame', layout: badLayout, tree: tree(), protocolVersion: 1 } as Msg,
+        e => errors.push(String(e)),
+        m => metrics.push(m),
+      )
+
+      expect(errors).toHaveLength(1)
+      expect(errors[0]).toContain('root layout')
+      expect(renders).toHaveLength(0)
+      expect(metrics).toHaveLength(0)
+      expect(state.layout).toBeNull()
+    }
+  })
+
   it('recovers with a valid frame after a malformed JSON object message', () => {
     const { renderer, renders } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
