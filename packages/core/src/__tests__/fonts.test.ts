@@ -213,6 +213,13 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('   ')).toEqual([])
   })
 
+  it('returns empty for non-string input (defensive)', () => {
+    expect(extractFontFamiliesFromCSSFont(null as unknown as string)).toEqual([])
+    expect(extractFontFamiliesFromCSSFont(undefined as unknown as string)).toEqual([])
+    expect(extractFontFamiliesFromCSSFont(14 as unknown as string)).toEqual([])
+    expect(extractFontFamiliesFromCSSFont({} as unknown as string)).toEqual([])
+  })
+
   it('parses CSS-wide font-style keyword before size', () => {
     expect(extractFontFamiliesFromCSSFont('normal 14px Inter')).toEqual(['Inter'])
     expect(extractFontFamiliesFromCSSFont('italic 14px Inter')).toEqual(['Inter'])

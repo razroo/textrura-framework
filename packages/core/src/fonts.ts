@@ -200,8 +200,13 @@ function splitFontFamilyList(tail: string): string[] {
  * segment (a common `src:` list paste into a fallback list); a leading `local(...)` after the size is kept
  * for callers that forward tokens to `document.fonts.load`.
  * The same spellings inside quotes are kept as literal family names (CSS `font-family` rules).
+ *
+ * Non-string values return an empty list so tree walks and callers with loose runtime data never throw.
  */
 export function extractFontFamiliesFromCSSFont(font: string): string[] {
+  if (typeof font !== 'string') {
+    return []
+  }
   function filterFamilies(tail: string): string[] {
     const out: string[] = []
     const seen = new Set<string>()
