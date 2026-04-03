@@ -56,6 +56,31 @@ describe('trapFocusStep', () => {
     expect(trapFocusStep(tree, layout, [0, 1], 'next')).toBe(false)
   })
 
+  it('skips a focusable when its layout slot is missing (sparse children array; matches hit-test)', () => {
+    const missingLayout = box({ onKeyDown: () => undefined }, [])
+    const reachable = box({ onKeyDown: () => undefined }, [])
+    const tree = box({}, [missingLayout, reachable])
+    const sparseChildren: ComputedLayout['children'] = []
+    sparseChildren[1] = { x: 0, y: 0, width: 100, height: 40, children: [] }
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: sparseChildren,
+    }
+    expect(layout.children).toHaveLength(2)
+    expect(layout.children[0]).toBeUndefined()
+
+    expect(() => trapFocusStep(tree, layout, [], 'next')).not.toThrow()
+    expect(trapFocusStep(tree, layout, [], 'next')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(reachable)
+    clearFocus()
+    expect(() => trapFocusStep(tree, layout, [], 'prev')).not.toThrow()
+    expect(trapFocusStep(tree, layout, [], 'prev')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(reachable)
+  })
+
   it('returns false when the tree root is not a box', () => {
     const tree = text({ text: 'x', font: '14px sans-serif', lineHeight: 20 })
     const layout: ComputedLayout = { x: 0, y: 0, width: 50, height: 20, children: [] }
