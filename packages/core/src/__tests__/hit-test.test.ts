@@ -1770,6 +1770,42 @@ describe('scroll and overflow clipping', () => {
     expect(getCursorAtPoint(parentNaNX, layoutX, 85, 50)).toBe('grab')
   })
 
+  it('BigInt scroll offsets are treated as zero (typeof guard; do not coerce with Number(bigint) in hot paths)', () => {
+    const layoutY = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 80, width: 100, height: 50, children: [] as const }],
+    }
+    const childY = box({ width: 100, height: 50, cursor: 'crosshair', onClick: () => {} })
+    const parentY = box(
+      { width: 100, height: 100, overflow: 'scroll', scrollY: 40n as unknown as number },
+      [childY],
+    )
+    expect(dispatchHit(parentY, layoutY, 'onClick', 50, 45).handled).toBe(false)
+    expect(dispatchHit(parentY, layoutY, 'onClick', 50, 85).handled).toBe(true)
+    expect(hitPathAtPoint(parentY, layoutY, 50, 85)).toEqual([0])
+    expect(getCursorAtPoint(parentY, layoutY, 50, 85)).toBe('crosshair')
+
+    const layoutX = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 80, y: 0, width: 50, height: 100, children: [] as const }],
+    }
+    const childX = box({ width: 50, height: 100, cursor: 'grab', onClick: () => {} })
+    const parentX = box(
+      { width: 100, height: 100, overflow: 'scroll', scrollX: 99n as unknown as number },
+      [childX],
+    )
+    expect(dispatchHit(parentX, layoutX, 'onClick', 45, 50).handled).toBe(false)
+    expect(dispatchHit(parentX, layoutX, 'onClick', 85, 50).handled).toBe(true)
+    expect(hitPathAtPoint(parentX, layoutX, 85, 50)).toEqual([0])
+    expect(getCursorAtPoint(parentX, layoutX, 85, 50)).toBe('grab')
+  })
+
   it('±Infinity scroll offsets are treated as zero (non-finite scroll cannot shift child geometry)', () => {
     const layoutY = {
       x: 0,
