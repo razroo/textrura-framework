@@ -661,6 +661,60 @@ describe('createClient WebSocket message parse errors', () => {
     expect(String((errors[0] as Error).message)).toContain('Invalid server message')
   })
 
+  it('invokes onError when frame root layout.children is null (JSON null is not an array), then accepts a valid frame', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+    const renders: ComputedLayout[] = []
+    const renderer: Renderer = {
+      render: (layout: ComputedLayout) => {
+        renders.push({ ...layout, children: layout.children })
+      },
+      destroy: () => {},
+    }
+
+    const client = createClient({
+      url: 'ws://mock.test',
+      renderer,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    sockets[0]!.emit('message', {
+      data: JSON.stringify({
+        type: 'frame',
+        layout: { x: 0, y: 0, width: 1, height: 1, children: null },
+        tree: { kind: 'box', props: {}, children: [] },
+        protocolVersion: 1,
+      }),
+    })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(Error)
+    expect(String((errors[0] as Error).message)).toContain('Invalid server message')
+    expect(renders).toHaveLength(0)
+    expect(client.layout).toBeNull()
+
+    const validFrame = {
+      type: 'frame',
+      layout: { x: 0, y: 0, width: 48, height: 49, children: [] },
+      tree: { kind: 'box', props: {}, children: [] } satisfies UIElement,
+      protocolVersion: 1,
+    }
+    sockets[0]!.emit('message', { data: JSON.stringify(validFrame) })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(renders).toHaveLength(1)
+    expect(renders[0]?.width).toBe(48)
+    expect(client.layout?.width).toBe(48)
+  })
+
   it('invokes onError when type is frame but layout or tree shape is invalid (array layout/tree, non-array children)', async () => {
     const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
     installMockWebSocket(sockets)
