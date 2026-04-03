@@ -1499,6 +1499,7 @@ describe('scroll and overflow clipping', () => {
     expect(childFired).toBe(true)
     expect(hitPathAtPoint(parent, layout, 35, 35)).toEqual([0])
     expect(hasInteractiveHitAtPoint(parent, layout, 35, 35)).toBe(true)
+    expect(getCursorAtPoint(parent, layout, 35, 35)).toBeNull()
   })
 
   it('non-number scroll props are ignored so child offsets stay finite', () => {
@@ -1522,6 +1523,7 @@ describe('scroll and overflow clipping', () => {
     }
     expect(dispatchHit(parent, layout, 'onClick', 35, 35).handled).toBe(true)
     expect(childFired).toBe(true)
+    expect(getCursorAtPoint(parent, layout, 35, 35)).toBeNull()
   })
 
   it('NaN scroll offsets are treated as zero (distinct from a finite scroll that would shift hits)', () => {
@@ -1649,7 +1651,12 @@ describe('scroll and overflow clipping', () => {
 
   it('overflow scroll: pointer inside parent still hits stacked children', () => {
     let childFired = false
-    const child = box({ width: 50, height: 50, onClick: () => { childFired = true } })
+    const child = box({
+      width: 50,
+      height: 50,
+      cursor: 'cell',
+      onClick: () => { childFired = true },
+    })
     const parent = box({ width: 100, height: 100, overflow: 'scroll' }, [child])
     const layout = {
       x: 0,
@@ -1662,6 +1669,7 @@ describe('scroll and overflow clipping', () => {
     dispatchHit(parent, layout, 'onClick', 25, 25)
     expect(childFired).toBe(true)
     expect(hitPathAtPoint(parent, layout, 25, 25)).toEqual([0])
+    expect(getCursorAtPoint(parent, layout, 25, 25)).toBe('cell')
   })
 
   it('scrollY shifts child bounds; localY matches scrolled content', () => {
