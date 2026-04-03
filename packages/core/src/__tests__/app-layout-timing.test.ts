@@ -321,6 +321,34 @@ describe('createApp waitForFonts', () => {
     expect(load).toHaveBeenCalledWith('16px CustomFace')
   })
 
+  it('skips document.fonts.load when the initial view has no loadable custom families', async () => {
+    const load = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('document', { fonts: { load, ready: Promise.resolve() } })
+
+    const renderer: Renderer = {
+      render: vi.fn(),
+      destroy: vi.fn(),
+    }
+
+    await createApp(
+      () =>
+        box({ width: 100, height: 50 }, [
+          text({
+            text: 'hi',
+            font: '14px sans-serif, serif',
+            lineHeight: 20,
+            width: 10,
+            height: 20,
+          }),
+        ]),
+      renderer,
+      { width: 200, height: 100, waitForFonts: true },
+    )
+
+    expect(load).not.toHaveBeenCalled()
+    expect(renderer.render).toHaveBeenCalled()
+  })
+
   it('invokes onError and rejects when the view throws during waitForFonts preflight', async () => {
     const onError = vi.fn()
     const load = vi.fn().mockResolvedValue(undefined)
