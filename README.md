@@ -317,9 +317,13 @@ cd demos/terminal && npm run dev
 
 # Text input playground (canvas)
 cd demos/text-input-canvas && npm run dev
+
+# Auth + @geometra/token-registry + remoteVerifier (three services in one Node process)
+cd demos/auth-registry-server-client && npm install && npm run server   # terminal 1
+cd demos/auth-registry-server-client && npm run client                   # terminal 2
 ```
 
-Terminal input/focus wiring snippets are in `TERMINAL_INPUT_EXAMPLES.md`.
+See `demos/auth-registry-server-client/README.md` for details. Terminal input/focus wiring snippets are in `TERMINAL_INPUT_EXAMPLES.md`.
 
 ## Known caveats
 

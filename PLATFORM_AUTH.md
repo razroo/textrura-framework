@@ -62,6 +62,10 @@ There is **no** in-band token refresh in the geometry protocol. When a token exp
 - No imports of `@geometra/auth` or `@geometra/token-registry` inside `packages/core`, renderers, or the default server/client surface.
 - Optional packages and cookbooks wire the stack at **app** level.
 
+## Runnable demo
+
+- `demos/auth-registry-server-client/` — in-process registry (`serveRegistry`), `remoteVerifier`, `createServer` + `createAuth`, and a Vite client using `connectWithAuth`. See `demos/auth-registry-server-client/README.md`.
+
 ## See also
 
 - `INTEGRATION_COOKBOOK.md` — links here for the thin-client + server path.

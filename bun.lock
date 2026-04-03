@@ -30,6 +30,21 @@
         "vite": "^8.0.3",
       },
     },
+    "demos/auth-registry-server-client": {
+      "name": "@geometra/demo-auth-registry-server-client",
+      "dependencies": {
+        "@geometra/auth": "^1.0.1",
+        "@geometra/client": "*",
+        "@geometra/core": "*",
+        "@geometra/renderer-canvas": "*",
+        "@geometra/server": "*",
+        "@geometra/token-registry": "^0.1.1",
+      },
+      "devDependencies": {
+        "tsx": "^4.19.0",
+        "vite": "^8.0.3",
+      },
+    },
     "demos/auth-server-client": {
       "name": "@geometra/demo-auth-server-client",
       "dependencies": {
@@ -201,11 +216,15 @@
 
     "@eslint/plugin-kit": ["@eslint/plugin-kit@0.6.1", "", { "dependencies": { "@eslint/core": "^1.1.1", "levn": "^0.4.1" } }, "sha512-iH1B076HoAshH1mLpHMgwdGeTs0CYwL0SPMkGuSebZrwBp16v415e9NZXg2jtrqPVQjf6IANe2Vtlr5KswtcZQ=="],
 
+    "@geometra/auth": ["@geometra/auth@1.0.1", "", { "peerDependencies": { "@geometra/client": ">=1.1.2", "@geometra/server": ">=1.0.0" }, "optionalPeers": ["@geometra/client"] }, "sha512-bXpzuz1O+NaimAC9qJ5fJvB6vFooTlKHqwAHUGVd492GHmtt+gRNLkdNp1MxDqWMFJbRQ2w+gGyRPbtMT9NDmA=="],
+
     "@geometra/client": ["@geometra/client@workspace:packages/client"],
 
     "@geometra/core": ["@geometra/core@workspace:packages/core"],
 
     "@geometra/demo-ai-on-demand": ["@geometra/demo-ai-on-demand@workspace:demos/ai-on-demand"],
+
+    "@geometra/demo-auth-registry-server-client": ["@geometra/demo-auth-registry-server-client@workspace:demos/auth-registry-server-client"],
 
     "@geometra/demo-auth-server-client": ["@geometra/demo-auth-server-client@workspace:demos/auth-server-client"],
 
@@ -230,6 +249,8 @@
     "@geometra/router": ["@geometra/router@workspace:packages/router"],
 
     "@geometra/server": ["@geometra/server@workspace:packages/server"],
+
+    "@geometra/token-registry": ["@geometra/token-registry@0.1.1", "", { "dependencies": { "jose": "^6.0.11" } }, "sha512-XL+zsztw5gcqPqMlvlftU3ktVlvZ4iR0qa/2JP+1ecQ1JHJum2gJwS0nDf0QNk8+qQFw/9Dy0SZkK4O5tQ0/nQ=="],
 
     "@geometra/ui": ["@geometra/ui@workspace:packages/ui"],
 
@@ -393,6 +414,8 @@
 
     "isexe": ["isexe@2.0.0", "", {}, "sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw=="],
 
+    "jose": ["jose@6.2.2", "", {}, "sha512-d7kPDd34KO/YnzaDOlikGpOurfF0ByC2sEV4cANCtdqLlTfBlw2p14O/5d/zv40gJPbIQxfES3nSx1/oYNyuZQ=="],
+
     "json-buffer": ["json-buffer@3.0.1", "", {}, "sha512-4bV5BfR2mqfQTJm+V5tPPdf+ZpuhiIvTuAB5g8kcrXOZpTT/QwwVRWBywX1ozr6lEuPdbHxwaJlm9G6mI2sfSQ=="],
 
     "json-schema-traverse": ["json-schema-traverse@0.4.1", "", {}, "sha512-xbbCH5dCYU5T8LcEhhuh7HJ88HXuW3qsI3Y0zOZFKfZEHcpWiHU/Jxzk629Brsab/mMiHQti9wMP+845RPe3Vg=="],
@@ -509,19 +532,11 @@
 
     "@eslint-community/eslint-utils/eslint-visitor-keys": ["eslint-visitor-keys@3.4.3", "", {}, "sha512-wpc+LXeiyiisxPlEkUzU6svyS1frIO3Mgxj1fdy7Pm8Ygzguax2N3Fa/D/ag1WqbOprdI+uY6wMUl8/a2G+iag=="],
 
-    "@geometra/client/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
-    "@geometra/renderer-canvas/@geometra/client": ["@geometra/client@file:packages/client", { "dependencies": { "@geometra/core": "file:../core" } }],
-
-    "@geometra/renderer-canvas/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
     "@geometra/renderer-terminal/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
 
     "@geometra/renderer-webgpu/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
 
     "@geometra/router/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
-
-    "@geometra/server/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
 
     "@geometra/ui/@geometra/core": ["@geometra/core@file:packages/core", { "dependencies": { "textura": "^1.1.2" }, "optionalDependencies": { "@napi-rs/canvas": "^0.1.65" } }],
 
@@ -530,8 +545,6 @@
     "@typescript-eslint/eslint-plugin/ignore": ["ignore@7.0.5", "", {}, "sha512-Hs59xBNfUIunMFgWAbGX5cq6893IbWg4KnrjbYwX3tx0ztorVgTDA6B2sxf8ejHJ4wz8BqGUMYlnzNBer5NvGg=="],
 
     "playwright/fsevents": ["fsevents@2.3.2", "", { "os": "darwin" }, "sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA=="],
-
-    "@geometra/renderer-canvas/@geometra/client/@geometra/core": ["@geometra/core@file:packages/core", {}],
 
     "@types/ws/@types/node/undici-types": ["undici-types@7.18.2", "", {}, ""],
   }

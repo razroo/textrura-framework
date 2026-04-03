@@ -23,6 +23,7 @@ Auth belongs on the **WebSocket upgrade** and optional **per-message** policy ho
 - Use **`@geometra/auth`** `createAuth()` and spread its hooks into `createServer()` (token verify + role policies).
 - Use **`@geometra/token-registry`** as the HTTP backend for `remoteVerifier()`, or any compatible verify endpoint.
 - Wire semantics, close codes **4001** / **4003**, refresh, and “what not to put in core” are documented in **`PLATFORM_AUTH.md`**.
+- End-to-end sample: **`demos/auth-registry-server-client/`** (registry + `remoteVerifier` + `connectWithAuth`).
 
 ## DOM-free migration
 
