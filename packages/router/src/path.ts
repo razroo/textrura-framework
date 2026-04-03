@@ -38,12 +38,20 @@ function stringifyParam(value: string | number): string {
   return encodeURIComponent(String(value))
 }
 
+/** True when a param value should participate in the path (non-finite numbers omitted; mirrors `stringifyQuery` in `query.ts`). */
+function paramValuePresent(value: string | number | null | undefined): boolean {
+  if (value == null || value === '') return false
+  if (typeof value === 'number' && !Number.isFinite(value)) return false
+  return true
+}
+
 /**
  * Build a pathname from a route pattern and {@link PathParams}. Static segments are copied as-is;
  * dynamic `:id` and optional `:id?` are filled from `params`; splat `*rest` (or a lone `*`, key `'*'`)
  * inserts the remainder with internal slashes preserved. For optional segments, `null`, `undefined`,
- * or empty string omits the segment (same as leaving the key unset). Required dynamic and splat
- * params throw when missing or empty. Leading and trailing slashes on `pattern` are trimmed before building.
+ * empty string, or a non-finite number (`NaN`, `±Infinity`) omits the segment (same as leaving the key unset).
+ * Required dynamic and splat params throw when missing, empty, or non-finite numeric. Leading and trailing
+ * slashes on `pattern` are trimmed before building.
  */
 export function buildPath<Path extends string>(pattern: Path, params: PathParams<Path>): string {
   const trimmed = trimSlashes(pattern)
@@ -56,7 +64,7 @@ export function buildPath<Path extends string>(pattern: Path, params: PathParams
     if (part.startsWith('*')) {
       const key = part.slice(1) || '*'
       const value = params[key as keyof PathParams<Path>]
-      if (value == null || value === '') {
+      if (!paramValuePresent(value)) {
         throw new Error(`Missing required splat param: ${key}`)
       }
       out.push(trimSlashes(String(value)))
@@ -67,7 +75,7 @@ export function buildPath<Path extends string>(pattern: Path, params: PathParams
       const optional = part.endsWith('?')
       const key = optional ? part.slice(1, -1) : part.slice(1)
       const value = params[key as keyof PathParams<Path>]
-      if (value == null || value === '') {
+      if (!paramValuePresent(value)) {
         if (optional) continue
         throw new Error(`Missing required path param: ${key}`)
       }

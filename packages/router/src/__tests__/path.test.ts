@@ -57,6 +57,30 @@ describe('path generation', () => {
     expect(buildPath('/a/:seg?/c', { seg: undefined })).toBe('/a/c')
   })
 
+  it('omits optional path params when the value is a non-finite number (parity with query stringify)', () => {
+    expect(buildPath('/users/:id?', { id: Number.NaN })).toBe('/users')
+    expect(buildPath('/users/:id?', { id: Number.POSITIVE_INFINITY })).toBe('/users')
+    expect(buildPath('/a/:seg?/c', { seg: Number.NEGATIVE_INFINITY })).toBe('/a/c')
+  })
+
+  it('throws for required path params when the value is a non-finite number', () => {
+    expect(() =>
+      buildPath('/users/:id', { id: Number.NaN } as PathParams<'/users/:id'>),
+    ).toThrow('Missing required path param: id')
+    expect(() =>
+      buildPath('/n/:x', { x: Number.POSITIVE_INFINITY } as PathParams<'/n/:x'>),
+    ).toThrow('Missing required path param: x')
+  })
+
+  it('throws for splat params when the value is a non-finite number', () => {
+    expect(() =>
+      buildPath('/docs/*rest', { rest: Number.NaN } as PathParams<'/docs/*rest'>),
+    ).toThrow('Missing required splat param: rest')
+    expect(() =>
+      buildPath('/*', { '*': Number.NEGATIVE_INFINITY } as PathParams<'/*'>),
+    ).toThrow('Missing required splat param: *')
+  })
+
   it('builds path with multiple dynamic segments', () => {
     expect(buildPath('/users/:userId/posts/:postId', { userId: 'a', postId: 2 })).toBe(
       '/users/a/posts/2',
