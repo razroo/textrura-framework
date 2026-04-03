@@ -1,3 +1,13 @@
+/**
+ * @packageDocumentation
+ * Public entry for `@geometra/router`: pathname matching ({@link matchPath}), reverse path building ({@link buildPath}),
+ * query helpers ({@link parseQuery}, {@link stringifyQuery}), browser and memory history adapters, the {@link link}
+ * primitive, loader/action response helpers ({@link redirect}, {@link response}, {@link json}), route pattern ranking,
+ * {@link createRouter} with navigation, data loading, and error boundaries, plus outlet rendering utilities ({@link matchRouteTree},
+ * {@link renderMatchedOutlet}). All routing state stays compatible with Geometra’s declarative tree across canvas,
+ * terminal, and server-driven clients.
+ */
+
 export { matchPath } from './matcher.js'
 export type { RouteMatch } from './matcher.js'
 export { buildPath } from './path.js'
