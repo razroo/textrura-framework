@@ -147,6 +147,22 @@ describe('collectFocusOrder', () => {
     }
     expect(collectFocusOrder(root, layout)).toEqual([])
   })
+
+  it('skips a sibling with corrupt layout but still collects a valid later sibling', () => {
+    const bad = box({ width: 40, height: 40, onClick: () => {} })
+    const good = box({ width: 40, height: 40, onClick: () => {} })
+    const root = box({ width: 100, height: 100 }, [bad, good])
+    const layout = {
+      ...makeLayout(),
+      children: [
+        { ...makeLayout({ width: 40, height: 40 }), width: Number.NaN, height: 40 },
+        makeLayout({ x: 50, width: 40, height: 40 }),
+      ],
+    }
+    const order = collectFocusOrder(root, layout)
+    expect(order).toHaveLength(1)
+    expect(order[0]!.element).toBe(good)
+  })
 })
 
 describe('focusNext', () => {
