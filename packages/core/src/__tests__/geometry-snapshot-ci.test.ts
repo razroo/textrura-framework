@@ -167,6 +167,28 @@ describe('geometry snapshot CI', () => {
     expect(roundLayout(layout)).toMatchSnapshot()
   })
 
+  it('stable column with mixed alignSelf on fixed-width text children (rounded)', async () => {
+    await init()
+    const item = { font: '14px sans-serif', lineHeight: 18, width: 60, height: 18 } as const
+    const tree = box(
+      {
+        width: 160,
+        height: 120,
+        padding: 8,
+        flexDirection: 'column',
+        gap: 4,
+        alignItems: 'stretch',
+      },
+      [
+        text({ text: 'Start', ...item, alignSelf: 'flex-start' }),
+        text({ text: 'Center', ...item, alignSelf: 'center' }),
+        text({ text: 'End', ...item, alignSelf: 'flex-end' }),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 160, height: 120 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
+
   it('stable rtl root column stacks two text children (rounded)', async () => {
     await init()
     const tree = box(

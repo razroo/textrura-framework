@@ -60,6 +60,38 @@ exports[`geometry snapshot CI > stable column with in-flow text and absolutely p
 }
 `;
 
+exports[`geometry snapshot CI > stable column with mixed alignSelf on fixed-width text children (rounded) 1`] = `
+{
+  "children": [
+    {
+      "children": [],
+      "height": 18,
+      "width": 60,
+      "x": 8,
+      "y": 8,
+    },
+    {
+      "children": [],
+      "height": 18,
+      "width": 60,
+      "x": 50,
+      "y": 30,
+    },
+    {
+      "children": [],
+      "height": 18,
+      "width": 60,
+      "x": 92,
+      "y": 52,
+    },
+  ],
+  "height": 120,
+  "width": 160,
+  "x": 0,
+  "y": 0,
+}
+`;
+
 exports[`geometry snapshot CI > stable ltr row with per-node rtl and ltr text dir (rounded) 1`] = `
 {
   "children": [
