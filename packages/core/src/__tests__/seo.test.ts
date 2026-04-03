@@ -588,6 +588,37 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<img src="https://example.com/photo.jpg" alt="A photo">')
   })
 
+  it('emits semantic role and aria-label on images when provided', () => {
+    const el = box({ width: 200, height: 200 }, [
+      image({
+        src: '/logo.png',
+        alt: 'Logo',
+        width: 64,
+        height: 64,
+        semantic: { role: 'img', ariaLabel: 'Company logo' },
+      }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toMatch(/<img[^>]*role="img"/)
+    expect(html).toMatch(/<img[^>]*aria-label="Company logo"/)
+    expect(html).toContain('alt="Logo"')
+  })
+
+  it('escapes semantic role and aria-label on images', () => {
+    const el = box({ width: 200, height: 200 }, [
+      image({
+        src: '/x.png',
+        alt: 'x',
+        width: 10,
+        height: 10,
+        semantic: { role: 'img"x', ariaLabel: 'A & B' },
+      }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('role="img&quot;x"')
+    expect(html).toContain('aria-label="A &amp; B"')
+  })
+
   it('uses only semantic aria-label on boxes when both ariaLabel and alt are set', () => {
     const el = box(
       {

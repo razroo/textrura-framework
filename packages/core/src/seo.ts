@@ -272,9 +272,15 @@ function elementToHTML(element: UIElement, indent: number): string {
   if (element.kind === 'image') {
     const imgEl = element as ImageElement
     const alt = imgEl.semantic?.alt ?? imgEl.props.alt ?? ''
+    const attrs: string[] = []
     const dir = dirAttribute(imgEl.props)
-    const dirStr = dir ? ` ${dir}` : ''
-    return `${pad}<img src="${escapeHTML(imgEl.props.src)}" alt="${escapeHTML(alt)}"${dirStr}>`
+    if (dir) attrs.push(dir)
+    if (imgEl.semantic?.role) attrs.push(`role="${escapeHTML(imgEl.semantic.role)}"`)
+    if (imgEl.semantic?.ariaLabel) {
+      attrs.push(`aria-label="${escapeHTML(imgEl.semantic.ariaLabel)}"`)
+    }
+    const attrStr = attrs.length ? ' ' + attrs.join(' ') : ''
+    return `${pad}<img src="${escapeHTML(imgEl.props.src)}" alt="${escapeHTML(alt)}"${attrStr}>`
   }
 
   if (element.kind === 'text') {
@@ -329,7 +335,8 @@ function elementToHTML(element: UIElement, indent: number): string {
  * version for real users.
  *
  * When `props.dir` is `ltr`, `rtl`, or `auto` on a box, text, or image node, the HTML `dir`
- * attribute is emitted on that element’s tag.
+ * attribute is emitted on that element’s tag. Images also honor `semantic.role` and
+ * `semantic.ariaLabel` (escaped), alongside `alt` from props or `semantic.alt`.
  *
  * `semantic.tag` is validated as a safe HTML local name (letter, then letters/digits/hyphen, ≤128
  * chars); invalid values fall back to font/box inference so crawlers cannot receive broken markup.
