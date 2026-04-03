@@ -9,6 +9,16 @@ import { focusedElement, setFocus } from './focus.js'
 import { collectFontFamiliesFromTree, resolveFontLoadTimeoutMs, waitForFonts } from './fonts.js'
 import { dispatchKeyboardEvent, dispatchCompositionEvent } from './keyboard.js'
 
+function resolveComputeLayoutDirection(
+  layoutDirection: AppOptions['layoutDirection'],
+  root: UIElement,
+): 'ltr' | 'rtl' {
+  if (layoutDirection === 'ltr' || layoutDirection === 'rtl') {
+    return layoutDirection
+  }
+  return resolveElementDirection(root, 'ltr')
+}
+
 export interface AppOptions {
   /** Root width for layout computation. */
   width?: number
@@ -29,6 +39,9 @@ export interface AppOptions {
   /**
    * Yoga / Textura root layout direction. When omitted, derived from the root element’s resolved
    * `dir` prop (parent context defaults to `ltr`), so RTL roots mirror flex rows correctly.
+   *
+   * Values other than the strings `ltr` and `rtl` (e.g. malformed plain-JS options) are ignored and
+   * treated like omission so `computeLayout` still receives a concrete direction.
    *
    * Nested `dir` on descendants still drives text, focus, and selection, but does not set a separate
    * flex direction per subtree: `computeLayout` receives one document direction and
@@ -94,8 +107,7 @@ export async function createApp(
       try {
         app.tree = view()
         const layoutTree = toLayoutTree(app.tree)
-        const direction =
-          options.layoutDirection ?? resolveElementDirection(app.tree, 'ltr')
+        const direction = resolveComputeLayoutDirection(options.layoutDirection, app.tree)
         const layoutStart = typeof performance !== 'undefined' ? performance.now() : 0
         app.layout = computeLayout(layoutTree, {
           width: options.width,
