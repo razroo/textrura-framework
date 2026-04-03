@@ -94,4 +94,35 @@ describe('demo input scenario smoke', () => {
     expect(inputEmail.peek()).toBe('a')
     expect(inputSearch.peek()).toBe('x')
   })
+
+  it('uiInput onSelectAll handles Ctrl+A and Meta+A without calling onKeyDown', () => {
+    const order: string[] = []
+    const el = uiInput('abc', 'field', {
+      focused: true,
+      onSelectAll: () => order.push('selectAll'),
+      onKeyDown: () => order.push('keyDown'),
+    })
+    expect(el.kind).toBe('box')
+
+    const base = {
+      key: 'a',
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+      target: {} as KeyboardHitEvent['target'],
+    }
+
+    el.handlers?.onKeyDown?.({ ...base, ctrlKey: true })
+    expect(order).toEqual(['selectAll'])
+
+    order.length = 0
+    el.handlers?.onKeyDown?.({ ...base, key: 'A', metaKey: true })
+    expect(order).toEqual(['selectAll'])
+
+    order.length = 0
+    el.handlers?.onKeyDown?.({ ...base, ctrlKey: false, metaKey: false })
+    expect(order).toEqual(['keyDown'])
+  })
 })
