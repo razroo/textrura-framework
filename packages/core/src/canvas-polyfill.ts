@@ -2,19 +2,22 @@
 // Pretext requires OffscreenCanvas for text measurement.
 // @napi-rs/canvas provides a compatible canvas for Node.js.
 
-import { createCanvas } from '@napi-rs/canvas'
+import { createCanvas, type Canvas } from '@napi-rs/canvas'
 
 if (typeof globalThis.OffscreenCanvas === 'undefined') {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ;(globalThis as any).OffscreenCanvas = class OffscreenCanvas {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private _canvas: any
+  class NodeOffscreenCanvas {
+    private readonly _canvas: Canvas
+
     constructor(width: number, height: number) {
       this._canvas = createCanvas(width, height)
     }
+
     getContext(type: string) {
-      if (type === '2d') return this._canvas.getContext('2d')
-      return null
+      if (type !== '2d') return null
+      return this._canvas.getContext('2d')
     }
   }
+
+  ;(globalThis as unknown as { OffscreenCanvas: typeof NodeOffscreenCanvas }).OffscreenCanvas =
+    NodeOffscreenCanvas
 }
