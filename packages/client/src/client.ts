@@ -111,6 +111,23 @@ function applyPatches(layout: ComputedLayout, patches: ServerPatch['patches']): 
   }
 }
 
+/**
+ * Apply a parsed GEOM v1 server message to local client state and the renderer.
+ *
+ * Updates `state.layout` / `state.tree` on full frames, mutates the existing layout in place for
+ * patches, and calls {@link Renderer.render} when a frame is applied or a patch runs against current
+ * state. Patches received before the first frame are ignored (no state change, no render).
+ *
+ * When `msg.protocolVersion` is present and greater than the client’s supported version, calls
+ * `onError` and returns without mutating state or invoking `onMetrics`.
+ *
+ * @param state — Mutable `{ layout, tree }` (same fields as {@link TexturaClient}).
+ * @param renderer — Receives `render` after successful frame or patch application.
+ * @param msg — `frame`, `patch`, or `error` payload from the wire after JSON/binary decode.
+ * @param onError — Server `error` messages and protocol-too-new mismatches.
+ * @param onMetrics — Once per call when processing continues past the protocol guard; includes decode/apply/render timing.
+ * @param decodeMeta — Optional timings and byte counts from the transport layer (binary vs JSON).
+ */
 export function applyServerMessage(
   state: ClientStateShape,
   renderer: Renderer,
