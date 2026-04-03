@@ -765,6 +765,12 @@ describe('collectFontFamiliesFromTree', () => {
     ])
     expect(collectFontFamiliesFromTree(tree)).toEqual([])
   })
+
+  it('treats non-string font on text nodes as empty (walk does not throw on bad deserialized props)', () => {
+    const node = text({ text: 'x', font: '14px Inter', lineHeight: 20 })
+    Object.assign(node.props, { font: null as unknown as string })
+    expect(collectFontFamiliesFromTree(box({}, [node]))).toEqual([])
+  })
 })
 
 describe('waitForFonts', () => {
