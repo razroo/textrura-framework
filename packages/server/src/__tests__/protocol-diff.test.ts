@@ -76,6 +76,48 @@ describe('diffLayout', () => {
     expect(patches).toEqual([])
   })
 
+  it('compares children pairwise by index and ignores trailing extras on prev (no removal patches)', () => {
+    const prev: TestLayout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 10, height: 10, children: [] },
+        { x: 20, y: 0, width: 30, height: 10, children: [] },
+      ],
+    }
+    const next: TestLayout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 99, height: 10, children: [] }],
+    }
+    expect(diffLayout(prev, next)).toEqual([{ path: [0], width: 99 }])
+  })
+
+  it('does not emit patches for appended child slots when next has more children than prev', () => {
+    const prev: TestLayout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 10, height: 10, children: [] }],
+    }
+    const next: TestLayout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 10, height: 10, children: [] },
+        { x: 50, y: 0, width: 5, height: 5, children: [] },
+      ],
+    }
+    expect(diffLayout(prev, next)).toEqual([])
+  })
+
   it('treats undefined/older protocol versions as compatible and newer as incompatible', () => {
     expect(isProtocolCompatible(undefined, 1)).toBe(true)
     expect(isProtocolCompatible(1, 1)).toBe(true)

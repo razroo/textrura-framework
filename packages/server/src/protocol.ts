@@ -88,7 +88,15 @@ export function coalescePatches(patches: LayoutPatch[]): LayoutPatch[] {
   return order.map(k => byPath.get(k)!)
 }
 
-/** Diff two computed layouts and return patches for changed nodes. */
+/**
+ * Diff two computed layouts and return patches for changed nodes.
+ *
+ * Only pairs existing children by index: if `prev.children` and `next.children` differ in length,
+ * extra slots on either side are ignored (no patches for “added” or “removed” subtrees). The server
+ * only uses patches when the UI tree JSON is unchanged (`createServer` sends full `frame` messages
+ * whenever the tree changes), so callers should not rely on this function across structural layout
+ * mismatches.
+ */
 export function diffLayout(
   prev: ComputedLayout,
   next: ComputedLayout,
