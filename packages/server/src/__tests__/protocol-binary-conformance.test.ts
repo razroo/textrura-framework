@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { encodeBinaryFrameJson, decodeBinaryFrameJson } from '../binary-frame.js'
 
+const V1_FIXTURES = ['frame.json', 'patch.json', 'error.json'] as const
+
 describe('protocol binary conformance', () => {
-  it('binary envelope decodes the same JSON as text fixtures', () => {
+  it.each(V1_FIXTURES)('binary envelope roundtrips v1/%s like text frames', name => {
     const frame = JSON.parse(
-      readFileSync(new URL('../../../../fixtures/protocol/v1/frame.json', import.meta.url), 'utf8'),
+      readFileSync(new URL(`../../../../fixtures/protocol/v1/${name}`, import.meta.url), 'utf8'),
     )
     const asText = JSON.stringify(frame)
     const buf = encodeBinaryFrameJson(asText)
