@@ -63,6 +63,10 @@ export function getMotionPreference(): MotionPreference {
 /**
  * Create an animated signal that transitions from `from` to `to` over `duration` ms.
  * Returns a signal whose `.value` tracks the current interpolated value.
+ *
+ * Non-finite `duration` (NaN, ±Infinity) jumps immediately to `to` with no RAF scheduling.
+ * Finite non-positive durations use the same 1 ms floor as {@link createTweenTimeline} so progress
+ * scale stays well-defined.
  */
 export function transition(
   from: number,
@@ -76,11 +80,16 @@ export function transition(
     s.set(to)
     return s
   }
+  if (!Number.isFinite(duration)) {
+    s.set(to)
+    return s
+  }
+  const d = Math.max(1, duration)
   const start = Date.now()
 
   function tick() {
     const elapsed = Date.now() - start
-    const t = Math.min(elapsed / duration, 1)
+    const t = Math.min(elapsed / d, 1)
     s.set(from + (to - from) * easingFn(t))
     if (t < 1) raf(tick)
   }

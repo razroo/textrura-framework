@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   createPropertyTimeline,
   createTweenTimeline,
@@ -88,6 +88,51 @@ describe('motion preference', () => {
     setMotionPreference('bogus' as never)
     expect(getMotionPreference()).toBe('full')
     setMotionPreference('full')
+  })
+})
+
+describe('transition()', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    vi.resetModules()
+  })
+
+  it('jumps to target when duration is non-finite (no NaN, no infinite RAF)', () => {
+    const pending: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      pending.push(cb)
+      return pending.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    expect(transition(0, 200, Number.NaN, easing.linear).peek()).toBe(200)
+    expect(transition(0, 40, Number.POSITIVE_INFINITY, easing.linear).peek()).toBe(40)
+    expect(pending).toHaveLength(0)
+  })
+
+  it('clamps non-positive finite duration to 1 ms scale like createTweenTimeline', async () => {
+    vi.resetModules()
+    const pending: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      pending.push(cb)
+      return pending.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    let mockNow = 1_000_000
+    vi.spyOn(Date, 'now').mockImplementation(() => mockNow)
+
+    const { transition: transitionFresh } = await import('../animation.js')
+    const s = transitionFresh(0, 100, 0, easing.linear)
+    expect(s.peek()).toBe(0)
+    expect(pending.length).toBeGreaterThanOrEqual(1)
+
+    while (pending.length) {
+      mockNow += 1
+      pending.shift()!(0)
+    }
+    expect(s.peek()).toBe(100)
   })
 })
 
