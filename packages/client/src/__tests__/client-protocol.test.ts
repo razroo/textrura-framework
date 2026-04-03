@@ -64,6 +64,37 @@ describe('applyServerMessage', () => {
     expect(renders.length).toBe(0)
   })
 
+  it('surfaces protocol mismatch on patch and leaves layout untouched (no extra render)', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const errors: string[] = []
+
+    applyServerMessage(state, renderer, {
+      type: 'frame',
+      layout: layout(0, 0, 100, 50),
+      tree: tree(),
+      protocolVersion: 1,
+    })
+    expect(renders.length).toBe(1)
+
+    const layoutBefore = state.layout
+    applyServerMessage(
+      state,
+      renderer,
+      {
+        type: 'patch',
+        patches: [{ path: [], width: 999 }],
+        protocolVersion: 42,
+      },
+      (err) => errors.push(String(err)),
+    )
+
+    expect(errors[0]).toContain('newer than client protocol')
+    expect(state.layout).toBe(layoutBefore)
+    expect(state.layout?.width).toBe(100)
+    expect(renders.length).toBe(1)
+  })
+
   it('ignores delayed patch before first frame and recovers on frame', () => {
     const { renderer, renders } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
