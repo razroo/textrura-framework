@@ -2371,6 +2371,35 @@ describe('pointerEvents', () => {
     expect(childFired).toBe(true)
   })
 
+  it('pointerEvents none on scroll parent: scrollY still shifts child hit geometry and cursor', () => {
+    let localY = -1
+    const child = box({
+      width: 100,
+      height: 50,
+      cursor: 'text',
+      onClick: e => {
+        localY = e.localY ?? -999
+      },
+    })
+    const parent = box(
+      { width: 100, height: 100, overflow: 'scroll', scrollY: 40, pointerEvents: 'none' },
+      [child],
+    )
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 80, width: 100, height: 50, children: [] }],
+    }
+
+    // Same abs geometry as scrollY shifts child bounds test; parent does not capture hits.
+    dispatchHit(parent, layout, 'onClick', 50, 45)
+    expect(localY).toBe(5)
+    expect(getCursorAtPoint(parent, layout, 50, 45)).toBe('text')
+    expect(hitPathAtPoint(parent, layout, 50, 45)).toEqual([0])
+  })
+
   it('pointerEvents none: hasInteractiveHitAtPoint sees interactive sibling behind overlay', () => {
     const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => undefined })
     const front = box({ width: 50, height: 50, zIndex: 2, pointerEvents: 'none' })
