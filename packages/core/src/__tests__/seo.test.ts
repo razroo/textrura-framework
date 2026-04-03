@@ -327,6 +327,22 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<h4>Dvb edge</h4>')
   })
 
+  it('infers headings from large-viewport axis and min/max units (lvw, lvi, lvb, lvmin, lvmax)', () => {
+    const el = box({ width: 400, height: 240 }, [
+      text({ text: 'Lvw hero', font: 'bold 10lvw sans-serif', lineHeight: 40 }),
+      text({ text: 'Lvi section', font: 'bold 8lvi sans-serif', lineHeight: 32 }),
+      text({ text: 'Lvb sub', font: 'bold 6lvb sans-serif', lineHeight: 28 }),
+      text({ text: 'Lvmin h4', font: 'bold 1.7lvmin sans-serif', lineHeight: 20 }),
+      text({ text: 'Lvmax edge', font: 'bold 1.7lvmax sans-serif', lineHeight: 20 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<h1>Lvw hero</h1>')
+    expect(html).toContain('<h2>Lvi section</h2>')
+    expect(html).toContain('<h3>Lvb sub</h3>')
+    expect(html).toContain('<h4>Lvmin h4</h4>')
+    expect(html).toContain('<h4>Lvmax edge</h4>')
+  })
+
   it('infers h1 from scientific-notation percentage before bold keyword', () => {
     const el = box({ width: 200, height: 50 }, [
       text({ text: 'Hero', font: 'bold 2e2% sans-serif', lineHeight: 40 }),
