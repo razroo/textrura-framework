@@ -1,6 +1,6 @@
 {
   "name": "@geometra/server",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Server-side layout engine with WebSocket geometry streaming",
   "license": "MIT",
   "type": "module",
@@ -30,7 +30,8 @@
   ],
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@geometra/core": "file:../core",
