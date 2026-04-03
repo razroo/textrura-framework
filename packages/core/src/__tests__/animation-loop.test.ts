@@ -47,6 +47,31 @@ describe('animationLoop', () => {
     expect(dts[3]).toBeCloseTo(0.05, 6)
   })
 
+  it('returning false on the first tick does not schedule another frame', async () => {
+    const pending: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      pending.push(cb)
+      return pending.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    let mockNow = 1000
+    vi.spyOn(Date, 'now').mockImplementation(() => mockNow)
+
+    const animationLoop = await loadAnimationLoop()
+    let ticks = 0
+    animationLoop(() => {
+      ticks++
+      mockNow += 16
+      return false
+    })
+
+    expect(pending).toHaveLength(1)
+    pending.shift()!(0)
+    expect(ticks).toBe(1)
+    expect(pending).toHaveLength(0)
+  })
+
   it('stop() prevents further callbacks even when another frame was already scheduled', async () => {
     const pending: FrameRequestCallback[] = []
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
