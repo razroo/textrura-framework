@@ -89,8 +89,9 @@ export async function createApp(
           width: options.width,
           height: options.height,
         })
-        const layoutMs =
+        const rawLayoutMs =
           typeof performance !== 'undefined' ? performance.now() - layoutStart : 0
+        const layoutMs = Math.max(0, Number.isFinite(rawLayoutMs) ? rawLayoutMs : 0)
         renderer.setFrameTimings?.({ layoutMs })
         renderer.render(app.layout, app.tree)
       } catch (err) {

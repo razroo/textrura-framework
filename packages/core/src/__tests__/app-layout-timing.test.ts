@@ -56,6 +56,41 @@ describe('createApp layout timing', () => {
     expect(render).toHaveBeenCalled()
   })
 
+  it('clamps negative or non-finite layout deltas to 0 for setFrameTimings', async () => {
+    const mkRenderer = (): Renderer => ({
+      setFrameTimings: vi.fn(),
+      render: vi.fn(),
+      destroy: vi.fn(),
+    })
+
+    {
+      let step = 0
+      const spy = vi.spyOn(performance, 'now').mockImplementation(() => (++step === 1 ? 1000 : 100))
+      try {
+        const renderer = mkRenderer()
+        await createApp(() => box({ width: 40, height: 20 }, []), renderer, { width: 100, height: 50 })
+        expect(renderer.setFrameTimings).toHaveBeenCalledWith({ layoutMs: 0 })
+      } finally {
+        spy.mockRestore()
+      }
+    }
+
+    {
+      let step = 0
+      const spy = vi.spyOn(performance, 'now').mockImplementation(() => {
+        step++
+        return step === 1 ? 50 : Number.NaN
+      })
+      try {
+        const renderer = mkRenderer()
+        await createApp(() => box({ width: 40, height: 20 }, []), renderer, { width: 100, height: 50 })
+        expect(renderer.setFrameTimings).toHaveBeenCalledWith({ layoutMs: 0 })
+      } finally {
+        spy.mockRestore()
+      }
+    }
+  })
+
   it('invokes setFrameTimings on each reactive re-layout when the view depends on a signal', async () => {
     const setFrameTimings = vi.fn()
     const render = vi.fn()
