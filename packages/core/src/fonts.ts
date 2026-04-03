@@ -192,6 +192,8 @@ function splitFontFamilyList(tail: string): string[] {
  * Leading absolute size keywords (`medium`, `xx-small`, `large`, …) are stripped the same way.
  * A comma-list segment that is exactly an absolute size keyword is dropped when unquoted; the same word
  * inside quotes is kept (CSS requires quoting when a family name matches a keyword).
+ * Broken `calc()`/`min()`/… values (unclosed parentheses) and stray `+` tails after a matched size
+ * token yield no families so {@link waitForFonts} is not called with math remnants.
  * Unquoted `url(...)` and `format(...)` segments (e.g. mistaken `@font-face` `src` paste) are not
  * concrete family names and are skipped so {@link waitForFonts} does not call `load` with them.
  * The same spellings inside quotes are kept as literal family names (CSS `font-family` rules).
@@ -209,6 +211,7 @@ export function extractFontFamiliesFromCSSFont(font: string): string[] {
       const inner = t.replace(/^["']|["']$/g, '')
       if (inner.length === 0) continue
       const lead = inner.trimStart()
+      if (!quoted && /^\+/.test(lead)) continue
       if (!quoted && /^url\s*\(/i.test(lead)) continue
       if (!quoted && /^format\s*\(/i.test(lead)) continue
       if (!quoted && ABSOLUTE_FONT_SIZE_KEYWORDS.has(inner.toLowerCase())) continue
@@ -240,6 +243,10 @@ export function extractFontFamiliesFromCSSFont(font: string): string[] {
   /** True when the family tail still begins with another size token (dimension, stacked shorthand, or CSS math size). */
   function tailLeadsWithStackedSize(tail: string): boolean {
     const first = firstFamilyListSegment(tail)
+    const tf = first.trimStart()
+    // Shorthand peel can match a dimension inside broken `calc(` / stacked tokens and leave a `+ …` math
+    // remnant; that is never a valid unquoted family name and must not be passed to `document.fonts.load`.
+    if (/^\+/.test(tf)) return true
     return (
       FONT_SIZE_ONLY.test(first) ||
       TAIL_LEADS_WITH_SIZE_TOKEN.test(tail) ||

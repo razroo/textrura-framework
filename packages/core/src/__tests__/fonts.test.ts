@@ -107,6 +107,23 @@ describe('extractFontFamiliesFromCSSFont', () => {
     expect(extractFontFamiliesFromCSSFont('calc(14px + 1vmin) Inter, sans-serif')).toEqual(['Inter'])
   })
 
+  it('returns empty when unclosed math leaves a leading + remnant (not a loadable family)', () => {
+    expect(extractFontFamiliesFromCSSFont('calc(14px + Inter')).toEqual([])
+  })
+
+  it('still extracts family when a dimension inside broken math is followed by a family token', () => {
+    expect(extractFontFamiliesFromCSSFont('calc(14px + 1vmin Inter')).toEqual(['Inter'])
+  })
+
+  it('returns empty for size tokens followed by a lone + tail (invalid shorthand)', () => {
+    expect(extractFontFamiliesFromCSSFont('14px + Inter')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('600 14px + Inter, sans-serif')).toEqual([])
+  })
+
+  it('keeps a quoted family whose spelling starts with +', () => {
+    expect(extractFontFamiliesFromCSSFont('14px "+Plus", serif')).toEqual(['+Plus'])
+  })
+
   it('parses min(), max(), and clamp() sizes before family', () => {
     expect(extractFontFamiliesFromCSSFont('min(1rem, 10vw) Literata, serif')).toEqual(['Literata'])
     expect(extractFontFamiliesFromCSSFont('max(12px, 1rem) JetBrains Mono, monospace')).toEqual([
