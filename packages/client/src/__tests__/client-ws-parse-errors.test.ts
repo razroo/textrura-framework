@@ -89,6 +89,70 @@ describe('createClient WebSocket message parse errors', () => {
     expect(String((errors[0] as Error).message)).toContain('Invalid server message')
   })
 
+  it('invokes onError for JSON text null, primitives, and arrays without breaking the socket', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+    const renders: ComputedLayout[] = []
+    const renderer: Renderer = {
+      render: (layout: ComputedLayout) => {
+        renders.push({ ...layout, children: layout.children })
+      },
+      destroy: () => {},
+    }
+
+    const client = createClient({
+      url: 'ws://mock.test',
+      renderer,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    sockets[0]!.emit('message', { data: 'null' })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
+    expect(String((errors[0] as Error).message)).toContain('expected a JSON object')
+
+    sockets[0]!.emit('message', { data: 'true' })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(2)
+    expect(String((errors[1] as Error).message)).toContain('expected a JSON object')
+
+    sockets[0]!.emit('message', { data: '42' })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(3)
+    expect(String((errors[2] as Error).message)).toContain('expected a JSON object')
+
+    sockets[0]!.emit('message', { data: '"literal"' })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(4)
+    expect(String((errors[3] as Error).message)).toContain('expected a JSON object')
+
+    sockets[0]!.emit('message', { data: '[]' })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(5)
+    expect(String((errors[4] as Error).message)).toMatch(/Invalid server message/)
+
+    const validFrame = {
+      type: 'frame',
+      layout: { x: 0, y: 0, width: 20, height: 21, children: [] },
+      tree: { kind: 'box', props: {}, children: [] } satisfies UIElement,
+      protocolVersion: 1,
+    }
+    sockets[0]!.emit('message', { data: JSON.stringify(validFrame) })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(renders).toHaveLength(1)
+    expect(renders[0]?.width).toBe(20)
+    expect(client.layout?.width).toBe(20)
+  })
+
   it('invokes onError for invalid JSON text frames without breaking the socket', async () => {
     const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
     installMockWebSocket(sockets)
