@@ -63,4 +63,12 @@ describe('binary frame envelope', () => {
     const view = combined.subarray(prefix, prefix + frame.length)
     expect(decodeBinaryFrameJson(view)).toBe(json)
   })
+
+  it('throws truncated payload when length exceeds the view (not the whole ArrayBuffer)', () => {
+    const headerOnly = Buffer.from([0x47, 0x45, 0x4f, 0x4d, 1, 4, 0, 0, 0])
+    const padded = new Uint8Array(headerOnly.length + 20)
+    padded.set(headerOnly, 0)
+    const view = padded.subarray(0, 9)
+    expect(() => decodeBinaryFrameJson(view)).toThrow('Truncated binary frame payload')
+  })
 })
