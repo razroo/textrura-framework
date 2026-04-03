@@ -357,6 +357,33 @@ describe('applyServerMessage', () => {
     expect(metrics[1]?.bytesReceived).toBe(64)
   })
 
+  it('emits onFrameMetrics for a well-formed server error (onError fires, no render)', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const errors: string[] = []
+    const metrics: ClientFrameMetrics[] = []
+
+    applyServerMessage(
+      state,
+      renderer,
+      { type: 'error', message: 'rate limited', protocolVersion: 1 },
+      (e) => errors.push(String(e)),
+      (m) => metrics.push(m),
+      { decodeMs: 0.5, encoding: 'json', bytesReceived: 48 },
+    )
+
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toContain('rate limited')
+    expect(renders).toHaveLength(0)
+    expect(metrics).toHaveLength(1)
+    expect(metrics[0]?.messageType).toBe('error')
+    expect(metrics[0]?.decodeMs).toBe(0.5)
+    expect(metrics[0]?.encoding).toBe('json')
+    expect(metrics[0]?.bytesReceived).toBe(48)
+    expect(metrics[0]?.renderMs).toBe(0)
+    expect(metrics[0]?.patchCount).toBeUndefined()
+  })
+
   it('rejects non-object, incomplete frame, and bad patch shape without render or metrics', () => {
     const { renderer, renders } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }

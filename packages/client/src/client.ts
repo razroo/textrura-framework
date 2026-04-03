@@ -160,6 +160,9 @@ function applyPatches(layout: ComputedLayout, patches: ServerPatch['patches']): 
  * When `msg.protocolVersion` is present but not a finite number, or is greater than the client’s
  * supported version, calls `onError` and returns without mutating state or invoking `onMetrics`.
  *
+ * Well-formed `error` messages call `onError` with the server message and still invoke `onMetrics`
+ * once with `messageType: 'error'` (no render; `renderMs` is zero).
+ *
  * @param state — Mutable `{ layout, tree }` (same fields as {@link TexturaClient}).
  * @param renderer — Receives `render` after successful frame or patch application.
  * @param msg — `frame`, `patch`, or `error` payload from the wire after JSON/binary decode.
