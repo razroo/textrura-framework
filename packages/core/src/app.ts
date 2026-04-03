@@ -86,6 +86,10 @@ export interface App {
  *
  * The `view` function is called inside a reactive effect — any signals
  * read during its execution will trigger automatic re-layout and re-render.
+ *
+ * After each successful `computeLayout`, optional {@link Renderer.setFrameTimings} is invoked with
+ * `{ layoutMs }` (non-negative wall milliseconds from `performance.now()` when available, otherwise `0`)
+ * immediately before `render`, so hosts can split Yoga/layout time from paint.
  */
 export async function createApp(
   view: () => UIElement,

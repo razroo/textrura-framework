@@ -278,6 +278,24 @@ describe('createApp layout timing', () => {
     expect(render).toHaveBeenCalled()
   })
 
+  it('passes layoutMs 0 for setFrameTimings when global performance is undefined', async () => {
+    vi.stubGlobal('performance', undefined)
+    try {
+      const setFrameTimings = vi.fn()
+      const renderer: Renderer = {
+        setFrameTimings,
+        render: vi.fn(),
+        destroy: vi.fn(),
+      }
+
+      await createApp(() => box({ width: 40, height: 20 }, []), renderer, { width: 100, height: 50 })
+
+      expect(setFrameTimings).toHaveBeenCalledWith({ layoutMs: 0 })
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('clamps negative or non-finite layout deltas to 0 for setFrameTimings', async () => {
     const mkRenderer = (): Renderer => ({
       setFrameTimings: vi.fn(),
