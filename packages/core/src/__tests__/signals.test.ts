@@ -452,4 +452,34 @@ describe('batch', () => {
     ).toThrow('a')
     expect(seen).toEqual(['a', 'b', 'a'])
   })
+
+  it('effect created inside batch runs once immediately and defers re-runs until flush', () => {
+    const a = signal(0)
+    let runs = 0
+    batch(() => {
+      effect(() => {
+        void a.value
+        runs++
+      })
+      expect(runs).toBe(1)
+      a.set(1)
+      expect(runs).toBe(1)
+    })
+    expect(runs).toBe(2)
+  })
+
+  it('dispose before batch flush no-ops when the effect run was only queued', () => {
+    const a = signal(0)
+    let runs = 0
+    const dispose = effect(() => {
+      void a.value
+      runs++
+    })
+    expect(runs).toBe(1)
+    batch(() => {
+      a.set(1)
+      dispose()
+    })
+    expect(runs).toBe(1)
+  })
 })
