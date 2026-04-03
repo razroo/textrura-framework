@@ -229,6 +229,8 @@ function dispatchHitRecursive(
  * can pass modifier keys, `button`, wheel deltas, and other renderer-specific metadata.
  * For `onClick` only, the return value may include `focusTarget` for focus routing
  * (including click-to-focus when there is no `onClick` handler).
+ * Pointer `x` / `y` must be finite numbers: anything that fails `Number.isFinite` (including
+ * non-numbers at runtime) returns `{ handled: false }` without invoking handlers.
  * Layout bounds must be finite and non-negative on `width` and `height`; otherwise the node is
  * skipped for hit-testing (corrupt geometry from Yoga or a bad snapshot).
  *
@@ -267,6 +269,8 @@ export function dispatchHit(
  * (`onClick`, `onPointerDown` / `Up` / `Move`, `onWheel`). Keyboard and composition
  * handlers alone do not count — use this for hover / pointer-capture style checks.
  *
+ * Non-finite or non-number `x` / `y` return `false` (same `Number.isFinite` guard as {@link dispatchHit}).
+ *
  * Optional `offsetX` / `offsetY` match {@link hitPathAtPoint} / {@link dispatchHit} for rooted coordinate transforms.
  * Non-finite or non-number offsets are treated as `0`.
  */
@@ -299,6 +303,7 @@ export function hasInteractiveHitAtPoint(
  * Child indices from root to the deepest box under (x, y). Among overlapping siblings, prefers higher z-index (topmost);
  * non-finite or non-number `zIndex` values match `dispatchHit` / paint order (treated as `0`).
  * Boxes with `pointerEvents: 'none'` do not terminate the path when they have no deeper hit (same idea as `getCursorAtPoint` and `collectHits`).
+ * Non-finite or non-number `x` / `y` return `null` (same `Number.isFinite` guard as {@link dispatchHit}).
  * Returns `null` when the point misses the tree. Returns `[]` when the point hits the
  * root (or a leaf box) with no deeper box hit.
  * Root `offsetX` / `offsetY` follow {@link dispatchHit}: non-finite or non-number values are treated as `0`.
@@ -360,6 +365,7 @@ export function hitPathAtPoint(
  * Resolve the deepest `cursor` style at `(x, y)` (boxes only; skips `pointerEvents: 'none'` the same way as
  * {@link hitPathAtPoint}). Scroll containers use the same clipping rules as {@link dispatchHit}.
  * Root `offsetX` / `offsetY` follow {@link dispatchHit}: non-finite or non-number values are treated as `0`.
+ * Non-finite or non-number `x` / `y` return `null`.
  *
  * An empty-string `cursor` on a nested box does not stop the walk (child results are checked with truthiness),
  * so the nearest ancestor with a non-empty `cursor` wins. A root hit on a lone box with `cursor: ''` still

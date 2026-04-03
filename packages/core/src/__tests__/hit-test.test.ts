@@ -149,6 +149,32 @@ describe('dispatchHit', () => {
     expect(getCursorAtPoint(el, layout, 50, Number.NEGATIVE_INFINITY)).toBeNull()
   })
 
+  it('non-number pointer coordinates miss dispatch and hit queries without throwing (Number.isFinite is false)', () => {
+    let fired = false
+    const el = box({ width: 100, height: 50, onClick: () => { fired = true }, cursor: 'pointer' })
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
+
+    const str50 = '50' as unknown as number
+    const str25 = '25' as unknown as number
+    expect(() => dispatchHit(el, layout, 'onClick', str50, 25)).not.toThrow()
+    expect(dispatchHit(el, layout, 'onClick', str50, 25).handled).toBe(false)
+    expect(dispatchHit(el, layout, 'onClick', 50, str25).handled).toBe(false)
+    const bx = 1n as unknown as number
+    expect(() => dispatchHit(el, layout, 'onClick', bx, 25)).not.toThrow()
+    expect(dispatchHit(el, layout, 'onClick', bx, 25).handled).toBe(false)
+    expect(dispatchHit(el, layout, 'onClick', 50, bx).handled).toBe(false)
+    expect(fired).toBe(false)
+
+    expect(() => hitPathAtPoint(el, layout, str50, 25)).not.toThrow()
+    expect(hitPathAtPoint(el, layout, str50, 25)).toBeNull()
+    expect(hitPathAtPoint(el, layout, 50, bx)).toBeNull()
+    expect(hasInteractiveHitAtPoint(el, layout, str50, 25)).toBe(false)
+    expect(hasInteractiveHitAtPoint(el, layout, bx, 25)).toBe(false)
+    expect(() => getCursorAtPoint(el, layout, str50, 25)).not.toThrow()
+    expect(getCursorAtPoint(el, layout, str50, 25)).toBeNull()
+    expect(getCursorAtPoint(el, layout, 50, bx)).toBeNull()
+  })
+
   it('non-finite layout bounds (NaN or ±Infinity) are a miss for dispatch and hit queries', () => {
     let fired: boolean
     const el = box({
