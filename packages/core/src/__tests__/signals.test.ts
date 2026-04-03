@@ -416,6 +416,37 @@ describe('batch', () => {
     expect(runs).toBe(2)
   })
 
+  it('coalesces effect runs when a computed dependency updates multiple times in one batch', () => {
+    const s = signal(1)
+    const c = computed(() => s.value * 2)
+    const seen: number[] = []
+    effect(() => {
+      seen.push(c.value)
+    })
+    expect(seen).toEqual([2])
+    batch(() => {
+      s.set(3)
+      s.set(4)
+    })
+    expect(seen).toEqual([2, 8])
+  })
+
+  it('coalesces effect runs for nested computeds when the root signal changes multiple times in one batch', () => {
+    const s = signal(1)
+    const mid = computed(() => s.value + 1)
+    const outer = computed(() => mid.value * 2)
+    const seen: number[] = []
+    effect(() => {
+      seen.push(outer.value)
+    })
+    expect(seen).toEqual([4])
+    batch(() => {
+      s.set(2)
+      s.set(3)
+    })
+    expect(seen).toEqual([4, 8])
+  })
+
   it('signal set from a flushing subscriber runs nested subscribers synchronously (outside batch queue)', () => {
     const a = signal(0)
     const steps: string[] = []
