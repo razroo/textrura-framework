@@ -97,3 +97,45 @@ describe('diffLayout', () => {
     ])
   })
 })
+
+describe('coalescePatches', () => {
+  it('returns an empty array for an empty input', () => {
+    expect(coalescePatches([])).toEqual([])
+  })
+
+  it('keeps distinct path keys separate (prefix paths are not merged)', () => {
+    const merged = coalescePatches([
+      { path: [1], x: 1 },
+      { path: [1, 0], y: 2 },
+      { path: [1], width: 3 },
+    ])
+    expect(merged).toEqual([
+      { path: [1], x: 1, width: 3 },
+      { path: [1, 0], y: 2 },
+    ])
+  })
+
+  it('preserves first-seen order for unrelated paths', () => {
+    const merged = coalescePatches([
+      { path: [2], x: 1 },
+      { path: [0], y: 2 },
+      { path: [1], width: 3 },
+    ])
+    expect(merged.map(p => p.path)).toEqual([[2], [0], [1]])
+  })
+
+  it('clones path arrays on first occurrence so later mutations do not alias', () => {
+    const path = [0, 1]
+    const merged = coalescePatches([{ path, x: 1 }, { path, y: 2 }])
+    path.push(9)
+    expect(merged).toEqual([{ path: [0, 1], x: 1, y: 2 }])
+  })
+
+  it('ignores explicit undefined fields (they do not clear prior writes)', () => {
+    const merged = coalescePatches([
+      { path: [0], x: 10, y: 20 },
+      { path: [0], x: undefined as unknown as number, width: 5 },
+    ])
+    expect(merged).toEqual([{ path: [0], x: 10, y: 20, width: 5 }])
+  })
+})
