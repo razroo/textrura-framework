@@ -189,6 +189,37 @@ describe('dispatchHit', () => {
     }
   })
 
+  it('negative width or height layout is a miss for dispatch and hit queries (layoutBoundsAreFinite)', () => {
+    let fired: boolean
+    const el = box({
+      width: 100,
+      height: 50,
+      onClick: () => {
+        fired = true
+      },
+      onPointerDown: () => {
+        fired = true
+      },
+      cursor: 'pointer',
+    })
+    const base = { x: 0, y: 0, width: 100, height: 50, children: [] as const }
+
+    for (const bad of [
+      { ...base, width: -1 },
+      { ...base, height: -0.001 },
+      { ...base, width: -Number.MIN_VALUE },
+    ] as const) {
+      fired = false
+      expect(dispatchHit(el, bad, 'onClick', 50, 25).handled).toBe(false)
+      expect(fired).toBe(false)
+      expect(dispatchHit(el, bad, 'onPointerDown', 50, 25).handled).toBe(false)
+      expect(fired).toBe(false)
+      expect(hitPathAtPoint(el, bad, 50, 25)).toBeNull()
+      expect(hasInteractiveHitAtPoint(el, bad, 50, 25)).toBe(false)
+      expect(getCursorAtPoint(el, bad, 50, 25)).toBeNull()
+    }
+  })
+
   it('BigInt layout fields are a miss for dispatch and hit queries without throwing', () => {
     let fired: boolean
     const el = box({
