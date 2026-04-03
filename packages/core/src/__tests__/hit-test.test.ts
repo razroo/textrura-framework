@@ -2950,4 +2950,31 @@ describe('pointerEvents', () => {
     expect(result.focusTarget?.element).toBe(back)
     expect(result.focusTarget?.layout).toBe(backLayout)
   })
+
+  it('pointerEvents none on top sibling: onWheel reaches handler on box behind (overlay onWheel is not invoked)', () => {
+    const log: string[] = []
+    const back = box({ width: 50, height: 50, zIndex: 0, onWheel: () => { log.push('back') } })
+    const front = box({
+      width: 50,
+      height: 50,
+      zIndex: 2,
+      pointerEvents: 'none',
+      onWheel: () => { log.push('front') },
+    })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    expect(dispatchHit(root, layout, 'onWheel', 10, 10).handled).toBe(true)
+    expect(log).toEqual(['back'])
+    expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(true)
+  })
 })
