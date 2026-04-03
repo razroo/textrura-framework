@@ -13,9 +13,10 @@ import { focusNext, focusPrev, resolveFocusedTarget } from './focus.js'
  * `eventType` runs; otherwise `false`.
  *
  * @returns `true` when `partialEvent.key` is `'Tab'` and `eventType` is `'onKeyDown'` (traversal is
- *   always attempted), or when a non-Tab event is delivered and the focused target’s handler for
- *   `eventType` runs. `false` when there is no resolved focus target, no matching handler, or Tab is
- *   received on `'onKeyUp'` (Tab never triggers traversal on keyup).
+ *   always attempted, even when the tree has no focusables), or when a resolved focus target exists
+ *   and its handler for `eventType` runs (including `'Tab'` on `'onKeyUp'` when `onKeyUp` is set —
+ *   traversal remains keydown-only). `false` when there is no resolved focus target or no matching
+ *   handler.
  */
 export function dispatchKeyboardEvent(
   tree: UIElement,
