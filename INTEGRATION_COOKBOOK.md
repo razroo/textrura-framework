@@ -16,6 +16,14 @@ Short recipes for common stacks. All paths assume a Geometra workspace install.
 3. Optional: negotiate `binaryFraming` and watch `onFrameMetrics` / server `onTransportMetrics` (see `TRANSPORT_1_4.md`).
 4. For the official full-stack path that also uses `@geometra/ui` and `@geometra/router`, run `npm run create:app -- ./my-geometra-app` or pick another template with `npm run create:app -- --list`.
 
+## Production auth (`@geometra/auth` + token registry)
+
+Auth belongs on the **WebSocket upgrade** and optional **per-message** policy hooks — not inside `@geometra/core`.
+
+- Use **`@geometra/auth`** `createAuth()` and spread its hooks into `createServer()` (token verify + role policies).
+- Use **`@geometra/token-registry`** as the HTTP backend for `remoteVerifier()`, or any compatible verify endpoint.
+- Wire semantics, close codes **4001** / **4003**, refresh, and “what not to put in core” are documented in **`PLATFORM_AUTH.md`**.
+
 ## DOM-free migration
 
 - Replace DOM measurement with Textura layout + core text metrics; avoid `window.getComputedStyle` in hot paths.
@@ -24,6 +32,7 @@ Short recipes for common stacks. All paths assume a Geometra workspace install.
 
 ## Related docs
 
+- `PLATFORM_AUTH.md` — `@geometra/auth`, `@geometra/token-registry`, WS contract, refresh/reconnect.
 - `FONTS_AND_METRICS.md` — `font` strings, `waitForFonts`, server/client metric parity.
 - `PROTOCOL_COMPATIBILITY.md` — wire format and optional binary frames.
 - `PROTOCOL_EVOLUTION.md` — versioning and future transport changes.

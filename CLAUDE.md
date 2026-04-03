@@ -6,6 +6,7 @@ See **`ROADMAP.md`** for phased framework goals (a11y, text input, protocol, etc
 See **`FRAMEWORK_NORTH_STAR.md`** for the always-on coding priorities and quality bar.
 See **`FONTS_AND_METRICS.md`** for `font` strings, `waitForFonts`, and server/client text metric parity.
 See **`INTEGRATION_COOKBOOK.md`** for canvas, server/client, and DOM-free migration notes.
+See **`PLATFORM_AUTH.md`** for `@geometra/auth`, `@geometra/token-registry`, and the WebSocket auth contract.
 See **`PROTOCOL_EVOLUTION.md`** for server/client protocol versioning beyond GEOM v1.
 See **`GEOMETRY_SNAPSHOT_TESTING.md`** for layout JSON / geometry regression patterns in CI.
 

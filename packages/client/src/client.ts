@@ -4,6 +4,9 @@ import { decodeBinaryFrameJson } from './binary-frame.js'
 
 const PROTOCOL_VERSION = 1
 
+/** Keep in sync with `CLOSE_AUTH_FAILED` in `@geometra/server` (`protocol.ts`). */
+const WS_CLOSE_AUTH_FAILED = 4001
+
 interface ServerFrame {
   type: 'frame'
   layout: ComputedLayout
@@ -71,6 +74,8 @@ export interface TexturaClientOptions {
   resizeTarget?: Window
   /** Called on WebSocket or message parsing errors. */
   onError?: (error: unknown) => void
+  /** Called when the WebSocket closes (any code). */
+  onClose?: (event: CloseEvent) => void
   /** Optional frame-budget telemetry hook per processed server message. */
   onFrameMetrics?: (metrics: ClientFrameMetrics) => void
   /** Enable automatic reconnection on disconnect. Default: true. */
@@ -163,7 +168,8 @@ export function applyServerMessage(
 export function createClient(options: TexturaClientOptions): TexturaClient {
   const url = options.url ?? 'ws://localhost:3100'
   const { renderer, canvas, onError, onFrameMetrics } = options
-  const shouldReconnect = options.reconnect !== false
+  const userWantsReconnect = options.reconnect !== false
+  let allowReconnect = userWantsReconnect
 
   let ws: WebSocket
   let closed = false
@@ -237,8 +243,12 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
       onError?.(event)
     })
 
-    ws.addEventListener('close', () => {
-      if (!closed && shouldReconnect) {
+    ws.addEventListener('close', (event) => {
+      options.onClose?.(event as CloseEvent)
+      if ((event as CloseEvent).code === WS_CLOSE_AUTH_FAILED) {
+        allowReconnect = false
+      }
+      if (!closed && allowReconnect) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 30000)
         retryCount++
         retryTimer = setTimeout(connect, delay)

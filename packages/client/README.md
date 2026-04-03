@@ -32,8 +32,14 @@ const client = createClient({
   onFrameMetrics: (m) => {
     console.log('frame metrics', m.messageType, m.decodeMs, m.applyMs, m.renderMs)
   },
+  // optional: observe closes; auth failures use WebSocket code 4001 and do not auto-reconnect
+  onClose: (ev) => {
+    if (ev.code === 4001) console.log('auth rejected')
+  },
 })
 ```
+
+Auth with `@geometra/auth` is documented in the main repo: [`PLATFORM_AUTH.md`](https://github.com/razroo/geometra/blob/main/PLATFORM_AUTH.md).
 
 ## Links
 
