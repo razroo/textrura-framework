@@ -195,6 +195,15 @@ describe('query helpers', () => {
     expect(stringifyQuery({ mix: [Number.NaN, 'a', Number.POSITIVE_INFINITY, 3] })).toBe('?mix=a&mix=3')
   })
 
+  it('stringifies ill-formed UTF-16 (lone surrogates) without throwing, via toWellFormed normalization', () => {
+    const loneHigh = '\uD800'
+    const loneLow = '\uDC00'
+    expect(() => stringifyQuery({ [loneHigh]: '1' })).not.toThrow()
+    expect(() => stringifyQuery({ k: loneLow })).not.toThrow()
+    expect(stringifyQuery({ [loneHigh]: 'a' })).toBe('?%EF%BF%BD=a')
+    expect(stringifyQuery({ x: loneLow })).toBe('?x=%EF%BF%BD')
+  })
+
   it('omits keys whose array value is empty (no pairs emitted for that key)', () => {
     expect(stringifyQuery({ tag: [], other: 'x' })).toBe('?other=x')
   })

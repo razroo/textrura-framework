@@ -16,7 +16,8 @@ function decode(value: string): string {
 }
 
 function encode(value: string): string {
-  return encodeURIComponent(value)
+  // Lone surrogates make encodeURIComponent throw URIError; normalize first (ES2024).
+  return encodeURIComponent(value.toWellFormed())
 }
 
 /**
@@ -52,6 +53,8 @@ export function parseQuery(search: string): ParsedQuery {
  * Serialize a shallow query object to `?a=1&b=2`. Keys are sorted lexicographically for stable output.
  * Skips `null` and `undefined`; array values become repeated keys. Booleans become `"true"` / `"false"`.
  * Skips non-finite numbers (`NaN`, `±Infinity`) so accidental numeric garbage does not produce query pairs.
+ * Keys and string values are normalized with `String.prototype.toWellFormed` before percent-encoding so
+ * ill-formed lone UTF-16 surrogates cannot throw from `encodeURIComponent`.
  * Returns `""` when there are no pairs to emit.
  */
 export function stringifyQuery(query: QueryInput): string {
