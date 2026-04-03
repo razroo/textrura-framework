@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { Renderer, UIElement } from '@geometra/core'
 import type { ComputedLayout } from 'textura'
-import { createClient } from '../client.js'
+import { createClient, type ClientFrameMetrics } from '../client.js'
 
 /** Build a v1 GEOM binary envelope with UTF-8 JSON payload (matches server/client frame layout). */
 function encodeGeomV1JsonPayload(json: string): ArrayBuffer {
@@ -98,6 +98,55 @@ describe('createClient WebSocket message parse errors', () => {
     expect(errors).toHaveLength(0)
     expect(renders).toHaveLength(1)
     expect(renders[0]?.width).toBe(55)
+  })
+
+  it('reports onFrameMetrics.bytesReceived as the Uint8Array subview length for embedded binary frames', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+    const metrics: ClientFrameMetrics[] = []
+    const renderer: Renderer = {
+      render: () => {},
+      destroy: () => {},
+    }
+
+    createClient({
+      url: 'ws://mock.test',
+      renderer,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+      onFrameMetrics: m => metrics.push(m),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    const buf = encodeGeomV1JsonPayload(
+      JSON.stringify({
+        type: 'frame',
+        layout: { x: 0, y: 0, width: 1, height: 2, children: [] },
+        tree: { kind: 'box', props: {}, children: [] },
+        protocolVersion: 1,
+      }),
+    )
+    const frame = new Uint8Array(buf)
+    const prefix = 19
+    const combined = new Uint8Array(prefix + frame.byteLength + 11)
+    combined.set(frame, prefix)
+    const view = combined.subarray(prefix, prefix + frame.byteLength)
+
+    sockets[0]!.emit('message', { data: view })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    expect(errors).toHaveLength(0)
+    expect(metrics).toHaveLength(1)
+    expect(metrics[0]?.encoding).toBe('binary')
+    expect(metrics[0]?.bytesReceived).toBe(view.byteLength)
+    expect(metrics[0]?.bytesReceived).toBeLessThan(combined.byteLength)
   })
 
   it('invokes onError when JSON parses but payload is not a well-formed GEOM v1 message', async () => {
