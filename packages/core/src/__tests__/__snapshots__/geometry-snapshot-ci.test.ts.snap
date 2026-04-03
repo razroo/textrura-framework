@@ -135,6 +135,31 @@ exports[`geometry snapshot CI > stable rtl root row mirrors two text children (r
 }
 `;
 
+exports[`geometry snapshot CI > stable rtl row with space-between and two text children (rounded) 1`] = `
+{
+  "children": [
+    {
+      "children": [],
+      "height": 56,
+      "width": 8,
+      "x": 180,
+      "y": 12,
+    },
+    {
+      "children": [],
+      "height": 56,
+      "width": 8,
+      "x": 12,
+      "y": 12,
+    },
+  ],
+  "height": 80,
+  "width": 200,
+  "x": 0,
+  "y": 0,
+}
+`;
+
 exports[`geometry snapshot CI > stable text-in-padded-box layout (rounded) 1`] = `
 {
   "children": [
