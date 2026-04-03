@@ -78,4 +78,24 @@ describe('text-input invariants', () => {
       assertStateInvariants(state)
     }
   })
+
+  it('clamps corrupt BigInt selection fields without throwing (deserialized / plain-JS payloads)', () => {
+    const corrupt: TextInputState = {
+      nodes: ['ab', 'cd'],
+      selection: {
+        anchorNode: 1n as unknown as number,
+        anchorOffset: 99n as unknown as number,
+        focusNode: 0n as unknown as number,
+        focusOffset: 3n as unknown as number,
+      },
+    }
+
+    assertStateInvariants(insertInputText(corrupt, 'x'))
+    assertStateInvariants(backspaceInput(corrupt))
+    assertStateInvariants(deleteInput(corrupt))
+    assertStateInvariants(moveInputCaret(corrupt, 'left', false))
+    assertStateInvariants(moveInputCaret(corrupt, 'right', true))
+    assertStateInvariants(moveInputCaretByWord(corrupt, 'left', false))
+    assertStateInvariants(moveInputCaretToLineBoundary(corrupt, 'start', false))
+  })
 })
