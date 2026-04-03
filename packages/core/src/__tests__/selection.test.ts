@@ -254,6 +254,30 @@ describe('hitTestText', () => {
     expect(hitTestText(textNodes, 5, Number.NEGATIVE_INFINITY)).toBeNull()
   })
 
+  it('returns null for BigInt or non-number pointer coordinates without throwing', () => {
+    const textNodes: TextNodeInfo[] = [
+      {
+        element: { kind: 'text' as const, props: { text: 'ab', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 18,
+        index: 0,
+        lines: [{ text: 'ab', x: 0, y: 0, charOffsets: [0, 8], charWidths: [8, 8] }],
+      },
+    ]
+    const bx = 5n as unknown as number
+    const by = 3n as unknown as number
+    expect(() => hitTestText(textNodes, bx, 5)).not.toThrow()
+    expect(hitTestText(textNodes, bx, 5)).toBeNull()
+    expect(() => hitTestText(textNodes, 5, by)).not.toThrow()
+    expect(hitTestText(textNodes, 5, by)).toBeNull()
+    const sx = '5' as unknown as number
+    expect(() => hitTestText(textNodes, sx, 5)).not.toThrow()
+    expect(hitTestText(textNodes, sx, 5)).toBeNull()
+  })
+
   it('skips nodes with non-number bounds without throwing (aligned with layoutBoundsAreFinite)', () => {
     const bigintW: TextNodeInfo[] = [
       {
