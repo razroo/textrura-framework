@@ -115,6 +115,9 @@ export interface TexturaClientOptions {
   /**
    * Negotiate optional binary JSON envelopes for server→client frames (same JSON payload as text).
    * Requires `resize` with `capabilities.binaryFraming` (sent automatically when true).
+   * When false, string frames still use `JSON.parse`; non-string `MessageEvent.data` is still decoded
+   * as a GEOM v1 binary envelope when it is an `ArrayBuffer` or view — this flag mainly sets
+   * `WebSocket.binaryType` to `"arraybuffer"` so real browsers deliver binary messages that way.
    */
   binaryFraming?: boolean
 }
