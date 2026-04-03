@@ -205,4 +205,10 @@ describe('layoutBoundsAreFinite', () => {
     expect(() => layoutBoundsAreFinite(bare)).not.toThrow()
     expect(layoutBoundsAreFinite(bare)).toBe(false)
   })
+
+  it('rejects Array and array-like objects mistaken for layout (no x/y/width/height fields)', () => {
+    expect(layoutBoundsAreFinite([] as unknown as ComputedLayout)).toBe(false)
+    expect(layoutBoundsAreFinite([0, 0, 10, 10] as unknown as ComputedLayout)).toBe(false)
+    expect(layoutBoundsAreFinite(new Uint32Array(4) as unknown as ComputedLayout)).toBe(false)
+  })
 })
