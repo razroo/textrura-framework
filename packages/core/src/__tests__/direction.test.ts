@@ -16,6 +16,15 @@ describe('direction model', () => {
     expect(resolveDirectionValue('bogus' as never, 'rtl')).toBe('rtl')
   })
 
+  it('treats non-string dir values like auto (inherit parent) for corrupt runtime payloads', () => {
+    expect(resolveDirectionValue(0 as never, 'rtl')).toBe('rtl')
+    expect(resolveDirectionValue(1 as never, 'ltr')).toBe('ltr')
+    expect(resolveDirectionValue(false as never, 'rtl')).toBe('rtl')
+    expect(resolveDirectionValue(true as never, 'ltr')).toBe('ltr')
+    expect(resolveDirectionValue(Number.NaN as never, 'rtl')).toBe('rtl')
+    expect(resolveDirectionValue({} as never, 'ltr')).toBe('ltr')
+  })
+
   it('falls back to ltr when parentDirection is not a concrete ltr/rtl at runtime', () => {
     expect(resolveDirectionValue(undefined, 'auto' as never)).toBe('ltr')
     expect(resolveDirectionValue('auto', '' as never)).toBe('ltr')
