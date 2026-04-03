@@ -2073,6 +2073,7 @@ describe('scroll and overflow clipping', () => {
         height: 100,
         overflow: 'scroll',
         scrollX: 'oops' as unknown as number,
+        scrollY: { n: 1 } as unknown as number,
       },
       [child],
     )
@@ -2085,6 +2086,8 @@ describe('scroll and overflow clipping', () => {
     }
     expect(dispatchHit(parent, layout, 'onClick', 35, 35).handled).toBe(true)
     expect(childFired).toBe(true)
+    expect(hitPathAtPoint(parent, layout, 35, 35)).toEqual([0])
+    expect(hasInteractiveHitAtPoint(parent, layout, 35, 35)).toBe(true)
     expect(getCursorAtPoint(parent, layout, 35, 35)).toBeNull()
   })
 
