@@ -255,6 +255,31 @@ describe('trapFocusStep', () => {
     expect(focusedElement.peek()?.element).toBe(updateOnly)
   })
 
+  it('with a single focusable, next and prev keep focus on that element (mod-1 wrap)', () => {
+    const only = box({ onKeyDown: () => undefined }, [])
+    const tree = box({}, [only])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 40,
+      children: [{ x: 0, y: 0, width: 100, height: 40, children: [] }],
+    }
+
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(only)
+
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(only)
+
+    expect(trapFocusStep(tree, layout, [0], 'prev')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(only)
+
+    clearFocus()
+    expect(trapFocusStep(tree, layout, [0], 'prev')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(only)
+  })
+
   it('treats empty scopePath as the tree root box (whole-tree trap)', () => {
     const a = box({ onKeyDown: () => undefined }, [])
     const b = box({ onKeyDown: () => undefined }, [])
