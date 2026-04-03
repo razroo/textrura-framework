@@ -53,4 +53,14 @@ describe('binary frame envelope', () => {
     const emptyPayload = Buffer.from([0x47, 0x45, 0x4f, 0x4d, 1, 0, 0, 0, 0])
     expect(decodeBinaryFrameJson(emptyPayload)).toBe('')
   })
+
+  it('decodes a Uint8Array view with non-zero byteOffset (frame embedded in a larger buffer)', () => {
+    const json = '{"embedded":true}'
+    const frame = encodeBinaryFrameJson(json)
+    const prefix = 7
+    const combined = new Uint8Array(prefix + frame.length + 3)
+    combined.set(frame, prefix)
+    const view = combined.subarray(prefix, prefix + frame.length)
+    expect(decodeBinaryFrameJson(view)).toBe(json)
+  })
 })

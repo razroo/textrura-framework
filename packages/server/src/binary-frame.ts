@@ -31,14 +31,16 @@ export function encodeBinaryFrameJson(jsonUtf8: string): Buffer {
 /**
  * Decode JSON string from a v1 binary envelope.
  * Bytes after `header + payloadLength` are ignored so callers may pass a longer buffer.
+ * Accepts any `Uint8Array` view (including non-zero `byteOffset` into a shared `ArrayBuffer`).
  */
-export function decodeBinaryFrameJson(data: Buffer): string {
+export function decodeBinaryFrameJson(data: Buffer | Uint8Array): string {
   if (!isBinaryFrameBuffer(data)) {
     throw new Error('Not a GEOM binary frame')
   }
-  const len = data.readUInt32LE(5)
+  const dv = new DataView(data.buffer, data.byteOffset, data.byteLength)
+  const len = dv.getUint32(5, true)
   if (HEADER_BYTES + len > data.length) {
     throw new Error('Truncated binary frame payload')
   }
-  return data.subarray(HEADER_BYTES, HEADER_BYTES + len).toString('utf8')
+  return new TextDecoder('utf-8').decode(data.subarray(HEADER_BYTES, HEADER_BYTES + len))
 }
