@@ -55,6 +55,21 @@ describe('toSemanticHTML', () => {
     expect(toSemanticHTML(el)).not.toContain('dir=')
   })
 
+  it('treats non-string font as empty for heading inference (no throw on bad deserialized nodes)', () => {
+    const node = text({ text: 'Body', font: 'bold 32px sans-serif', lineHeight: 20 })
+    Object.assign(node.props, { font: null as unknown as string })
+    const html = toSemanticHTML(box({ width: 100, height: 100 }, [node]))
+    expect(html).toContain('<p>Body</p>')
+  })
+
+  it('treats non-string text content as empty for static HTML (no throw)', () => {
+    const node = text({ text: 'gone', font: '14px sans-serif', lineHeight: 18 })
+    Object.assign(node.props, { text: null as unknown as string })
+    const html = toSemanticHTML(box({ width: 100, height: 100 }, [node]))
+    expect(html).not.toContain('gone')
+    expect(html).toMatch(/<p(?:\s[^>]*)?><\/p>/)
+  })
+
   it('escapes lang attribute values', () => {
     const el = box({ width: 100, height: 100 })
     const html = toSemanticHTML(el, { lang: 'xx"><script' })

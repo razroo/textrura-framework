@@ -171,7 +171,8 @@ function fontLengthToApproxPx(value: number, unit: string): number {
 
 /** Infer an HTML tag from a text element's font property. */
 function inferTag(element: TextElement): string {
-  const font = element.props.font.toLowerCase()
+  const rawFont = element.props.font
+  const font = typeof rawFont === 'string' ? rawFont.toLowerCase() : ''
   // Detect heading-like fonts by size (first length token in shorthand)
   const sizeMatch = font.match(FONT_SIZE_LENGTH)
   let size = 14
@@ -291,7 +292,8 @@ function elementToHTML(element: UIElement, indent: number): string {
     if (element.semantic?.role) attrs.push(`role="${escapeHTML(element.semantic.role)}"`)
     if (element.semantic?.ariaLabel) attrs.push(`aria-label="${escapeHTML(element.semantic.ariaLabel)}"`)
     const attrStr = attrs.length ? ' ' + attrs.join(' ') : ''
-    const body = escapeHTML(element.props.text)
+    const rawText = element.props.text
+    const body = escapeHTML(typeof rawText === 'string' ? rawText : '')
     if (VOID_HTML_TAGS.has(tag.toLowerCase())) {
       const voidOpen = `${pad}<${tag}${attrStr}>`
       if (body === '') return voidOpen
