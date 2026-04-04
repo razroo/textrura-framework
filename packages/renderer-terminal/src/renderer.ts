@@ -126,6 +126,8 @@ export class TerminalRenderer implements Renderer {
       }
     } else if (element.kind === 'image') {
       this.paintImagePlaceholder(element, x, y, w, h)
+    } else if (element.kind === 'scene3d') {
+      // scene3d not supported in terminal — skip silently
     } else {
       this.paintText(element, x, y, w, h)
     }

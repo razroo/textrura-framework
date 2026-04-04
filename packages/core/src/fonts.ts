@@ -392,7 +392,7 @@ export function collectFontFamiliesFromTree(root: UIElement): string[] {
       }
       return
     }
-    if (el.kind === 'image') {
+    if (el.kind === 'image' || el.kind === 'scene3d') {
       return
     }
     const { children } = el

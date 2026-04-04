@@ -15,7 +15,10 @@ export { signal, computed, effect, batch } from './signals.js'
 export type { Signal, Computed } from './signals.js'
 
 // Element constructors
-export { box, text, image } from './elements.js'
+export { box, text, image, scene3d } from './elements.js'
+
+// Scene3d object helpers
+export { sphere, points, line, ring, ambientLight, directionalLight, group } from './elements.js'
 
 // App mount
 export { createApp } from './app.js'
@@ -109,6 +112,16 @@ export type {
   BoxElement,
   TextElement,
   ImageElement,
+  Scene3dElement,
+  Scene3dObject,
+  Scene3dSphere,
+  Scene3dPoints,
+  Scene3dLine,
+  Scene3dRing,
+  Scene3dAmbientLight,
+  Scene3dDirectionalLight,
+  Scene3dGroup,
+  OrbitControlsConfig,
   StyleProps,
   CursorProp,
   Direction,

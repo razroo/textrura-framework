@@ -129,8 +129,122 @@ export interface ImageElement {
   semantic?: SemanticProps
 }
 
+/** Orbit-controls configuration for {@link Scene3dElement}. */
+export interface OrbitControlsConfig {
+  /** Damping factor (0–1). Default renderer-specific. */
+  damping?: number
+  /** Minimum camera distance. */
+  minDistance?: number
+  /** Maximum camera distance. */
+  maxDistance?: number
+  /** Maximum polar angle in radians. */
+  maxPolarAngle?: number
+}
+
+/**
+ * Discriminated union of declarative 3D objects that live inside a {@link Scene3dElement}.
+ * All fields are plain JSON-serializable so the server can stream them over the Geometra WebSocket protocol.
+ */
+export type Scene3dObject =
+  | Scene3dSphere
+  | Scene3dPoints
+  | Scene3dLine
+  | Scene3dRing
+  | Scene3dAmbientLight
+  | Scene3dDirectionalLight
+  | Scene3dGroup
+
+export interface Scene3dSphere {
+  type: 'sphere'
+  position?: [number, number, number]
+  radius?: number
+  color?: number
+  emissive?: number
+  metalness?: number
+  roughness?: number
+  widthSegments?: number
+  heightSegments?: number
+}
+
+export interface Scene3dPoints {
+  type: 'points'
+  /** Flat xyz array: [x0, y0, z0, x1, y1, z1, …]. Length must be divisible by 3. */
+  positions: number[]
+  color?: number
+  size?: number
+  opacity?: number
+}
+
+export interface Scene3dLine {
+  type: 'line'
+  /** Array of [x, y, z] tuples. */
+  points: Array<[number, number, number]>
+  color?: number
+  opacity?: number
+  dashed?: boolean
+  dashSize?: number
+  gapSize?: number
+}
+
+export interface Scene3dRing {
+  type: 'ring'
+  innerRadius: number
+  outerRadius: number
+  position?: [number, number, number]
+  rotation?: [number, number, number]
+  color?: number
+  opacity?: number
+  segments?: number
+}
+
+export interface Scene3dAmbientLight {
+  type: 'ambientLight'
+  color?: number
+  intensity?: number
+}
+
+export interface Scene3dDirectionalLight {
+  type: 'directionalLight'
+  color?: number
+  intensity?: number
+  position?: [number, number, number]
+}
+
+export interface Scene3dGroup {
+  type: 'group'
+  objects: Scene3dObject[]
+  position?: [number, number, number]
+}
+
+/** A declarative 3D scene element. Renderers that support Three.js build a scene graph from {@link Scene3dObject} descriptors. */
+export interface Scene3dElement {
+  kind: 'scene3d'
+  props: FlexProps & StyleProps & DirectionProps & {
+    /** Hex color for the scene background. */
+    background?: number
+    /** 3D objects in the scene. */
+    objects: Scene3dObject[]
+    /** Camera field of view in degrees. Default: 50. */
+    fov?: number
+    /** Camera near plane. Default: 0.1. */
+    near?: number
+    /** Camera far plane. Default: 2000. */
+    far?: number
+    /** Camera position [x, y, z]. */
+    cameraPosition?: [number, number, number]
+    /** Camera look-at target [x, y, z]. */
+    cameraTarget?: [number, number, number]
+    /** Enable orbit controls. */
+    orbitControls?: boolean | OrbitControlsConfig
+    /** Cap the device pixel ratio for the WebGL canvas. */
+    maxPixelRatio?: number
+  }
+  key?: string
+  semantic?: SemanticProps
+}
+
 /** Union of all element types. */
-export type UIElement = TextElement | BoxElement | ImageElement
+export type UIElement = TextElement | BoxElement | ImageElement | Scene3dElement
 
 /** Supported event handlers on box elements. */
 export interface EventHandlers {

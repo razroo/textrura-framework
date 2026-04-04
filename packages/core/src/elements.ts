@@ -4,6 +4,16 @@ import type {
   BoxElement,
   TextElement,
   ImageElement,
+  Scene3dElement,
+  Scene3dObject,
+  Scene3dSphere,
+  Scene3dPoints,
+  Scene3dLine,
+  Scene3dRing,
+  Scene3dAmbientLight,
+  Scene3dDirectionalLight,
+  Scene3dGroup,
+  OrbitControlsConfig,
   UIElement,
   EventHandlers,
   SemanticProps,
@@ -24,6 +34,20 @@ type ImageProps = FlexProps & StyleProps & DirectionProps & {
   src: string
   alt?: string
   objectFit?: 'fill' | 'contain' | 'cover'
+  key?: string
+  semantic?: SemanticProps
+}
+
+type Scene3dProps = FlexProps & StyleProps & DirectionProps & {
+  background?: number
+  objects: Scene3dObject[]
+  fov?: number
+  near?: number
+  far?: number
+  cameraPosition?: [number, number, number]
+  cameraTarget?: [number, number, number]
+  orbitControls?: boolean | OrbitControlsConfig
+  maxPixelRatio?: number
   key?: string
   semantic?: SemanticProps
 }
@@ -94,4 +118,47 @@ export function text(props: TextProps): TextElement {
 export function image(props: ImageProps): ImageElement {
   const { key, semantic, ...rest } = props
   return { kind: 'image', props: rest, key, semantic }
+}
+
+/**
+ * Create a declarative 3D scene element.
+ * The `objects` array describes the scene graph using plain serializable data;
+ * a Three.js-capable renderer (e.g. `@geometra/renderer-three`) builds the live scene from these descriptors.
+ * Flex and sizing props feed {@link import('./tree.js').toLayoutTree} — the element reserves layout space like a box.
+ */
+export function scene3d(props: Scene3dProps): Scene3dElement {
+  const { key, semantic, ...rest } = props
+  return { kind: 'scene3d', props: rest, key, semantic }
+}
+
+// ---------------------------------------------------------------------------
+// Scene3d object helpers — plain data factories for the `objects` array.
+// ---------------------------------------------------------------------------
+
+export function sphere(opts: Omit<Scene3dSphere, 'type'>): Scene3dSphere {
+  return { type: 'sphere', ...opts }
+}
+
+export function points(opts: Omit<Scene3dPoints, 'type'>): Scene3dPoints {
+  return { type: 'points', ...opts }
+}
+
+export function line(opts: Omit<Scene3dLine, 'type'>): Scene3dLine {
+  return { type: 'line', ...opts }
+}
+
+export function ring(opts: Omit<Scene3dRing, 'type'>): Scene3dRing {
+  return { type: 'ring', ...opts }
+}
+
+export function ambientLight(opts: Omit<Scene3dAmbientLight, 'type'> = {}): Scene3dAmbientLight {
+  return { type: 'ambientLight', ...opts }
+}
+
+export function directionalLight(opts: Omit<Scene3dDirectionalLight, 'type'>): Scene3dDirectionalLight {
+  return { type: 'directionalLight', ...opts }
+}
+
+export function group(opts: Omit<Scene3dGroup, 'type'>): Scene3dGroup {
+  return { type: 'group', ...opts }
 }

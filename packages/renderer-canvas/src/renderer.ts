@@ -381,6 +381,11 @@ export class CanvasRenderer implements Renderer {
       }
     } else if (element.kind === 'image') {
       this.paintImage(element, x, y, width, height)
+    } else if (element.kind === 'scene3d') {
+      // scene3d elements are rendered by a Three.js host; paint a placeholder on canvas.
+      this.ctx.fillStyle = '#111827'
+      this.roundRect(x, y, width, height, 0)
+      this.ctx.fill()
     } else {
       this.paintText(element, x, y, width, height)
     }

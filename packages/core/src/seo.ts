@@ -302,6 +302,17 @@ function elementToHTML(element: UIElement, indent: number): string {
     return `${pad}<${tag}${attrStr}>${body}</${tag}>`
   }
 
+  if (element.kind === 'scene3d') {
+    const tag = sanitizeHtmlTagName(element.semantic?.tag, 'div')
+    const attrs: string[] = []
+    const dir = dirAttribute(element.props)
+    if (dir) attrs.push(dir)
+    if (element.semantic?.role) attrs.push(`role="${escapeHTML(element.semantic.role)}"`)
+    if (element.semantic?.ariaLabel) attrs.push(`aria-label="${escapeHTML(element.semantic.ariaLabel)}"`)
+    const attrStr = attrs.length ? ' ' + attrs.join(' ') : ''
+    return `${pad}<${tag}${attrStr}></${tag}>`
+  }
+
   const tag = sanitizeHtmlTagName(element.semantic?.tag, inferBoxTag(element))
   const attrs: string[] = []
   const dir = dirAttribute(element.props)

@@ -29,6 +29,16 @@ function stripStyleProps(props: Record<string, unknown>): Record<string, unknown
   delete layoutProps.src
   delete layoutProps.alt
   delete layoutProps.objectFit
+  // Scene3d-only props
+  delete layoutProps.background
+  delete layoutProps.objects
+  delete layoutProps.fov
+  delete layoutProps.near
+  delete layoutProps.far
+  delete layoutProps.cameraPosition
+  delete layoutProps.cameraTarget
+  delete layoutProps.orbitControls
+  delete layoutProps.maxPixelRatio
   return layoutProps
 }
 
@@ -53,7 +63,7 @@ function stripStyleProps(props: Record<string, unknown>): Record<string, unknown
 export function toLayoutTree(element: UIElement): LayoutNode {
   const layoutProps = stripStyleProps(element.props as Record<string, unknown>)
 
-  if (element.kind === 'text' || element.kind === 'image') {
+  if (element.kind === 'text' || element.kind === 'image' || element.kind === 'scene3d') {
     return layoutProps as LayoutNode
   }
 

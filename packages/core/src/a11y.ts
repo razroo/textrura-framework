@@ -90,6 +90,7 @@ function stateFor(element: UIElement): AccessibilityNode['state'] | undefined {
 function roleFor(element: UIElement): string {
   if (element.kind === 'text') return inferTextRole(element)
   if (element.kind === 'image') return inferImageRole(element)
+  if (element.kind === 'scene3d') return element.semantic?.role ?? 'img'
   return inferBoxRole(element)
 }
 
