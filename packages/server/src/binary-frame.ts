@@ -5,6 +5,8 @@ export const BINARY_FRAME_MAGIC = Buffer.from([0x47, 0x45, 0x4f, 0x4d]) // GEOM
 
 const FRAME_VERSION = 1
 const HEADER_BYTES = 9
+/** Maximum UTF-8 payload bytes representable in the v1 length field (inclusive). */
+const MAX_V1_PAYLOAD_BYTES = 0xffff_ffff
 
 /** True if buffer looks like a v1 binary envelope (GEOM + version 1). */
 export function isBinaryFrameBuffer(data: Buffer | Uint8Array): boolean {
@@ -18,9 +20,18 @@ export function isBinaryFrameBuffer(data: Buffer | Uint8Array): boolean {
   )
 }
 
-/** Wrap UTF-8 JSON bytes in a binary envelope for WebSocket binary frames. */
+/**
+ * Wrap UTF-8 JSON bytes in a binary envelope for WebSocket binary frames.
+ *
+ * @throws {RangeError} When the UTF-8 payload is larger than 4294967295 bytes (v1 uint32 length field).
+ */
 export function encodeBinaryFrameJson(jsonUtf8: string): Buffer {
   const payload = Buffer.from(jsonUtf8, 'utf8')
+  if (payload.length > MAX_V1_PAYLOAD_BYTES) {
+    throw new RangeError(
+      `GEOM v1 binary frame payload length ${payload.length} exceeds uint32 max (${MAX_V1_PAYLOAD_BYTES})`,
+    )
+  }
   const header = Buffer.alloc(HEADER_BYTES)
   BINARY_FRAME_MAGIC.copy(header, 0)
   header.writeUInt8(FRAME_VERSION, 4)

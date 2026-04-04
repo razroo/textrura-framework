@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { decodeBinaryFrameJson, encodeBinaryFrameJson, isBinaryFrameBuffer } from '../binary-frame.js'
 
 /** v1 envelope with arbitrary bytes (including invalid UTF-8 for decode policy tests). */
@@ -32,6 +32,18 @@ describe('isBinaryFrameBuffer', () => {
 })
 
 describe('binary frame envelope', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('encode throws RangeError when payload byte length exceeds uint32 (no silent header truncation)', () => {
+    const fake = Buffer.alloc(0)
+    Object.defineProperty(fake, 'length', { value: 0x1_0000_0000 })
+    vi.spyOn(Buffer, 'from').mockReturnValue(fake as Buffer)
+    expect(() => encodeBinaryFrameJson('x')).toThrow(RangeError)
+    expect(() => encodeBinaryFrameJson('x')).toThrow(/exceeds uint32 max/)
+  })
+
   it('roundtrips JSON through GEOM v1 envelope', () => {
     const json = JSON.stringify({ type: 'frame', protocolVersion: 1, layout: { x: 0, y: 0, width: 1, height: 1, children: [] } })
     const buf = encodeBinaryFrameJson(json)
