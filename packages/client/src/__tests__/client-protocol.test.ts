@@ -802,6 +802,8 @@ describe('applyServerMessage', () => {
       { d: new Date(0) },
       { m: new Map([['a', 1]]) },
       Object.create(null),
+      { n: 1n },
+      { nested: Object.assign(Object.create(null), { x: 1 }) },
     ]
 
     for (const payload of badPayloads) {
