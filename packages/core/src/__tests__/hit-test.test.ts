@@ -290,6 +290,48 @@ describe('dispatchHit', () => {
     }
   })
 
+  it('corrupt earlier sibling layout does not throw and still allows hits on later siblings', () => {
+    let innerFired = false
+    const inner = box({
+      width: 50,
+      height: 50,
+      cursor: 'crosshair',
+      onClick: () => {
+        innerFired = true
+      },
+    })
+    const parent = box(
+      { width: 200, height: 100, cursor: 'pointer' },
+      [
+        box({ width: 1, height: 1 }),
+        inner,
+      ],
+    )
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: -1, height: 10, children: [] as const },
+        { x: 10, y: 10, width: 50, height: 50, children: [] as const },
+      ],
+    }
+
+    expect(() => dispatchHit(parent, layout, 'onClick', 35, 35)).not.toThrow()
+    expect(dispatchHit(parent, layout, 'onClick', 35, 35).handled).toBe(true)
+    expect(innerFired).toBe(true)
+
+    expect(() => hitPathAtPoint(parent, layout, 35, 35)).not.toThrow()
+    expect(hitPathAtPoint(parent, layout, 35, 35)).toEqual([1])
+
+    expect(() => hasInteractiveHitAtPoint(parent, layout, 35, 35)).not.toThrow()
+    expect(hasInteractiveHitAtPoint(parent, layout, 35, 35)).toBe(true)
+
+    expect(() => getCursorAtPoint(parent, layout, 35, 35)).not.toThrow()
+    expect(getCursorAtPoint(parent, layout, 35, 35)).toBe('crosshair')
+  })
+
   it('BigInt layout fields are a miss for dispatch and hit queries without throwing', () => {
     let fired: boolean
     const el = box({
