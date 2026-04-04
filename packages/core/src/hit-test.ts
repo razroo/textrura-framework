@@ -214,6 +214,7 @@ function dispatchHitRecursive(
  * can pass modifier keys, `button`, wheel deltas, and other renderer-specific metadata.
  * For `onClick` only, the return value may include `focusTarget` for focus routing
  * (including click-to-focus when there is no `onClick` handler).
+ * Non-box roots (`text`, `image`, `scene3d`) always return `{ handled: false }` — attach pointer handlers to a parent {@link import('./types.js').BoxElement}.
  * Pointer `x` / `y` must be finite numbers: anything that fails `Number.isFinite` (including
  * non-numbers at runtime) returns `{ handled: false }` without invoking handlers.
  * Layout bounds must be finite and non-negative on `width` and `height`; otherwise the node is

@@ -34,6 +34,31 @@ describe('dispatchHit', () => {
     expect(fired).toBe(true)
   })
 
+  it('non-box root (text): pointer inside layout does not dispatch handlers', () => {
+    const el = text({
+      text: 'hi',
+      font: '16px sans-serif',
+      lineHeight: 20,
+      width: 100,
+      height: 50,
+    })
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] as const }
+    expect(dispatchHit(el, layout, 'onClick', 50, 25)).toEqual({ handled: false })
+    expect(dispatchHit(el, layout, 'onPointerDown', 50, 25)).toEqual({ handled: false })
+  })
+
+  it('non-box root (image): pointer inside layout does not dispatch handlers', () => {
+    const el = image({ src: 'x.png', width: 100, height: 50 })
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] as const }
+    expect(dispatchHit(el, layout, 'onClick', 50, 25)).toEqual({ handled: false })
+  })
+
+  it('non-box root (scene3d): pointer inside layout does not dispatch handlers', () => {
+    const el = scene3d({ objects: [], width: 100, height: 50 })
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] as const }
+    expect(dispatchHit(el, layout, 'onClick', 50, 25)).toEqual({ handled: false })
+  })
+
   it('merges extra metadata onto the HitEvent after base pointer fields', () => {
     let received: HitEvent | undefined
     const layout = { x: 10, y: 20, width: 100, height: 50, children: [] }
