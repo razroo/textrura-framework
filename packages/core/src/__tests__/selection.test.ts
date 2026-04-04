@@ -672,6 +672,24 @@ describe('hitTestText', () => {
     expect(hitTestText(textNodes, 2, 5)).toEqual({ nodeIndex: 0, charOffset: 0 })
     expect(hitTestText(textNodes, 12, 5)).toEqual({ nodeIndex: 0, charOffset: 2 })
   })
+
+  it('does not throw when a line has NaN charWidths; LTR still resolves early glyphs then snaps past the bad width', () => {
+    const textNodes: TextNodeInfo[] = [
+      {
+        element: { kind: 'text' as const, props: { text: 'ab', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 18,
+        index: 0,
+        lines: [{ text: 'ab', x: 0, y: 0, charOffsets: [0, 8], charWidths: [8, Number.NaN] }],
+      },
+    ]
+    expect(() => hitTestText(textNodes, 2, 5)).not.toThrow()
+    expect(hitTestText(textNodes, 2, 5)).toEqual({ nodeIndex: 0, charOffset: 0 })
+    expect(hitTestText(textNodes, 14, 5)).toEqual({ nodeIndex: 0, charOffset: 2 })
+  })
 })
 
 describe('hitTestText direction mapping', () => {
@@ -698,5 +716,23 @@ describe('hitTestText direction mapping', () => {
 
     expect(leftHit).toEqual({ nodeIndex: 0, charOffset: 4 })
     expect(rightHit).toEqual({ nodeIndex: 0, charOffset: 0 })
+  })
+
+  it('does not throw when an RTL line has NaN charWidths (non-finite visual width); snaps to end of line', () => {
+    const textNodes: TextNodeInfo[] = [
+      {
+        element: { kind: 'text' as const, props: { text: 'ab', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'rtl' as const,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 18,
+        index: 0,
+        lines: [{ text: 'ab', x: 0, y: 0, charOffsets: [0, 8], charWidths: [8, Number.NaN] }],
+      },
+    ]
+    expect(() => hitTestText(textNodes, 2, 5)).not.toThrow()
+    expect(hitTestText(textNodes, 2, 5)).toEqual({ nodeIndex: 0, charOffset: 2 })
+    expect(hitTestText(textNodes, 20, 5)).toEqual({ nodeIndex: 0, charOffset: 2 })
   })
 })
