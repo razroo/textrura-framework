@@ -708,6 +708,42 @@ describe('applyServerMessage', () => {
     expect(metrics[0]!.renderMs).toBe(0)
   })
 
+  it('accepts data messages with null, empty array, or primitive array payloads (JSON-serializable)', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const dataCalls: Array<{ channel: string; payload: unknown }> = []
+    const metrics: ClientFrameMetrics[] = []
+    type Msg = Parameters<typeof applyServerMessage>[2]
+
+    const payloads: unknown[] = [null, [], [1, 2, 'x'], ['nested', [true, false]]]
+    for (let i = 0; i < payloads.length; i++) {
+      applyServerMessage(
+        state,
+        renderer,
+        {
+          type: 'data',
+          channel: `geom.payload.shape.${i}`,
+          payload: payloads[i],
+          protocolVersion: 1,
+        } as unknown as Msg,
+        undefined,
+        m => metrics.push(m),
+        { decodeMs: 0 },
+        (ch, pl) => dataCalls.push({ channel: ch, payload: pl }),
+      )
+    }
+
+    expect(dataCalls).toEqual([
+      { channel: 'geom.payload.shape.0', payload: null },
+      { channel: 'geom.payload.shape.1', payload: [] },
+      { channel: 'geom.payload.shape.2', payload: [1, 2, 'x'] },
+      { channel: 'geom.payload.shape.3', payload: ['nested', [true, false]] },
+    ])
+    expect(renders).toHaveLength(0)
+    expect(metrics).toHaveLength(payloads.length)
+    expect(metrics.every(m => m.messageType === 'data' && m.renderMs === 0)).toBe(true)
+  })
+
   it('rejects data with empty channel', () => {
     const { renderer, renders } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
