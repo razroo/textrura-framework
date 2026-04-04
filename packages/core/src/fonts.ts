@@ -382,8 +382,13 @@ export function extractFontFamiliesFromCSSFont(font: string): string[] {
  * `image` and `scene3d` leaves carry no `font` shorthand and are skipped (siblings under the same parent are still walked).
  * Boxes with a missing or non-array `children` field are treated as empty (no throw) so bad
  * deserialization cannot take down font collection.
+ * `null`, `undefined`, and non-object roots return an empty list so loose runtime data never throws
+ * on property access.
  */
 export function collectFontFamiliesFromTree(root: UIElement): string[] {
+  if (root == null || typeof root !== 'object') {
+    return []
+  }
   const out = new Set<string>()
   function walk(el: UIElement): void {
     if (el.kind === 'text') {

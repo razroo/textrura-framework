@@ -6,6 +6,7 @@ import {
   waitForFonts,
 } from '../fonts.js'
 import { box, image, scene3d, text } from '../elements.js'
+import type { UIElement } from '../types.js'
 
 describe('extractFontFamiliesFromCSSFont', () => {
   it('returns empty for non-string font argument (boxed strings, symbols, loose runtime data)', () => {
@@ -689,6 +690,14 @@ describe('resolveFontLoadTimeoutMs', () => {
 })
 
 describe('collectFontFamiliesFromTree', () => {
+  it('returns empty for null, undefined, or non-object roots (corrupt deserialization)', () => {
+    expect(collectFontFamiliesFromTree(null as unknown as UIElement)).toEqual([])
+    expect(collectFontFamiliesFromTree(undefined as unknown as UIElement)).toEqual([])
+    expect(collectFontFamiliesFromTree('oops' as unknown as UIElement)).toEqual([])
+    expect(collectFontFamiliesFromTree(1 as unknown as UIElement)).toEqual([])
+    expect(collectFontFamiliesFromTree(true as unknown as UIElement)).toEqual([])
+  })
+
   it('returns empty when tree has no text nodes', () => {
     const tree = box({ width: 10, height: 10 })
     expect(collectFontFamiliesFromTree(tree)).toEqual([])
