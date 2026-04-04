@@ -226,6 +226,52 @@ describe('createApp layout direction (Textura computeLayout)', () => {
   })
 })
 
+describe('createApp root width/height sanitization', () => {
+  it('omits NaN, ±Infinity, negative, and non-number root extents so computeLayout stays finite', async () => {
+    const render = vi.fn()
+    const renderer: Renderer = { render, destroy: vi.fn() }
+
+    for (const badWidth of [
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      -1,
+      -0.001,
+      '100' as unknown as number,
+      1n as unknown as number,
+      Object(100) as unknown as number,
+    ]) {
+      render.mockClear()
+      await createApp(() => box({ width: 40, height: 20 }, []), renderer, {
+        width: badWidth,
+        height: 50,
+      })
+      expect(render).toHaveBeenCalledTimes(1)
+      const layout = render.mock.calls[0]![0] as { width: number; height: number }
+      expect(Number.isFinite(layout.width)).toBe(true)
+      expect(Number.isFinite(layout.height)).toBe(true)
+    }
+
+    for (const badHeight of [
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      -1,
+      '50' as unknown as number,
+    ]) {
+      render.mockClear()
+      await createApp(() => box({ width: 40, height: 20 }, []), renderer, {
+        width: 100,
+        height: badHeight,
+      })
+      expect(render).toHaveBeenCalledTimes(1)
+      const layout = render.mock.calls[0]![0] as { width: number; height: number }
+      expect(Number.isFinite(layout.width)).toBe(true)
+      expect(Number.isFinite(layout.height)).toBe(true)
+    }
+  })
+})
+
 describe('createApp layout timing', () => {
   it('invokes renderer.setFrameTimings with layoutMs before render', async () => {
     const order: string[] = []

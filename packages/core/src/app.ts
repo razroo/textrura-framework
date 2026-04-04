@@ -1,5 +1,5 @@
 import { init, computeLayout } from 'textura'
-import type { ComputedLayout } from 'textura'
+import type { ComputedLayout, ComputeOptions } from 'textura'
 import type { UIElement, Renderer, EventHandlers, KeyboardHitEvent } from './types.js'
 import { toLayoutTree } from './tree.js'
 import { resolveElementDirection } from './direction.js'
@@ -19,10 +19,21 @@ function resolveComputeLayoutDirection(
   return resolveElementDirection(root, 'ltr')
 }
 
+/** Only finite, non-negative numbers become Textura root constraints; otherwise the key is omitted (unconstrained). */
+function finiteRootExtent(value: number | undefined): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
+}
+
 export interface AppOptions {
-  /** Root width for layout computation. */
+  /**
+   * Root width for layout computation. Non-numbers, non-finite values, and negatives are ignored
+   * (same as omitting the option) so corrupt options cannot poison Yoga.
+   */
   width?: number
-  /** Root height for layout computation. */
+  /**
+   * Root height for layout computation. Non-numbers, non-finite values, and negatives are ignored
+   * (same as omitting the option) so corrupt options cannot poison Yoga.
+   */
   height?: number
   /** Called when an error occurs during update. */
   onError?: (error: unknown) => void
@@ -124,11 +135,12 @@ export async function createApp(
         const layoutTree = toLayoutTree(app.tree)
         const direction = resolveComputeLayoutDirection(options.layoutDirection, app.tree)
         const layoutStart = typeof performance !== 'undefined' ? performance.now() : 0
-        app.layout = computeLayout(layoutTree, {
-          width: options.width,
-          height: options.height,
-          direction,
-        })
+        const computeOpts: ComputeOptions = { direction }
+        const rootW = finiteRootExtent(options.width)
+        const rootH = finiteRootExtent(options.height)
+        if (rootW !== undefined) computeOpts.width = rootW
+        if (rootH !== undefined) computeOpts.height = rootH
+        app.layout = computeLayout(layoutTree, computeOpts)
         const rawLayoutMs =
           typeof performance !== 'undefined' ? performance.now() - layoutStart : 0
         const layoutMs = Math.max(0, Number.isFinite(rawLayoutMs) ? rawLayoutMs : 0)
