@@ -522,4 +522,32 @@ describe('geometry snapshot CI', () => {
     const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 100 })
     expect(roundLayout(layout)).toMatchSnapshot()
   })
+
+  it('stable row where minWidth exceeds width on first text and second text flexGrows (rounded)', async () => {
+    await init()
+    const base = { font: '16px sans-serif', lineHeight: 20, height: 20 } as const
+    const tree = box(
+      { width: 200, height: 56, padding: 8, flexDirection: 'row', gap: 6 },
+      [
+        text({ text: 'Min', ...base, width: 40, minWidth: 72 }),
+        text({ text: 'Grow', ...base, flexGrow: 1 }),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 56 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
+
+  it('stable row with maxWidth capping a text child and flexGrow sibling (rounded)', async () => {
+    await init()
+    const base = { font: '16px sans-serif', lineHeight: 20, height: 20 } as const
+    const tree = box(
+      { width: 220, height: 56, padding: 8, flexDirection: 'row', gap: 6 },
+      [
+        text({ text: 'Capped', ...base, width: 120, maxWidth: 64 }),
+        text({ text: 'Rest', ...base, flexGrow: 1 }),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 220, height: 56 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
 })

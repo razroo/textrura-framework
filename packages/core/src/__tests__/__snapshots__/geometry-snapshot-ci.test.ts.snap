@@ -301,6 +301,31 @@ exports[`geometry snapshot CI > stable ltr row with per-node rtl and ltr text di
 }
 `;
 
+exports[`geometry snapshot CI > stable row where minWidth exceeds width on first text and second text flexGrows (rounded) 1`] = `
+{
+  "children": [
+    {
+      "children": [],
+      "height": 20,
+      "width": 72,
+      "x": 8,
+      "y": 8,
+    },
+    {
+      "children": [],
+      "height": 20,
+      "width": 106,
+      "x": 86,
+      "y": 8,
+    },
+  ],
+  "height": 56,
+  "width": 200,
+  "x": 0,
+  "y": 0,
+}
+`;
+
 exports[`geometry snapshot CI > stable row with alignItems baseline and mixed font sizes (rounded) 1`] = `
 {
   "children": [
@@ -446,6 +471,31 @@ exports[`geometry snapshot CI > stable row with justifyContent center and two fi
   ],
   "height": 80,
   "width": 200,
+  "x": 0,
+  "y": 0,
+}
+`;
+
+exports[`geometry snapshot CI > stable row with maxWidth capping a text child and flexGrow sibling (rounded) 1`] = `
+{
+  "children": [
+    {
+      "children": [],
+      "height": 20,
+      "width": 64,
+      "x": 8,
+      "y": 8,
+    },
+    {
+      "children": [],
+      "height": 20,
+      "width": 134,
+      "x": 78,
+      "y": 8,
+    },
+  ],
+  "height": 56,
+  "width": 220,
   "x": 0,
   "y": 0,
 }
