@@ -104,6 +104,8 @@ describe('extractFontFamiliesFromCSSFont', () => {
 
   it('parses scientific-notation font size before family', () => {
     expect(extractFontFamiliesFromCSSFont('1e2px Inter, sans-serif')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('1E+2px Inter, sans-serif')).toEqual(['Inter'])
+    expect(extractFontFamiliesFromCSSFont('1e-1px Inter, sans-serif')).toEqual(['Inter'])
     expect(extractFontFamiliesFromCSSFont('2.5e+1px Inter')).toEqual(['Inter'])
     expect(extractFontFamiliesFromCSSFont('16e0px JetBrains Mono, monospace')).toEqual(['JetBrains Mono'])
     expect(extractFontFamiliesFromCSSFont('600 3e0rem Literata, serif')).toEqual(['Literata'])
@@ -111,6 +113,8 @@ describe('extractFontFamiliesFromCSSFont', () => {
 
   it('does not treat scientific-notation size token as a family name', () => {
     expect(extractFontFamiliesFromCSSFont('1e2px')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('1E+2px')).toEqual([])
+    expect(extractFontFamiliesFromCSSFont('1e-1px')).toEqual([])
   })
 
   it('parses calc() font-size before family', () => {
