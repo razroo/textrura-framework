@@ -21,6 +21,10 @@ export const CLOSE_FORBIDDEN = 4003
  *
  * Non-number runtime values (e.g. `BigInt` from a malformed decoder) are rejected via the `typeof`
  * check before `Number.isFinite` — we never coerce wire values (global `isFinite` throws on `BigInt`).
+ *
+ * `currentVersion` is not validated: `NaN` makes `peerVersion <= currentVersion` false for every
+ * defined peer (while `undefined` peers still short-circuit to `true`). `±Infinity` follows normal
+ * numeric ordering (`finite <= Infinity` is `true`; `finite <= -Infinity` is `false`).
  */
 export function isProtocolCompatible(
   peerVersion: number | undefined,
@@ -90,7 +94,10 @@ export interface LayoutPatch {
   height?: number
 }
 
-/** Coalesce multiple patches on the same path (last write wins per field). */
+/**
+ * Coalesce multiple patches on the same path (last write wins per field).
+ * Paths are keyed by joining indices with `.` (e.g. `[1,23]` → `"1.23"`, `[12,3]` → `"12.3"`) so distinct nodes never alias.
+ */
 export function coalescePatches(patches: LayoutPatch[]): LayoutPatch[] {
   const byPath = new Map<string, LayoutPatch>()
   const order: string[] = []

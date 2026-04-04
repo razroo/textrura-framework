@@ -150,6 +150,25 @@ describe('isProtocolCompatible', () => {
   it('rejects non-number peer versions from malformed wire decode (e.g. string)', () => {
     expect(isProtocolCompatible('1' as unknown as number, 1)).toBe(false)
   })
+
+  it('rejects boxed number peer versions (typeof object; no coercion)', () => {
+    expect(isProtocolCompatible(Object(1) as unknown as number, 1)).toBe(false)
+    expect(isProtocolCompatible(Object(0) as unknown as number, 1)).toBe(false)
+  })
+
+  it('treats NaN currentVersion as incompatible with any defined peer (<= is always false)', () => {
+    expect(isProtocolCompatible(0, Number.NaN)).toBe(false)
+    expect(isProtocolCompatible(1, Number.NaN)).toBe(false)
+    // Legacy undefined peer still short-circuits before the numeric compare
+    expect(isProtocolCompatible(undefined, Number.NaN)).toBe(true)
+  })
+
+  it('uses raw <= ordering for infinite currentVersion (finite peers pass against +Infinity, fail against -Infinity)', () => {
+    expect(isProtocolCompatible(0, Number.POSITIVE_INFINITY)).toBe(true)
+    expect(isProtocolCompatible(1, Number.POSITIVE_INFINITY)).toBe(true)
+    expect(isProtocolCompatible(0, Number.NEGATIVE_INFINITY)).toBe(false)
+    expect(isProtocolCompatible(1, Number.NEGATIVE_INFINITY)).toBe(false)
+  })
 })
 
 describe('coalescePatches', () => {
@@ -224,5 +243,16 @@ describe('coalescePatches', () => {
         { path: [1], width: 0, height: 0 },
       ]),
     ).toEqual([{ path: [1], width: 0, height: 0 }])
+  })
+
+  it('keeps path keys unambiguous: [12,3] vs [1,23] do not collide when stringified with dots', () => {
+    const merged = coalescePatches([
+      { path: [12, 3], x: 1 },
+      { path: [1, 23], y: 2 },
+    ])
+    expect(merged).toEqual([
+      { path: [12, 3], x: 1 },
+      { path: [1, 23], y: 2 },
+    ])
   })
 })
