@@ -316,6 +316,15 @@ describe('toLayoutTree', () => {
     expect(layout.children[2]).toHaveProperty('dir', 'rtl')
   })
 
+  it('forwards dir on nested box children for Textura (only the layout root omits dir)', () => {
+    const inner = box({ width: 50, height: 50, dir: 'rtl' })
+    const root = box({ width: 100, height: 100, dir: 'ltr' }, [inner])
+    const layout = toLayoutTree(root) as BoxLayoutNode
+    expect(layout).not.toHaveProperty('dir')
+    const childLayout = layout.children[0] as Record<string, unknown>
+    expect(childLayout).toMatchObject({ width: 50, height: 50, dir: 'rtl' })
+  })
+
   it('does not mutate live element.props when building the layout snapshot', () => {
     const root = box(
       {
