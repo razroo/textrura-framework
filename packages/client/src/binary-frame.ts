@@ -1,6 +1,9 @@
 const FRAME_VERSION = 1
 const HEADER_BYTES = 9
 
+/** Maximum UTF-8 payload bytes in the v1 length field (inclusive). Keep in sync with `@geometra/server` `binary-frame`. */
+export const MAX_V1_PAYLOAD_BYTES = 0xffff_ffff
+
 /**
  * Input slice for v1 GEOM binary frames: a whole backing buffer (`ArrayBuffer` or `SharedArrayBuffer`)
  * or any `ArrayBufferView` into a larger store.
@@ -54,6 +57,9 @@ export function isBinaryFrameArrayBuffer(data: BinaryFrameBytes): boolean {
  *
  * @throws {Error} When the buffer is not a v1 GEOM frame (`Not a GEOM binary frame`).
  * @throws {Error} When the declared payload length exceeds available bytes (`Truncated binary frame payload`).
+ *
+ * Length is uint32 little-endian. The view must contain `9 + length` bytes; otherwise decode throws.
+ * Conforming encoders keep UTF-8 payload size ≤ {@link MAX_V1_PAYLOAD_BYTES} (same cap as `@geometra/server`).
  */
 export function decodeBinaryFrameJson(data: BinaryFrameBytes): string {
   if (!isBinaryFrameArrayBuffer(data)) {

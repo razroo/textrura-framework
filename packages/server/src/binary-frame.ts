@@ -5,7 +5,7 @@ export const BINARY_FRAME_MAGIC = Buffer.from([0x47, 0x45, 0x4f, 0x4d]) // GEOM
 
 const FRAME_VERSION = 1
 const HEADER_BYTES = 9
-/** Maximum UTF-8 payload bytes representable in the v1 length field (inclusive). */
+/** Maximum UTF-8 payload bytes representable in the v1 length field (inclusive). Keep in sync with `@geometra/client` `MAX_V1_PAYLOAD_BYTES`. */
 const MAX_V1_PAYLOAD_BYTES = 0xffff_ffff
 
 /** True if buffer looks like a v1 binary envelope (GEOM + version 1). */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { decodeBinaryFrameJson, isBinaryFrameArrayBuffer } from '../binary-frame.js'
+import { decodeBinaryFrameJson, isBinaryFrameArrayBuffer, MAX_V1_PAYLOAD_BYTES } from '../binary-frame.js'
 
 /** Mirrors server v1 envelope layout (see `packages/server/src/binary-frame.ts`). */
 function encodeBinaryFrameJsonV1(jsonUtf8: string): ArrayBuffer {
@@ -45,6 +45,10 @@ describe('isBinaryFrameArrayBuffer', () => {
 })
 
 describe('client binary frame decode', () => {
+  it('exposes the v1 uint32 payload cap (aligned with server encode limits)', () => {
+    expect(MAX_V1_PAYLOAD_BYTES).toBe(0xffff_ffff)
+  })
+
   it('decodes v1 GEOM envelopes', () => {
     const json = '{"type":"patch","patches":[],"protocolVersion":1}'
     expect(decodeBinaryFrameJson(encodeBinaryFrameJsonV1(json))).toBe(json)
