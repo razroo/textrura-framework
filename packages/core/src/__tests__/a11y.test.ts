@@ -75,6 +75,44 @@ describe('toAccessibilityTree', () => {
     expect(a11y.children[0]?.focusable).toBe(true)
   })
 
+  it('marks composition-update-only and composition-end-only boxes as focusable (hasFocusCandidateHandlers parity)', () => {
+    const tree = box({}, [
+      box(
+        { width: 80, height: 24, onCompositionUpdate: () => undefined },
+        [text({ text: 'Update', font: '14px Inter', lineHeight: 18 })],
+      ),
+      box(
+        { width: 80, height: 24, onCompositionEnd: () => undefined },
+        [text({ text: 'End', font: '14px Inter', lineHeight: 18 })],
+      ),
+    ])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: [
+        {
+          x: 8,
+          y: 10,
+          width: 80,
+          height: 24,
+          children: [{ x: 0, y: 0, width: 80, height: 18, children: [] }],
+        },
+        {
+          x: 8,
+          y: 44,
+          width: 80,
+          height: 24,
+          children: [{ x: 0, y: 0, width: 80, height: 18, children: [] }],
+        },
+      ],
+    }
+    const a11y = toAccessibilityTree(tree, layout)
+    expect(a11y.children[0]?.focusable).toBe(true)
+    expect(a11y.children[1]?.focusable).toBe(true)
+  })
+
   it('applies scroll offsets to child geometry', () => {
     const tree = box({ scrollX: 10, scrollY: 20 }, [
       text({ text: 'Item', font: '14px Inter', lineHeight: 18 }),

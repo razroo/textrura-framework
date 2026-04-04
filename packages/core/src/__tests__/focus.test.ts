@@ -89,6 +89,20 @@ describe('collectFocusOrder', () => {
     expect(order[0]!.element).toBe(el)
   })
 
+  it('includes boxes with onCompositionUpdate or onCompositionEnd only (parity with a11y focusable)', () => {
+    const a = box({ width: 10, height: 10, onCompositionUpdate: () => {} })
+    const b = box({ width: 10, height: 10, onCompositionEnd: () => {} })
+    const root = box({ width: 100, height: 100 }, [a, b])
+    const layout = {
+      ...makeLayout(),
+      children: [makeLayout({ width: 10, height: 10 }), makeLayout({ x: 20, width: 10, height: 10 })],
+    }
+    const order = collectFocusOrder(root, layout)
+    expect(order).toHaveLength(2)
+    expect(order[0]!.element).toBe(a)
+    expect(order[1]!.element).toBe(b)
+  })
+
   it('includes pointerEvents none boxes (Tab order is not filtered like pointer hit-testing)', () => {
     const kb = box({ width: 10, height: 10, pointerEvents: 'none', onKeyDown: () => {} })
     const clickOnly = box({ width: 10, height: 10, pointerEvents: 'none', onClick: () => {} })
