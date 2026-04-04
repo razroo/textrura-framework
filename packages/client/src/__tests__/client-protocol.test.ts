@@ -47,6 +47,27 @@ describe('applyServerMessage', () => {
     expect(renders.length).toBe(1)
   })
 
+  it('rejects server error payloads when protocolVersion is newer than client (protocol guard before onError)', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const errors: string[] = []
+    const metrics: ClientFrameMetrics[] = []
+
+    applyServerMessage(
+      state,
+      renderer,
+      { type: 'error', message: 'server exploded', protocolVersion: 999 },
+      e => errors.push(String(e)),
+      m => metrics.push(m),
+    )
+
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toContain('newer than client protocol')
+    expect(errors[0]).not.toContain('server exploded')
+    expect(metrics).toHaveLength(0)
+    expect(renders.length).toBe(0)
+  })
+
   it('surfaces protocol mismatch and ignores incompatible frame', () => {
     const { renderer, renders } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
@@ -711,6 +732,65 @@ describe('applyServerMessage', () => {
     expect(metrics).toHaveLength(1)
     expect(metrics[0]!.messageType).toBe('data')
     expect(metrics[0]!.renderMs).toBe(0)
+  })
+
+  it('rejects data messages when protocolVersion is newer than client (no onData, no metrics)', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const errors: string[] = []
+    const dataCalls: unknown[] = []
+    const metrics: ClientFrameMetrics[] = []
+
+    applyServerMessage(
+      state,
+      renderer,
+      {
+        type: 'data',
+        channel: 'geom.side',
+        payload: { n: 1 },
+        protocolVersion: 999,
+      },
+      e => errors.push(String(e)),
+      m => metrics.push(m),
+      { decodeMs: 0 },
+      () => dataCalls.push(1),
+    )
+
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toContain('newer than client protocol')
+    expect(dataCalls).toHaveLength(0)
+    expect(metrics).toHaveLength(0)
+    expect(renders).toHaveLength(0)
+  })
+
+  it('rejects data messages when protocolVersion is non-finite (no onData, no metrics)', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const errors: string[] = []
+    const dataCalls: unknown[] = []
+    const metrics: ClientFrameMetrics[] = []
+    type Msg = Parameters<typeof applyServerMessage>[2]
+
+    applyServerMessage(
+      state,
+      renderer,
+      {
+        type: 'data',
+        channel: 'geom.side',
+        payload: {},
+        protocolVersion: Number.NaN,
+      } as unknown as Msg,
+      e => errors.push(String(e)),
+      m => metrics.push(m),
+      { decodeMs: 0 },
+      () => dataCalls.push(1),
+    )
+
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toContain('protocolVersion must be a finite number')
+    expect(dataCalls).toHaveLength(0)
+    expect(metrics).toHaveLength(0)
+    expect(renders).toHaveLength(0)
   })
 
   it('accepts data messages with null, empty array, or primitive array payloads (JSON-serializable)', () => {
