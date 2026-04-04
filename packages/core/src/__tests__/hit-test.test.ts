@@ -1249,6 +1249,29 @@ describe('dispatchHit', () => {
     expect(log).toEqual(['second'])
   })
 
+  it('overlapping siblings: three-way equal z-index ties break to highest child index (general sort path)', () => {
+    const log: string[] = []
+    const a = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('a') } })
+    const b = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('b') } })
+    const c = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('c') } })
+    const root = box({ width: 100, height: 100 }, [a, b, c])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['c'])
+    expect(hitPathAtPoint(root, layout, 10, 10)).toEqual([2])
+  })
+
   it('overlapping siblings: equal z-index top hit updates when child order mutates (cache invalidation)', () => {
     const log: string[] = []
     const first = box(
