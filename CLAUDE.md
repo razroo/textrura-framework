@@ -12,9 +12,10 @@ See **`GEOMETRY_SNAPSHOT_TESTING.md`** for layout JSON / geometry regression pat
 
 ## Architecture
 
-- **`packages/core`** — Signals reactivity, `box()`/`text()` element constructors, hit-testing, text selection, SEO, `createApp()` (optional `Renderer.setFrameTimings` for layout ms), `waitForFonts`, font helpers
+- **`packages/core`** — Signals reactivity, `box()`/`text()`/`image()`/`scene3d()` element constructors, hit-testing, text selection, SEO, `createApp()` (optional `Renderer.setFrameTimings` for layout ms), `waitForFonts`, font helpers. `scene3d()` carries declarative 3D object descriptors (`sphere`, `points`, `line`, `ring`, `ambientLight`, `directionalLight`, `group`) as plain JSON for WebSocket streaming.
 - **`packages/renderer-canvas`** — Canvas2D paint backend with text selection highlight rendering, optional layout debug overlay and focus ring
 - **`packages/renderer-terminal`** — ANSI terminal renderer
+- **`packages/renderer-three`** — Three.js render hosts (`createThreeGeometraSplitHost`, `createThreeGeometraStackedHost`), `Scene3dManager` for reconciling `scene3d` element descriptors into a live Three.js scene graph, WebGL sizing utilities, layout sync
 - **`packages/server`** — WebSocket server, layout computation, geometry diffing
 - **`packages/client`** — Thin WebSocket client (~2KB), receives pre-computed geometry
 - **`demo/`** — Main marketing/demo website (Vite, served via GitHub Pages)
@@ -58,4 +59,6 @@ Releases are done via GitHub Releases, **not** `npm publish` directly.
 - Strict TypeScript with `.js` extensions in imports
 - Style props (backgroundColor, color, etc.) are stripped in `toLayoutTree()` — only layout props go to Yoga
 - Rendering-only props (like `selectable`) must also be stripped in `toLayoutTree()`
-- Element constructors (`box()`, `text()`) extract non-layout concerns (handlers, semantic, key) before building the element
+- Element constructors (`box()`, `text()`, `scene3d()`) extract non-layout concerns (handlers, semantic, key) before building the element
+- `scene3d()` is a layout leaf (like `image()`) — its 3D-specific props (`objects`, `background`, `fov`, `cameraPosition`, etc.) are stripped in `toLayoutTree()`
+- When adding a new element kind: update `types.ts` (interface + union), `elements.ts` (constructor), `tree.ts` (strip + leaf/container), `index.ts` (exports), then handle in `fonts.ts`, `a11y.ts`, `seo.ts`, and all renderer `paintNode` methods
