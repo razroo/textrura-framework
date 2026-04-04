@@ -21,7 +21,9 @@ fi
 # `packages/*/src/__tests__/**/*.test.ts` that `npm run test` / vitest.fast.config.ts includes — a file
 # passing `vitest.fast` does not imply it runs in CI gate; check package.json before assuming coverage ships.
 # Before appending a path to the gate script, confirm it is not already listed (duplicate paths make
-# vitest run the same file twice). `npm run release:gate` runs `scripts/release/verify-release-gate.mjs`
+# vitest run the same file twice). Scan the whole `scripts.release:gate` string — paths are not strictly
+# ordered, so a file can appear early in the vitest argv list while you only eyeball a later segment.
+# `npm run release:gate` runs `scripts/release/verify-release-gate.mjs`
 # first to fail fast on duplicates or missing paths. The allowlist evolves; read package.json instead of copying examples
 # from older prompts or transcripts.
 # Extend an allowlisted file when adding release-critical tests unless you intentionally widen the gate.
