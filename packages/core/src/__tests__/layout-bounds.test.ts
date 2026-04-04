@@ -265,6 +265,12 @@ describe('finiteNumberOrZero', () => {
     expect(() => finiteNumberOrZero(sym)).not.toThrow()
     expect(finiteNumberOrZero(sym)).toBe(0)
 
+    // Boxed `-0` is `typeof object`, so it does not preserve IEEE −0 (unlike primitive `-0` above).
+    const boxedNegZero = Object(-0) as unknown as number
+    expect(finiteNumberOrZero(boxedNegZero)).toBe(0)
+    expect(Object.is(finiteNumberOrZero(boxedNegZero), -0)).toBe(false)
+    expect(1 / finiteNumberOrZero(boxedNegZero)).toBe(Infinity)
+
     expect(finiteNumberOrZero(Object(0) as unknown as number)).toBe(0)
     expect(finiteNumberOrZero(Object(3.5) as unknown as number)).toBe(0)
     expect(finiteNumberOrZero(Object(NaN) as unknown as number)).toBe(0)
