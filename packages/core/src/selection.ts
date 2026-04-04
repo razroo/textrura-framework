@@ -1,7 +1,7 @@
 import type { ComputedLayout } from 'textura'
 import type { UIElement, TextElement } from './types.js'
 import { resolveElementDirection, type ResolvedDirection } from './direction.js'
-import { layoutBoundsAreFinite } from './layout-bounds.js'
+import { finiteNumberOrZero, layoutBoundsAreFinite } from './layout-bounds.js'
 
 /** Info about a rendered text node's position and content. */
 export interface TextNodeInfo {
@@ -28,10 +28,6 @@ export interface TextLineInfo {
   charOffsets: number[]
   /** Width of each character. */
   charWidths: number[]
-}
-
-function finiteRootOffset(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
 
 /** A selection range across text nodes. */
@@ -71,8 +67,8 @@ export function collectTextNodes(
   collectTextNodesWalk(
     element,
     layout,
-    finiteRootOffset(offsetX),
-    finiteRootOffset(offsetY),
+    finiteNumberOrZero(offsetX),
+    finiteNumberOrZero(offsetY),
     results,
     parentDirection,
   )
@@ -110,8 +106,8 @@ function collectTextNodesWalk(
 
   if (element.kind !== 'box') return
 
-  const childOffsetX = x - finiteRootOffset(element.props.scrollX)
-  const childOffsetY = y - finiteRootOffset(element.props.scrollY)
+  const childOffsetX = x - finiteNumberOrZero(element.props.scrollX)
+  const childOffsetY = y - finiteNumberOrZero(element.props.scrollY)
 
   for (let i = 0; i < element.children.length; i++) {
     const childLayout = layout.children[i]

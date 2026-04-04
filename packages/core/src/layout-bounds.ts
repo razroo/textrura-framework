@@ -6,6 +6,17 @@ function isFiniteLayoutNumber(value: unknown): value is number {
 }
 
 /**
+ * Coerce a runtime value to a finite number for scroll offsets, root paint offsets, and similar layout math.
+ * Non-numbers, NaN, and ±Infinity become `0`. `typeof` rejects `BigInt` before any numeric coercion that could throw.
+ *
+ * Shared by hit-testing, text selection walks, accessibility bounds, text-input caret math, and animation timelines
+ * so corrupt serialized values cannot poison coordinates or timing.
+ */
+export function finiteNumberOrZero(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
+/**
  * Reject NaN, ±Infinity, and negative sizes so corrupt layout cannot invert rects or poison
  * coordinate math. Shared by hit-testing, focus order, and focus traps.
  *

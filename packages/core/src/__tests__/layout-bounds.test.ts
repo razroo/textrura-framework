@@ -1,6 +1,6 @@
 import type { ComputedLayout } from 'textura'
 import { describe, it, expect } from 'vitest'
-import { layoutBoundsAreFinite } from '../layout-bounds.js'
+import { finiteNumberOrZero, layoutBoundsAreFinite } from '../layout-bounds.js'
 
 const emptyChildren = [] as const
 
@@ -221,5 +221,24 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite([] as unknown as ComputedLayout)).toBe(false)
     expect(layoutBoundsAreFinite([0, 0, 10, 10] as unknown as ComputedLayout)).toBe(false)
     expect(layoutBoundsAreFinite(new Uint32Array(4) as unknown as ComputedLayout)).toBe(false)
+  })
+})
+
+describe('finiteNumberOrZero', () => {
+  it('returns finite numbers unchanged', () => {
+    expect(finiteNumberOrZero(0)).toBe(0)
+    expect(finiteNumberOrZero(-3.5)).toBe(-3.5)
+    expect(finiteNumberOrZero(Number.MAX_VALUE)).toBe(Number.MAX_VALUE)
+  })
+
+  it('maps NaN, ±Infinity, and non-numbers to 0 without throwing', () => {
+    expect(finiteNumberOrZero(Number.NaN)).toBe(0)
+    expect(finiteNumberOrZero(Number.POSITIVE_INFINITY)).toBe(0)
+    expect(finiteNumberOrZero(Number.NEGATIVE_INFINITY)).toBe(0)
+    expect(finiteNumberOrZero(undefined)).toBe(0)
+    expect(finiteNumberOrZero(null)).toBe(0)
+    expect(finiteNumberOrZero('1' as unknown as number)).toBe(0)
+    expect(() => finiteNumberOrZero(1n as unknown as number)).not.toThrow()
+    expect(finiteNumberOrZero(1n as unknown as number)).toBe(0)
   })
 })

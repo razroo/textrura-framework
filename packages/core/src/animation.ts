@@ -1,3 +1,4 @@
+import { finiteNumberOrZero } from './layout-bounds.js'
 import { signal } from './signals.js'
 import type { Signal } from './signals.js'
 
@@ -8,11 +9,6 @@ const raf = typeof requestAnimationFrame !== 'undefined'
 const cancelRaf = typeof cancelAnimationFrame !== 'undefined'
   ? cancelAnimationFrame
   : (id: number) => clearTimeout(id)
-
-/** Same finite guard as layout/hit paths: NaN and ±Infinity become `0` so stepping never propagates poisoned floats. */
-function finiteTimelineNumber(value: number): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0
-}
 
 /** Advance amount for timeline stepping: finite `deltaMs` clamped to `>= 0`; otherwise `0` (NaN/±Infinity cannot poison `elapsed`). */
 function stepDeltaMs(deltaMs: number): number {
@@ -125,7 +121,7 @@ export function transition(
  * cannot poison internal elapsed time.
  */
 export function createTweenTimeline(initialValue: number): TweenTimeline {
-  const initial = finiteTimelineNumber(initialValue)
+  const initial = finiteNumberOrZero(initialValue)
   const value = signal(initial)
   let from = initial
   let to = initial

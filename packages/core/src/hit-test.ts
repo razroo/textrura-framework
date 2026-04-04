@@ -1,6 +1,6 @@
 import type { ComputedLayout } from 'textura'
 import type { UIElement, BoxElement, EventHandlers, HitEvent } from './types.js'
-import { layoutBoundsAreFinite } from './layout-bounds.js'
+import { finiteNumberOrZero, layoutBoundsAreFinite } from './layout-bounds.js'
 
 interface HitTarget {
   layout: ComputedLayout
@@ -17,11 +17,6 @@ interface ZIndexCacheEntry {
 }
 
 const zIndexOrderCache = new WeakMap<BoxElement, ZIndexCacheEntry>()
-
-/** Ignore non-finite and non-number values so derived coordinates stay finite (±Infinity/NaN cannot poison abs coords). */
-function finiteNumber(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0
-}
 
 function zIndexOf(el: UIElement): number {
   const z = el.props.zIndex
@@ -103,8 +98,8 @@ function collectHits(
         return
       }
     }
-    childOffsetX -= finiteNumber(scrollX)
-    childOffsetY -= finiteNumber(scrollY)
+    childOffsetX -= finiteNumberOrZero(scrollX)
+    childOffsetY -= finiteNumberOrZero(scrollY)
   }
 
   const inside =
@@ -165,8 +160,8 @@ function dispatchHitRecursive(
   if (!inside) return { handled: false }
 
   let focusTarget: HitDispatchResult['focusTarget']
-  const childOffsetX = absX - finiteNumber(scrollX)
-  const childOffsetY = absY - finiteNumber(scrollY)
+  const childOffsetX = absX - finiteNumberOrZero(scrollX)
+  const childOffsetY = absY - finiteNumberOrZero(scrollY)
   const asc = getChildrenByZAsc(boxEl)
 
   for (let k = asc.length - 1; k >= 0; k--) {
@@ -258,8 +253,8 @@ export function dispatchHit(
     eventType,
     x,
     y,
-    finiteNumber(offsetX),
-    finiteNumber(offsetY),
+    finiteNumberOrZero(offsetX),
+    finiteNumberOrZero(offsetY),
     extra,
   )
 }
@@ -283,7 +278,7 @@ export function hasInteractiveHitAtPoint(
   offsetY = 0,
 ): boolean {
   const hits: HitTarget[] = []
-  collectHits(element, layout, x, y, finiteNumber(offsetX), finiteNumber(offsetY), hits)
+  collectHits(element, layout, x, y, finiteNumberOrZero(offsetX), finiteNumberOrZero(offsetY), hits)
   for (let i = hits.length - 1; i >= 0; i--) {
     const handlers = hits[i]!.handlers
     if (
@@ -302,10 +297,12 @@ export function hasInteractiveHitAtPoint(
 /**
  * Child indices from root to the deepest box under (x, y). Among overlapping siblings, prefers higher z-index (topmost);
  * non-finite or non-number `zIndex` values match `dispatchHit` / paint order (treated as `0`).
- * Boxes with `pointerEvents: 'none'` do not terminate the path when they have no deeper hit (same idea as `getCursorAtPoint` and `collectHits`).
+ * Boxes with `pointerEvents: 'none'` are skipped for path segments; if the deepest matching geometry is only such a box
+ * (no deeper box under the point), returns `null` (same as missing the interactive stack).
  * Non-finite or non-number `x` / `y` return `null` (same `Number.isFinite` guard as {@link dispatchHit}).
- * Returns `null` when the point misses the tree. Returns `[]` when the point hits the
- * root (or a leaf box) with no deeper box hit.
+ * Returns `null` when the point misses the tree, when the root is not a `box` (text/image/scene3d roots have no index path),
+ * or in the `pointerEvents: 'none'` deepest-only case above. Returns `[]` when the point hits a box root or leaf box with
+ * no deeper box under the point.
  * Root `offsetX` / `offsetY` follow {@link dispatchHit}: non-finite or non-number values are treated as `0`.
  */
 export function hitPathAtPoint(
@@ -319,8 +316,8 @@ export function hitPathAtPoint(
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null
   if (!layoutBoundsAreFinite(layout)) return null
 
-  const ox = finiteNumber(offsetX)
-  const oy = finiteNumber(offsetY)
+  const ox = finiteNumberOrZero(offsetX)
+  const oy = finiteNumberOrZero(offsetY)
   const absX = ox + layout.x
   const absY = oy + layout.y
 
@@ -346,8 +343,8 @@ export function hitPathAtPoint(
   const boxEl = element as BoxElement
   let childOffsetX = absX
   let childOffsetY = absY
-  childOffsetX -= finiteNumber(boxEl.props.scrollX)
-  childOffsetY -= finiteNumber(boxEl.props.scrollY)
+  childOffsetX -= finiteNumberOrZero(boxEl.props.scrollX)
+  childOffsetY -= finiteNumberOrZero(boxEl.props.scrollY)
 
   const asc = getChildrenByZAsc(boxEl)
   for (let k = asc.length - 1; k >= 0; k--) {
@@ -388,8 +385,8 @@ export function getCursorAtPoint(
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null
   if (!layoutBoundsAreFinite(layout)) return null
 
-  const ox = finiteNumber(offsetX)
-  const oy = finiteNumber(offsetY)
+  const ox = finiteNumberOrZero(offsetX)
+  const oy = finiteNumberOrZero(offsetY)
   const absX = ox + layout.x
   const absY = oy + layout.y
 
@@ -412,8 +409,8 @@ export function getCursorAtPoint(
   if (element.kind === 'box') {
     let childOffX = absX
     let childOffY = absY
-    childOffX -= finiteNumber(element.props.scrollX)
-    childOffY -= finiteNumber(element.props.scrollY)
+    childOffX -= finiteNumberOrZero(element.props.scrollX)
+    childOffY -= finiteNumberOrZero(element.props.scrollY)
 
     const asc = getChildrenByZAsc(element)
     for (let k = asc.length - 1; k >= 0; k--) {
