@@ -188,16 +188,27 @@ describe('dispatchHit', () => {
     expect(() => dispatchHit(el, layout, 'onClick', bx, 25)).not.toThrow()
     expect(dispatchHit(el, layout, 'onClick', bx, 25).handled).toBe(false)
     expect(dispatchHit(el, layout, 'onClick', 50, bx).handled).toBe(false)
+    const boxed50 = Object(50) as unknown as number
+    const boxed25 = Object(25) as unknown as number
+    expect(() => dispatchHit(el, layout, 'onClick', boxed50, 25)).not.toThrow()
+    expect(dispatchHit(el, layout, 'onClick', boxed50, 25).handled).toBe(false)
+    expect(dispatchHit(el, layout, 'onClick', 50, boxed25).handled).toBe(false)
     expect(fired).toBe(false)
 
     expect(() => hitPathAtPoint(el, layout, str50, 25)).not.toThrow()
     expect(hitPathAtPoint(el, layout, str50, 25)).toBeNull()
     expect(hitPathAtPoint(el, layout, 50, bx)).toBeNull()
+    expect(() => hitPathAtPoint(el, layout, boxed50, 25)).not.toThrow()
+    expect(hitPathAtPoint(el, layout, boxed50, 25)).toBeNull()
+    expect(hitPathAtPoint(el, layout, 50, boxed25)).toBeNull()
     expect(hasInteractiveHitAtPoint(el, layout, str50, 25)).toBe(false)
     expect(hasInteractiveHitAtPoint(el, layout, bx, 25)).toBe(false)
+    expect(hasInteractiveHitAtPoint(el, layout, boxed50, 25)).toBe(false)
     expect(() => getCursorAtPoint(el, layout, str50, 25)).not.toThrow()
     expect(getCursorAtPoint(el, layout, str50, 25)).toBeNull()
     expect(getCursorAtPoint(el, layout, 50, bx)).toBeNull()
+    expect(getCursorAtPoint(el, layout, boxed50, 25)).toBeNull()
+    expect(getCursorAtPoint(el, layout, 50, boxed25)).toBeNull()
   })
 
   it('non-finite layout bounds (NaN or ±Infinity) are a miss for dispatch and hit queries', () => {
