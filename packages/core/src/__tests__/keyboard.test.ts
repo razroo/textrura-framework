@@ -139,6 +139,50 @@ describe('dispatchKeyboardEvent', () => {
     expect(focusedElement.peek()).toBeNull()
   })
 
+  it('non-Tab keydown returns false when focus is unset even if a focusable box exists', () => {
+    let pressed = ''
+    const tree = box({ onKeyDown: e => { pressed = e.key } }, [])
+    const layout = { x: 0, y: 0, width: 200, height: 100, children: [] }
+    const handled = dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'a',
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    expect(handled).toBe(false)
+    expect(pressed).toBe('')
+    expect(focusedElement.peek()).toBeNull()
+  })
+
+  it('Tab keydown does not traverse when key is not the primitive Tab string (strict equality)', () => {
+    const tree = box({}, [
+      box({ onClick: () => undefined }, []),
+      box({ onClick: () => undefined }, []),
+    ])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 100, height: 100, children: [] },
+        { x: 120, y: 0, width: 100, height: 100, children: [] },
+      ],
+    }
+    const handled = dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: Object('Tab') as never,
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    expect(handled).toBe(false)
+    expect(focusedElement.peek()).toBeNull()
+  })
+
   it('tab focuses composition-only targets and advances between them (IME without click/key handlers)', () => {
     const first = box({ onCompositionStart: () => undefined }, [])
     const second = box({ onCompositionEnd: () => undefined }, [])
