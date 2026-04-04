@@ -57,6 +57,12 @@ describe('direction model', () => {
     expect(resolveDirectionValue('auto', '' as never)).toBe('ltr')
     expect(resolveDirectionValue(undefined, 0 as never)).toBe('ltr')
     expect(resolveDirectionValue('auto', null as never)).toBe('ltr')
+    expect(resolveDirectionValue(undefined, Number.NaN as never)).toBe('ltr')
+    expect(resolveDirectionValue('auto', Number.POSITIVE_INFINITY as never)).toBe('ltr')
+    expect(resolveDirectionValue(undefined, Number.NEGATIVE_INFINITY as never)).toBe('ltr')
+    const autoEl = box({ width: 1, height: 1, dir: 'auto' })
+    expect(resolveElementDirection(autoEl, Number.NaN as never)).toBe('ltr')
+    expect(resolveElementDirection(autoEl, Number.POSITIVE_INFINITY as never)).toBe('ltr')
     // Explicit dir still wins even if parent is garbage
     expect(resolveDirectionValue('rtl', 'nope' as never)).toBe('rtl')
   })
