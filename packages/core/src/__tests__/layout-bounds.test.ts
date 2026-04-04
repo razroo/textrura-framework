@@ -267,6 +267,9 @@ describe('finiteNumberOrZero', () => {
 
     expect(finiteNumberOrZero(Object(0) as unknown as number)).toBe(0)
     expect(finiteNumberOrZero(Object(3.5) as unknown as number)).toBe(0)
+    expect(finiteNumberOrZero(Object(NaN) as unknown as number)).toBe(0)
+    expect(finiteNumberOrZero(Object(Number.POSITIVE_INFINITY) as unknown as number)).toBe(0)
+    expect(finiteNumberOrZero(Object(Number.NEGATIVE_INFINITY) as unknown as number)).toBe(0)
 
     const d = new Date(0) as unknown as number
     expect(() => finiteNumberOrZero(d)).not.toThrow()
