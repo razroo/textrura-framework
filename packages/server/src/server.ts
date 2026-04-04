@@ -86,6 +86,13 @@ export interface TexturaServer {
   close(): void
 }
 
+/**
+ * Whether outbound sends to a client should be deferred because `WebSocket.bufferedAmount`
+ * already exceeds the configured backpressure ceiling. Uses strict `>` so equality does not defer.
+ *
+ * @param bufferedAmount — Bytes queued for the socket (from the runtime).
+ * @param backpressureBytes — Defer when `bufferedAmount` is greater than this value.
+ */
 export function shouldDeferClientSend(
   bufferedAmount: number,
   backpressureBytes: number,
