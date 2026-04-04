@@ -2183,6 +2183,39 @@ describe('getCursorAtPoint', () => {
     expect(getCursorAtPoint(parent, layout, 20, 20)).toBe('pointer')
   })
 
+  it('treats empty-string cursor on a nested text leaf as unset so an ancestor box cursor wins', () => {
+    const leaf = text({
+      text: 'hi',
+      font: '16px sans-serif',
+      lineHeight: 20,
+      width: 40,
+      height: 40,
+      cursor: '',
+    })
+    const parent = box({ width: 100, height: 100, cursor: 'pointer' }, [leaf])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+    expect(getCursorAtPoint(parent, layout, 20, 20)).toBe('pointer')
+  })
+
+  it('treats empty-string cursor on a nested image leaf as unset so an ancestor box cursor wins', () => {
+    const leaf = image({ src: 'x.png', width: 40, height: 40, cursor: '' })
+    const parent = box({ width: 100, height: 100, cursor: 'grab' }, [leaf])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+    expect(getCursorAtPoint(parent, layout, 20, 20)).toBe('grab')
+  })
+
   it('empty-string cursor on a deep chain falls through to the first non-empty ancestor', () => {
     const leaf = box({ width: 20, height: 20, cursor: '' })
     const mid = box({ width: 50, height: 50, cursor: '' }, [leaf])
