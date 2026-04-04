@@ -490,6 +490,26 @@ describe('createApp layout timing', () => {
     }
   })
 
+  it('clamps negative layout deltas to 0 when performance.now uses negative finite values (hostile polyfill)', async () => {
+    let step = 0
+    const spy = vi.spyOn(performance, 'now').mockImplementation(() => {
+      step++
+      return step === 1 ? -50 : -100
+    })
+    try {
+      const setFrameTimings = vi.fn()
+      const renderer: Renderer = {
+        setFrameTimings,
+        render: vi.fn(),
+        destroy: vi.fn(),
+      }
+      await createApp(() => box({ width: 40, height: 20 }, []), renderer, { width: 100, height: 50 })
+      expect(setFrameTimings).toHaveBeenCalledWith({ layoutMs: 0 })
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
   it('clamps negative or non-finite layout deltas to 0 for setFrameTimings', async () => {
     const mkRenderer = (): Renderer => ({
       setFrameTimings: vi.fn(),
