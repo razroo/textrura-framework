@@ -4,7 +4,7 @@ import { box, image, scene3d, text } from '../elements.js'
 import { clearFocus, focusedElement } from '../focus.js'
 import { layoutBoundsAreFinite } from '../layout-bounds.js'
 import { signal } from '../signals.js'
-import type { Renderer } from '../types.js'
+import type { HitEvent, Renderer } from '../types.js'
 
 describe('createApp layout direction (Textura computeLayout)', () => {
   it('passes resolved root dir:rtl into layout so flex rows mirror child order', async () => {
@@ -653,6 +653,37 @@ describe('createApp dispatch guards', () => {
     fired = false
     expect(app.dispatch('onClick', 70, 30)).toBe(false)
     expect(fired).toBe(false)
+  })
+
+  it('forwards optional extra fields to dispatchHit (shallow-merged onto HitEvent)', async () => {
+    let received: HitEvent | null = null
+    const renderer: Renderer = {
+      render: vi.fn(),
+      destroy: vi.fn(),
+    }
+    const child = box({
+      width: 40,
+      height: 40,
+      onPointerDown: e => {
+        received = e
+      },
+    })
+    const app = await createApp(() => box({ width: 100, height: 100 }, [child]), renderer, {
+      width: 200,
+      height: 200,
+    })
+
+    expect(app.dispatch('onPointerDown', 20, 20, { button: 2, shiftKey: true })).toBe(true)
+    expect(received).not.toBeNull()
+    expect(received!.x).toBe(20)
+    expect(received!.y).toBe(20)
+    expect(received!.localX).toBe(20)
+    expect(received!.localY).toBe(20)
+    const withExtras = received as HitEvent & { button?: number; shiftKey?: boolean }
+    expect(withExtras.button).toBe(2)
+    expect(withExtras.shiftKey).toBe(true)
+
+    app.destroy()
   })
 
   it('treats non-finite and non-number dispatch offsets like dispatchHit (finiteNumber)', async () => {
