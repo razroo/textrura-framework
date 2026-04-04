@@ -31,6 +31,8 @@ export class Scene3dManager {
   private sceneGroup = new THREE.Group()
   private orbitControls: import('three/examples/jsm/controls/OrbitControls.js').OrbitControls | null = null
   private orbitControlsModule: typeof import('three/examples/jsm/controls/OrbitControls.js') | null = null
+  private cameraInitialized = false
+  private lastCameraTarget: [number, number, number] | undefined
 
   constructor(
     readonly scene: THREE.Scene,
@@ -42,6 +44,8 @@ export class Scene3dManager {
   /**
    * Reconcile the live Three.js scene with the given element's props.
    * Creates, updates, or removes objects as needed.
+   * Camera position/target are applied on the first call; subsequent calls update
+   * orbit controls target but leave camera position to user interaction.
    */
   sync(element: Scene3dElement, canvas?: HTMLCanvasElement): void {
     const { objects, background, fov, near, far, cameraPosition, cameraTarget, orbitControls } =
@@ -52,7 +56,7 @@ export class Scene3dManager {
       this.scene.background = new THREE.Color(background)
     }
 
-    // Update camera
+    // Update camera projection (always safe to update)
     if (fov !== undefined && fov > 0 && fov < 180) {
       this.camera.fov = fov
     }
@@ -62,16 +66,35 @@ export class Scene3dManager {
     if (far !== undefined && far > this.camera.near) {
       this.camera.far = far
     }
-    if (cameraPosition) {
-      this.camera.position.set(cameraPosition[0], cameraPosition[1], cameraPosition[2])
-    }
     this.camera.updateProjectionMatrix()
+
+    // Set camera position only on first sync (subsequent frames: orbit controls owns it)
+    if (!this.cameraInitialized) {
+      if (cameraPosition) {
+        this.camera.position.set(cameraPosition[0], cameraPosition[1], cameraPosition[2])
+      }
+      if (cameraTarget) {
+        this.camera.lookAt(cameraTarget[0], cameraTarget[1], cameraTarget[2])
+      }
+      this.cameraInitialized = true
+    }
+
+    // Track the latest target for orbit controls
     if (cameraTarget) {
-      this.camera.lookAt(cameraTarget[0], cameraTarget[1], cameraTarget[2])
+      this.lastCameraTarget = cameraTarget
     }
 
     // Orbit controls
     this.syncOrbitControls(orbitControls, canvas)
+
+    // Update orbit controls target to track the scene center
+    if (this.orbitControls && this.lastCameraTarget) {
+      this.orbitControls.target.set(
+        this.lastCameraTarget[0],
+        this.lastCameraTarget[1],
+        this.lastCameraTarget[2],
+      )
+    }
 
     // Reconcile objects
     this.reconcileObjects(objects)
