@@ -285,6 +285,37 @@ describe('collectTextNodes', () => {
     expect(results).toHaveLength(1)
     expect(results[0].element.props.text).toBe('Good')
   })
+
+  it('skips a corrupt nested text under a middle box but still collects later siblings (document order)', () => {
+    const el = box({ width: 200, height: 120 }, [
+      text({ text: 'Before', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
+      box({ width: 100, height: 40 }, [
+        text({ text: 'Broken', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
+      ]),
+      text({ text: 'After', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
+    ])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 120,
+      children: [
+        { x: 0, y: 0, width: 100, height: 18, children: [] },
+        {
+          x: 0,
+          y: 20,
+          width: 100,
+          height: 40,
+          children: [{ x: 0, y: 0, width: Number.NaN, height: 18, children: [] }],
+        },
+        { x: 0, y: 62, width: 100, height: 18, children: [] },
+      ],
+    }
+    const results: TextNodeInfo[] = []
+    collectTextNodes(el, layout, 0, 0, results)
+    expect(results.map(n => n.element.props.text)).toEqual(['Before', 'After'])
+    expect(results.map(n => n.index)).toEqual([0, 1])
+  })
 })
 
 describe('getSelectedText', () => {
