@@ -368,7 +368,8 @@ export function spring(
 
 /**
  * Run a raw animation loop. The callback receives delta time in seconds.
- * Return `false` from the callback to stop. Returns a stop function.
+ * Return `false` from the callback to stop. Returns a stop function that is safe
+ * to call multiple times (only the first call cancels a pending frame).
  */
 export function animationLoop(callback: (dt: number) => boolean): () => void {
   let lastTime = Date.now()
@@ -388,5 +389,9 @@ export function animationLoop(callback: (dt: number) => boolean): () => void {
   }
 
   id = raf(tick) as unknown as number
-  return () => { running = false; cancelRaf(id) }
+  return () => {
+    if (!running) return
+    running = false
+    cancelRaf(id)
+  }
 }

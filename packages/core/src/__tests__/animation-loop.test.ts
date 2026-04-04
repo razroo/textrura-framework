@@ -107,4 +107,57 @@ describe('animationLoop', () => {
 
     expect(count).toBe(1)
   })
+
+  it('stop() is idempotent: repeated calls cancel at most once', async () => {
+    const pending: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      pending.push(cb)
+      return pending.length
+    })
+    const cancel = vi.fn()
+    vi.stubGlobal('cancelAnimationFrame', cancel)
+
+    let mockNow = 0
+    vi.spyOn(Date, 'now').mockImplementation(() => mockNow)
+
+    const animationLoop = await loadAnimationLoop()
+    const stop = animationLoop(() => {
+      mockNow += 16
+      return true
+    })
+
+    expect(pending).toHaveLength(1)
+    stop()
+    stop()
+    expect(cancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('stop() after the callback returned false is a no-op (no extra cancelAnimationFrame)', async () => {
+    const pending: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      pending.push(cb)
+      return pending.length
+    })
+    const cancel = vi.fn()
+    vi.stubGlobal('cancelAnimationFrame', cancel)
+
+    let mockNow = 0
+    vi.spyOn(Date, 'now').mockImplementation(() => mockNow)
+
+    const animationLoop = await loadAnimationLoop()
+    let frames = 0
+    const stop = animationLoop(() => {
+      frames++
+      mockNow += 16
+      return false
+    })
+
+    expect(pending).toHaveLength(1)
+    pending.shift()!(0)
+    expect(frames).toBe(1)
+    expect(pending).toHaveLength(0)
+
+    stop()
+    expect(cancel).not.toHaveBeenCalled()
+  })
 })
