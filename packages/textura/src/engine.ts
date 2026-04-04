@@ -292,7 +292,16 @@ export interface ComputeOptions {
   width?: number
   /** Available height for the root container. Default: unconstrained. */
   height?: number
-  /** Text direction. Default: 'ltr'. */
+  /**
+   * Yoga **root** layout direction (`Direction` passed to `calculateLayout`). This affects row main-axis
+   * order, `flex-start` / `flex-end`, and related inline-axis resolution for the subtree Yoga lays out.
+   *
+   * Textura does not yet read per-node direction from {@link LayoutNode} (that remains application-level
+   * in Geometra for text, selection, and focus). Pass the same document direction you use for flex layout;
+   * Geometra’s `createApp` maps `AppOptions.layoutDirection` or the root element’s resolved `dir` here.
+   *
+   * Default: `'ltr'`.
+   */
   direction?: 'ltr' | 'rtl'
 }
 
@@ -301,6 +310,10 @@ export interface ComputeOptions {
  *
  * Builds a Yoga node tree, wires Pretext text measurement into leaf nodes,
  * runs Yoga's flexbox algorithm, and returns the computed positions and sizes.
+ *
+ * Layout direction is a single root option ({@link ComputeOptions.direction}); nested `dir` on a host
+ * tree is not applied inside this call unless the host strips or maps it into flex props before building
+ * {@link LayoutNode} values.
  */
 export function computeLayout(
   tree: LayoutNode,
