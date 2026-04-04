@@ -429,6 +429,24 @@ describe('resolveFocusedTarget', () => {
     expect(resolveFocusedTarget(root, badLayout)).toBeNull()
   })
 
+  it('returns null for corrupt root layout without clearing focusedElement (stale target preserved for retry)', () => {
+    const el = box({ width: 10, height: 10, onClick: () => {} })
+    setFocus(el, makeLayout({ width: 10, height: 10 }))
+    const before = focusedElement.peek()
+
+    const root = box({ width: 10, height: 10, onClick: () => {} })
+    const badLayout = {
+      x: Number.NaN,
+      y: 0,
+      width: 10,
+      height: 10,
+      children: [],
+    } as ComputedLayout
+
+    expect(resolveFocusedTarget(root, badLayout)).toBeNull()
+    expect(focusedElement.peek()).toBe(before)
+  })
+
   it('resolves by element identity when same reference persists', () => {
     const btn = box({ width: 50, height: 30, onClick: () => {} })
     const root = box({ width: 200, height: 100 }, [btn])
