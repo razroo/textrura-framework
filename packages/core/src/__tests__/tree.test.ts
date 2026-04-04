@@ -108,9 +108,31 @@ describe('toLayoutTree', () => {
       'boxShadow',
       'gradient',
       'dir',
+      'selectable',
     ] as const) {
       expect(layout).not.toHaveProperty(k)
     }
+  })
+
+  it('strips selectable from box, image, and scene3d when the key appears on props (e.g. corrupt serialization)', () => {
+    const b = box({ width: 10, height: 10, selectable: true } as unknown as Parameters<typeof box>[0])
+    expect(toLayoutTree(b)).not.toHaveProperty('selectable')
+
+    const img = image({
+      src: 'x.png',
+      width: 8,
+      height: 8,
+      selectable: false,
+    } as unknown as Parameters<typeof image>[0])
+    expect(toLayoutTree(img)).not.toHaveProperty('selectable')
+
+    const sc = scene3d({
+      width: 16,
+      height: 16,
+      objects: [sphere({ radius: 1 })],
+      selectable: true,
+    } as unknown as Parameters<typeof scene3d>[0])
+    expect(toLayoutTree(sc)).not.toHaveProperty('selectable')
   })
 
   it('preserves flexDirection, padding, gap', () => {
@@ -194,6 +216,7 @@ describe('toLayoutTree', () => {
       'boxShadow',
       'gradient',
       'dir',
+      'selectable',
     ] as const) {
       expect(layout).not.toHaveProperty(k)
     }
