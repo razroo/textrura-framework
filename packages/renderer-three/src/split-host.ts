@@ -61,6 +61,19 @@ export interface ThreeGeometraSplitHostOptions
    * If this callback throws, the host is fully torn down and the error is rethrown (same as {@link onThreeReady}).
    */
   onThreeFrame?: (ctx: ThreeFrameContext) => void | false
+  /**
+   * WebSocket URL for a transparent Geometra overlay canvas on the Three.js panel.
+   * When set, a second canvas is absolutely positioned over the Three.js panel and connected
+   * to this URL. Use for HUD elements (pills, labels, info panels) rendered by a separate
+   * Geometra server view.
+   */
+  overlayUrl?: string
+  /** Renderer options for the overlay canvas. Default: transparent background. */
+  overlayRendererOptions?: Record<string, unknown>
+  /** CSS pointer-events for the overlay. Default: ‘none’ (click-through). */
+  overlayPointerEvents?: string
+  /** Binary framing for the overlay WebSocket. Default: same as main client. */
+  overlayBinaryFraming?: boolean
 }
 
 export interface ThreeRuntimeContext {
@@ -84,16 +97,20 @@ export interface ThreeGeometraSplitHostHandle {
   geometraPanel: HTMLDivElement
   threeCanvas: HTMLCanvasElement
   geometraCanvas: HTMLCanvasElement
+  /** Overlay canvas on the Three.js panel (present when `overlayUrl` was provided). */
+  overlayCanvas?: HTMLCanvasElement
   renderer: THREE.WebGLRenderer
   scene: THREE.Scene
   camera: THREE.PerspectiveCamera
   clock: THREE.Clock
   geometra: BrowserCanvasClientHandle
+  /** Overlay Geometra client (present when `overlayUrl` was provided). */
+  overlay?: BrowserCanvasClientHandle
   /**
    * Stops the render loop, tears down WebGL via {@link disposeGeometraThreeWebGLWithSceneBasics} (clock stop +
    * the same renderer registration headless {@link renderGeometraThreeWebGLWithSceneBasicsFrame} /
    * {@link tickGeometraThreeWebGLWithSceneBasicsFrame} use to skip draws after dispose), disconnects observers,
-   * and tears down the Geometra client.
+   * and tears down the Geometra client and overlay.
    */
   destroy(): void
 }
@@ -151,6 +168,10 @@ export function createThreeGeometraSplitHost(
     cameraPosition = GEOMETRA_THREE_HOST_SCENE_DEFAULTS.cameraPosition,
     onThreeReady,
     onThreeFrame,
+    overlayUrl,
+    overlayRendererOptions,
+    overlayPointerEvents = 'none',
+    overlayBinaryFraming,
     window: providedWindow,
     ...browserOptions
   } = options
@@ -192,6 +213,21 @@ export function createThreeGeometraSplitHost(
   const threeCanvas = doc.createElement('canvas')
   fullSizeCanvas(threeCanvas)
   threePanel.appendChild(threeCanvas)
+
+  // Overlay canvas on the Three.js panel (optional)
+  let overlayCanvasEl: HTMLCanvasElement | undefined
+  if (overlayUrl) {
+    overlayCanvasEl = doc.createElement('canvas')
+    overlayCanvasEl.style.display = 'block'
+    overlayCanvasEl.style.position = 'absolute'
+    overlayCanvasEl.style.left = '0'
+    overlayCanvasEl.style.top = '0'
+    overlayCanvasEl.style.width = '100%'
+    overlayCanvasEl.style.height = '100%'
+    overlayCanvasEl.style.pointerEvents = overlayPointerEvents
+    overlayCanvasEl.style.zIndex = '1'
+    threePanel.appendChild(overlayCanvasEl)
+  }
 
   const geometraCanvas = doc.createElement('canvas')
   fullSizeCanvas(geometraCanvas)
@@ -251,6 +287,30 @@ export function createThreeGeometraSplitHost(
     }
   })()
 
+  // Overlay Geometra client (optional)
+  let overlayHandle: BrowserCanvasClientHandle | undefined
+  if (overlayUrl && overlayCanvasEl) {
+    try {
+      overlayHandle = createBrowserCanvasClient({
+        url: overlayUrl,
+        binaryFraming: overlayBinaryFraming ?? browserOptions.binaryFraming,
+        canvas: overlayCanvasEl,
+        window: win,
+        rendererOptions: {
+          background: 'transparent',
+          ...(overlayRendererOptions as object),
+        },
+      })
+    } catch (err) {
+      layoutSync.cancel()
+      win.removeEventListener('resize', onWindowResize)
+      geometraHandle.destroy()
+      disposeGeometraThreeWebGLWithSceneBasics({ renderer: glRenderer, clock })
+      root.remove()
+      throw err
+    }
+  }
+
   const roContainer = new ResizeObserver(() => {
     layoutSync.schedule(true)
   })
@@ -270,6 +330,7 @@ export function createThreeGeometraSplitHost(
     layoutSync.cancel()
     win.removeEventListener('resize', onWindowResize)
     roContainer.disconnect()
+    overlayHandle?.destroy()
     geometraHandle.destroy()
     disposeGeometraThreeWebGLWithSceneBasics({ renderer: glRenderer, clock })
     root.remove()
@@ -317,11 +378,13 @@ export function createThreeGeometraSplitHost(
     geometraPanel,
     threeCanvas,
     geometraCanvas,
+    overlayCanvas: overlayCanvasEl,
     renderer: glRenderer,
     scene,
     camera,
     clock,
     geometra: geometraHandle,
+    overlay: overlayHandle,
     destroy,
   }
 }

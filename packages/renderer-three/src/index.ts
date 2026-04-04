@@ -138,6 +138,13 @@ export {
  * The runtime value is **`geom.tracker.snapshot`**; `npm run release:gate` asserts it still matches
  * the installed `@geometra/client` package.
  */
+export {
+  createThreeGeometraPageHost,
+  type GeometraPageSection,
+  type ThreeGeometraPageHostOptions,
+  type ThreeGeometraPageHostHandle,
+} from './page-host.js'
+
 export { GEOM_DATA_CHANNEL_TRACKER_SNAPSHOT } from '@geometra/client'
 
 export { Scene3dManager } from './scene3d-manager.js'
