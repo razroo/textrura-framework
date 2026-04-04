@@ -231,6 +231,11 @@ describe('finiteNumberOrZero', () => {
     expect(finiteNumberOrZero(Number.MAX_VALUE)).toBe(Number.MAX_VALUE)
   })
 
+  it('preserves IEEE negative zero (finite; scroll/sign math must not collapse -0 to +0)', () => {
+    expect(1 / finiteNumberOrZero(-0)).toBe(-Infinity)
+    expect(Object.is(finiteNumberOrZero(-0), -0)).toBe(true)
+  })
+
   it('maps NaN, ±Infinity, and non-numbers to 0 without throwing', () => {
     expect(finiteNumberOrZero(Number.NaN)).toBe(0)
     expect(finiteNumberOrZero(Number.POSITIVE_INFINITY)).toBe(0)
