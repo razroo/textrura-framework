@@ -264,6 +264,29 @@ describe('animation timeline', () => {
     expect(props.values.y.peek()).toBe(1)
   })
 
+  it('normalizes non-finite to() targets so step() never produces NaN', () => {
+    const timeline = createTweenTimeline(0)
+    timeline.to(Number.NaN, 100, easing.linear)
+    expect(timeline.step(50)).toBe(0)
+    expect(timeline.value.peek()).toBe(0)
+    expect(Number.isNaN(timeline.value.peek())).toBe(false)
+    expect(timeline.step(50)).toBe(0)
+    expect(timeline.state()).toBe('finished')
+
+    const fromTen = createTweenTimeline(10)
+    fromTen.to(Number.POSITIVE_INFINITY, 100, easing.linear)
+    expect(fromTen.step(50)).toBe(5)
+    expect(Number.isFinite(fromTen.value.peek())).toBe(true)
+
+    const props = createPropertyTimeline({ x: 0 })
+    props.to({ x: Number.NaN }, 200, easing.linear)
+    expect(props.step(100).x).toBe(0)
+    expect(props.values.x.peek()).toBe(0)
+    expect(Number.isNaN(props.values.x.peek())).toBe(false)
+    props.step(100)
+    expect(props.state()).toBe('finished')
+  })
+
   it('steps deterministically to completion', () => {
     const timeline = createTweenTimeline(0)
     timeline.to(100, 1000, easing.linear)

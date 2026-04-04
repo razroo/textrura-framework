@@ -28,7 +28,7 @@ export type TweenPlaybackState = 'idle' | 'running' | 'paused' | 'finished' | 'c
 
 export interface TweenTimeline {
   value: Signal<number>
-  /** Schedule/interrupt toward a new target. */
+  /** Schedule/interrupt toward a new target (non-finite values normalize to `0`, same as the initial value). */
   to(to: number, durationMs: number, easingFn?: EasingFn): void
   /**
    * Deterministically advance the timeline by up to `deltaMs` ms (finite values clamped to `>= 0`).
@@ -116,6 +116,8 @@ export function transition(
  * matching {@link transition} so corrupt or serialized values never leave `step()` dividing by NaN.
  *
  * Non-finite `initialValue` normalizes to `0` so a corrupt starting pose cannot freeze timelines in NaN.
+ * {@link TweenTimeline.to} applies the same normalization to targets so corrupt or serialized goal values
+ * cannot poison `step()` interpolation.
  *
  * {@link TweenTimeline.step} uses the same finite guard for `deltaMs` so a bad frame clock (NaN/±Infinity)
  * cannot poison internal elapsed time.
@@ -131,10 +133,11 @@ export function createTweenTimeline(initialValue: number): TweenTimeline {
   let playbackState: TweenPlaybackState = 'idle'
 
   function toTarget(nextTo: number, durationMs: number, nextEasing: EasingFn = easing.easeInOut): void {
+    const target = finiteNumberOrZero(nextTo)
     if (getMotionPreference() === 'reduced') {
-      value.set(nextTo)
-      from = nextTo
-      to = nextTo
+      value.set(target)
+      from = target
+      to = target
       elapsed = 0
       duration = 1
       easingFn = nextEasing
@@ -142,9 +145,9 @@ export function createTweenTimeline(initialValue: number): TweenTimeline {
       return
     }
     if (!Number.isFinite(durationMs)) {
-      value.set(nextTo)
-      from = nextTo
-      to = nextTo
+      value.set(target)
+      from = target
+      to = target
       elapsed = 0
       duration = 1
       easingFn = nextEasing
@@ -152,7 +155,7 @@ export function createTweenTimeline(initialValue: number): TweenTimeline {
       return
     }
     from = value.peek()
-    to = nextTo
+    to = target
     elapsed = 0
     duration = Math.max(1, durationMs)
     easingFn = nextEasing
@@ -199,7 +202,8 @@ export function createTweenTimeline(initialValue: number): TweenTimeline {
 /**
  * Multi-property deterministic timeline for geometry/paint numeric fields.
  * Typical usage includes x/y/width/height/opacity style numeric transitions.
- * Per-key initial values use the same non-finite normalization as {@link createTweenTimeline}.
+ * Per-key initial values and {@link PropertyTimeline.to} targets use the same non-finite normalization
+ * as {@link createTweenTimeline} (via each key's timeline).
  */
 export function createPropertyTimeline(initialValues: Record<string, number>): PropertyTimeline {
   const timelines = new Map<string, TweenTimeline>()
