@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { decodeBinaryFrameJson, encodeBinaryFrameJson, isBinaryFrameBuffer } from '../binary-frame.js'
+import {
+  decodeBinaryFrameJson,
+  encodeBinaryFrameJson,
+  isBinaryFrameBuffer,
+  MAX_V1_PAYLOAD_BYTES,
+} from '../binary-frame.js'
 
 /** v1 envelope with arbitrary bytes (including invalid UTF-8 for decode policy tests). */
 function encodeBinaryFrameRawV1(payload: Uint8Array): Buffer {
@@ -34,6 +39,10 @@ describe('isBinaryFrameBuffer', () => {
 describe('binary frame envelope', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('exposes the v1 uint32 payload cap (aligned with @geometra/client MAX_V1_PAYLOAD_BYTES)', () => {
+    expect(MAX_V1_PAYLOAD_BYTES).toBe(0xffff_ffff)
   })
 
   it('encode throws RangeError when payload byte length exceeds uint32 (no silent header truncation)', () => {
