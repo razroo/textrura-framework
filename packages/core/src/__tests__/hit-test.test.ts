@@ -1803,6 +1803,24 @@ describe('dispatchHit', () => {
     expect(result.focusTarget).toBeUndefined()
   })
 
+  it('onPointerUp, onPointerMove, and onWheel: no focusTarget when target is focusable (click-only routing)', () => {
+    const el = box({
+      width: 100,
+      height: 50,
+      onPointerUp: () => undefined,
+      onPointerMove: () => undefined,
+      onWheel: () => undefined,
+      onKeyDown: () => undefined,
+    })
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] as const }
+
+    for (const eventType of ['onPointerUp', 'onPointerMove', 'onWheel'] as const) {
+      const result = dispatchHit(el, layout, eventType, 50, 25)
+      expect(result.handled).toBe(true)
+      expect(result.focusTarget, eventType).toBeUndefined()
+    }
+  })
+
   it('nested boxes: both onClick — focus target is the deepest handler', () => {
     const child = box({ width: 40, height: 40, onClick: () => undefined })
     const parent = box({ width: 100, height: 100, onClick: () => undefined }, [child])
