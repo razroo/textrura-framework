@@ -1,4 +1,5 @@
 import { afterEach, describe, it, expect, vi } from 'vitest'
+import * as textura from 'textura'
 import { createApp } from '../app.js'
 import { box, image, scene3d, text } from '../elements.js'
 import { clearFocus, focusedElement } from '../focus.js'
@@ -1030,7 +1031,7 @@ describe('createApp onError', () => {
       destroy: vi.fn(),
     }
 
-    await createApp(() => box({ width: 10, height: 10 }, []), renderer, {
+    const app = await createApp(() => box({ width: 10, height: 10 }, []), renderer, {
       width: 100,
       height: 50,
       onError,
@@ -1040,6 +1041,71 @@ describe('createApp onError', () => {
     expect(onError).toHaveBeenCalledWith(err)
     expect(setFrameTimings).toHaveBeenCalledTimes(1)
     expect(setFrameTimings).toHaveBeenCalledWith({ layoutMs: expect.any(Number) })
+    expect(app.tree).toBeNull()
+    expect(app.layout).toBeNull()
+  })
+
+  it('keeps the last committed tree and layout when render throws during a reactive update', async () => {
+    const onError = vi.fn()
+    let paintCount = 0
+    const width = signal(40)
+    const renderer: Renderer = {
+      render: vi.fn((_layout, tree) => {
+        paintCount++
+        if (paintCount > 1) throw new Error('second paint failed')
+        expect((tree.props as { width: number }).width).toBe(40)
+      }),
+      destroy: vi.fn(),
+    }
+
+    const app = await createApp(() => box({ width: width.value, height: 20 }, []), renderer, {
+      width: 100,
+      height: 50,
+      onError,
+    })
+
+    expect(paintCount).toBe(1)
+    expect((app.tree!.props as { width: number }).width).toBe(40)
+
+    width.set(44)
+    expect(paintCount).toBe(2)
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect((app.tree!.props as { width: number }).width).toBe(40)
+    expect(app.layout).not.toBeNull()
+  })
+
+  it('keeps the last committed tree and layout when computeLayout throws during a reactive update', async () => {
+    const onError = vi.fn()
+    const width = signal(40)
+    const orig = textura.computeLayout.bind(textura)
+    let layoutCalls = 0
+    const spy = vi.spyOn(textura, 'computeLayout').mockImplementation((tree, opts) => {
+      layoutCalls++
+      if (layoutCalls > 1) throw new Error('layout boom')
+      return orig(tree, opts)
+    })
+    try {
+      const renderer: Renderer = {
+        render: vi.fn(),
+        destroy: vi.fn(),
+      }
+      const app = await createApp(() => box({ width: width.value, height: 20 }, []), renderer, {
+        width: 100,
+        height: 50,
+        onError,
+      })
+      expect(layoutCalls).toBe(1)
+      expect(renderer.render).toHaveBeenCalledTimes(1)
+      expect((app.tree!.props as { width: number }).width).toBe(40)
+
+      width.set(44)
+      expect(layoutCalls).toBe(2)
+      expect(onError).toHaveBeenCalledTimes(1)
+      expect(renderer.render).toHaveBeenCalledTimes(1)
+      expect((app.tree!.props as { width: number }).width).toBe(40)
+    } finally {
+      spy.mockRestore()
+    }
   })
 
   it('allows a later manual update after the view first throws', async () => {

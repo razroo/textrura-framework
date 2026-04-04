@@ -132,6 +132,9 @@ export interface App {
  * After each successful `computeLayout`, optional {@link Renderer.setFrameTimings} is invoked with
  * `{ layoutMs }` (non-negative wall milliseconds from a guarded `performance.now()` when usable, otherwise `0`)
  * immediately before `render`, so hosts can split Yoga/layout time from paint.
+ *
+ * `tree` and `layout` are assigned together only after `render` completes so a failed frame never leaves
+ * a new element tree paired with a stale layout (or layout without a matching paint).
  */
 export async function createApp(
   view: () => UIElement,
@@ -162,20 +165,22 @@ export async function createApp(
     tree: null,
     update() {
       try {
-        app.tree = view()
-        const layoutTree = toLayoutTree(app.tree)
-        const direction = resolveComputeLayoutDirection(options.layoutDirection, app.tree)
+        const nextTree = view()
+        const layoutTree = toLayoutTree(nextTree)
+        const direction = resolveComputeLayoutDirection(options.layoutDirection, nextTree)
         const layoutStart = safePerformanceNowMs()
         const computeOpts: ComputeOptions = { direction }
         const rootW = finiteRootExtent(options.width)
         const rootH = finiteRootExtent(options.height)
         if (rootW !== undefined) computeOpts.width = rootW
         if (rootH !== undefined) computeOpts.height = rootH
-        app.layout = computeLayout(layoutTree, computeOpts)
+        const nextLayout = computeLayout(layoutTree, computeOpts)
         const rawLayoutMs = safePerformanceNowMs() - layoutStart
         const layoutMs = Math.max(0, Number.isFinite(rawLayoutMs) ? rawLayoutMs : 0)
         renderer.setFrameTimings?.({ layoutMs })
-        renderer.render(app.layout, app.tree)
+        renderer.render(nextLayout, nextTree)
+        app.tree = nextTree
+        app.layout = nextLayout
       } catch (err) {
         if (options.onError) {
           options.onError(err)
