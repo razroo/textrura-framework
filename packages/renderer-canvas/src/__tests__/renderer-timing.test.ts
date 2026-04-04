@@ -124,6 +124,34 @@ describe('CanvasRenderer.render wall time', () => {
     spy.mockRestore()
   })
 
+  it('records 0 lastRenderWallMs when the second performance.now is non-finite (corrupt clock)', () => {
+    Object.defineProperty(globalThis, 'window', {
+      value: { devicePixelRatio: 1 },
+      configurable: true,
+      writable: true,
+    })
+    const ctx = new FakeCtx()
+    const canvas = {
+      style: {} as Record<string, string>,
+      getContext: () => ctx,
+    } as unknown as HTMLCanvasElement
+
+    let step = 0
+    const spy = vi.spyOn(performance, 'now').mockImplementation(() => {
+      step++
+      return step === 1 ? 100 : Number.NaN
+    })
+
+    const renderer = new CanvasRenderer({ canvas })
+    const tree = box({ width: 10, height: 10 })
+    const layout = { x: 0, y: 0, width: 10, height: 10, children: [] }
+
+    renderer.render(layout, tree)
+
+    expect(renderer.lastRenderWallMs).toBe(0)
+    spy.mockRestore()
+  })
+
   it('records 0 lastRenderWallMs when performance.now does not advance (stable clock)', () => {
     Object.defineProperty(globalThis, 'window', {
       value: { devicePixelRatio: 1 },

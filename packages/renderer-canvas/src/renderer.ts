@@ -271,13 +271,15 @@ export class CanvasRenderer implements Renderer {
       }
     }
     if (this.layoutInspector && !skipOverlays) {
-      const msBeforeHud =
+      const hudRaw =
         typeof performance !== 'undefined' ? performance.now() - frameStart : 0
+      const msBeforeHud = Math.max(0, Number.isFinite(hudRaw) ? hudRaw : 0)
       this.paintLayoutInspectorHud(layout, tree, msBeforeHud)
     }
 
     if (typeof performance !== 'undefined') {
-      this.lastRenderWallMs = performance.now() - frameStart
+      const delta = performance.now() - frameStart
+      this.lastRenderWallMs = Math.max(0, Number.isFinite(delta) ? delta : 0)
     }
 
     ctx.setTransform(1, 0, 0, 1, 0, 0)
