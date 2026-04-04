@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { toSemanticHTML } from '../seo.js'
-import { box, text, image } from '../elements.js'
+import { box, image, scene3d, sphere, text } from '../elements.js'
 
 describe('toSemanticHTML', () => {
   it('generates valid HTML with doctype', () => {
@@ -96,6 +96,50 @@ describe('toSemanticHTML', () => {
       image({ src: '/a.png', width: 10, height: 10, alt: 'x', dir: 'auto' }),
     ])
     expect(toSemanticHTML(el)).toMatch(/<img[^>]*dir="auto"/)
+  })
+
+  it('serializes scene3d as an empty placeholder div (no 3D payload in static HTML)', () => {
+    const el = box({ width: 200, height: 200 }, [
+      scene3d({
+        width: 180,
+        height: 180,
+        objects: [sphere({ position: [0, 0, 0], radius: 1 })],
+      }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toMatch(/<div>\s*<\/div>/)
+    expect(html).not.toContain('sphere')
+    expect(html).not.toContain('position')
+  })
+
+  it('emits scene3d semantic tag, role, aria-label, and dir when provided', () => {
+    const el = box({ width: 200, height: 200 }, [
+      scene3d({
+        width: 180,
+        height: 180,
+        dir: 'ltr',
+        objects: [],
+        semantic: {
+          tag: 'section',
+          role: 'application',
+          ariaLabel: '3D preview',
+        },
+      }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<section dir="ltr" role="application" aria-label="3D preview"></section>')
+  })
+
+  it('omits invalid runtime dir on scene3d (matches box/text guards)', () => {
+    const el = box({ width: 100, height: 100 }, [
+      scene3d({
+        width: 80,
+        height: 80,
+        dir: 'evil" onclick=' as never,
+        objects: [],
+      }),
+    ])
+    expect(toSemanticHTML(el)).not.toMatch(/dir=/)
   })
 
   it('omits dir when props.dir is unset', () => {
