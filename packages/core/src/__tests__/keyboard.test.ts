@@ -123,6 +123,98 @@ describe('dispatchKeyboardEvent', () => {
     expect(back?.element).toBe(first?.element)
   })
 
+  it('Tab keydown uses JavaScript truthiness for shiftKey (undefined acts like forward)', () => {
+    const tree = box({}, [
+      box({ onClick: () => undefined }, []),
+      box({ onClick: () => undefined }, []),
+    ])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 100, height: 100, children: [] },
+        { x: 120, y: 0, width: 100, height: 100, children: [] },
+      ],
+    }
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: undefined as unknown as boolean,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    const first = focusedElement.peek()
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: undefined as unknown as boolean,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    const second = focusedElement.peek()
+
+    expect(first).not.toBeNull()
+    expect(second).not.toBeNull()
+    expect(second?.element).not.toBe(first?.element)
+  })
+
+  it('Tab keydown uses JavaScript truthiness for shiftKey (truthy non-boolean acts like Shift+Tab)', () => {
+    const tree = box({}, [
+      box({ onClick: () => undefined }, []),
+      box({ onClick: () => undefined }, []),
+    ])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 100, height: 100, children: [] },
+        { x: 120, y: 0, width: 100, height: 100, children: [] },
+      ],
+    }
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    const first = focusedElement.peek()
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    const second = focusedElement.peek()
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: 1 as unknown as boolean,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    const afterTruthyShift = focusedElement.peek()
+
+    expect(first).not.toBeNull()
+    expect(second?.element).not.toBe(first?.element)
+    expect(afterTruthyShift?.element).toBe(first?.element)
+  })
+
   it('tab keydown returns true when no focusable targets exist (traversal is a no-op)', () => {
     clearFocus()
     const tree = box({}, [])
