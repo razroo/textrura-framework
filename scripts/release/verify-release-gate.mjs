@@ -13,6 +13,17 @@ async function main() {
     throw new Error('package.json: missing scripts.release:gate string')
   }
 
+  if (!gate.includes('verify-release-gate')) {
+    throw new Error(
+      'release:gate: package.json scripts.release:gate must invoke verify-release-gate (duplicate/missing test path check)',
+    )
+  }
+  if (!gate.includes('test:terminal-input')) {
+    throw new Error(
+      'release:gate: package.json scripts.release:gate must end with test:terminal-input (@geometra/demo-terminal input suite)',
+    )
+  }
+
   const tokens = gate.split(/\s+/).filter(Boolean)
   const paths = tokens.filter(t => t.startsWith('packages/') && t.endsWith('.test.ts'))
 
