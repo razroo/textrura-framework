@@ -3740,4 +3740,42 @@ describe('Yoga-computed row layout and hit routing (document direction)', () => 
     dispatchHit(root, layout, 'onClick', b.x + b.width / 2, cy)
     expect(log).toEqual(['dom-second'])
   })
+
+  it('LTR document: hitPathAtPoint and getCursorAtPoint follow row geometry', () => {
+    const first = box({ width: 50, height: 50, cursor: 'crosshair' })
+    const second = box({ width: 50, height: 50, cursor: 'pointer' })
+    const root = box({ width: 100, height: 50, flexDirection: 'row' }, [first, second])
+    const layout = computeLayout(toLayoutTree(root), { width: 100, height: 50, direction: 'ltr' })
+
+    const a = layout.children[0]!
+    const b = layout.children[1]!
+    expect(a.x).toBeLessThan(b.x)
+    const cy = a.y + a.height / 2
+    const ax = a.x + a.width / 2
+    const bx = b.x + b.width / 2
+
+    expect(hitPathAtPoint(root, layout, ax, cy)).toEqual([0])
+    expect(getCursorAtPoint(root, layout, ax, cy)).toBe('crosshair')
+    expect(hitPathAtPoint(root, layout, bx, cy)).toEqual([1])
+    expect(getCursorAtPoint(root, layout, bx, cy)).toBe('pointer')
+  })
+
+  it('RTL document: hitPathAtPoint and getCursorAtPoint follow mirrored row geometry', () => {
+    const first = box({ width: 50, height: 50, cursor: 'crosshair' })
+    const second = box({ width: 50, height: 50, cursor: 'pointer' })
+    const root = box({ width: 100, height: 50, flexDirection: 'row' }, [first, second])
+    const layout = computeLayout(toLayoutTree(root), { width: 100, height: 50, direction: 'rtl' })
+
+    const a = layout.children[0]!
+    const b = layout.children[1]!
+    expect(a.x).toBeGreaterThan(b.x)
+    const cy = a.y + a.height / 2
+    const ax = a.x + a.width / 2
+    const bx = b.x + b.width / 2
+
+    expect(hitPathAtPoint(root, layout, ax, cy)).toEqual([0])
+    expect(getCursorAtPoint(root, layout, ax, cy)).toBe('crosshair')
+    expect(hitPathAtPoint(root, layout, bx, cy)).toEqual([1])
+    expect(getCursorAtPoint(root, layout, bx, cy)).toBe('pointer')
+  })
 })
