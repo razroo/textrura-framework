@@ -582,6 +582,24 @@ describe('hitTestText', () => {
     ]
     expect(hitTestText(textNodes, 5, 5)).toEqual({ nodeIndex: 0, charOffset: 0 })
   })
+
+  it('does not throw when a line has NaN charOffsets; midpoint checks fall through to end-of-line snap', () => {
+    const textNodes: TextNodeInfo[] = [
+      {
+        element: { kind: 'text' as const, props: { text: 'ab', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 18,
+        index: 0,
+        lines: [{ text: 'ab', x: 0, y: 0, charOffsets: [0, Number.NaN], charWidths: [8, 8] }],
+      },
+    ]
+    expect(() => hitTestText(textNodes, 2, 5)).not.toThrow()
+    expect(hitTestText(textNodes, 2, 5)).toEqual({ nodeIndex: 0, charOffset: 0 })
+    expect(hitTestText(textNodes, 12, 5)).toEqual({ nodeIndex: 0, charOffset: 2 })
+  })
 })
 
 describe('hitTestText direction mapping', () => {
