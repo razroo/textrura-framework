@@ -550,4 +550,15 @@ describe('geometry snapshot CI', () => {
     const layout = computeLayout(toLayoutTree(tree), { width: 220, height: 56 })
     expect(roundLayout(layout)).toMatchSnapshot()
   })
+
+  it('stable narrow row: flexShrink on fixed-width text children (rounded)', async () => {
+    await init()
+    const item = { font: '16px sans-serif', lineHeight: 20, width: 56, height: 20, flexShrink: 1 } as const
+    const tree = box(
+      { width: 100, height: 44, padding: 6, flexDirection: 'row', gap: 8 },
+      [text({ text: 'A', ...item }), text({ text: 'B', ...item })],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 100, height: 44 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
 })
