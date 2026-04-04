@@ -191,6 +191,14 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ ...base, width: coercible })).toBe(false)
   })
 
+  it('rejects objects with Symbol.toPrimitive returning a number (typeof object; no numeric coercion)', () => {
+    const base = { x: 0, y: 0, width: 10, height: 10, children: [] as [] }
+    const exotic = { [Symbol.toPrimitive]: () => 7 } as unknown as number
+    expect(() => layoutBoundsAreFinite({ ...base, y: exotic })).not.toThrow()
+    expect(layoutBoundsAreFinite({ ...base, y: exotic })).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, height: exotic })).toBe(false)
+  })
+
   it('validates only the root node (does not recurse into children)', () => {
     const corruptChild = {
       x: NaN,
@@ -266,5 +274,10 @@ describe('finiteNumberOrZero', () => {
 
     const coercible = { valueOf: () => 7 } as unknown as number
     expect(finiteNumberOrZero(coercible)).toBe(0)
+  })
+
+  it('maps objects with Symbol.toPrimitive to 0 (typeof must be number; no ToNumber coercion)', () => {
+    const exotic = { [Symbol.toPrimitive]: () => 99 } as unknown as number
+    expect(finiteNumberOrZero(exotic)).toBe(0)
   })
 })
