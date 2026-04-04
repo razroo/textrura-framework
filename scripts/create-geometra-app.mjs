@@ -67,6 +67,7 @@ const TEMPLATES = {
         notes: [
           'The browser client listens on Vite and connects to the Geometra server on ws://localhost:3300.',
           'Open the URL printed by Vite, then focus the canvas with Tab or a click so keyboard forwarding works.',
+          'Web fonts and server/client text metric parity: see FONTS_AND_METRICS.md in the Geometra repository.',
         ],
       }),
     }),
@@ -109,6 +110,7 @@ const TEMPLATES = {
           'The server listens on ws://localhost:8080.',
           'The browser client only paints frames; it does not run a layout engine.',
           'The host page is a full-viewport canvas; window resize is forwarded to the server.',
+          'Web fonts and server/client text metric parity: see FONTS_AND_METRICS.md in the Geometra repository.',
         ],
       }),
     }),
@@ -137,6 +139,7 @@ const TEMPLATES = {
         notes: [
           'The host page is a full-viewport canvas; layout tracks window resize.',
           'Open the Vite URL and click inside the canvas to interact with the app.',
+          'Web fonts, waitForFonts, and text metric expectations: see FONTS_AND_METRICS.md in the Geometra repository.',
         ],
       }),
     }),
