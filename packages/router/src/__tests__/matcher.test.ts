@@ -116,6 +116,16 @@ describe('route matcher', () => {
     expect(matchPath('', 'nested')).toBeNull()
   })
 
+  it('slash-only patterns normalize to zero segments (root-only match, same as empty pattern)', () => {
+    for (const pattern of ['/', '//', '///']) {
+      expect(matchPath(pattern, '/')).toEqual({ params: {} })
+      expect(matchPath(pattern, '')).toEqual({ params: {} })
+      expect(matchPath(pattern, '/?ref=1')).toEqual({ params: {} })
+      expect(matchPath(pattern, '/foo')).toBeNull()
+      expect(matchPath(pattern, 'nested')).toBeNull()
+    }
+  })
+
   it('when the same param name appears twice, the later capture wins', () => {
     expect(matchPath('/users/:id/posts/:id', '/users/1/posts/2')).toEqual({
       params: { id: '2' },
