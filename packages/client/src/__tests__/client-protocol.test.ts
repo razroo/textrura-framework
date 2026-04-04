@@ -596,6 +596,8 @@ describe('applyServerMessage', () => {
       { type: 'patch', patches: [{ path: [-1] }], protocolVersion: 1 } as unknown as Msg,
       { type: 'patch', patches: [{ path: [0.5] }], protocolVersion: 1 } as unknown as Msg,
       { type: 'patch', patches: [{ path: [], width: Number.NaN }], protocolVersion: 1 } as unknown as Msg,
+      { type: 'patch', patches: [{ path: [], width: -1 }], protocolVersion: 1 } as unknown as Msg,
+      { type: 'patch', patches: [{ path: [], height: -0.001 }], protocolVersion: 1 } as unknown as Msg,
       { type: 'patch', patches: [{ path: [], x: Number.POSITIVE_INFINITY }], protocolVersion: 1 } as unknown as Msg,
       {
         type: 'patch',

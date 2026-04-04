@@ -81,6 +81,13 @@ function isOptionalFiniteNumberField(record: Record<string, unknown>, key: strin
   return typeof v === 'number' && Number.isFinite(v)
 }
 
+/** Like {@link isOptionalFiniteNumberField} but requires `>= 0` when present (layout width/height). */
+function isOptionalNonNegativeFiniteDimensionField(record: Record<string, unknown>, key: string): boolean {
+  if (!Object.prototype.hasOwnProperty.call(record, key)) return true
+  const v = record[key]
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0
+}
+
 /** Each patch must be a plain object with an array `path` of non-negative integer indices. */
 function isWellFormedPatchList(patches: unknown): boolean {
   if (!Array.isArray(patches)) return false
@@ -100,8 +107,8 @@ function isWellFormedPatchList(patches: unknown): boolean {
     }
     if (!isOptionalFiniteNumberField(patch, 'x')) return false
     if (!isOptionalFiniteNumberField(patch, 'y')) return false
-    if (!isOptionalFiniteNumberField(patch, 'width')) return false
-    if (!isOptionalFiniteNumberField(patch, 'height')) return false
+    if (!isOptionalNonNegativeFiniteDimensionField(patch, 'width')) return false
+    if (!isOptionalNonNegativeFiniteDimensionField(patch, 'height')) return false
   }
   return true
 }
@@ -233,7 +240,8 @@ function applyPatches(layout: ComputedLayout, patches: ServerPatch['patches']): 
  *
  * When the payload is not a plain object, or is missing a well-formed `type` (`frame` with object
  * `layout`/`tree`, `patch` with a `patches` array of objects that each include an integer `path` and
- * only finite numeric geometry fields, or `error` with string `message`), calls `onError` and returns
+ * only finite numeric `x`/`y` and non-negative finite `width`/`height` when those fields are present,
+ * or `error` with string `message`), calls `onError` and returns
  * without mutating state or invoking `onMetrics`. Full `frame` messages additionally require root `layout`
  * to be a plain object with an array `children`, and root bounds that satisfy {@link layoutBoundsAreFinite}
  * (finite `x`/`y`, non-negative finite `width`/`height`).
