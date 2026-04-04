@@ -366,6 +366,60 @@ describe('createApp layout timing', () => {
     }
   })
 
+  it('passes layoutMs 0 when performance.now is missing or not a function', async () => {
+    for (const perf of [{}, { now: 'bad' as unknown as () => number }] as const) {
+      vi.stubGlobal('performance', perf)
+      try {
+        const setFrameTimings = vi.fn()
+        const renderer: Renderer = {
+          setFrameTimings,
+          render: vi.fn(),
+          destroy: vi.fn(),
+        }
+        await createApp(() => box({ width: 40, height: 20 }, []), renderer, { width: 100, height: 50 })
+        expect(setFrameTimings).toHaveBeenCalledWith({ layoutMs: 0 })
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    }
+  })
+
+  it('passes layoutMs 0 when performance.now throws or returns non-finite numbers', async () => {
+    vi.stubGlobal('performance', {
+      now() {
+        throw new Error('broken clock')
+      },
+    })
+    try {
+      const setFrameTimings = vi.fn()
+      const renderer: Renderer = {
+        setFrameTimings,
+        render: vi.fn(),
+        destroy: vi.fn(),
+      }
+      await createApp(() => box({ width: 40, height: 20 }, []), renderer, { width: 100, height: 50 })
+      expect(setFrameTimings).toHaveBeenCalledWith({ layoutMs: 0 })
+    } finally {
+      vi.unstubAllGlobals()
+    }
+
+    vi.stubGlobal('performance', {
+      now: () => Number.NaN,
+    })
+    try {
+      const setFrameTimings = vi.fn()
+      const renderer: Renderer = {
+        setFrameTimings,
+        render: vi.fn(),
+        destroy: vi.fn(),
+      }
+      await createApp(() => box({ width: 40, height: 20 }, []), renderer, { width: 100, height: 50 })
+      expect(setFrameTimings).toHaveBeenCalledWith({ layoutMs: 0 })
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('clamps negative or non-finite layout deltas to 0 for setFrameTimings', async () => {
     const mkRenderer = (): Renderer => ({
       setFrameTimings: vi.fn(),

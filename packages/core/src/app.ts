@@ -24,6 +24,23 @@ function finiteRootExtent(value: number | undefined): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
 }
 
+/**
+ * Monotonic layout timing without throwing when `performance` is partial or hostile
+ * (missing `now`, non-function `now`, or a throwing implementation).
+ */
+function safePerformanceNowMs(): number {
+  try {
+    const perf = globalThis.performance
+    if (perf && typeof perf.now === 'function') {
+      const t = perf.now()
+      return typeof t === 'number' && Number.isFinite(t) ? t : 0
+    }
+  } catch {
+    // ignore
+  }
+  return 0
+}
+
 export interface AppOptions {
   /**
    * Root width for layout computation. Non-numbers, non-finite values, and negatives are ignored
@@ -110,7 +127,7 @@ export interface App {
  * read during its execution will trigger automatic re-layout and re-render.
  *
  * After each successful `computeLayout`, optional {@link Renderer.setFrameTimings} is invoked with
- * `{ layoutMs }` (non-negative wall milliseconds from `performance.now()` when available, otherwise `0`)
+ * `{ layoutMs }` (non-negative wall milliseconds from a guarded `performance.now()` when usable, otherwise `0`)
  * immediately before `render`, so hosts can split Yoga/layout time from paint.
  */
 export async function createApp(
@@ -145,15 +162,14 @@ export async function createApp(
         app.tree = view()
         const layoutTree = toLayoutTree(app.tree)
         const direction = resolveComputeLayoutDirection(options.layoutDirection, app.tree)
-        const layoutStart = typeof performance !== 'undefined' ? performance.now() : 0
+        const layoutStart = safePerformanceNowMs()
         const computeOpts: ComputeOptions = { direction }
         const rootW = finiteRootExtent(options.width)
         const rootH = finiteRootExtent(options.height)
         if (rootW !== undefined) computeOpts.width = rootW
         if (rootH !== undefined) computeOpts.height = rootH
         app.layout = computeLayout(layoutTree, computeOpts)
-        const rawLayoutMs =
-          typeof performance !== 'undefined' ? performance.now() - layoutStart : 0
+        const rawLayoutMs = safePerformanceNowMs() - layoutStart
         const layoutMs = Math.max(0, Number.isFinite(rawLayoutMs) ? rawLayoutMs : 0)
         renderer.setFrameTimings?.({ layoutMs })
         renderer.render(app.layout, app.tree)
