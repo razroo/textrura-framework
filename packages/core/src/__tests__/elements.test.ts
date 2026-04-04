@@ -254,6 +254,19 @@ describe('scene3d', () => {
     })
     expect((el.props as { dir?: string }).dir).toBe('rtl')
   })
+
+  it('preserves pointer style props on props for hit-test and cursor resolution', () => {
+    const el = scene3d({
+      width: 48,
+      height: 48,
+      objects: [],
+      cursor: 'grab',
+      pointerEvents: 'none',
+    })
+    const p = el.props as Record<string, unknown>
+    expect(p.cursor).toBe('grab')
+    expect(p.pointerEvents).toBe('none')
+  })
 })
 
 describe('scene3d object helpers', () => {
