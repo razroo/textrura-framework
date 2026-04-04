@@ -242,7 +242,8 @@ function applyPatches(layout: ComputedLayout, patches: ServerPatch['patches']): 
  * or is missing a well-formed `type` (`frame` with object
  * `layout`/`tree`, `patch` with a `patches` array of objects that each include an integer `path` and
  * only finite numeric `x`/`y` and non-negative finite `width`/`height` when those fields are present,
- * or `error` with string `message`), calls `onError` and returns
+ * `error` with string `message`, or `data` with non-empty string `channel` and JSON-serializable
+ * `payload`), calls `onError` and returns
  * without mutating state or invoking `onMetrics`. Full `frame` messages additionally require root `layout`
  * to be a plain object with an array `children`, and root bounds that satisfy {@link layoutBoundsAreFinite}
  * (finite `x`/`y`, non-negative finite `width`/`height`).
@@ -260,7 +261,8 @@ function applyPatches(layout: ComputedLayout, patches: ServerPatch['patches']): 
  * @param state — Mutable `{ layout, tree }` (same fields as {@link TexturaClient}).
  * @param renderer — Receives `render` after successful frame or patch application.
  * @param msg — `frame`, `patch`, `error`, or `data` payload from the wire after JSON/binary decode.
- * @param onError — Server `error` messages and protocol-too-new mismatches.
+ * @param onError — Malformed messages, invalid `frame` root bounds, protocol version mismatches, and
+ * well-formed server `error` messages (those still invoke `onMetrics` once with `messageType: 'error'`).
  * @param onMetrics — Once per call when processing continues past the protocol guard; includes decode/apply/render timing.
  * @param decodeMeta — Optional timings and byte counts from the transport layer (binary vs JSON).
  * @param onData — Optional handler for `data` messages (namespaced side-channel JSON).
