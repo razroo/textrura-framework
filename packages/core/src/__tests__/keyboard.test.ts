@@ -139,6 +139,52 @@ describe('dispatchKeyboardEvent', () => {
     expect(focusedElement.peek()).toBeNull()
   })
 
+  it('tab focuses composition-only targets and advances between them (IME without click/key handlers)', () => {
+    const first = box({ onCompositionStart: () => undefined }, [])
+    const second = box({ onCompositionEnd: () => undefined }, [])
+    const tree = box({}, [first, second])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 100, height: 100, children: [] },
+        { x: 120, y: 0, width: 100, height: 100, children: [] },
+      ],
+    }
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    expect(focusedElement.peek()?.element).toBe(first)
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    expect(focusedElement.peek()?.element).toBe(second)
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: true,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    expect(focusedElement.peek()?.element).toBe(first)
+  })
+
   it('tab on keyup does not traverse focus (only keydown moves)', () => {
     const tree = box({}, [
       box({ onClick: () => undefined }, []),
