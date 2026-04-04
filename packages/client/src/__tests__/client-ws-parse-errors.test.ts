@@ -862,6 +862,48 @@ describe('createClient WebSocket message parse errors', () => {
     expect(client.layout?.width).toBe(81)
   })
 
+  it('accepts JSON frame when protocolVersion is 0 (finite and not newer than client)', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+    const renders: ComputedLayout[] = []
+    const renderer: Renderer = {
+      render: (layout: ComputedLayout) => {
+        renders.push({ ...layout, children: layout.children })
+      },
+      destroy: () => {},
+    }
+
+    const client = createClient({
+      url: 'ws://mock.test',
+      renderer,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    sockets[0]!.emit('message', {
+      data: JSON.stringify({
+        type: 'frame',
+        layout: { x: 0, y: 0, width: 83, height: 84, children: [] },
+        tree: { kind: 'box', props: {}, children: [] },
+        protocolVersion: 0,
+      }),
+    })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    expect(errors).toHaveLength(0)
+    expect(renders).toHaveLength(1)
+    expect(renders[0]?.width).toBe(83)
+    expect(client.layout?.width).toBe(83)
+  })
+
   it('invokes onError when JSON protocolVersion is newer than client, then accepts a valid frame', async () => {
     const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
     installMockWebSocket(sockets)
@@ -968,6 +1010,75 @@ describe('createClient WebSocket message parse errors', () => {
     expect(renders).toHaveLength(1)
     expect(renders[0]?.width).toBe(47)
     expect(client.layout?.width).toBe(47)
+  })
+
+  it('invokes onError when frame protocolVersion is boolean JSON (type confusion), then accepts a valid frame', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+    const renders: ComputedLayout[] = []
+    const renderer: Renderer = {
+      render: (layout: ComputedLayout) => {
+        renders.push({ ...layout, children: layout.children })
+      },
+      destroy: () => {},
+    }
+
+    const client = createClient({
+      url: 'ws://mock.test',
+      renderer,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    sockets[0]!.emit('message', {
+      data: JSON.stringify({
+        type: 'frame',
+        layout: { x: 0, y: 0, width: 1, height: 1, children: [] },
+        tree: { kind: 'box', props: {}, children: [] },
+        protocolVersion: false,
+      }),
+    })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(Error)
+    expect(String((errors[0] as Error).message)).toContain('protocolVersion must be a finite number')
+    expect(renders).toHaveLength(0)
+    expect(client.layout).toBeNull()
+
+    sockets[0]!.emit('message', {
+      data: JSON.stringify({
+        type: 'frame',
+        layout: { x: 0, y: 0, width: 1, height: 1, children: [] },
+        tree: { kind: 'box', props: {}, children: [] },
+        protocolVersion: true,
+      }),
+    })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(2)
+    expect(errors[1]).toBeInstanceOf(Error)
+    expect(String((errors[1] as Error).message)).toContain('protocolVersion must be a finite number')
+    expect(renders).toHaveLength(0)
+    expect(client.layout).toBeNull()
+
+    const validFrame = {
+      type: 'frame',
+      layout: { x: 0, y: 0, width: 43, height: 44, children: [] },
+      tree: { kind: 'box', props: {}, children: [] } satisfies UIElement,
+      protocolVersion: 1,
+    }
+    sockets[0]!.emit('message', { data: JSON.stringify(validFrame) })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(renders).toHaveLength(1)
+    expect(renders[0]?.width).toBe(43)
+    expect(client.layout?.width).toBe(43)
   })
 
   it('invokes onError when frame protocolVersion is a JSON string (type confusion), then accepts a valid frame', async () => {
