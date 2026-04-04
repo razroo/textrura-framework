@@ -92,6 +92,26 @@ describe('server connection hooks', () => {
     expect(result.messages.filter(m => m.type === 'frame')).toHaveLength(0)
   })
 
+  it('onConnection rejects when returning undefined (same nullish gate as null)', async () => {
+    const port = pickPort()
+    const server = await createServer(
+      () => box({ width: 40, height: 20 }, []),
+      {
+        port,
+        width: 200,
+        height: 100,
+        onConnection: () => undefined,
+      },
+    )
+
+    const result = await connectAndCollect(`ws://127.0.0.1:${port}`).finally(() => {
+      server.close()
+    })
+
+    expect(result.closeCode).toBe(CLOSE_AUTH_FAILED)
+    expect(result.messages.filter(m => m.type === 'frame')).toHaveLength(0)
+  })
+
   it('onConnection rejects when throwing', async () => {
     const port = pickPort()
     const server = await createServer(
