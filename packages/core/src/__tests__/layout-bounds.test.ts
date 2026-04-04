@@ -241,4 +241,20 @@ describe('finiteNumberOrZero', () => {
     expect(() => finiteNumberOrZero(1n as unknown as number)).not.toThrow()
     expect(finiteNumberOrZero(1n as unknown as number)).toBe(0)
   })
+
+  it('maps Symbol, boxed numbers, and other objects to 0 without throwing (typeof must be number)', () => {
+    const sym = Symbol('scroll') as unknown as number
+    expect(() => finiteNumberOrZero(sym)).not.toThrow()
+    expect(finiteNumberOrZero(sym)).toBe(0)
+
+    expect(finiteNumberOrZero(Object(0) as unknown as number)).toBe(0)
+    expect(finiteNumberOrZero(Object(3.5) as unknown as number)).toBe(0)
+
+    const d = new Date(0) as unknown as number
+    expect(() => finiteNumberOrZero(d)).not.toThrow()
+    expect(finiteNumberOrZero(d)).toBe(0)
+
+    const coercible = { valueOf: () => 7 } as unknown as number
+    expect(finiteNumberOrZero(coercible)).toBe(0)
+  })
 })
