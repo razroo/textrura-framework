@@ -3787,6 +3787,31 @@ describe('z-index sort cache invalidation', () => {
     dispatchHit(root, layout, 'onClick', 10, 10)
     expect(log).toEqual(['back'])
   })
+
+  it('hitPathAtPoint and getCursorAtPoint follow recomputed z-order after top sibling removal', () => {
+    const back = box({ width: 50, height: 50, zIndex: 0, cursor: 'pointer' })
+    const front = box({ width: 50, height: 50, zIndex: 10, cursor: 'text' })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] as const },
+        { x: 0, y: 0, width: 50, height: 50, children: [] as const },
+      ],
+    }
+
+    expect(hitPathAtPoint(root, layout, 10, 10)).toEqual([1])
+    expect(getCursorAtPoint(root, layout, 10, 10)).toBe('text')
+
+    root.children.pop()
+    layout.children.pop()
+
+    expect(hitPathAtPoint(root, layout, 10, 10)).toEqual([0])
+    expect(getCursorAtPoint(root, layout, 10, 10)).toBe('pointer')
+  })
 })
 
 describe('Yoga-computed row layout and hit routing (document direction)', () => {
