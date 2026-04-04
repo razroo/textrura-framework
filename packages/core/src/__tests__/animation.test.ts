@@ -215,6 +215,23 @@ describe('animation timeline', () => {
     expect(timelineNeg.state()).toBe('finished')
   })
 
+  it('clamps negative finite step deltas to 0 so clock skew cannot rewind elapsed time', () => {
+    const timeline = createTweenTimeline(0)
+    timeline.to(100, 1000, easing.linear)
+    expect(timeline.step(500)).toBe(50)
+    expect(timeline.step(-100)).toBe(50)
+    expect(timeline.value.peek()).toBe(50)
+    expect(timeline.state()).toBe('running')
+    expect(timeline.step(500)).toBe(100)
+    expect(timeline.state()).toBe('finished')
+
+    const props = createPropertyTimeline({ x: 0 })
+    props.to({ x: 100 }, 1000, easing.linear)
+    expect(props.step(400).x).toBe(40)
+    expect(props.step(-200).x).toBe(40)
+    expect(props.values.x.peek()).toBe(40)
+  })
+
   it('treats non-finite step deltas as 0 so elapsed and values stay finite', () => {
     const timeline = createTweenTimeline(0)
     timeline.to(100, 1000, easing.linear)
