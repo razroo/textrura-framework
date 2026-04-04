@@ -2625,7 +2625,7 @@ describe('createClient WebSocket message parse errors', () => {
     expect(client.layout?.width).toBe(11)
   })
 
-  it('invokes onError when binary event.data is a Blob (wrong binaryType / unexpected payload)', async () => {
+  it('invokes onError when binary event.data is a Blob (unexpected payload; client still sets binaryType arraybuffer)', async () => {
     if (typeof Blob === 'undefined') return
 
     const sockets: Array<{ emit(type: string, event?: unknown): void }> = []

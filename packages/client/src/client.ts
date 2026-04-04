@@ -11,7 +11,7 @@ function asBinaryFrameBytes(data: unknown): BinaryFrameBytes {
     return data
   }
   throw new Error(
-    'WebSocket binary message is not ArrayBuffer or ArrayBufferView; with binaryFraming, ensure binaryType is "arraybuffer" (default when enabled).',
+    'WebSocket binary message is not ArrayBuffer, SharedArrayBuffer, or ArrayBufferView (createClient sets binaryType to "arraybuffer"; unexpected Blob or other type).',
   )
 }
 
@@ -196,9 +196,9 @@ export interface TexturaClientOptions {
   /**
    * Negotiate optional binary JSON envelopes for server→client frames (same JSON payload as text).
    * Requires `resize` with `capabilities.binaryFraming` (sent automatically when true).
-   * When false, string frames still use `JSON.parse`; non-string `MessageEvent.data` is still decoded
-   * as a GEOM v1 binary envelope when it is an `ArrayBuffer` or view — this flag mainly sets
-   * `WebSocket.binaryType` to `"arraybuffer"` so real browsers deliver binary messages that way.
+   * The client always sets `WebSocket.binaryType` to `"arraybuffer"` so binary GEOM envelopes decode
+   * reliably even when this flag is false (e.g. mixed JSON text + binary fallback). String frames still
+   * use `JSON.parse`; non-string `MessageEvent.data` is decoded as a GEOM v1 binary envelope.
    */
   binaryFraming?: boolean
 }
@@ -380,9 +380,7 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
 
   function connect() {
     ws = new WebSocket(url)
-    if (options.binaryFraming) {
-      ws.binaryType = 'arraybuffer'
-    }
+    ws.binaryType = 'arraybuffer'
 
     ws.addEventListener('open', () => {
       retryCount = 0
