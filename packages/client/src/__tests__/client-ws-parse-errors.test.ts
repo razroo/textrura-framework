@@ -2469,4 +2469,109 @@ describe('createClient WebSocket message parse errors', () => {
     expect(renders).toHaveLength(1)
     expect(renders[0]?.width).toBe(55)
   })
+
+  it('invokes onError when data message omits payload (undefined after JSON parse), then accepts a valid frame', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+    const renders: ComputedLayout[] = []
+    const dataCalls: unknown[] = []
+    const renderer: Renderer = {
+      render: (layout: ComputedLayout) => {
+        renders.push({ ...layout, children: layout.children })
+      },
+      destroy: () => {},
+    }
+
+    const client = createClient({
+      url: 'ws://mock.test',
+      renderer,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+      onData: (_ch, pl) => dataCalls.push(pl),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    sockets[0]!.emit('message', {
+      data: JSON.stringify({
+        type: 'data',
+        channel: 'geom.side',
+        protocolVersion: 1,
+      }),
+    })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(Error)
+    expect(String((errors[0] as Error).message)).toContain('Invalid server message')
+    expect(dataCalls).toHaveLength(0)
+    expect(renders).toHaveLength(0)
+    expect(client.layout).toBeNull()
+
+    const validFrame = {
+      type: 'frame',
+      layout: { x: 0, y: 0, width: 70, height: 71, children: [] },
+      tree: { kind: 'box', props: {}, children: [] } satisfies UIElement,
+      protocolVersion: 1,
+    }
+    sockets[0]!.emit('message', { data: JSON.stringify(validFrame) })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(renders).toHaveLength(1)
+    expect(renders[0]?.width).toBe(70)
+    expect(client.layout?.width).toBe(70)
+  })
+
+  it('delivers well-formed data messages to onData over WebSocket (metrics, no render)', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+    const renders: ComputedLayout[] = []
+    const dataCalls: Array<{ channel: string; payload: unknown }> = []
+    const metrics: ClientFrameMetrics[] = []
+    const renderer: Renderer = {
+      render: (layout: ComputedLayout) => {
+        renders.push({ ...layout, children: layout.children })
+      },
+      destroy: () => {},
+    }
+
+    createClient({
+      url: 'ws://mock.test',
+      renderer,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+      onFrameMetrics: m => metrics.push(m),
+      onData: (ch, pl) => dataCalls.push({ channel: ch, payload: pl }),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    const payload = { n: 42, nested: { ok: true } }
+    sockets[0]!.emit('message', {
+      data: JSON.stringify({
+        type: 'data',
+        channel: 'geom.notify',
+        payload,
+        protocolVersion: 1,
+      }),
+    })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    expect(errors).toHaveLength(0)
+    expect(renders).toHaveLength(0)
+    expect(dataCalls).toEqual([{ channel: 'geom.notify', payload }])
+    expect(metrics).toHaveLength(1)
+    expect(metrics[0]?.messageType).toBe('data')
+    expect(metrics[0]?.renderMs).toBe(0)
+  })
 })
