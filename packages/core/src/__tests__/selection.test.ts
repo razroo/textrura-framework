@@ -859,4 +859,41 @@ describe('hitTestText direction mapping', () => {
     expect(hitTestText(textNodes, 2, 5)).toEqual({ nodeIndex: 0, charOffset: 2 })
     expect(hitTestText(textNodes, 20, 5)).toEqual({ nodeIndex: 0, charOffset: 2 })
   })
+
+  it('does not throw when charWidths is shorter than charOffsets; trailing slots use NaN midpoints and snap to end of line', () => {
+    const textNodes: TextNodeInfo[] = [
+      {
+        element: { kind: 'text' as const, props: { text: 'ab', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 18,
+        index: 0,
+        lines: [{ text: 'ab', x: 0, y: 0, charOffsets: [0, 8, 16], charWidths: [8] }],
+      },
+    ]
+    expect(() => hitTestText(textNodes, 2, 5)).not.toThrow()
+    // First glyph still has a paired width; later offsets have no width → NaN midpoints → no early hit.
+    expect(hitTestText(textNodes, 2, 5)).toEqual({ nodeIndex: 0, charOffset: 0 })
+    expect(hitTestText(textNodes, 12, 5)).toEqual({ nodeIndex: 0, charOffset: 2 })
+  })
+
+  it('does not throw when charOffsets is shorter than charWidths; only paired entries participate in midpoint tests', () => {
+    const textNodes: TextNodeInfo[] = [
+      {
+        element: { kind: 'text' as const, props: { text: 'ab', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 18,
+        index: 0,
+        lines: [{ text: 'ab', x: 0, y: 0, charOffsets: [0, 8], charWidths: [8, 8, 99] }],
+      },
+    ]
+    expect(() => hitTestText(textNodes, 2, 5)).not.toThrow()
+    expect(hitTestText(textNodes, 2, 5)).toEqual({ nodeIndex: 0, charOffset: 0 })
+    expect(hitTestText(textNodes, 12, 5)).toEqual({ nodeIndex: 0, charOffset: 2 })
+  })
 })
