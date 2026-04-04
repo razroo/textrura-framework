@@ -57,7 +57,7 @@ function coerceGeometraThreeSceneBasicsCamera(
       ? merged.cameraFov
       : d.cameraFov
 
-  let cameraNear =
+  const cameraNear =
     Number.isFinite(merged.cameraNear) && merged.cameraNear > 0 ? merged.cameraNear : d.cameraNear
 
   let cameraFar = merged.cameraFar

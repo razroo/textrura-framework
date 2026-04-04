@@ -110,11 +110,13 @@ describe('layoutBoundsAreFinite', () => {
 
   it('rejects bounds that overflow double range to ±Infinity (JSON exponent edge cases)', () => {
     const base = { x: 0, y: 0, width: 10, height: 10, children: [] as [] }
-    expect(1e400).toBe(Infinity)
-    expect(layoutBoundsAreFinite({ ...base, width: 1e400 })).toBe(false)
-    expect(layoutBoundsAreFinite({ ...base, height: 1e400 })).toBe(false)
-    expect(layoutBoundsAreFinite({ ...base, x: 1e400 })).toBe(false)
-    expect(layoutBoundsAreFinite({ ...base, y: -1e400 })).toBe(false)
+    const posOverflow = Number.parseFloat('1e400')
+    const negOverflow = Number.parseFloat('-1e400')
+    expect(posOverflow).toBe(Infinity)
+    expect(layoutBoundsAreFinite({ ...base, width: posOverflow })).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, height: posOverflow })).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, x: posOverflow })).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, y: negOverflow })).toBe(false)
     expect(Number.MAX_VALUE * 2).toBe(Infinity)
     expect(layoutBoundsAreFinite({ ...base, width: Number.MAX_VALUE * 2 })).toBe(false)
   })

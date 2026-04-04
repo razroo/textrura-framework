@@ -207,13 +207,14 @@ describe('query helpers', () => {
   })
 
   it('omits non-finite numbers (NaN, ±Infinity, and double overflow to Infinity)', () => {
+    const jsonExponentOverflow = Number.parseFloat('1e400')
     expect(stringifyQuery({ n: Number.NaN })).toBe('')
     expect(stringifyQuery({ a: 1, n: Number.NaN })).toBe('?a=1')
     expect(stringifyQuery({ x: Number.POSITIVE_INFINITY })).toBe('')
     expect(stringifyQuery({ x: Number.NEGATIVE_INFINITY, y: 2 })).toBe('?y=2')
-    expect(1e400).toBe(Infinity)
-    expect(stringifyQuery({ overflow: 1e400 })).toBe('')
-    expect(stringifyQuery({ a: 1, overflow: 1e400 })).toBe('?a=1')
+    expect(jsonExponentOverflow).toBe(Infinity)
+    expect(stringifyQuery({ overflow: jsonExponentOverflow })).toBe('')
+    expect(stringifyQuery({ a: 1, overflow: jsonExponentOverflow })).toBe('?a=1')
     expect(Number.MAX_VALUE * 2).toBe(Infinity)
     expect(stringifyQuery({ huge: Number.MAX_VALUE * 2 })).toBe('')
   })
@@ -229,7 +230,7 @@ describe('query helpers', () => {
 
   it('omits non-finite entries inside arrays while preserving finite values', () => {
     expect(stringifyQuery({ mix: [Number.NaN, 'a', Number.POSITIVE_INFINITY, 3] })).toBe('?mix=a&mix=3')
-    expect(stringifyQuery({ mix: ['a', 1e400, 3] })).toBe('?mix=a&mix=3')
+    expect(stringifyQuery({ mix: ['a', Number.parseFloat('1e400'), 3] })).toBe('?mix=a&mix=3')
   })
 
   it('stringifies ill-formed UTF-16 (lone surrogates) without throwing, via toWellFormed normalization', () => {
