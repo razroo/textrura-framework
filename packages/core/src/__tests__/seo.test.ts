@@ -27,6 +27,13 @@ describe('toSemanticHTML', () => {
     const el = box({ width: 100, height: 100 })
     expect(toSemanticHTML(el, { lang: 123 as never })).toContain('<html lang="en">')
     expect(toSemanticHTML(el, { lang: true as never })).toContain('<html lang="en">')
+    expect(toSemanticHTML(el, { lang: null as never })).toContain('<html lang="en">')
+    expect(toSemanticHTML(el, { lang: undefined })).toContain('<html lang="en">')
+  })
+
+  it('ignores boxed-string lang (typeof object) and falls back to en', () => {
+    const el = box({ width: 100, height: 100 })
+    expect(toSemanticHTML(el, { lang: Object('fr-CA') as never })).toContain('<html lang="en">')
   })
 
   it('ignores non-string head/meta option values at runtime (no throw; matches lang guard)', () => {

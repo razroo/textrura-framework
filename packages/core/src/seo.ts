@@ -5,6 +5,8 @@ export interface SemanticHTMLOptions {
   /**
    * BCP 47 language tag for the root `<html lang="...">` attribute (defaults to `en`).
    * Value is HTML-escaped; prefer well-formed tags like `en-US` or `fr`.
+   * Only **primitive** strings are accepted at runtime (`typeof === 'string'`); boxed `String` objects,
+   * `null`, and other shapes fall back to `en` so corrupt options never reach the internal `escapeHTML` path.
    */
   lang?: string
   /** Page title for the <title> tag. */
