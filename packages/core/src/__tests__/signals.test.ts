@@ -310,6 +310,22 @@ describe('effect', () => {
     expect(runs).toBe(1)
   })
 
+  it('dispose on a re-run drops signal deps so further sets do not schedule the effect', () => {
+    const s = signal(0)
+    let runs = 0
+    const dispose = effect(() => {
+      void s.value
+      runs++
+      if (runs === 2) dispose()
+    })
+    expect(runs).toBe(1)
+    s.set(1)
+    expect(runs).toBe(2)
+    s.set(2)
+    s.set(3)
+    expect(runs).toBe(2)
+  })
+
   it('propagates synchronous errors from the initial run (no dispose returned)', () => {
     expect(() =>
       effect(() => {
