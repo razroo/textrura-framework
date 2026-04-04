@@ -3736,6 +3736,59 @@ describe('pointerEvents', () => {
   })
 })
 
+describe('z-index sort cache invalidation', () => {
+  it('recomputes sibling order when a child is appended (cached z-order length mismatch)', () => {
+    const log: string[] = []
+    const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } })
+    const root = box({ width: 100, height: 100 }, [back])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 50, height: 50, children: [] as const }],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['back'])
+    log.length = 0
+
+    const front = box({ width: 50, height: 50, zIndex: 10, onClick: () => { log.push('front') } })
+    root.children.push(front)
+    layout.children.push({ x: 0, y: 0, width: 50, height: 50, children: [] as const })
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['front'])
+  })
+
+  it('recomputes sibling order when a child is removed (cached z-order length mismatch)', () => {
+    const log: string[] = []
+    const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } })
+    const front = box({ width: 50, height: 50, zIndex: 10, onClick: () => { log.push('front') } })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] as const },
+        { x: 0, y: 0, width: 50, height: 50, children: [] as const },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['front'])
+    log.length = 0
+
+    root.children.pop()
+    layout.children.pop()
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['back'])
+  })
+})
+
 describe('Yoga-computed row layout and hit routing (document direction)', () => {
   beforeAll(async () => {
     await init()
