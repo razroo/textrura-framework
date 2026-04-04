@@ -601,6 +601,44 @@ describe('hitTestText', () => {
     expect(hitTestText(textNodes, 0, 15)).toBeNull()
   })
 
+  it('treats the last line bottom edge as inclusive so the node box bottom matches box hit-test edges', () => {
+    const textNodes: TextNodeInfo[] = [
+      {
+        element: { kind: 'text' as const, props: { text: 'ab', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 18,
+        index: 0,
+        lines: [{ text: 'ab', x: 0, y: 0, charOffsets: [0, 8], charWidths: [8, 8] }],
+      },
+    ]
+    // py === line.y + lineHeight: inside node rect (inclusive bottom) but was previously a "between lines" false snap
+    expect(hitTestText(textNodes, 2, 18)).toEqual({ nodeIndex: 0, charOffset: 0 })
+    expect(hitTestText(textNodes, 12, 18)).toEqual({ nodeIndex: 0, charOffset: 2 })
+  })
+
+  it('keeps half-open bands between stacked lines so a shared y boundary hits the upper line only', () => {
+    const textNodes: TextNodeInfo[] = [
+      {
+        element: { kind: 'text' as const, props: { text: 'ab\ncd', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 36,
+        index: 0,
+        lines: [
+          { text: 'ab', x: 0, y: 0, charOffsets: [0, 8], charWidths: [8, 8] },
+          { text: 'cd', x: 0, y: 18, charOffsets: [0, 8], charWidths: [8, 8] },
+        ],
+      },
+    ]
+    expect(hitTestText(textNodes, 2, 18)).toEqual({ nodeIndex: 0, charOffset: 2 })
+    expect(hitTestText(textNodes, 2, 17)).toEqual({ nodeIndex: 0, charOffset: 0 })
+  })
+
   it('snaps to charOffset 0 when inside node box but lines are empty', () => {
     const textNodes: TextNodeInfo[] = [
       {

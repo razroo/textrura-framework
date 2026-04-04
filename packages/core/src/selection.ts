@@ -199,7 +199,15 @@ function textNodeBoundsAreFinite(node: TextNodeInfo): boolean {
   })
 }
 
-/** Find which text node and character offset is at a given (x, y) point. Coordinates must be finite numbers — otherwise `null` (e.g. NaN, ±Infinity, BigInt, or non-numbers). Nodes with non-finite or negative-size bounds are skipped (aligned with {@link import('./layout-bounds.js').layoutBoundsAreFinite}). */
+/**
+ * Find which text node and character offset is at a given (x, y) point. Coordinates must be finite numbers —
+ * otherwise `null` (e.g. NaN, ±Infinity, BigInt, or non-numbers). Nodes with non-finite or negative-size bounds
+ * are skipped (aligned with {@link import('./layout-bounds.js').layoutBoundsAreFinite}).
+ *
+ * Vertical line bands are half-open between stacked lines so a y exactly on an interior boundary belongs to the
+ * lower line; the **last** line’s bottom edge is inclusive so it matches {@link import('./hit-test.js').dispatchHit}
+ * inclusive rect edges on the text node box.
+ */
 export function hitTestText(
   textNodes: TextNodeInfo[],
   px: number,
@@ -214,11 +222,19 @@ export function hitTestText(
       continue
     }
 
-    // Find the line
+    // Find the line. Use half-open vertical bands between lines so shared boundaries
+    // (next line's y === previous line bottom) map to the lower line only. The last line
+    // uses an inclusive bottom so the node's bottom edge (same rule as box hit-test rects)
+    // still resolves to this line instead of falling through to the "between lines" snap.
     let globalCharOffset = 0
-    for (const line of node.lines) {
-      const lineBottom = line.y + (node.element.props.lineHeight)
-      if (py >= line.y && py < lineBottom) {
+    for (let li = 0; li < node.lines.length; li++) {
+      const line = node.lines[li]!
+      const lineBottom = line.y + node.element.props.lineHeight
+      const lastLine = li === node.lines.length - 1
+      const inBand = lastLine
+        ? py >= line.y && py <= lineBottom
+        : py >= line.y && py < lineBottom
+      if (inBand) {
         // Find the character within the line
         const localX = px - line.x
         const lineVisualWidth = line.charOffsets.length > 0
