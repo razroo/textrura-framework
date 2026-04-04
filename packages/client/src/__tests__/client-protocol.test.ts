@@ -716,4 +716,40 @@ describe('applyServerMessage', () => {
     expect(errors.length).toBeGreaterThan(0)
     expect(renders).toHaveLength(0)
   })
+
+  it('rejects data messages whose payload is not JSON-serializable plain data (no render, onData not called)', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const errors: string[] = []
+    const dataCalls: unknown[] = []
+    const metrics: ClientFrameMetrics[] = []
+    type Msg = Parameters<typeof applyServerMessage>[2]
+
+    const badPayloads: unknown[] = [
+      { nested: undefined },
+      { d: new Date(0) },
+      { m: new Map([['a', 1]]) },
+      Object.create(null),
+    ]
+
+    for (const payload of badPayloads) {
+      applyServerMessage(
+        state,
+        renderer,
+        { type: 'data', channel: 'geom.test', payload, protocolVersion: 1 } as unknown as Msg,
+        e => errors.push(String(e)),
+        m => metrics.push(m),
+        { decodeMs: 0 },
+        () => dataCalls.push(payload),
+      )
+    }
+
+    expect(errors).toHaveLength(badPayloads.length)
+    for (const err of errors) {
+      expect(err).toContain('Invalid server message')
+    }
+    expect(dataCalls).toHaveLength(0)
+    expect(metrics).toHaveLength(0)
+    expect(renders).toHaveLength(0)
+  })
 })
