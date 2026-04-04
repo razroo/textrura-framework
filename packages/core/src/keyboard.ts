@@ -5,9 +5,13 @@ import { focusNext, focusPrev, resolveFocusedTarget } from './focus.js'
 /**
  * Dispatch keyboard events to the focused element.
  *
- * Tab / Shift+Tab runs only on `'onKeyDown'` (not `'onKeyUp'`). On keydown, Tab always returns
- * `true` and runs focus traversal (`focusNext` / `focusPrev` from `./focus.js`); when the tree has
- * no focusable boxes, those calls no-op and focus stays unset.
+ * Tab / Shift+Tab runs only on `'onKeyDown'` (not `'onKeyUp'`). Detection uses **strict** string
+ * equality with `partialEvent.key === 'Tab'` (capital T), matching typical `KeyboardEvent.key` from
+ * browsers; values such as `'tab'` do not trigger traversal and are handled like any other key below.
+ *
+ * On Tab keydown, the function always returns `true` and runs focus traversal (`focusNext` /
+ * `focusPrev` from `./focus.js`); when the tree has no focusable boxes, those calls no-op and focus
+ * stays unset.
  *
  * For other keys, returns `true` only when a resolved focus target exists and its handler for
  * `eventType` runs; otherwise `false`.

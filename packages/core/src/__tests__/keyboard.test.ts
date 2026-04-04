@@ -215,6 +215,58 @@ describe('dispatchKeyboardEvent', () => {
     expect(afterTruthyShift?.element).toBe(first?.element)
   })
 
+  it('lowercase "tab" does not run Tab focus traversal (strict key match; DOM uses "Tab")', () => {
+    const tree = box({}, [
+      box({ onClick: () => undefined }, []),
+      box({ onClick: () => undefined }, []),
+    ])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 100, height: 100, children: [] },
+        { x: 120, y: 0, width: 100, height: 100, children: [] },
+      ],
+    }
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    const first = focusedElement.peek()
+
+    const lowercaseHandled = dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    const afterLowercase = focusedElement.peek()
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    const afterRealTab = focusedElement.peek()
+
+    expect(first).not.toBeNull()
+    expect(lowercaseHandled).toBe(false)
+    expect(afterLowercase?.element).toBe(first?.element)
+    expect(afterRealTab?.element).not.toBe(first?.element)
+  })
+
   it('tab keydown returns true when no focusable targets exist (traversal is a no-op)', () => {
     clearFocus()
     const tree = box({}, [])
