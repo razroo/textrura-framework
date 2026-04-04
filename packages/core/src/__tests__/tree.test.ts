@@ -362,6 +362,34 @@ describe('toLayoutTree', () => {
     expect(textLayout).not.toHaveProperty('semantic')
   })
 
+  it('forwards props not in the strip list to the layout snapshot (strip-list, not a whitelist)', () => {
+    const hinted = box({
+      width: 10,
+      height: 10,
+      _experimentalLayoutHint: 42,
+    } as unknown as Parameters<typeof box>[0])
+    const layout = toLayoutTree(hinted) as Record<string, unknown>
+    expect(layout).toMatchObject({ width: 10, height: 10, _experimentalLayoutHint: 42 })
+
+    const textHinted = text({
+      text: 'x',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      width: 8,
+      height: 18,
+      _customMetricKey: 'ok',
+    } as unknown as Parameters<typeof text>[0])
+    const tLayout = toLayoutTree(textHinted) as Record<string, unknown>
+    expect(tLayout).toMatchObject({
+      text: 'x',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      width: 8,
+      height: 18,
+      _customMetricKey: 'ok',
+    })
+  })
+
   it('strips scene3d scene/camera props and paint metadata from scene3d leaves', () => {
     const el = scene3d({
       width: 320,
