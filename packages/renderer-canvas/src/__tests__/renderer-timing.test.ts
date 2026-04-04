@@ -92,6 +92,12 @@ describe('CanvasRenderer.setFrameTimings', () => {
       renderer.setFrameTimings({ layoutMs: true as unknown as number }),
     ).not.toThrow()
     expect(renderer.lastLayoutWallMs).toBe(0)
+
+    // Boxed numbers are typeof object; Number.isFinite is false — do not coerce via unary +.
+    expect(() =>
+      renderer.setFrameTimings({ layoutMs: Object(4.25) as unknown as number }),
+    ).not.toThrow()
+    expect(renderer.lastLayoutWallMs).toBe(0)
   })
 })
 
