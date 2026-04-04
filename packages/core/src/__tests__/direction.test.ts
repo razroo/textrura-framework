@@ -30,6 +30,14 @@ describe('direction model', () => {
     expect(resolveDirectionValue(1n as never, 'ltr')).toBe('ltr')
   })
 
+  it('treats JSON null dir like auto (inherit parent) without throwing', () => {
+    expect(resolveDirectionValue(null as never, 'rtl')).toBe('rtl')
+    expect(resolveDirectionValue(null as never, 'ltr')).toBe('ltr')
+    const el = box({ width: 1, height: 1, dir: null as never })
+    expect(resolveElementDirection(el, 'rtl')).toBe('rtl')
+    expect(resolveElementDirection(el, 'ltr')).toBe('ltr')
+  })
+
   it('treats boxed string dir like auto (strict equality only matches primitive ltr/rtl)', () => {
     expect(resolveDirectionValue(Object('rtl') as never, 'ltr')).toBe('ltr')
     expect(resolveDirectionValue(Object('ltr') as never, 'rtl')).toBe('rtl')
