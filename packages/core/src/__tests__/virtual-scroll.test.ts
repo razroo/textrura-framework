@@ -45,6 +45,20 @@ describe('syncVirtualWindow', () => {
     expect(r.end - r.start).toBeLessThanOrEqual(3)
   })
 
+  it('floors fractional totalRows, selected, and currentStart to whole row indices', () => {
+    // 4.9 rows → 4 rows (indices 0..3); selection 3.9 floors to 3
+    expect(syncVirtualWindow(4.9, 2, 3.9, 0)).toEqual({ start: 2, end: 3, selected: 3 })
+    // Same as integer 4-row list with selected 3
+    expect(syncVirtualWindow(4.9, 2, 3.9, 0)).toEqual(syncVirtualWindow(4, 2, 3, 0))
+    // currentStart 1.9 floors to 1 before clamp/scroll
+    expect(syncVirtualWindow(10, 3, 5, 1.9)).toEqual(syncVirtualWindow(10, 3, 5, 1))
+    const r = syncVirtualWindow(6.2, 4, 2.7, 0.25)
+    expect(Number.isInteger(r.start)).toBe(true)
+    expect(Number.isInteger(r.end)).toBe(true)
+    expect(Number.isInteger(r.selected)).toBe(true)
+    expect(r.selected).toBe(2)
+  })
+
   it('clamps selected below zero and above last index', () => {
     expect(syncVirtualWindow(8, 3, -10, 0)).toEqual({ start: 0, end: 2, selected: 0 })
     expect(syncVirtualWindow(8, 3, 999, 0)).toEqual({ start: 5, end: 7, selected: 7 })
