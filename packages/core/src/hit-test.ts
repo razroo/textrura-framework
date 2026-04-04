@@ -230,6 +230,15 @@ function dispatchHitRecursive(
  * Non-finite or non-number offsets are treated as `0` (same rule as scroll offsets on boxes).
  * Event `x` / `y` remain the caller coordinates; `localX` / `localY` are relative to the hit target’s abs rect.
  *
+ * @param element - Root of the UI tree (typically a `box`).
+ * @param layout - Computed layout node parallel to `element` (same shape as Yoga/Textura output).
+ * @param eventType - Which handler slot to dispatch (e.g. `onClick`, `onPointerDown`).
+ * @param x - Pointer X in the same space as `layout` (after root offsets).
+ * @param y - Pointer Y in the same space as `layout` (after root offsets).
+ * @param extra - Optional fields shallow-merged onto the {@link HitEvent} after `x`, `y`, `localX`, `localY`, and `target`.
+ * @param offsetX - Added to the root layout origin; non-finite values become `0`.
+ * @param offsetY - Added to the root layout origin; non-finite values become `0`.
+ * @returns Whether a handler ran, and optional `focusTarget` for `onClick` only.
  * @see {@link getCursorAtPoint} for resolving `cursor` at the same logical hit region.
  */
 export function dispatchHit(
@@ -263,6 +272,14 @@ export function dispatchHit(
  *
  * Optional `offsetX` / `offsetY` match {@link hitPathAtPoint} / {@link dispatchHit} for rooted coordinate transforms.
  * Non-finite or non-number offsets are treated as `0`.
+ *
+ * @param element - Root of the UI tree.
+ * @param layout - Computed layout parallel to `element`.
+ * @param x - Pointer X (must be a finite number at runtime).
+ * @param y - Pointer Y (must be a finite number at runtime).
+ * @param offsetX - Root origin shift; non-finite values become `0`.
+ * @param offsetY - Root origin shift; non-finite values become `0`.
+ * @returns `true` when the deepest qualifying hit stack entry has a pointer or wheel handler.
  */
 export function hasInteractiveHitAtPoint(
   element: UIElement,
@@ -299,6 +316,14 @@ export function hasInteractiveHitAtPoint(
  * or in the `pointerEvents: 'none'` deepest-only case above. Returns `[]` when the point hits a box root or leaf box with
  * no deeper box under the point.
  * Root `offsetX` / `offsetY` follow {@link dispatchHit}: non-finite or non-number values are treated as `0`.
+ *
+ * @param element - Root of the UI tree.
+ * @param layout - Computed layout parallel to `element`.
+ * @param x - Pointer X (must be a finite number at runtime).
+ * @param y - Pointer Y (must be a finite number at runtime).
+ * @param offsetX - Root origin shift for child recursion; non-finite values become `0`.
+ * @param offsetY - Root origin shift for child recursion; non-finite values become `0`.
+ * @returns Index path, empty array for a hit leaf box, or `null` when there is no path.
  */
 export function hitPathAtPoint(
   element: UIElement,
@@ -369,6 +394,14 @@ export function hitPathAtPoint(
  * so the nearest ancestor with a non-empty `cursor` wins. A root hit on a lone box with `cursor: ''` still
  * yields `''`. The same applies to lone `text` / `image` / `scene3d` roots: `cursor: ''` yields `''`, while
  * omitting `cursor` yields `null` (host/renderer default).
+ *
+ * @param element - Root of the UI tree.
+ * @param layout - Computed layout parallel to `element`.
+ * @param x - Pointer X (must be a finite number at runtime).
+ * @param y - Pointer Y (must be a finite number at runtime).
+ * @param offsetX - Root origin shift; non-finite values become `0`.
+ * @param offsetY - Root origin shift; non-finite values become `0`.
+ * @returns Deepest resolved `cursor` string, `''` when explicitly set empty, or `null` for default / miss.
  */
 export function getCursorAtPoint(
   element: UIElement,
