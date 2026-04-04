@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { toLayoutTree } from '../tree.js'
-import { box, text, image } from '../elements.js'
+import { ambientLight, box, image, scene3d, sphere, text } from '../elements.js'
 
 type BoxLayoutNode = ReturnType<typeof toLayoutTree> & { children: Array<Record<string, unknown>> }
 

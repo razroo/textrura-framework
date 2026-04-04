@@ -1,5 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { box, text, image } from '../elements.js'
+import {
+  ambientLight,
+  box,
+  directionalLight,
+  group,
+  image,
+  line,
+  points,
+  ring,
+  scene3d,
+  sphere,
+  text,
+} from '../elements.js'
 
 describe('box', () => {
   it('moves pointer, keyboard, and composition handlers off props onto handlers', () => {
@@ -192,5 +204,87 @@ describe('image', () => {
     const p = el.props as Record<string, unknown>
     expect(p.cursor).toBe('crosshair')
     expect(p.pointerEvents).toBe('auto')
+  })
+})
+
+describe('scene3d', () => {
+  it('lifts key and semantic; keeps layout and scene props on props', () => {
+    const objects = [sphere({ radius: 1, color: 0xff0000 }), ambientLight({ intensity: 0.4 })]
+    const el = scene3d({
+      width: 200,
+      height: 120,
+      background: 0x111111,
+      objects,
+      fov: 45,
+      near: 0.05,
+      far: 500,
+      cameraPosition: [0, 2, 5],
+      cameraTarget: [0, 0, 0],
+      orbitControls: { damping: 0.08 },
+      maxPixelRatio: 2,
+      key: 's1',
+      semantic: { role: 'img', label: 'preview' },
+    })
+    expect(el.kind).toBe('scene3d')
+    expect(el.key).toBe('s1')
+    expect(el.semantic).toEqual({ role: 'img', label: 'preview' })
+    expect(el.props).toMatchObject({
+      width: 200,
+      height: 120,
+      background: 0x111111,
+      objects,
+      fov: 45,
+      near: 0.05,
+      far: 500,
+      cameraPosition: [0, 2, 5],
+      cameraTarget: [0, 0, 0],
+      orbitControls: { damping: 0.08 },
+      maxPixelRatio: 2,
+    })
+    expect((el.props as Record<string, unknown>).key).toBeUndefined()
+    expect((el.props as Record<string, unknown>).semantic).toBeUndefined()
+  })
+
+  it('preserves dir on props for runtime direction resolution', () => {
+    const el = scene3d({
+      width: 100,
+      height: 80,
+      dir: 'rtl',
+      objects: [],
+    })
+    expect((el.props as { dir?: string }).dir).toBe('rtl')
+  })
+})
+
+describe('scene3d object helpers', () => {
+  it('tags each factory with the expected discriminant', () => {
+    expect(sphere({ radius: 2 })).toEqual({ type: 'sphere', radius: 2 })
+    expect(points({ positions: [0, 1, 2] })).toEqual({ type: 'points', positions: [0, 1, 2] })
+    expect(
+      line({
+        points: [
+          [0, 0, 0],
+          [1, 0, 0],
+        ],
+      }),
+    ).toEqual({
+      type: 'line',
+      points: [
+        [0, 0, 0],
+        [1, 0, 0],
+      ],
+    })
+    expect(ring({ innerRadius: 0.5, outerRadius: 1 })).toEqual({
+      type: 'ring',
+      innerRadius: 0.5,
+      outerRadius: 1,
+    })
+    expect(ambientLight({ color: 0xffffff })).toEqual({ type: 'ambientLight', color: 0xffffff })
+    expect(ambientLight()).toEqual({ type: 'ambientLight' })
+    expect(directionalLight({ intensity: 0.7 })).toEqual({ type: 'directionalLight', intensity: 0.7 })
+    expect(group({ objects: [sphere({ radius: 1 })] })).toEqual({
+      type: 'group',
+      objects: [{ type: 'sphere', radius: 1 }],
+    })
   })
 })
