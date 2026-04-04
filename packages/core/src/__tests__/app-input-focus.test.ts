@@ -80,6 +80,51 @@ describe('app input focus routing', () => {
     app.destroy()
   })
 
+  it('non-finite pointer coordinates return false without onClick or click-to-focus', async () => {
+    let clicks = 0
+    const app = await createApp(
+      () =>
+        box(
+          { width: 220, height: 120 },
+          [
+            box(
+              {
+                width: 180,
+                height: 40,
+                onClick: () => {
+                  clicks++
+                },
+                onKeyDown: () => {},
+              },
+              [],
+            ),
+          ],
+        ),
+      new TestRenderer(),
+      { width: 220, height: 120 },
+    )
+
+    expect(app.dispatch('onClick', Number.NaN, 10)).toBe(false)
+    expect(app.dispatch('onClick', 10, Number.POSITIVE_INFINITY)).toBe(false)
+    expect(clicks).toBe(0)
+
+    expect(
+      app.dispatchKey('onKeyDown', {
+        key: 'a',
+        code: 'KeyA',
+        shiftKey: false,
+        ctrlKey: false,
+        metaKey: false,
+        altKey: false,
+      }),
+    ).toBe(false)
+
+    expect(app.dispatch('onClick', 10, 10)).toBe(true)
+    expect(clicks).toBe(1)
+
+    app.destroy()
+  })
+
   it('focusNext after createApp re-renders once and returns', async () => {
     const renderer = new TestRenderer()
     const app = await createApp(

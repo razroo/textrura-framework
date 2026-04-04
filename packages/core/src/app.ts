@@ -88,6 +88,8 @@ export interface App {
   /**
    * Dispatch a pointer event at `(x, y)` using the same coordinate space and optional root offsets as
    * {@link dispatchHit} (nested canvas surfaces, CSS transforms).
+   * Non-finite or non-number `x` / `y` return `false` without handlers or focus changes (same
+   * `Number.isFinite` rule as {@link dispatchHit}).
    * Non-finite or non-number offsets are treated as `0`.
    *
    * @returns `true` when a handler ran (`handled` from {@link dispatchHit}). For `'onClick'`, focus may
