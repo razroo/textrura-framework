@@ -210,6 +210,39 @@ describe('CanvasRenderer.render wall time', () => {
     spy.mockRestore()
   })
 
+  it('sets lastRenderWallMs to 0 when global performance is undefined (no stale frame time)', () => {
+    Object.defineProperty(globalThis, 'window', {
+      value: { devicePixelRatio: 1 },
+      configurable: true,
+      writable: true,
+    })
+    const ctx = new FakeCtx()
+    const canvas = {
+      style: {} as Record<string, string>,
+      getContext: () => ctx,
+    } as unknown as HTMLCanvasElement
+
+    const stamps = [100, 103.5]
+    let i = 0
+    const spy = vi.spyOn(performance, 'now').mockImplementation(() => stamps[i++] ?? stamps[stamps.length - 1]!)
+
+    const renderer = new CanvasRenderer({ canvas })
+    const tree = box({ width: 10, height: 10 })
+    const layout = { x: 0, y: 0, width: 10, height: 10, children: [] }
+
+    renderer.render(layout, tree)
+    expect(renderer.lastRenderWallMs).toBeCloseTo(3.5, 5)
+    spy.mockRestore()
+
+    vi.stubGlobal('performance', undefined)
+    try {
+      renderer.render(layout, tree)
+      expect(renderer.lastRenderWallMs).toBe(0)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('records 0 lastRenderWallMs when performance.now moves backward (non-monotonic clock)', () => {
     Object.defineProperty(globalThis, 'window', {
       value: { devicePixelRatio: 1 },

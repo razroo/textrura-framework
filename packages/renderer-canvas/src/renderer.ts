@@ -280,6 +280,8 @@ export class CanvasRenderer implements Renderer {
     if (typeof performance !== 'undefined') {
       const delta = performance.now() - frameStart
       this.lastRenderWallMs = Math.max(0, Number.isFinite(delta) ? delta : 0)
+    } else {
+      this.lastRenderWallMs = 0
     }
 
     ctx.setTransform(1, 0, 0, 1, 0, 0)
