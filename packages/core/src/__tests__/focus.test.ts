@@ -104,6 +104,21 @@ describe('collectFocusOrder', () => {
     expect(order.map(t => t.element)).toEqual([kb, clickOnly])
   })
 
+  it('uses source child order for Tab, not z-index paint order (differs from pointer hit-testing)', () => {
+    const backVisually = box({ width: 50, height: 50, zIndex: 0, onClick: () => {} })
+    const frontVisually = box({ width: 50, height: 50, zIndex: 10, onClick: () => {} })
+    const root = box({ width: 100, height: 100 }, [backVisually, frontVisually])
+    const layout = {
+      ...makeLayout({ width: 100, height: 100 }),
+      children: [
+        makeLayout({ width: 50, height: 50 }),
+        makeLayout({ x: 0, y: 0, width: 50, height: 50 }),
+      ],
+    }
+    const order = collectFocusOrder(root, layout)
+    expect(order.map(t => t.element)).toEqual([backVisually, frontVisually])
+  })
+
   it('returns elements in document order (depth-first)', () => {
     const deepChild = box({ width: 10, height: 10, onClick: () => {} })
     const mid = box({ width: 40, height: 40 }, [deepChild])
