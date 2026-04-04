@@ -179,6 +179,19 @@ describe('text input history', () => {
     expect(h.present.nodes).toEqual(['5'])
   })
 
+  it('treats boxed number maxPast as default 100 (typeof object is not a numeric cap)', () => {
+    const boxed = Object(2) as unknown as number
+    expect(typeof boxed).toBe('object')
+    let h = createTextInputHistory({ nodes: ['0'], selection: sel(0, 1) })
+    for (let i = 1; i <= 5; i++) {
+      h = pushTextInputHistory(h, { nodes: [String(i)], selection: sel(0, 1) }, boxed)
+    }
+    // A real cap of 2 would trim `past` to 2 entries after five pushes.
+    expect(h.past).toHaveLength(5)
+    expect(h.past.map(p => p.nodes.join('\n'))).toEqual(['0', '1', '2', '3', '4'])
+    expect(h.present.nodes).toEqual(['5'])
+  })
+
   it('treats equivalent multi-line text as unchanged when selection fields match (node split only)', () => {
     const h = createTextInputHistory({ nodes: ['x', 'y'], selection: sel(0, 1) })
     const sameJoin = pushTextInputHistory(h, { nodes: ['x\ny'], selection: sel(0, 1) })
