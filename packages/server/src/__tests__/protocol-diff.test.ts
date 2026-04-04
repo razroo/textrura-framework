@@ -211,6 +211,18 @@ describe('coalescePatches', () => {
     expect(merged.map(p => p.path)).toEqual([[2], [0], [1]])
   })
 
+  it('merges interleaved updates to the same path without reordering relative to other paths', () => {
+    const merged = coalescePatches([
+      { path: [0], x: 1 },
+      { path: [1], y: 2 },
+      { path: [0], width: 3 },
+    ])
+    expect(merged).toEqual([
+      { path: [0], x: 1, width: 3 },
+      { path: [1], y: 2 },
+    ])
+  })
+
   it('clones path arrays on first occurrence so later mutations do not alias', () => {
     const path = [0, 1]
     const merged = coalescePatches([{ path, x: 1 }, { path, y: 2 }])
