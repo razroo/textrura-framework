@@ -488,8 +488,13 @@ describe('applyServerMessage', () => {
     expect(renders).toHaveLength(0)
     expect(metrics).toHaveLength(0)
 
+    applyServerMessage(state, renderer, [] as unknown as Msg, onErr, onMetrics)
+    expect(errors[1]).toContain('expected a JSON object')
+    expect(renders).toHaveLength(0)
+    expect(metrics).toHaveLength(0)
+
     applyServerMessage(state, renderer, {} as unknown as Msg, onErr, onMetrics)
-    expect(errors[1]).toContain('Invalid server message')
+    expect(errors[2]).toContain('Invalid server message')
     expect(renders).toHaveLength(0)
     expect(metrics).toHaveLength(0)
 
@@ -500,7 +505,7 @@ describe('applyServerMessage', () => {
       onErr,
       onMetrics,
     )
-    expect(errors[2]).toContain('Invalid server message')
+    expect(errors[3]).toContain('Invalid server message')
     expect(renders).toHaveLength(0)
     expect(metrics).toHaveLength(0)
 
@@ -511,7 +516,7 @@ describe('applyServerMessage', () => {
       onErr,
       onMetrics,
     )
-    expect(errors[3]).toContain('Invalid server message')
+    expect(errors[4]).toContain('Invalid server message')
     expect(renders).toHaveLength(0)
     expect(metrics).toHaveLength(0)
 
@@ -522,7 +527,7 @@ describe('applyServerMessage', () => {
       onErr,
       onMetrics,
     )
-    expect(errors[4]).toContain('Invalid server message')
+    expect(errors[5]).toContain('Invalid server message')
     expect(renders).toHaveLength(0)
     expect(metrics).toHaveLength(0)
   })

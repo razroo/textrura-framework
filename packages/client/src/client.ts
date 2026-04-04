@@ -238,7 +238,8 @@ function applyPatches(layout: ComputedLayout, patches: ServerPatch['patches']): 
  * walk stops and any `x` / `y` / `width` / `height` fields apply to that last resolved node (often the
  * root). This is intentional lenient behavior and does not call `onError`.
  *
- * When the payload is not a plain object, or is missing a well-formed `type` (`frame` with object
+ * When the payload is not a plain object (including JSON array roots, which are `typeof` `"object"`),
+ * or is missing a well-formed `type` (`frame` with object
  * `layout`/`tree`, `patch` with a `patches` array of objects that each include an integer `path` and
  * only finite numeric `x`/`y` and non-negative finite `width`/`height` when those fields are present,
  * or `error` with string `message`), calls `onError` and returns
@@ -276,7 +277,7 @@ export function applyServerMessage(
   const applyStart = performance.now()
   let renderMs = 0
   let didRender = false
-  if (msg === null || typeof msg !== 'object') {
+  if (msg === null || typeof msg !== 'object' || Array.isArray(msg)) {
     onError?.(new Error('Invalid server message: expected a JSON object'))
     return
   }
