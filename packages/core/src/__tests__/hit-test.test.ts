@@ -802,6 +802,12 @@ describe('dispatchHit', () => {
 
     expect(hasInteractiveHitAtPoint(parent, layout, 70, 30, 'oops' as unknown as number, 0)).toBe(false)
     expect(getCursorAtPoint(parent, layout, 70, 30, 50, Number.NaN)).toBe('pointer')
+    // getCursorAtPoint uses the same finiteNumberOrZero root offsets as dispatchHit / hitPathAtPoint.
+    expect(() => getCursorAtPoint(parent, layout, 70, 30, 'oops' as unknown as number, 0)).not.toThrow()
+    expect(getCursorAtPoint(parent, layout, 70, 30, 'oops' as unknown as number, 0)).toBeNull()
+    expect(() => getCursorAtPoint(parent, layout, 70, 30, 50n as unknown as number, 0)).not.toThrow()
+    expect(getCursorAtPoint(parent, layout, 70, 30, 50n as unknown as number, 0)).toBeNull()
+    expect(getCursorAtPoint(parent, layout, 70, 30, Object(50) as unknown as number, 0)).toBeNull()
 
     // BigInt offsets are non-numbers → treated as 0 (same as corrupt scroll props); must not throw.
     expect(dispatchHit(parent, layout, 'onClick', 70, 30, undefined, 50n as unknown as number, 0).handled).toBe(
