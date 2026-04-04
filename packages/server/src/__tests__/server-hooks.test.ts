@@ -245,6 +245,104 @@ describe('server message hooks', () => {
     expect(clickDispatched).toBe(false)
   })
 
+  it('ignores pointer events when x/y are not finite numbers (no layout broadcast; finite clicks still work)', async () => {
+    const port = pickPort()
+    /** Mutate props on click so serialized tree changes and the server always sends a follow-up frame. */
+    const viewState = { bump: 0 }
+    const server = await createServer(
+      () =>
+        box(
+          {
+            width: 40,
+            height: 20 + viewState.bump,
+            onClick: () => {
+              viewState.bump++
+            },
+          },
+          [],
+        ),
+      { port, width: 200, height: 100 },
+    )
+
+    const messages: Array<{ type: string }> = []
+
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}`)
+      const timeout = setTimeout(() => reject(new Error('timed out')), 8000)
+
+      let phase = 0
+
+      ws.on('message', (raw) => {
+        const msg = JSON.parse(String(raw)) as { type: string }
+        messages.push(msg)
+
+        if (phase === 0 && messages.length === 1 && msg.type === 'frame') {
+          phase = 1
+          ws.send(
+            JSON.stringify({
+              type: 'event',
+              eventType: 'onClick',
+              x: null,
+              y: 10,
+            }),
+          )
+          setTimeout(() => {
+            try {
+              expect(messages.length).toBe(1)
+            } catch (e) {
+              clearTimeout(timeout)
+              reject(e)
+              return
+            }
+            ws.send(
+              JSON.stringify({
+                type: 'event',
+                eventType: 'onClick',
+                x: 5,
+                y: 5,
+              }),
+            )
+          }, 100)
+        }
+
+        if (phase === 1 && messages.length === 2) {
+          phase = 2
+          ws.send(
+            JSON.stringify({
+              type: 'event',
+              eventType: 'onClick',
+              x: '5',
+              y: 5,
+            }),
+          )
+          setTimeout(() => {
+            try {
+              expect(messages.length).toBe(2)
+            } catch (e) {
+              clearTimeout(timeout)
+              reject(e)
+              return
+            }
+            clearTimeout(timeout)
+            ws.close()
+            resolve()
+          }, 100)
+        }
+      })
+
+      ws.on('error', (err) => {
+        clearTimeout(timeout)
+        reject(err)
+      })
+    }).finally(() => {
+      server.close()
+    })
+
+    expect(messages).toHaveLength(2)
+    expect(messages[0]!.type).toBe('frame')
+    expect(messages[1]!.type).toBe('frame')
+  })
+
   it('works without any hooks (backward-compatible)', async () => {
     const port = pickPort()
     const server = await createServer(

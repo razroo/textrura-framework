@@ -116,6 +116,11 @@ function upgradePathMatches(request: IncomingMessage, wsPath: string): boolean {
   }
 }
 
+/** Reject corrupt wire values (null from JSON, strings, NaN) before pointer dispatch + layout churn. */
+function clientPointerXYAreFinite(x: unknown, y: unknown): boolean {
+  return typeof x === 'number' && Number.isFinite(x) && typeof y === 'number' && Number.isFinite(y)
+}
+
 /**
  * Create a Textura server that computes layout and streams geometry to clients.
  *
@@ -291,14 +296,16 @@ export async function createServer(
           }
         }
         if (msg.type === 'event' && currentTree && prevLayout) {
-          dispatchHit(
-            currentTree,
-            prevLayout,
-            msg.eventType as keyof EventHandlers,
-            msg.x,
-            msg.y,
-          )
-          computeAndBroadcast()
+          if (clientPointerXYAreFinite(msg.x, msg.y)) {
+            dispatchHit(
+              currentTree,
+              prevLayout,
+              msg.eventType as keyof EventHandlers,
+              msg.x,
+              msg.y,
+            )
+            computeAndBroadcast()
+          }
         } else if (msg.type === 'key' && currentTree && prevLayout) {
           dispatchKeyboardEvent(currentTree, prevLayout, msg.eventType, {
             key: msg.key,

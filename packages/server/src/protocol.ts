@@ -59,7 +59,11 @@ export type ServerMessage =
   | (VersionedMessage & { type: 'error'; message: string; code?: number })
   | ServerDataMessage
 
-/** Messages sent from client to server. */
+/**
+ * Messages sent from client to server.
+ * For `type: 'event'`, `x` and `y` must be finite plain numbers; the server ignores events whose
+ * coordinates are null (e.g. JSON-serialized `NaN`), strings, or otherwise non-finite.
+ */
 export type ClientMessage =
   | (VersionedMessage & { type: 'event'; eventType: string; x: number; y: number })
   | (VersionedMessage & {
