@@ -9,6 +9,7 @@ import {
   focusPrev,
   resolveFocusedTarget,
 } from '../focus.js'
+import { hasFocusCandidateHandlers } from '../focus-candidates.js'
 import type { ComputedLayout } from 'textura'
 import type { BoxElement } from '../types.js'
 
@@ -623,5 +624,42 @@ describe('focusNext / focusPrev interaction', () => {
       focusPrev(root, layout)
       expect(focusedElement.peek()!.element).toBe(items[i])
     }
+  })
+})
+
+describe('hasFocusCandidateHandlers', () => {
+  const noop = () => {}
+
+  it('is false for undefined and empty handlers', () => {
+    expect(hasFocusCandidateHandlers(undefined)).toBe(false)
+    expect(hasFocusCandidateHandlers({})).toBe(false)
+  })
+
+  it('is false for pointer-only handlers (differs from interactive pointer hit-testing)', () => {
+    expect(hasFocusCandidateHandlers({ onPointerDown: noop })).toBe(false)
+    expect(hasFocusCandidateHandlers({ onPointerUp: noop })).toBe(false)
+    expect(hasFocusCandidateHandlers({ onPointerMove: noop })).toBe(false)
+    expect(hasFocusCandidateHandlers({ onWheel: noop })).toBe(false)
+    expect(
+      hasFocusCandidateHandlers({
+        onPointerDown: noop,
+        onPointerUp: noop,
+        onPointerMove: noop,
+        onWheel: noop,
+      }),
+    ).toBe(false)
+  })
+
+  it('is true when any Tab / click-to-focus handler is present', () => {
+    expect(hasFocusCandidateHandlers({ onClick: noop })).toBe(true)
+    expect(hasFocusCandidateHandlers({ onKeyDown: noop })).toBe(true)
+    expect(hasFocusCandidateHandlers({ onKeyUp: noop })).toBe(true)
+    expect(hasFocusCandidateHandlers({ onCompositionStart: noop })).toBe(true)
+    expect(hasFocusCandidateHandlers({ onCompositionUpdate: noop })).toBe(true)
+    expect(hasFocusCandidateHandlers({ onCompositionEnd: noop })).toBe(true)
+  })
+
+  it('is true when pointer and focus handlers are combined', () => {
+    expect(hasFocusCandidateHandlers({ onPointerDown: noop, onKeyDown: noop })).toBe(true)
   })
 })
