@@ -10,6 +10,7 @@ export type Direction = 'ltr' | 'rtl' | 'auto'
 /**
  * CSS `cursor` keyword for box props (canvas hosts assign it to `canvas.style.cursor` when supported).
  * Use `''` so {@link import('./hit-test.js').getCursorAtPoint} can fall through to an ancestor cursor.
+ * The union is a curated subset of valid CSS keywords, not an exhaustive list.
  */
 export type CursorProp =
   | ''
@@ -23,6 +24,8 @@ export type CursorProp =
   | 'move'
   | 'help'
   | 'cell'
+  | 'zoom-in'
+  | 'zoom-out'
 
 /** Optional direction metadata carried on UI props (see {@link Direction}). */
 export interface DirectionProps {
