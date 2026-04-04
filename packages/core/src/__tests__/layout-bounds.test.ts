@@ -170,6 +170,21 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ ...base, height: {} as unknown as number })).toBe(false)
   })
 
+  it('rejects Map, Set, and Promise values on bounds without throwing (typeof object; no ToNumber)', () => {
+    const base = { x: 0, y: 0, width: 10, height: 10, children: [] as [] }
+    const m = new Map() as unknown as number
+    const s = new Set() as unknown as number
+    const p = Promise.resolve(1) as unknown as number
+    expect(() => layoutBoundsAreFinite({ ...base, x: m })).not.toThrow()
+    expect(layoutBoundsAreFinite({ ...base, x: m })).toBe(false)
+    expect(() => layoutBoundsAreFinite({ ...base, y: s })).not.toThrow()
+    expect(layoutBoundsAreFinite({ ...base, y: s })).toBe(false)
+    expect(() => layoutBoundsAreFinite({ ...base, width: p })).not.toThrow()
+    expect(layoutBoundsAreFinite({ ...base, width: p })).toBe(false)
+    expect(() => layoutBoundsAreFinite({ ...base, height: m })).not.toThrow()
+    expect(layoutBoundsAreFinite({ ...base, height: m })).toBe(false)
+  })
+
   it('rejects Date and RegExp values on bounds without throwing (typeof object, not plain numbers)', () => {
     const base = { x: 0, y: 0, width: 10, height: 10, children: [] as [] }
     const d = new Date(0) as unknown as number
@@ -283,6 +298,14 @@ describe('finiteNumberOrZero', () => {
 
     const coercible = { valueOf: () => 7 } as unknown as number
     expect(finiteNumberOrZero(coercible)).toBe(0)
+
+    const m = new Map() as unknown as number
+    const st = new Set() as unknown as number
+    const pr = Promise.resolve(0) as unknown as number
+    expect(() => finiteNumberOrZero(m)).not.toThrow()
+    expect(finiteNumberOrZero(m)).toBe(0)
+    expect(finiteNumberOrZero(st)).toBe(0)
+    expect(finiteNumberOrZero(pr)).toBe(0)
   })
 
   it('maps objects with Symbol.toPrimitive to 0 (typeof must be number; no ToNumber coercion)', () => {
