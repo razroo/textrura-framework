@@ -56,6 +56,30 @@ describe('trapFocusStep', () => {
     expect(trapFocusStep(tree, layout, [0, 1], 'next')).toBe(false)
   })
 
+  it('returns false for negative, fractional, or non-finite scope indices without throwing', () => {
+    const inner = box({ onKeyDown: () => undefined }, [])
+    const tree = box({}, [inner])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 40,
+      children: [{ x: 0, y: 0, width: 100, height: 40, children: [] }],
+    }
+
+    for (const bad of [-1, 0.7, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY] as const) {
+      const path = [bad] as never
+      expect(() => trapFocusStep(tree, layout, path, 'next')).not.toThrow()
+      expect(trapFocusStep(tree, layout, path, 'next')).toBe(false)
+      expect(() => trapFocusStep(tree, layout, path, 'prev')).not.toThrow()
+      expect(trapFocusStep(tree, layout, path, 'prev')).toBe(false)
+    }
+
+    const onePast = [1n] as never
+    expect(() => trapFocusStep(tree, layout, onePast, 'next')).not.toThrow()
+    expect(trapFocusStep(tree, layout, onePast, 'next')).toBe(false)
+  })
+
   it('skips a focusable when its layout slot is missing (sparse children array; matches hit-test)', () => {
     const missingLayout = box({ onKeyDown: () => undefined }, [])
     const reachable = box({ onKeyDown: () => undefined }, [])
