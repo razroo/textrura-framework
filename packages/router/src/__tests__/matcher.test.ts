@@ -63,6 +63,16 @@ describe('route matcher', () => {
     expect(matchPath('/users/:id', '/users/42?x=1#y')).toEqual({ params: { id: '42' } })
   })
 
+  it('treats search-only, hash-only, and leading-delimiter path strings as root after stripping', () => {
+    expect(matchPath('/', '?')).toEqual({ params: {} })
+    expect(matchPath('/', '?q=1')).toEqual({ params: {} })
+    expect(matchPath('/', '#')).toEqual({ params: {} })
+    expect(matchPath('/', '#section')).toEqual({ params: {} })
+    expect(matchPath('/', '?#frag')).toEqual({ params: {} })
+    expect(matchPath('/home', '?')).toBeNull()
+    expect(matchPath('/home', '#x')).toBeNull()
+  })
+
   it('matches root pattern against root pathname', () => {
     expect(matchPath('/', '/')).toEqual({ params: {} })
     expect(matchPath('/', '/?ref=1')).toEqual({ params: {} })
