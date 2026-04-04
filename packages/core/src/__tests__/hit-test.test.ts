@@ -1197,6 +1197,55 @@ describe('dispatchHit', () => {
     expect(hitPathAtPoint(root, layout, 10, 10)).toEqual([2])
   })
 
+  it('z-index paint order cache invalidates when the sibling count changes', () => {
+    const log: string[] = []
+    const a = box({
+      width: 50,
+      height: 50,
+      zIndex: 0,
+      onClick: () => {
+        log.push('a')
+      },
+    })
+    const b = box({
+      width: 50,
+      height: 50,
+      zIndex: 1,
+      onClick: () => {
+        log.push('b')
+      },
+    })
+    const root = box({ width: 100, height: 100 }, [a, b])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['b'])
+
+    const c = box({
+      width: 50,
+      height: 50,
+      zIndex: 2,
+      onClick: () => {
+        log.push('c')
+      },
+    })
+    root.children.push(c)
+    layout.children.push({ x: 0, y: 0, width: 50, height: 50, children: [] })
+
+    log.length = 0
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['c'])
+  })
+
   it('overlapping siblings: non-finite z-index is treated as 0 for hit order', () => {
     const log: string[] = []
     const invalid = box({
