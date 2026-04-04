@@ -390,3 +390,82 @@ describe('animation timeline', () => {
     expect(props.state()).toBe('finished')
   })
 })
+
+describe('spring', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    vi.resetModules()
+  })
+
+  async function loadSpringAndSignal() {
+    vi.resetModules()
+    const { spring } = await import('../animation.js')
+    const { signal } = await import('../signals.js')
+    return { spring, signal }
+  }
+
+  /** `spring()` always schedules a perpetual `checkTarget` poll; drain with a hard step cap. */
+  function drainRafQueue(pending: FrameRequestCallback[], maxSteps: number) {
+    for (let i = 0; i < maxSteps && pending.length > 0; i++) {
+      pending.shift()!(0)
+    }
+  }
+
+  it('follows target.value after set() under mocked rAF (physics converges)', async () => {
+    const pending: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      pending.push(cb)
+      return pending.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    const { spring, signal } = await loadSpringAndSignal()
+    const target = signal(0)
+    const out = spring(target, { stiffness: 800, damping: 48, mass: 1 })
+
+    expect(out.peek()).toBe(0)
+
+    target.set(100)
+    drainRafQueue(pending, 50_000)
+
+    expect(out.peek()).toBeCloseTo(100, 1)
+  })
+
+  it('retargets when the signal changes again before settling', async () => {
+    const pending: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      pending.push(cb)
+      return pending.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    const { spring, signal } = await loadSpringAndSignal()
+    const target = signal(0)
+    const out = spring(target, { stiffness: 500, damping: 40, mass: 1 })
+
+    target.set(80)
+    drainRafQueue(pending, 8_000)
+
+    target.set(20)
+    drainRafQueue(pending, 50_000)
+
+    expect(out.peek()).toBeCloseTo(20, 1)
+  })
+
+  it('leaves the output at the initial target when no further sets occur', async () => {
+    const pending: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      pending.push(cb)
+      return pending.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    const { spring, signal } = await loadSpringAndSignal()
+    const target = signal(42)
+    const out = spring(target, { stiffness: 200, damping: 24, mass: 1 })
+
+    drainRafQueue(pending, 2_000)
+    expect(out.peek()).toBe(42)
+  })
+})
