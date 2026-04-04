@@ -195,7 +195,8 @@ while true; do
       echo "error: stream formatter exited non-zero ($fmt_status) on iteration $i" >&2
       exit "$fmt_status"
     fi
-  else
+  fi
+  if [[ "$VERBOSE" != "1" ]]; then
     set +e
     "${agent_cmd[@]}" "$prompt"
     agent_status=$?
