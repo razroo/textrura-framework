@@ -281,7 +281,10 @@ describe('createApp root width/height sanitization', () => {
       Number.POSITIVE_INFINITY,
       Number.NEGATIVE_INFINITY,
       -1,
+      -0.001,
       '50' as unknown as number,
+      1n as unknown as number,
+      Object(50) as unknown as number,
     ]) {
       render.mockClear()
       await createApp(() => box({ width: 40, height: 20 }, []), renderer, {
