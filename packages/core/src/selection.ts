@@ -55,6 +55,9 @@ export interface SelectionRange {
  * For each box, child origins subtract {@link import('./types.js').StyleProps.scrollX} /
  * `scrollY` (non-finite values → `0`), matching {@link import('./hit-test.js').dispatchHit} and
  * canvas paint so text metrics and pointer hit-testing share one coordinate space inside scroll containers.
+ *
+ * Sibling order is **element child index** (tree source order), not {@link import('./types.js').StyleProps.zIndex}
+ * paint order — pointer routing uses z-index for topmost hits; selection indexing stays stable for a11y and ranges.
  */
 export function collectTextNodes(
   element: UIElement,

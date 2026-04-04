@@ -140,6 +140,40 @@ describe('collectTextNodes', () => {
     expect(results[0].y).toBe(40)
   })
 
+  it('overlapping siblings: text node order follows children array index, not z-index paint stack', () => {
+    const el = box({ width: 100, height: 40 }, [
+      text({
+        text: 'PaintedOnTop',
+        font: '14px sans-serif',
+        lineHeight: 18,
+        width: 100,
+        height: 18,
+        zIndex: 5,
+      }),
+      text({
+        text: 'PaintedBelow',
+        font: '14px sans-serif',
+        lineHeight: 18,
+        width: 100,
+        height: 18,
+        zIndex: 1,
+      }),
+    ])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 40,
+      children: [
+        { x: 0, y: 0, width: 100, height: 18, children: [] },
+        { x: 0, y: 0, width: 100, height: 18, children: [] },
+      ],
+    }
+    const results: TextNodeInfo[] = []
+    collectTextNodes(el, layout, 0, 0, results)
+    expect(results.map(n => n.element.props.text)).toEqual(['PaintedOnTop', 'PaintedBelow'])
+  })
+
   it('treats non-finite root offsetX/Y as zero (aligned with pointer hit-test root offsets)', () => {
     const el = box({ width: 200, height: 100 }, [
       text({ text: 'Hi', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
