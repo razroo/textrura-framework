@@ -379,7 +379,7 @@ export function extractFontFamiliesFromCSSFont(font: string): string[] {
 /**
  * Collect unique font families referenced by text nodes in a UI tree.
  * Order is first-seen in a depth-first preorder walk (later duplicates are skipped).
- * Image leaves carry no `font` shorthand and are skipped.
+ * `image` and `scene3d` leaves carry no `font` shorthand and are skipped (siblings under the same parent are still walked).
  * Boxes with a missing or non-array `children` field are treated as empty (no throw) so bad
  * deserialization cannot take down font collection.
  */

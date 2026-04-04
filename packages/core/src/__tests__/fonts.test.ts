@@ -5,7 +5,7 @@ import {
   resolveFontLoadTimeoutMs,
   waitForFonts,
 } from '../fonts.js'
-import { box, image, text } from '../elements.js'
+import { box, image, scene3d, text } from '../elements.js'
 
 describe('extractFontFamiliesFromCSSFont', () => {
   it('returns empty for non-string font argument (boxed strings, symbols, loose runtime data)', () => {
@@ -704,6 +704,11 @@ describe('collectFontFamiliesFromTree', () => {
     expect(collectFontFamiliesFromTree(root)).toEqual([])
   })
 
+  it('returns empty when the root is scene3d (3D views carry no font shorthand)', () => {
+    const root = scene3d({ objects: [], width: 1, height: 1 })
+    expect(collectFontFamiliesFromTree(root)).toEqual([])
+  })
+
   it('dedupes families from text nodes', () => {
     const tree = box({}, [
       text({ text: 'a', font: '14px Inter', lineHeight: 20 }),
@@ -761,6 +766,14 @@ describe('collectFontFamiliesFromTree', () => {
   it('ignores image nodes and still collects fonts from text in the same subtree', () => {
     const tree = box({}, [
       image({ src: '/a.png', width: 40, height: 40 }),
+      text({ text: 'hi', font: '14px Inter', lineHeight: 20 }),
+    ])
+    expect(collectFontFamiliesFromTree(tree)).toEqual(['Inter'])
+  })
+
+  it('ignores scene3d nodes and still collects fonts from text in the same subtree', () => {
+    const tree = box({}, [
+      scene3d({ objects: [], width: 40, height: 40 }),
       text({ text: 'hi', font: '14px Inter', lineHeight: 20 }),
     ])
     expect(collectFontFamiliesFromTree(tree)).toEqual(['Inter'])
