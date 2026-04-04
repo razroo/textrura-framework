@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { Renderer, UIElement } from '@geometra/core'
 import type { ComputedLayout } from 'textura'
 import { createClient, type ClientFrameMetrics } from '../client.js'
+import { createHeadlessClient } from '../headless.js'
 
 /** Build a v1 GEOM binary envelope with UTF-8 JSON payload (matches server/client frame layout). */
 function encodeGeomV1JsonPayload(json: string): ArrayBuffer {
@@ -2980,5 +2981,46 @@ describe('createClient WebSocket message parse errors', () => {
     expect(renders).toHaveLength(1)
     expect(renders[0]?.width).toBe(72)
     expect(client.layout?.width).toBe(72)
+  })
+})
+
+describe('createHeadlessClient', () => {
+  afterEach(() => {
+    globalThis.WebSocket = origWebSocket
+  })
+
+  it('applies JSON text frames to layout and tree without a caller-supplied renderer', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+    const errors: unknown[] = []
+
+    const client = createHeadlessClient({
+      url: 'ws://mock.test',
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    sockets[0]!.emit('message', {
+      data: JSON.stringify({
+        type: 'frame',
+        layout: { x: 0, y: 0, width: 91, height: 92, children: [] },
+        tree: { kind: 'box', props: {}, children: [] } satisfies UIElement,
+        protocolVersion: 1,
+      }),
+    })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    expect(errors).toHaveLength(0)
+    expect(client.layout?.width).toBe(91)
+    expect(client.layout?.height).toBe(92)
+    expect(client.tree?.kind).toBe('box')
+
+    client.close()
   })
 })
