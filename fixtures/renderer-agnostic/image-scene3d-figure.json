@@ -1,0 +1,53 @@
+{
+  "tree": {
+    "kind": "box",
+    "props": { "width": 400, "height": 300 },
+    "semantic": { "tag": "figure", "ariaLabel": "Product preview" },
+    "children": [
+      {
+        "kind": "image",
+        "props": {
+          "src": "/assets/preview.png",
+          "width": 200,
+          "height": 120,
+          "alt": "Product photo"
+        }
+      },
+      {
+        "kind": "scene3d",
+        "props": {
+          "width": 200,
+          "height": 120,
+          "objects": [{ "type": "sphere", "radius": 1 }]
+        },
+        "semantic": { "tag": "div", "role": "application", "ariaLabel": "3D viewer" }
+      },
+      {
+        "kind": "text",
+        "props": { "text": "Caption line", "font": "14px Inter", "lineHeight": 18 }
+      }
+    ]
+  },
+  "layout": {
+    "x": 0,
+    "y": 0,
+    "width": 400,
+    "height": 300,
+    "children": [
+      { "x": 0, "y": 0, "width": 200, "height": 120, "children": [] },
+      { "x": 0, "y": 130, "width": 200, "height": 120, "children": [] },
+      { "x": 0, "y": 260, "width": 400, "height": 18, "children": [] }
+    ]
+  },
+  "expectedSemanticIncludes": [
+    "<figure",
+    "Product preview",
+    "<img",
+    "/assets/preview.png",
+    "Product photo",
+    "role=\"application\"",
+    "3D viewer",
+    "Caption line"
+  ],
+  "expectedA11yRoles": ["group", "img", "application", "text"]
+}
