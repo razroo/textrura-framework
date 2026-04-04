@@ -242,6 +242,11 @@ describe('finiteNumberOrZero', () => {
     expect(finiteNumberOrZero(1n as unknown as number)).toBe(0)
   })
 
+  it('maps double overflow (e.g. MAX_VALUE * 2) to 0 so scroll math cannot become non-finite', () => {
+    expect(Number.MAX_VALUE * 2).toBe(Infinity)
+    expect(finiteNumberOrZero(Number.MAX_VALUE * 2)).toBe(0)
+  })
+
   it('maps Symbol, boxed numbers, and other objects to 0 without throwing (typeof must be number)', () => {
     const sym = Symbol('scroll') as unknown as number
     expect(() => finiteNumberOrZero(sym)).not.toThrow()
