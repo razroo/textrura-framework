@@ -45,6 +45,32 @@ describe('core perf smoke', () => {
     expect(best).toBeLessThanOrEqual(500)
   })
 
+  it('hit-testing stays fast on a deep linear box chain', () => {
+    const depth = 90
+    let el = box({ width: 100, height: 100, onClick: () => {} })
+    let layout: ComputedLayout = { x: 0, y: 0, width: 100, height: 100, children: [] }
+    for (let d = 1; d < depth; d++) {
+      el = box({ width: 100, height: 100 }, [el])
+      layout = { x: 0, y: 0, width: 100, height: 100, children: [layout] }
+    }
+
+    for (let i = 0; i < 400; i++) {
+      dispatchHit(el, layout, 'onClick', 50 + (i % 3), 50 - (i % 2))
+    }
+
+    let best = Number.POSITIVE_INFINITY
+    for (let run = 0; run < 3; run++) {
+      const start = nowMs()
+      for (let i = 0; i < 1200; i++) {
+        dispatchHit(el, layout, 'onClick', 50 + (i % 3), 50 - (i % 2))
+      }
+      best = Math.min(best, nowMs() - start)
+    }
+
+    expect(best).toBeGreaterThan(0)
+    expect(best).toBeLessThanOrEqual(500)
+  })
+
   it('hit path and cursor resolution stay fast with many z-ordered siblings', () => {
     const cols = 20
     const rows = 10
