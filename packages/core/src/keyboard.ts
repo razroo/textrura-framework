@@ -16,6 +16,10 @@ import { focusNext, focusPrev, resolveFocusedTarget } from './focus.js'
  * For other keys, returns `true` only when a resolved focus target exists and its handler for
  * `eventType` runs; otherwise `false`.
  *
+ * @param tree - Root of the UI tree (same as composition dispatch).
+ * @param layout - Computed layout parallel to `tree`.
+ * @param eventType - `onKeyDown` or `onKeyUp`. Tab traversal runs only on `onKeyDown`.
+ * @param partialEvent - Keyboard fields merged before `target` is set on the dispatched event; must not rely on a pre-set `target`.
  * @returns `true` when `partialEvent.key` is `'Tab'` and `eventType` is `'onKeyDown'` (traversal is
  *   always attempted, even when the tree has no focusables), or when a resolved focus target exists
  *   and its handler for `eventType` runs (including `'Tab'` on `'onKeyUp'` when `onKeyUp` is set —
