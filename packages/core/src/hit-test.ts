@@ -363,7 +363,8 @@ export function hitPathAtPoint(
  *
  * An empty-string `cursor` on a nested box does not stop the walk (child results are checked with truthiness),
  * so the nearest ancestor with a non-empty `cursor` wins. A root hit on a lone box with `cursor: ''` still
- * yields `''`.
+ * yields `''`. The same applies to lone `text` / `image` / `scene3d` roots: `cursor: ''` yields `''`, while
+ * omitting `cursor` yields `null` (host/renderer default).
  */
 export function getCursorAtPoint(
   element: UIElement,

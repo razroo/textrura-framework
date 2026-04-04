@@ -2853,6 +2853,20 @@ describe('non-box leaves (text, image, scene3d)', () => {
     expect(hasInteractiveHitAtPoint(root, layout, 32, 32)).toBe(false)
     expect(getCursorAtPoint(root, layout, 32, 32)).toBe('crosshair')
   })
+
+  it('leaf roots: empty-string cursor yields empty string (distinct from omitted cursor → null)', () => {
+    const t = text({ text: 'Hi', font: '14px Inter', lineHeight: 20, cursor: '' })
+    const tLayout = { x: 0, y: 0, width: 50, height: 20, children: [] as const }
+    expect(getCursorAtPoint(t, tLayout, 10, 10)).toBe('')
+
+    const img = image({ src: '/x.png', width: 32, height: 32, cursor: '' })
+    const imgLayout = { x: 0, y: 0, width: 32, height: 32, children: [] as const }
+    expect(getCursorAtPoint(img, imgLayout, 16, 16)).toBe('')
+
+    const s3 = scene3d({ width: 64, height: 64, objects: [], cursor: '' })
+    const s3Layout = { x: 0, y: 0, width: 64, height: 64, children: [] as const }
+    expect(getCursorAtPoint(s3, s3Layout, 32, 32)).toBe('')
+  })
 })
 
 describe('overflow hidden clipping', () => {
