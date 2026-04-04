@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { box, image, text } from '../elements.js'
+import { box, image, scene3d, sphere, text } from '../elements.js'
 import { resolveDirectionValue, resolveElementDirection } from '../direction.js'
 import { toLayoutTree } from '../tree.js'
 
@@ -61,11 +61,13 @@ describe('direction model', () => {
     expect(resolveElementDirection(auto, 'rtl')).toBe('rtl')
   })
 
-  it('resolves direction for text and image nodes the same as boxes', () => {
+  it('resolves direction for text, image, and scene3d leaf nodes the same as boxes', () => {
     const rtlText = text({ text: 'x', font: '14px Inter', lineHeight: 20, dir: 'rtl' })
     const rtlImage = image({ src: '/x.png', width: 1, height: 1, dir: 'rtl' })
+    const rtlScene = scene3d({ width: 100, height: 100, objects: [sphere({ radius: 1 })], dir: 'rtl' })
     expect(resolveElementDirection(rtlText, 'ltr')).toBe('rtl')
     expect(resolveElementDirection(rtlImage, 'ltr')).toBe('rtl')
+    expect(resolveElementDirection(rtlScene, 'ltr')).toBe('rtl')
   })
 
   it('resolveElementDirection inherits parent for unknown dir on element props', () => {
@@ -103,6 +105,17 @@ describe('direction model', () => {
       lineHeight: 18,
       width: 50,
       height: 18,
+      dir: 'rtl',
+    })
+    expect(resolveElementDirection(el, 'ltr')).toBe('rtl')
+    expect(toLayoutTree(el)).not.toHaveProperty('dir')
+  })
+
+  it('keeps dir on scene3d for resolveElementDirection while toLayoutTree omits it for Textura', () => {
+    const el = scene3d({
+      width: 50,
+      height: 50,
+      objects: [sphere({ radius: 1 })],
       dir: 'rtl',
     })
     expect(resolveElementDirection(el, 'ltr')).toBe('rtl')
