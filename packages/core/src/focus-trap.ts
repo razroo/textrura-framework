@@ -1,5 +1,6 @@
 import type { ComputedLayout } from 'textura'
 import type { UIElement, BoxElement } from './types.js'
+import { hasFocusCandidateHandlers } from './focus-candidates.js'
 import { focusedElement, setFocus } from './focus.js'
 import { layoutBoundsAreFinite } from './layout-bounds.js'
 
@@ -11,14 +12,7 @@ interface FocusTarget {
 function collectFocusable(element: UIElement, layout: ComputedLayout, out: FocusTarget[]): void {
   if (!layoutBoundsAreFinite(layout)) return
   if (element.kind !== 'box') return
-  if (
-    element.handlers?.onClick ||
-    element.handlers?.onKeyDown ||
-    element.handlers?.onKeyUp ||
-    element.handlers?.onCompositionStart ||
-    element.handlers?.onCompositionUpdate ||
-    element.handlers?.onCompositionEnd
-  ) {
+  if (hasFocusCandidateHandlers(element.handlers)) {
     out.push({ element, layout })
   }
   for (let i = 0; i < element.children.length; i++) {

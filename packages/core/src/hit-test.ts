@@ -1,5 +1,6 @@
 import type { ComputedLayout } from 'textura'
 import type { UIElement, BoxElement, EventHandlers, HitEvent } from './types.js'
+import { hasFocusCandidateHandlers } from './focus-candidates.js'
 import { finiteNumberOrZero, layoutBoundsAreFinite } from './layout-bounds.js'
 
 interface HitTarget {
@@ -42,17 +43,6 @@ function getChildrenByZAsc(boxEl: BoxElement): number[] {
     .sort((a, b) => zValues[a]! - zValues[b]!)
   zIndexOrderCache.set(boxEl, { zValues, asc })
   return asc
-}
-
-function isFocusableHandlers(handlers: EventHandlers | undefined): boolean {
-  return !!(
-    handlers?.onClick ||
-    handlers?.onKeyDown ||
-    handlers?.onKeyUp ||
-    handlers?.onCompositionStart ||
-    handlers?.onCompositionUpdate ||
-    handlers?.onCompositionEnd
-  )
 }
 
 /**
@@ -203,13 +193,13 @@ function dispatchHitRecursive(
     return {
       handled: true,
       focusTarget:
-        eventType === 'onClick' && isFocusableHandlers(handlers)
+        eventType === 'onClick' && hasFocusCandidateHandlers(handlers)
           ? { element: boxEl, layout }
           : undefined,
     }
   }
 
-  if (eventType === 'onClick' && !focusTarget && isFocusableHandlers(handlers)) {
+  if (eventType === 'onClick' && !focusTarget && hasFocusCandidateHandlers(handlers)) {
     focusTarget = { element: boxEl, layout }
   }
 

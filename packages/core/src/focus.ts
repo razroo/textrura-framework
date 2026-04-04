@@ -1,5 +1,6 @@
 import type { ComputedLayout } from 'textura'
 import type { UIElement, BoxElement } from './types.js'
+import { hasFocusCandidateHandlers } from './focus-candidates.js'
 import { layoutBoundsAreFinite } from './layout-bounds.js'
 import { signal } from './signals.js'
 import type { Signal } from './signals.js'
@@ -52,14 +53,7 @@ function collectFocusable(
 ): void {
   if (!layoutBoundsAreFinite(layout)) return
   if (element.kind === 'box') {
-    if (
-      element.handlers?.onKeyDown ||
-      element.handlers?.onKeyUp ||
-      element.handlers?.onCompositionStart ||
-      element.handlers?.onCompositionUpdate ||
-      element.handlers?.onCompositionEnd ||
-      element.handlers?.onClick
-    ) {
+    if (hasFocusCandidateHandlers(element.handlers)) {
       results.push({ element, layout })
     }
     for (let i = 0; i < element.children.length; i++) {

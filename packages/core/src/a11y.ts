@@ -1,5 +1,6 @@
 import type { ComputedLayout } from 'textura'
 import type { UIElement, BoxElement, TextElement, ImageElement } from './types.js'
+import { hasFocusCandidateHandlers } from './focus-candidates.js'
 import { finiteNumberOrZero } from './layout-bounds.js'
 
 export interface AccessibilityBounds {
@@ -61,16 +62,7 @@ function inferName(element: UIElement): string | undefined {
 
 /** Matches `collectFocusOrder` / click-to-focus: key, click, or composition handlers make a box focusable. */
 function isFocusable(element: UIElement): boolean {
-  if (element.kind !== 'box') return false
-  const h = element.handlers
-  return !!(
-    h?.onClick ||
-    h?.onKeyDown ||
-    h?.onKeyUp ||
-    h?.onCompositionStart ||
-    h?.onCompositionUpdate ||
-    h?.onCompositionEnd
-  )
+  return element.kind === 'box' && hasFocusCandidateHandlers(element.handlers)
 }
 
 function stateFor(element: UIElement): AccessibilityNode['state'] | undefined {
