@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { box, text, image } from '../elements.js'
+import { box, text, image, scene3d } from '../elements.js'
 import {
   focusedElement,
   setFocus,
@@ -152,17 +152,19 @@ describe('collectFocusOrder', () => {
     expect(order[1]!.element).toBe(sibling)
   })
 
-  it('skips text and image elements', () => {
+  it('skips text, image, and scene3d elements (layout leaves; only boxes participate in Tab order)', () => {
     const txt = text({ text: 'hi', font: '14px sans', lineHeight: 18, width: 50, height: 18 })
     const img = image({ src: 'a.png', width: 50, height: 50 })
+    const s3 = scene3d({ width: 50, height: 50, objects: [] })
     const btn = box({ width: 50, height: 30, onClick: () => {} })
-    const root = box({ width: 200, height: 100 }, [txt, img, btn])
+    const root = box({ width: 260, height: 100 }, [txt, img, s3, btn])
     const layout = {
-      ...makeLayout({ width: 200, height: 100 }),
+      ...makeLayout({ width: 260, height: 100 }),
       children: [
         makeLayout({ width: 50, height: 18 }),
         makeLayout({ x: 60, width: 50, height: 50 }),
-        makeLayout({ x: 120, width: 50, height: 30 }),
+        makeLayout({ x: 120, width: 50, height: 50 }),
+        makeLayout({ x: 180, width: 50, height: 30 }),
       ],
     }
     const order = collectFocusOrder(root, layout)

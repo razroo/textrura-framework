@@ -29,6 +29,7 @@ export function clearFocus(): void {
  *
  * A box is focusable when it defines any of `onClick`, `onKeyDown`, `onKeyUp`,
  * `onCompositionStart`, `onCompositionUpdate`, or `onCompositionEnd`.
+ * Non-box leaves (`text`, `image`, `scene3d`) are ignored — only `box` nodes participate in this walk.
  * Skips boxes whose layout bounds are non-finite or have negative width/height, and does not walk
  * their subtrees — same rule as hit-testing so corrupt geometry cannot enter focus order.
  *
