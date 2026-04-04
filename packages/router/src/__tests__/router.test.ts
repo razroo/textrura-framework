@@ -599,6 +599,7 @@ describe('createRouter lifecycle', () => {
 
   it('exposes pending/loading states during navigation lifecycle', async () => {
     const history = createMemoryHistory({ initialEntries: ['/'] })
+    const control: { resolve?: (value: { id: string }) => void } = {}
     const routesWithDelay: RouteNode[] = [
       {
         id: 'root',
@@ -608,7 +609,9 @@ describe('createRouter lifecycle', () => {
             id: 'users',
             path: 'users/:id',
             loader: ({ params }) =>
-              new Promise((resolve) => setTimeout(() => resolve({ id: params.id }), 20)),
+              new Promise((resolve) => {
+                control.resolve = () => resolve({ id: params.id })
+              }),
           },
         ],
       },
@@ -621,11 +624,12 @@ describe('createRouter lifecycle', () => {
     expect(['navigating', 'loading']).toContain(router.getState().navigation)
     expect(router.isPending('/users/5')).toBe(true)
 
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await Promise.resolve()
     expect(router.getState().loading).toBe(true)
     expect(router.getState().navigation).toBe('loading')
     expect(router.isPending('/users/5')).toBe(true)
 
+    control.resolve?.()
     await navPromise
     expect(router.getState().pending).toBe(false)
     expect(router.getState().loading).toBe(false)

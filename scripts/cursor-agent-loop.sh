@@ -11,9 +11,9 @@ fi
 #
 # Task selection (humans/agents): grep the entire ROADMAP.md for `- [ ]` (Phase A–C, post-1.0 plans,
 # release polish, and next frontier all use the same checkbox pattern) and grep ROUTING_COMPETITIVENESS_CHECKLIST.md.
-# Many sections may already be all `[x]` — that only means unchecked roadmap boxes are exhausted,
+# Both trackers may already be all `[x]` — that only means unchecked checkbox backlog is exhausted there,
 # not that the repo is "done". ROADMAP "Deferred / research" uses plain bullets (no `- [ ]`), so an empty
-# grep does not mean no roadmap-backed themes — read that subsection when casting next work (RTL through
+# roadmap grep does not mean no roadmap-backed themes — read that subsection when casting next work (RTL through
 # Textura, animation beyond helpers, extra render targets). Otherwise prefer one scoped change under
 # packages/ (tests, perf in hit-test/text/layout paths, types, public JSDoc, or
 # `rg 'TODO|FIXME|HACK' packages`; a clean TODO grep is normal — pick a north-star bucket anyway).
@@ -125,7 +125,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
 1. Explore the codebase. Read ROADMAP.md, CLAUDE.md, and browse the source in packages/. Understand the architecture and what already exists. If the task touches demo sites, \`create:app\` templates, or starter examples, read AGENTS.md (full-viewport canvas; no extra DOM chrome around Geometra).
 
 2. Decide what to work on. Use this priority order:
-   a) Unchecked items in ROADMAP.md (if any remain). Grep the whole file for \`[ ]\` — not only Phase A–C; post-1.0, release polish, and next-frontier blocks use the same pattern. When every checkbox is \`[x]\`, still grep ROUTING_COMPETITIVENESS_CHECKLIST.md for any remaining \`[ ]\` lines; use those sections for thematic priorities (fonts/metrics, hit-test and input, protocol, renderers, demos). The ROADMAP "Deferred / research" subsection has no checkboxes — read it explicitly when everything else is \`[x]\` and you want roadmap-aligned themes. Ignore \`[ ]\` in RELEASE_CHECKLIST.md and v1-release-checklist.md — those are maintainer release steps, not framework backlog.
+   a) Unchecked items in ROADMAP.md (if any remain). Grep the whole file for \`[ ]\` — not only Phase A–C; post-1.0, release polish, and next-frontier blocks use the same pattern. When ROADMAP is all \`[x]\`, still grep ROUTING_COMPETITIVENESS_CHECKLIST.md for any remaining \`[ ]\` lines; when both greps are empty, use ROADMAP "Deferred / research" or the routing doc's sections only as thematic hints (fonts/metrics, hit-test and input, protocol, renderers, demos). The ROADMAP "Deferred / research" subsection has no checkboxes — read it explicitly when everything else is \`[x]\` and you want roadmap-aligned themes. Ignore \`[ ]\` in RELEASE_CHECKLIST.md and v1-release-checklist.md — those are maintainer release steps, not framework backlog.
    b) If nothing is unchecked there either, improve the framework on your own initiative. Examples of valuable work:
       - Add or expand test coverage (unit tests, edge cases, integration tests)
       - Improve performance in hot paths (hit-testing, text measurement, layout, repaint)
@@ -138,7 +138,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
       - Improve the demo site or starter templates (follow AGENTS.md: Geometra owns the page; minimal host HTML)
       Prefer one primary subsystem or package per iteration (e.g. core hit-test, fonts, server protocol); avoid wide drive-by refactors unless the task truly spans boundaries. For hit-test, text input, protocol, or layout/repaint work, align with FRAMEWORK_NORTH_STAR.md (merge checklist: tests where practical, no DOM leaks, no avoidable perf regressions).
       When adding tests without a specific bugfix, prefer extending files already run by root \`package.json\` \`release:gate\` (keeps new coverage in the vetted CI path; only widen the gate when the suite is release-critical). The gate is an explicit file allowlist — \`npm run test\` (vitest.fast) may run additional files that the gate does not; confirm in \`package.json\` rather than assuming. If you widen the gate, grep or read the existing \`vitest run ...\` list first so you do not add a duplicate path (vitest would execute that file twice).
-      When both roadmap checklists are fully checked, re-read ROADMAP "Deferred / research" for themes, or target north-star hot paths (hit-test, text measurement, protocol encode/decode, layout/repaint).
+      When roadmap and routing checklists are fully checked, re-read ROADMAP "Deferred / research" for themes, or target north-star hot paths (hit-test, text measurement, protocol encode/decode, layout/repaint).
       Pick something concrete and high-value. Do NOT say there is nothing to do — there is always room to improve a codebase.
 
    c) Self-improve this loop: when scripts/cursor-agent-loop.sh — the prompt you are reading or the script's header comments — is stale, misleading, too vague, or omits heuristics that would help later runs pick better tasks and scope work smarter, prefer a minimal, accurate edit to that script if that is higher leverage right now than the next item in (a)/(b). Goal: successive iterations should get better at deciding what to work on and how.
