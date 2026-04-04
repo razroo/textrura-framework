@@ -858,6 +858,16 @@ describe('dispatchHit', () => {
     expect(result.focusTarget?.element).toBe(el)
   })
 
+  it('hasInteractiveHitAtPoint ignores keyboard and composition-only handlers (pointer hover semantics)', () => {
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
+    const keyDownOnly = box({ width: 100, height: 50, onKeyDown: () => undefined })
+    const keyUpOnly = box({ width: 100, height: 50, onKeyUp: () => undefined })
+    const compStartOnly = box({ width: 100, height: 50, onCompositionStart: () => undefined })
+    expect(hasInteractiveHitAtPoint(keyDownOnly, layout, 50, 25)).toBe(false)
+    expect(hasInteractiveHitAtPoint(keyUpOnly, layout, 50, 25)).toBe(false)
+    expect(hasInteractiveHitAtPoint(compStartOnly, layout, 50, 25)).toBe(false)
+  })
+
   it('merges extra fields into the hit event', () => {
     let received: Record<string, unknown> | null = null
     const el = box({
