@@ -50,10 +50,12 @@ function stripStyleProps(props: Record<string, unknown>): Record<string, unknown
  * `selectable`, `dir`, and image `src` / `alt` / `objectFit`. Remaining props are flex and
  * sizing fields that belong in the layout pipeline.
  *
- * `dir` is omitted because upstream Textura {@link LayoutNode} types do not carry direction yet;
- * Yoga sees one document direction via {@link import('./app.js').createApp}'s `layoutDirection` /
- * `computeLayout`, while per-node text, focus, and hit-testing resolve direction on the live
- * {@link UIElement} tree with {@link import('./direction.js').resolveElementDirection}.
+ * Per-node `dir` is intentionally stripped from layout nodes: Yoga/Textura receives one document
+ * direction from {@link import('./app.js').createApp}'s {@link import('./app.js').AppOptions.layoutDirection}
+ * (or the root element’s resolved `dir` when that option is omitted), while nested `dir` on the live
+ * {@link UIElement} tree is resolved at text, focus, selection, and hit-test time with
+ * {@link import('./direction.js').resolveElementDirection}. ROADMAP.md “Deferred / research” tracks an
+ * optional future pass that would thread per-node direction through Textura layout props.
  *
  * Does not mutate the source element or its `props` (strip list is applied to a shallow copy).
  *
