@@ -126,7 +126,7 @@ describe('dispatchHit', () => {
     })
   })
 
-  it('merges extra metadata onto the HitEvent after base pointer fields', () => {
+  it('merges extra metadata onto the HitEvent; pointer geometry comes from the hit', () => {
     let received: HitEvent | undefined
     const layout = { x: 10, y: 20, width: 100, height: 50, children: [] }
     const el = box({
@@ -152,32 +152,6 @@ describe('dispatchHit', () => {
     expect((received as HitEvent & { button: number }).button).toBe(2)
     expect((received as HitEvent & { shiftKey: boolean }).shiftKey).toBe(true)
     expect((received as HitEvent & { buttons: number }).buttons).toBe(4)
-  })
-
-  it('applies extra after base HitEvent fields so renderer-supplied keys can override coordinates', () => {
-    let received: HitEvent | undefined
-    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
-    const el = box({
-      width: 100,
-      height: 50,
-      onPointerDown: e => {
-        received = e
-      },
-    })
-
-    dispatchHit(el, layout, 'onPointerDown', 50, 25, {
-      x: 1,
-      y: 2,
-      localX: 3,
-      localY: 4,
-    })
-
-    expect(received).toBeDefined()
-    expect(received!.x).toBe(1)
-    expect(received!.y).toBe(2)
-    expect(received!.localX).toBe(3)
-    expect(received!.localY).toBe(4)
-    expect(received!.target).toBe(layout)
   })
 
   it('zero-size box: only the origin corner is inside', () => {
@@ -920,6 +894,33 @@ describe('dispatchHit', () => {
     expect(received!.target).toBe(layout)
     expect(received!.button).toBe(2)
     expect(received!.shiftKey).toBe(true)
+  })
+
+  it('does not let extra override computed x, y, localX, localY, or target', () => {
+    const decoyLayout = { x: 9, y: 9, width: 1, height: 1, children: [] as const }
+    let received: HitEvent | null = null
+    const el = box({
+      width: 100,
+      height: 50,
+      onPointerDown: (e) => {
+        received = e
+      },
+    })
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
+
+    dispatchHit(el, layout, 'onPointerDown', 10, 20, {
+      x: 999,
+      y: 888,
+      localX: 777,
+      localY: 666,
+      target: decoyLayout as unknown as HitEvent['target'],
+    })
+    expect(received).not.toBeNull()
+    expect(received!.x).toBe(10)
+    expect(received!.y).toBe(20)
+    expect(received!.localX).toBe(10)
+    expect(received!.localY).toBe(20)
+    expect(received!.target).toBe(layout)
   })
 
   it('click returns focus target for key-only focusable boxes', () => {

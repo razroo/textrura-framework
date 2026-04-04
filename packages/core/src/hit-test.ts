@@ -186,12 +186,12 @@ function dispatchHitRecursive(
   const handler = handlers?.[eventType]
   if (handler) {
     const event: HitEvent = {
+      ...(extra ?? {}),
       x,
       y,
       localX: x - absX,
       localY: y - absY,
       target: layout,
-      ...extra,
     }
     ;(handler as (e: HitEvent) => void)(event)
     return {
@@ -221,8 +221,9 @@ function dispatchHitRecursive(
  * {@link import('./app.js').App.dispatchComposition} from `createApp`) so Tab, typing, and IME go to the
  * focused target instead of whatever box lies under the pointer.
  *
- * Optional `extra` is shallow-merged onto the `HitEvent` after base fields so callers
- * can pass modifier keys, `button`, wheel deltas, and other renderer-specific metadata.
+ * Optional `extra` is shallow-merged first; `x`, `y`, `localX`, `localY`, and `target` are then
+ * set from the hit so corrupt or mistaken keys in `extra` cannot override pointer geometry or layout.
+ * Use `extra` for modifier keys, `button`, wheel deltas, and other renderer-specific metadata.
  * For `onClick` only, the return value may include `focusTarget` for focus routing
  * (including click-to-focus when there is no `onClick` handler).
  * Non-box roots (`text`, `image`, `scene3d`) always return `{ handled: false }` — attach pointer handlers to a parent {@link import('./types.js').BoxElement}.
