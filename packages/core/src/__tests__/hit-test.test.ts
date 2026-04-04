@@ -1308,6 +1308,34 @@ describe('dispatchHit', () => {
     expect(hitPathAtPoint(root, layoutOne, 10, 10)).toEqual([0])
   })
 
+  it('overlapping siblings: replacing a child at the same index invalidates z-order cache', () => {
+    const log: string[] = []
+    const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } })
+    const front = box({ width: 50, height: 50, zIndex: 10, onClick: () => { log.push('front') } })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['front'])
+
+    const behind = box({ width: 50, height: 50, zIndex: -1, onClick: () => { log.push('behind') } })
+    root.children[1] = behind
+
+    log.length = 0
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['back'])
+    expect(hitPathAtPoint(root, layout, 10, 10)).toEqual([0])
+  })
+
   it('overlapping siblings: fractional z-index sorts numerically for dispatch', () => {
     const log: string[] = []
     const low = box({ width: 50, height: 50, zIndex: 1, onClick: () => { log.push('low') } })
