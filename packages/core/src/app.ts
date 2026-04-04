@@ -70,8 +70,11 @@ export interface App {
   update(): void
   /**
    * Dispatch a pointer event at `(x, y)` using the same coordinate space and optional root offsets as
-   * `dispatchHit` in `hit-test.js` (nested canvas surfaces, CSS transforms).
+   * {@link dispatchHit} (nested canvas surfaces, CSS transforms).
    * Non-finite or non-number offsets are treated as `0`.
+   *
+   * @returns `true` when a handler ran (`handled` from {@link dispatchHit}). For `'onClick'`, focus may
+   *   still move via click-to-focus when this returns `false` (keyboard/composition target only).
    */
   dispatch(
     eventType: keyof EventHandlers,
@@ -81,14 +84,22 @@ export interface App {
     offsetX?: number,
     offsetY?: number,
   ): boolean
-  /** Dispatch a keyboard event to the focused element. */
+  /**
+   * Dispatch a keyboard event to the focused element (and Tab / Shift+Tab traversal on keydown).
+   *
+   * @see {@link dispatchKeyboardEvent} for full return semantics (Tab keydown always reports handled).
+   */
   dispatchKey(eventType: 'onKeyDown' | 'onKeyUp', event: Omit<KeyboardHitEvent, 'target'>): boolean
-  /** Dispatch an IME composition event to the focused element. */
+  /**
+   * Dispatch an IME composition event to the focused element.
+   *
+   * @see {@link dispatchCompositionEvent}
+   */
   dispatchComposition(
     eventType: 'onCompositionStart' | 'onCompositionUpdate' | 'onCompositionEnd',
     event: { data: string },
   ): boolean
-  /** Tear down the app. */
+  /** Stops the reactive effect and calls {@link Renderer.destroy} on the renderer. */
   destroy(): void
 }
 
