@@ -427,6 +427,40 @@ describe('@geometra/ui input', () => {
     expect(selectAllCalled).toBe(true)
   })
 
+  it('calls onSelectAll when key is uppercase A under Ctrl/Meta (normalizes with toLowerCase)', () => {
+    const order: string[] = []
+    const el = input('x', 'f', {
+      focused: true,
+      onSelectAll: () => order.push('selectAll'),
+      onKeyDown: () => order.push('keyDown'),
+    })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+
+    el.handlers?.onKeyDown?.({
+      key: 'A',
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: true,
+      metaKey: false,
+      altKey: false,
+      target: {} as KeyboardHitEvent['target'],
+    })
+    expect(order).toEqual(['selectAll'])
+
+    order.length = 0
+    el.handlers?.onKeyDown?.({
+      key: 'A',
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: true,
+      altKey: false,
+      target: {} as KeyboardHitEvent['target'],
+    })
+    expect(order).toEqual(['selectAll'])
+  })
+
   it('falls through to onKeyDown for Cmd+A when onSelectAll is not provided', () => {
     let keyDownKey = ''
 
