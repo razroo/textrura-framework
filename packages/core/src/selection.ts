@@ -55,6 +55,10 @@ export interface SelectionRange {
  * Nodes whose {@link ComputedLayout} bounds fail {@link layoutBoundsAreFinite} are skipped, and box
  * subtrees under a corrupt parent are not walked — same rule as hit-testing and focus order so bad
  * geometry cannot poison absolute coordinates or flood selection with unusable entries.
+ *
+ * For each box, child origins subtract {@link import('./types.js').StyleProps.scrollX} /
+ * `scrollY` (non-finite values → `0`), matching {@link import('./hit-test.js').dispatchHit} and
+ * canvas paint so text metrics and pointer hit-testing share one coordinate space inside scroll containers.
  */
 export function collectTextNodes(
   element: UIElement,
@@ -106,10 +110,13 @@ function collectTextNodesWalk(
 
   if (element.kind !== 'box') return
 
+  const childOffsetX = x - finiteRootOffset(element.props.scrollX)
+  const childOffsetY = y - finiteRootOffset(element.props.scrollY)
+
   for (let i = 0; i < element.children.length; i++) {
     const childLayout = layout.children[i]
     if (childLayout) {
-      collectTextNodesWalk(element.children[i]!, childLayout, x, y, results, direction)
+      collectTextNodesWalk(element.children[i]!, childLayout, childOffsetX, childOffsetY, results, direction)
     }
   }
 }

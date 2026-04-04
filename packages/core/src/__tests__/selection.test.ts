@@ -168,6 +168,37 @@ describe('collectTextNodes', () => {
     expect(collect(3, bx)[0]).toMatchObject({ x: 18, y: 20 })
   })
 
+  it('subtracts scrollX/scrollY when descending into children (aligned with canvas paint and hit-test)', () => {
+    const t = text({ text: 'InScroll', font: '14px sans-serif', lineHeight: 18, width: 80, height: 18 })
+    const el = box({ width: 200, height: 120 }, [
+      box(
+        { width: 100, height: 100, overflow: 'scroll', scrollX: 12, scrollY: 40 },
+        [t],
+      ),
+    ])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 120,
+      children: [
+        {
+          x: 10,
+          y: 20,
+          width: 100,
+          height: 100,
+          children: [{ x: 5, y: 30, width: 80, height: 18, children: [] }],
+        },
+      ],
+    }
+    const results: TextNodeInfo[] = []
+    collectTextNodes(el, layout, 0, 0, results)
+    expect(results).toHaveLength(1)
+    // paintNode: childOffsetX = (0+10) - 12 = -2, text x = -2 + 5 = 3
+    // childOffsetY = (0+20) - 40 = -20, text y = -20 + 30 = 10
+    expect(results[0]).toMatchObject({ x: 3, y: 10 })
+  })
+
   it('skips the whole walk when root layout bounds are corrupt (aligned with hit-test / focus)', () => {
     const el = box({ width: 200, height: 100 }, [
       text({ text: 'Hi', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
