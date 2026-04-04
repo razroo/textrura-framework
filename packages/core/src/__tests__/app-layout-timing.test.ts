@@ -1,7 +1,8 @@
 import { afterEach, describe, it, expect, vi } from 'vitest'
 import { createApp } from '../app.js'
-import { box, text } from '../elements.js'
+import { box, image, scene3d, text } from '../elements.js'
 import { clearFocus, focusedElement } from '../focus.js'
+import { layoutBoundsAreFinite } from '../layout-bounds.js'
 import { signal } from '../signals.js'
 import type { Renderer } from '../types.js'
 
@@ -247,6 +248,72 @@ describe('createApp layout direction (Textura computeLayout)', () => {
     const row = layouts[0]!.children[0]!
     const [a, b] = row.children
     expect(a!.x).toBeLessThan(b!.x)
+  })
+})
+
+describe('createApp non-box roots (layout + direction resolution)', () => {
+  it('computes finite layout for text, image, and scene3d roots (no flex children)', async () => {
+    const renderer: Renderer = {
+      render: vi.fn(),
+      destroy: vi.fn(),
+    }
+
+    await createApp(
+      () =>
+        text({
+          text: 'hi',
+          font: '16px sans-serif',
+          lineHeight: 20,
+          width: 120,
+          height: 24,
+          dir: 'rtl',
+        }),
+      renderer,
+      { width: 200, height: 80 },
+    )
+    expect(renderer.render).toHaveBeenCalledTimes(1)
+    const textLayout = renderer.render.mock.calls[0]![0]
+    expect(layoutBoundsAreFinite(textLayout)).toBe(true)
+
+    renderer.render.mockClear()
+    await createApp(
+      () => image({ src: '/x.png', width: 64, height: 48, dir: 'ltr' }),
+      renderer,
+      { width: 200, height: 80 },
+    )
+    expect(renderer.render).toHaveBeenCalledTimes(1)
+    const imageLayout = renderer.render.mock.calls[0]![0]
+    expect(layoutBoundsAreFinite(imageLayout)).toBe(true)
+
+    renderer.render.mockClear()
+    await createApp(
+      () => scene3d({ width: 80, height: 60, objects: [], dir: 'auto' }),
+      renderer,
+      { width: 200, height: 80 },
+    )
+    expect(renderer.render).toHaveBeenCalledTimes(1)
+    const sceneLayout = renderer.render.mock.calls[0]![0]
+    expect(layoutBoundsAreFinite(sceneLayout)).toBe(true)
+  })
+
+  it('exposes the live non-box tree on the app after mount', async () => {
+    const renderer: Renderer = {
+      render: vi.fn(),
+      destroy: vi.fn(),
+    }
+    const app = await createApp(
+      () =>
+        text({
+          text: 'x',
+          font: '14px sans-serif',
+          lineHeight: 18,
+          width: 10,
+          height: 18,
+        }),
+      renderer,
+      { width: 100, height: 50 },
+    )
+    expect(app.tree?.kind).toBe('text')
   })
 })
 
