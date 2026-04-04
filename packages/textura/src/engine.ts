@@ -171,6 +171,12 @@ function applyFlexProps(node: Node, props: FlexProps): void {
   }
   if (props.display !== undefined)
     node.setDisplay(props.display === 'none' ? Display.None : Display.Flex)
+
+  if (props.dir !== undefined) {
+    if (props.dir === 'rtl') node.setDirection(Direction.RTL)
+    else if (props.dir === 'ltr') node.setDirection(Direction.LTR)
+    else node.setDirection(Direction.Inherit)
+  }
 }
 
 // --- Parallel metadata tree ---
@@ -293,12 +299,12 @@ export interface ComputeOptions {
   /** Available height for the root container. Default: unconstrained. */
   height?: number
   /**
-   * Yoga **root** layout direction (`Direction` passed to `calculateLayout`). This affects row main-axis
-   * order, `flex-start` / `flex-end`, and related inline-axis resolution for the subtree Yoga lays out.
+   * Yoga **owner** direction passed to `calculateLayout` (document / root context). It seeds inheritance
+   * for nodes that use `dir: 'auto'` or Yoga’s default inherit behavior.
    *
-   * Textura does not yet read per-node direction from {@link LayoutNode} (that remains application-level
-   * in Geometra for text, selection, and focus). Pass the same document direction you use for flex layout;
-   * Geometra’s `createApp` maps `AppOptions.layoutDirection` or the root element’s resolved `dir` here.
+   * Nodes may also set {@link FlexProps.dir} for per-subtree layout direction (mirrors flex rows, start/end).
+   * Geometra’s `createApp` maps `AppOptions.layoutDirection` or the root element’s resolved `dir` here while
+   * omitting `dir` on the layout-tree root so this option stays authoritative for the host root.
    *
    * Default: `'ltr'`.
    */
@@ -311,9 +317,8 @@ export interface ComputeOptions {
  * Builds a Yoga node tree, wires Pretext text measurement into leaf nodes,
  * runs Yoga's flexbox algorithm, and returns the computed positions and sizes.
  *
- * Layout direction is a single root option ({@link ComputeOptions.direction}); nested `dir` on a host
- * tree is not applied inside this call unless the host strips or maps it into flex props before building
- * {@link LayoutNode} values.
+ * Combine {@link ComputeOptions.direction} with optional per-node {@link FlexProps.dir} on each
+ * {@link LayoutNode} for mixed-direction flex subtrees.
  */
 export function computeLayout(
   tree: LayoutNode,

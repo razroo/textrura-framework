@@ -223,7 +223,7 @@ describe('createApp layout direction (Textura computeLayout)', () => {
     expect(a!.x).toBeGreaterThan(b!.x)
   })
 
-  it('does not mirror nested flex rows from dir:rtl on a descendant — document direction stays ltr', async () => {
+  it('mirrors nested flex rows when a descendant sets dir:rtl (per-node Yoga direction)', async () => {
     const layouts: Array<{ children: Array<{ children: Array<{ x: number }> }> }> = []
     const renderer: Renderer = {
       render(layout) {
@@ -247,7 +247,7 @@ describe('createApp layout direction (Textura computeLayout)', () => {
     expect(layouts).toHaveLength(1)
     const row = layouts[0]!.children[0]!
     const [a, b] = row.children
-    expect(a!.x).toBeLessThan(b!.x)
+    expect(a!.x).toBeGreaterThan(b!.x)
   })
 })
 

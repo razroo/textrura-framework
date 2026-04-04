@@ -107,7 +107,7 @@ describe('geometry snapshot CI', () => {
     expect(roundLayout(layout)).toMatchSnapshot()
   })
 
-  it('stable ltr document: descendant dir rtl on inner flex row does not mirror Yoga (rounded)', async () => {
+  it('stable ltr document: descendant dir rtl on inner flex row mirrors child order (rounded)', async () => {
     await init()
     const item = { font: '16px sans-serif', lineHeight: 20 } as const
     const tree = box(

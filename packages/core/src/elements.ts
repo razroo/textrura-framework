@@ -55,9 +55,9 @@ type Scene3dProps = FlexProps & StyleProps & DirectionProps & {
 /**
  * Create a box (container) element.
  * Handlers, `semantic`, and `key` are runtime metadata; flex and layout fields are consumed by `toLayoutTree()`.
- * Optional `dir` (`ltr` | `rtl` | `auto`) sets resolved direction for this subtree for focus, hit-testing, and text
- * interaction; `auto` inherits from the parent context. It is stripped in {@link import('./tree.js').toLayoutTree}
- * (Yoga root direction uses {@link import('./app.js').createApp}'s `layoutDirection` when provided).
+ * Optional `dir` (`ltr` | `rtl` | `auto`) sets resolved direction for this subtree for focus, hit-testing, text
+ * interaction, and Yoga layout on descendants; `auto` inherits from the parent context. The layout-tree root
+ * omits `dir` so {@link import('./app.js').createApp}'s `layoutDirection` (when provided) stays authoritative.
  * For pointer routing, only `pointerEvents: 'none'` opts out; `'auto'` matches the default (see {@link import('./types.js').StyleProps.pointerEvents}).
  */
 export function box(props: BoxProps, children: UIElement[] = []): BoxElement {
@@ -101,8 +101,8 @@ export function box(props: BoxProps, children: UIElement[] = []): BoxElement {
 /**
  * Create a text leaf element.
  * `selectable` and `semantic` are runtime/rendering concerns; remaining props feed `toLayoutTree()` and Textura.
- * Optional `dir` participates in the same resolved-direction model as boxes (caret, selection, bidi); it is not part
- * of the Yoga layout snapshot.
+ * Optional `dir` participates in the same resolved-direction model as boxes (caret, selection, bidi) and is
+ * forwarded to Textura when this node is not the layout root.
  */
 export function text(props: TextProps): TextElement {
   const { key, semantic, ...rest } = props
@@ -114,7 +114,8 @@ export function text(props: TextProps): TextElement {
  * `semantic` and `key` are runtime metadata. Flex and sizing props feed {@link import('./tree.js').toLayoutTree}
  * for Yoga/Textura; `src`, `alt`, and `objectFit` remain on the live element for renderers and a11y but are
  * stripped from the layout snapshot (Textura measures boxes from width/height, not bitmaps).
- * Optional `dir` is used for resolved direction alongside siblings and ancestors; it is stripped from the layout snapshot.
+ * Optional `dir` is used for resolved direction alongside siblings and ancestors and is forwarded to Textura when
+ * this node is not the layout root.
  */
 export function image(props: ImageProps): ImageElement {
   const { key, semantic, ...rest } = props

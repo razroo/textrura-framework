@@ -3,8 +3,9 @@ import type { UIElement } from './types.js'
 
 /**
  * Removes paint, hit-target, scroll-container, and non-Yoga metadata from element props.
- * Keep this list aligned with {@link StyleProps}, text/image-only fields, and `dir` /
- * `selectable` (see tests in `tree.test.ts`).
+ * Keep this list aligned with {@link StyleProps}, text/image-only fields, and `selectable`
+ * (see tests in `tree.test.ts`). Per-node `dir` is forwarded to Textura for non-root nodes only
+ * (see {@link toLayoutTree}).
  */
 function stripStyleProps(props: Record<string, unknown>): Record<string, unknown> {
   const layoutProps = { ...props }
@@ -23,8 +24,6 @@ function stripStyleProps(props: Record<string, unknown>): Record<string, unknown
   delete layoutProps.boxShadow
   delete layoutProps.gradient
   delete layoutProps.selectable
-  // Direction metadata is resolved by interaction/text helpers, not Yoga.
-  delete layoutProps.dir
   // Image-only props
   delete layoutProps.src
   delete layoutProps.alt
@@ -47,24 +46,26 @@ function stripStyleProps(props: Record<string, unknown>): Record<string, unknown
  *
  * Strips everything that is not consumed by Textura layout: colors, borders, opacity, cursor,
  * `pointerEvents`, `zIndex`, `overflow` / `scrollX` / `scrollY`, `boxShadow`, `gradient`,
- * `selectable`, `dir`, image `src` / `alt` / `objectFit`, and scene3d host fields (`background`,
+ * `selectable`, `dir` on the layout root only, image `src` / `alt` / `objectFit`, and scene3d host fields (`background`,
  * `objects`, `fov`, `near`, `far`, `cameraPosition`, `cameraTarget`, `orbitControls`, `maxPixelRatio`).
  * Remaining props are flex and sizing fields that belong in the layout pipeline.
  *
- * Per-node `dir` is intentionally stripped from layout nodes: Yoga/Textura receives one document
- * direction from {@link import('./app.js').createApp}'s {@link import('./app.js').AppOptions.layoutDirection}
- * (or the root element’s resolved `dir` when that option is omitted), while nested `dir` on the live
- * {@link UIElement} tree is resolved at text, focus, selection, and hit-test time with
- * {@link import('./direction.js').resolveElementDirection}. ROADMAP.md “Deferred / research” tracks an
- * optional future pass that would thread per-node direction through Textura layout props.
+ * The layout **root** omits `dir` so {@link import('./app.js').createApp}'s
+ * {@link import('./app.js').AppOptions.layoutDirection} (or the root element’s resolved `dir` when that
+ * option is omitted) stays the single source of truth for the Yoga owner direction passed to Textura.
+ * Descendant nodes forward `dir` (`ltr` | `rtl` | `auto`) into Textura for per-subtree flex direction;
+ * interaction helpers still resolve direction with {@link import('./direction.js').resolveElementDirection}.
  *
  * Does not mutate the source element or its `props` (strip list is applied to a shallow copy).
  *
  * Runtime fields on boxes (`handlers`, `semantic`, `key`) are not part of `element.props` and
  * are unchanged on the live tree — they are not copied into the layout snapshot.
  */
-export function toLayoutTree(element: UIElement): LayoutNode {
+export function toLayoutTree(element: UIElement, isLayoutRoot = true): LayoutNode {
   const layoutProps = stripStyleProps(element.props as Record<string, unknown>)
+  if (isLayoutRoot) {
+    delete layoutProps.dir
+  }
 
   if (element.kind === 'text' || element.kind === 'image' || element.kind === 'scene3d') {
     return layoutProps as LayoutNode
@@ -72,6 +73,6 @@ export function toLayoutTree(element: UIElement): LayoutNode {
 
   return {
     ...layoutProps,
-    children: element.children.map(toLayoutTree),
+    children: element.children.map((child) => toLayoutTree(child, false)),
   } as LayoutNode
 }

@@ -10,6 +10,7 @@ function fromRoot(...segments: string[]) {
 
 // Exact-match aliases keep workspace package imports on source files without requiring dist builds.
 const workspaceAliases = [
+  { find: /^textura$/, replacement: fromRoot('packages/textura/src/index.ts') },
   { find: /^@geometra\/core$/, replacement: fromRoot('packages/core/src/index.ts') },
   { find: /^@geometra\/core\/node$/, replacement: fromRoot('packages/core/src/node.ts') },
   { find: /^@geometra\/renderer-canvas$/, replacement: fromRoot('packages/renderer-canvas/src/index.ts') },

@@ -70,7 +70,7 @@ describe('box', () => {
     expect(box({ width: 1, height: 1 }).children).toEqual([])
   })
 
-  it('preserves dir on props for runtime direction resolution (toLayoutTree strips dir from Yoga input)', () => {
+  it('preserves dir on props for runtime direction resolution (toLayoutTree omits dir on the layout root)', () => {
     const el = box({ width: 1, height: 1, dir: 'rtl' })
     expect((el.props as { dir?: string }).dir).toBe('rtl')
   })
@@ -122,7 +122,7 @@ describe('text', () => {
     expect((el.props as Record<string, unknown>).semantic).toBeUndefined()
   })
 
-  it('preserves dir on props for runtime direction resolution (toLayoutTree strips dir from Yoga input)', () => {
+  it('preserves dir on props for runtime direction resolution (toLayoutTree omits dir on the layout root)', () => {
     const el = text({
       text: 'x',
       font: '14px sans-serif',
@@ -178,7 +178,7 @@ describe('image', () => {
     expect((el.props as Record<string, unknown>).semantic).toBeUndefined()
   })
 
-  it('preserves dir on props for runtime direction resolution (toLayoutTree strips dir from Yoga input)', () => {
+  it('preserves dir on props for runtime direction resolution (toLayoutTree omits dir on the layout root)', () => {
     const el = image({ src: '/a.png', width: 8, height: 8, dir: 'rtl' })
     expect((el.props as { dir?: string }).dir).toBe('rtl')
   })

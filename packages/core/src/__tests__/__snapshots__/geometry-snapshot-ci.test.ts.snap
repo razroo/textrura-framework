@@ -218,7 +218,7 @@ exports[`geometry snapshot CI > stable ltr document: descendant dir rtl on inner
 }
 `;
 
-exports[`geometry snapshot CI > stable ltr document: descendant dir rtl on inner flex row does not mirror Yoga (rounded) 1`] = `
+exports[`geometry snapshot CI > stable ltr document: descendant dir rtl on inner flex row mirrors child order (rounded) 1`] = `
 {
   "children": [
     {
@@ -227,14 +227,14 @@ exports[`geometry snapshot CI > stable ltr document: descendant dir rtl on inner
           "children": [],
           "height": 56,
           "width": 8,
-          "x": 0,
+          "x": 168,
           "y": 0,
         },
         {
           "children": [],
           "height": 56,
           "width": 8,
-          "x": 16,
+          "x": 152,
           "y": 0,
         },
       ],

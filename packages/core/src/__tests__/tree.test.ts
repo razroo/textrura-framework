@@ -269,7 +269,7 @@ describe('toLayoutTree', () => {
     expect(layout).not.toHaveProperty('dir')
   })
 
-  it('strips dir from text, image, and scene3d layout props (direction is resolved outside Yoga)', () => {
+  it('omits dir on root text, image, and scene3d layout snapshots', () => {
     const t = text({
       text: 'x',
       font: '14px sans-serif',
@@ -290,6 +290,30 @@ describe('toLayoutTree', () => {
       objects: [sphere({ radius: 1 })],
     })
     expect(toLayoutTree(s3)).not.toHaveProperty('dir')
+  })
+
+  it('forwards dir on nested text, image, and scene3d for Textura', () => {
+    const t = text({
+      text: 'x',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      width: 10,
+      height: 18,
+      dir: 'rtl',
+    })
+    const img = image({ src: '/a.png', width: 8, height: 8, dir: 'ltr' })
+    const s3 = scene3d({
+      width: 80,
+      height: 80,
+      dir: 'rtl',
+      objects: [sphere({ radius: 1 })],
+    })
+    const root = box({ width: 200, height: 200 }, [t, img, s3])
+    const layout = toLayoutTree(root) as BoxLayoutNode
+    expect(layout).not.toHaveProperty('dir')
+    expect(layout.children[0]).toHaveProperty('dir', 'rtl')
+    expect(layout.children[1]).toHaveProperty('dir', 'ltr')
+    expect(layout.children[2]).toHaveProperty('dir', 'rtl')
   })
 
   it('does not mutate live element.props when building the layout snapshot', () => {

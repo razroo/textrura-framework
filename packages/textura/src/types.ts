@@ -80,6 +80,11 @@ export interface FlexProps {
   aspectRatio?: number
   overflow?: 'visible' | 'hidden' | 'scroll'
   display?: 'flex' | 'none'
+
+  /**
+   * Per-node layout direction for Yoga (`setDirection`). `auto` maps to Yoga inherit (parent / root owner direction).
+   */
+  dir?: 'ltr' | 'rtl' | 'auto'
 }
 
 /** A text leaf node. Has text content, font, and lineHeight for measurement. */

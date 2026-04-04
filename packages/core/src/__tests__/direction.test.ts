@@ -127,7 +127,7 @@ describe('direction model', () => {
     expect(d).toBe('rtl')
   })
 
-  it('keeps dir on the live element for resolveElementDirection while toLayoutTree omits it for Textura', () => {
+  it('keeps dir on the live element for resolveElementDirection while toLayoutTree omits it on the layout root', () => {
     const el = text({
       text: 'a',
       font: '14px sans-serif',
@@ -140,7 +140,7 @@ describe('direction model', () => {
     expect(toLayoutTree(el)).not.toHaveProperty('dir')
   })
 
-  it('keeps dir on scene3d for resolveElementDirection while toLayoutTree omits it for Textura', () => {
+  it('keeps dir on scene3d for resolveElementDirection while toLayoutTree omits it on the layout root', () => {
     const el = scene3d({
       width: 50,
       height: 50,
@@ -151,7 +151,7 @@ describe('direction model', () => {
     expect(toLayoutTree(el)).not.toHaveProperty('dir')
   })
 
-  it('toLayoutTree omits dir recursively; live tree still resolves mixed rtl/auto/ltr per node', () => {
+  it('toLayoutTree omits dir on the root only; nested layout nodes forward dir; live tree still resolves mixed rtl/auto/ltr per node', () => {
     const leaf = text({
       text: 'a',
       font: '14px sans-serif',
@@ -166,10 +166,10 @@ describe('direction model', () => {
     const layout = toLayoutTree(root) as { children: unknown[] }
     expect(layout).not.toHaveProperty('dir')
     expect(layout.children).toHaveLength(1)
-    const innerLayout = layout.children[0] as { children: unknown[] }
-    expect(innerLayout).not.toHaveProperty('dir')
+    const innerLayout = layout.children[0] as { children: unknown[]; dir?: string }
+    expect(innerLayout).toHaveProperty('dir', 'auto')
     const textLayout = innerLayout.children[0] as Record<string, unknown>
-    expect(textLayout).not.toHaveProperty('dir')
+    expect(textLayout).toHaveProperty('dir', 'ltr')
 
     let d = resolveElementDirection(root, 'ltr')
     expect(d).toBe('rtl')

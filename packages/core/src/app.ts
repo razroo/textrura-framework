@@ -73,9 +73,8 @@ export interface AppOptions {
    * Values other than the strings `ltr` and `rtl` (e.g. malformed plain-JS options) are ignored and
    * treated like omission so `computeLayout` still receives a concrete direction.
    *
-   * Nested `dir` on descendants still drives text, focus, and selection, but does not set a separate
-   * flex direction per subtree: `computeLayout` receives one document direction and
-   * {@link import('./tree.js').toLayoutTree} strips `dir` from layout nodes.
+   * Nested `dir` on descendants is forwarded into Textura for per-subtree flex layout; the layout-tree root
+   * still omits `dir` so this option and the resolved root direction stay aligned.
    */
   layoutDirection?: 'ltr' | 'rtl'
 }
