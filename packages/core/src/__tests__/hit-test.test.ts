@@ -3421,6 +3421,33 @@ describe('pointerEvents', () => {
     expect(log).toEqual(['back'])
   })
 
+  it('pointerEvents auto: top overlay receives hit (same stack behavior as omitting pointerEvents)', () => {
+    const log: string[] = []
+    const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } })
+    const front = box({
+      width: 50,
+      height: 50,
+      zIndex: 1,
+      pointerEvents: 'auto',
+      onClick: () => { log.push('front') },
+    })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['front'])
+    expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(true)
+  })
+
   it('pointerEvents none on parent: child with onClick still receives dispatch', () => {
     let childFired = false
     const inner = box({ width: 40, height: 40, onClick: () => { childFired = true } })

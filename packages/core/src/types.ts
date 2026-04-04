@@ -49,8 +49,9 @@ export interface StyleProps {
    */
   zIndex?: number
   /**
-   * Pointer hit targeting. `'none'` skips this box for pointer handlers and cursor resolution;
-   * hits pass through to geometry behind it. Descendants still receive hits unless they also set `'none'`.
+   * Pointer hit targeting. Only `'none'` is pass-through: this box is omitted from the pointer stack and
+   * cursor walk so hits reach geometry behind. `'auto'` and omitting the prop behave the same (the box stays
+   * in the stack). Descendants still receive hits under a `'none'` parent unless they also set `'none'`.
    */
   pointerEvents?: 'auto' | 'none'
   /**

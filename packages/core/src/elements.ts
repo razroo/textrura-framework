@@ -58,6 +58,7 @@ type Scene3dProps = FlexProps & StyleProps & DirectionProps & {
  * Optional `dir` (`ltr` | `rtl` | `auto`) sets resolved direction for this subtree for focus, hit-testing, and text
  * interaction; `auto` inherits from the parent context. It is stripped in {@link import('./tree.js').toLayoutTree}
  * (Yoga root direction uses {@link import('./app.js').createApp}'s `layoutDirection` when provided).
+ * For pointer routing, only `pointerEvents: 'none'` opts out; `'auto'` matches the default (see {@link import('./types.js').StyleProps.pointerEvents}).
  */
 export function box(props: BoxProps, children: UIElement[] = []): BoxElement {
   const {
