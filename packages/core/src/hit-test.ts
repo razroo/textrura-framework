@@ -25,6 +25,10 @@ function zIndexOf(el: UIElement): number {
 }
 
 function getChildrenByZAsc(boxEl: BoxElement): number[] {
+  const n = boxEl.children.length
+  if (n === 0) return []
+  if (n === 1) return [0]
+
   const cached = zIndexOrderCache.get(boxEl)
   if (cached && cached.zValues.length === boxEl.children.length) {
     let unchanged = true
