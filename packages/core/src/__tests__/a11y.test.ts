@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { box, image, text } from '../elements.js'
+import { box, image, scene3d, text } from '../elements.js'
 import { toAccessibilityTree } from '../a11y.js'
 
 describe('toAccessibilityTree', () => {
@@ -22,6 +22,56 @@ describe('toAccessibilityTree', () => {
     expect(a11y.children[0]?.name).toBe('Hello world')
     expect(a11y.children[1]?.role).toBe('img')
     expect(a11y.children[1]?.name).toBe('Hero image')
+  })
+
+  it('maps scene3d leaves to img with optional accessible name and custom role', () => {
+    const bare = scene3d({ width: 120, height: 90, objects: [] })
+    const withAlt = scene3d({
+      width: 120,
+      height: 90,
+      objects: [],
+      semantic: { alt: 'Spinning globe' },
+    })
+    const withAria = scene3d({
+      width: 120,
+      height: 90,
+      objects: [],
+      semantic: { alt: 'ignored when ariaLabel set', ariaLabel: '3D workspace' },
+    })
+    const customRole = scene3d({
+      width: 120,
+      height: 90,
+      objects: [],
+      semantic: { role: 'application', ariaLabel: 'CAD viewport' },
+    })
+
+    const tree = box({}, [bare, withAlt, withAria, customRole])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 400,
+      height: 200,
+      children: [
+        { x: 0, y: 0, width: 120, height: 90, children: [] },
+        { x: 0, y: 100, width: 120, height: 90, children: [] },
+        { x: 130, y: 0, width: 120, height: 90, children: [] },
+        { x: 130, y: 100, width: 120, height: 90, children: [] },
+      ],
+    }
+
+    const a11y = toAccessibilityTree(tree, layout)
+    expect(a11y.children[0]?.role).toBe('img')
+    expect(a11y.children[0]?.name).toBeUndefined()
+    expect(a11y.children[0]?.focusable).toBe(false)
+
+    expect(a11y.children[1]?.role).toBe('img')
+    expect(a11y.children[1]?.name).toBe('Spinning globe')
+
+    expect(a11y.children[2]?.role).toBe('img')
+    expect(a11y.children[2]?.name).toBe('3D workspace')
+
+    expect(a11y.children[3]?.role).toBe('application')
+    expect(a11y.children[3]?.name).toBe('CAD viewport')
   })
 
   it('marks interactive boxes as focusable buttons by default', () => {
