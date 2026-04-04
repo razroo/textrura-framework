@@ -1,7 +1,7 @@
 import type { ComputedLayout } from 'textura'
 import type { UIElement, BoxElement, TextElement, ImageElement } from './types.js'
 import { hasFocusCandidateHandlers } from './focus-candidates.js'
-import { finiteNumberOrZero } from './layout-bounds.js'
+import { finiteNumberOrZero, layoutBoundsAreFinite } from './layout-bounds.js'
 
 export interface AccessibilityBounds {
   x: number
@@ -89,6 +89,18 @@ function walk(
   offsetY: number,
   path: number[],
 ): AccessibilityNode {
+  if (!layoutBoundsAreFinite(layout)) {
+    return {
+      role: roleFor(element),
+      ...(inferName(element) !== undefined ? { name: inferName(element) } : {}),
+      ...(stateFor(element) !== undefined ? { state: stateFor(element) } : {}),
+      bounds: { x: 0, y: 0, width: 0, height: 0 },
+      path,
+      children: [],
+      focusable: false,
+    }
+  }
+
   const x = offsetX + layout.x
   const y = offsetY + layout.y
   const children: AccessibilityNode[] = []
@@ -115,7 +127,14 @@ function walk(
   }
 }
 
-/** Build an accessibility tree from UI elements and computed layout geometry. */
+/**
+ * Build an accessibility tree from UI elements and computed layout geometry.
+ *
+ * When a node’s {@link ComputedLayout} bounds fail {@link layoutBoundsAreFinite}, that node is emitted as a
+ * leaf with zero bounds, no children, and `focusable: false` (even if it has pointer/keyboard handlers).
+ * Subtrees under corrupt geometry are not walked — same rule as {@link import('./focus.js').collectFocusOrder}
+ * and hit-testing so bad Yoga output cannot surface misleading bounds or hidden descendants.
+ */
 export function toAccessibilityTree(tree: UIElement, layout: ComputedLayout): AccessibilityNode {
   return walk(tree, layout, 0, 0, [])
 }

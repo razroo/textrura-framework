@@ -145,6 +145,54 @@ describe('toAccessibilityTree', () => {
     expect(a11y.children[0]?.bounds.y).toBe(68)
   })
 
+  it('skips subtrees when layout bounds fail layoutBoundsAreFinite (parity with focus order and hit-test)', () => {
+    const inner = text({ text: 'Hidden', font: '14px Inter', lineHeight: 18 })
+    const tree = box({ semantic: { tag: 'main' } }, [
+      box({ width: 80, height: 24, onClick: () => undefined }, [inner]),
+    ])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: [
+        {
+          x: 10,
+          y: 10,
+          width: Number.NaN,
+          height: 24,
+          children: [{ x: 0, y: 0, width: 80, height: 18, children: [] as const }],
+        },
+      ],
+    }
+
+    const a11y = toAccessibilityTree(tree, layout)
+    expect(a11y.role).toBe('main')
+    expect(a11y.bounds).toEqual({ x: 0, y: 0, width: 200, height: 100 })
+    const bad = a11y.children[0]!
+    expect(bad.role).toBe('button')
+    expect(bad.bounds).toEqual({ x: 0, y: 0, width: 0, height: 0 })
+    expect(bad.children).toEqual([])
+    expect(bad.focusable).toBe(false)
+  })
+
+  it('emits a zero-bounds stub for corrupt root layout without throwing', () => {
+    const tree = box({ width: 1, height: 1, onClick: () => undefined }, [])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: Number.NaN,
+      height: 10,
+      children: [] as const,
+    }
+    expect(() => toAccessibilityTree(tree, layout)).not.toThrow()
+    const a11y = toAccessibilityTree(tree, layout)
+    expect(a11y.role).toBe('button')
+    expect(a11y.bounds).toEqual({ x: 0, y: 0, width: 0, height: 0 })
+    expect(a11y.children).toEqual([])
+    expect(a11y.focusable).toBe(false)
+  })
+
   it('maps common semantic tags for nav/list/form patterns', () => {
     const tree = box({ semantic: { tag: 'main' } }, [
       box({ semantic: { tag: 'nav' } }, [
