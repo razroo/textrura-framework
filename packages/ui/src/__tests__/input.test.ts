@@ -507,6 +507,42 @@ describe('@geometra/ui input', () => {
     expect(hasHighlight).toBe(true)
   })
 
+  it('normalizes reversed selectionStart/selectionEnd to the same range as forward order', () => {
+    const forward = input('Hello World', '', {
+      focused: true,
+      caretOffset: 8,
+      selectionStart: 2,
+      selectionEnd: 8,
+    })
+    const reversed = input('Hello World', '', {
+      focused: true,
+      caretOffset: 2,
+      selectionStart: 8,
+      selectionEnd: 2,
+    })
+
+    expect(forward.kind).toBe('box')
+    expect(reversed.kind).toBe('box')
+    if (forward.kind !== 'box' || reversed.kind !== 'box') return
+
+    const forwardHighlight = forward.children.find(
+      (child) => child.kind === 'box' && child.props.backgroundColor === 'rgba(56, 189, 248, 0.3)',
+    )
+    const reversedHighlight = reversed.children.find(
+      (child) => child.kind === 'box' && child.props.backgroundColor === 'rgba(56, 189, 248, 0.3)',
+    )
+    expect(forwardHighlight).toBeDefined()
+    expect(reversedHighlight).toBeDefined()
+
+    const forwardInner = forwardHighlight?.kind === 'box' ? forwardHighlight.children[0] : undefined
+    const reversedInner = reversedHighlight?.kind === 'box' ? reversedHighlight.children[0] : undefined
+    expect(forwardInner?.kind).toBe('text')
+    expect(reversedInner?.kind).toBe('text')
+    if (forwardInner?.kind === 'text' && reversedInner?.kind === 'text') {
+      expect(reversedInner.props.text).toBe(forwardInner.props.text)
+    }
+  })
+
   it('renders partial selection with text segments on either side', () => {
     const el = input('Hello World', '', {
       focused: true,
