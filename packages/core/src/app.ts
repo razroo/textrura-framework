@@ -21,7 +21,9 @@ function resolveComputeLayoutDirection(
 
 /** Only finite, non-negative numbers become Textura root constraints; otherwise the key is omitted (unconstrained). */
 function finiteRootExtent(value: number | undefined): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined
+  const v = Object.is(value, -0) ? 0 : value
+  return v >= 0 ? v : undefined
 }
 
 /**

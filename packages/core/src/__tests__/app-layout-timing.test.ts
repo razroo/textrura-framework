@@ -318,6 +318,30 @@ describe('createApp non-box roots (layout + direction resolution)', () => {
 })
 
 describe('createApp root width/height sanitization', () => {
+  it('normalizes signed-zero root extents like +0 (hostile options cannot pass -0 into computeLayout)', async () => {
+    const render = vi.fn()
+    const renderer: Renderer = { render, destroy: vi.fn() }
+
+    await createApp(() => box({ width: 40, height: 20 }, []), renderer, {
+      width: -0,
+      height: -0,
+    })
+    expect(render).toHaveBeenCalledTimes(1)
+    const negZeroLayout = render.mock.calls[0]![0] as { width: number; height: number }
+    expect(Object.is(negZeroLayout.width, -0)).toBe(false)
+    expect(Object.is(negZeroLayout.height, -0)).toBe(false)
+
+    render.mockClear()
+    await createApp(() => box({ width: 40, height: 20 }, []), renderer, {
+      width: 0,
+      height: 0,
+    })
+    expect(render).toHaveBeenCalledTimes(1)
+    const zeroLayout = render.mock.calls[0]![0] as { width: number; height: number }
+    expect(zeroLayout.width).toBe(negZeroLayout.width)
+    expect(zeroLayout.height).toBe(negZeroLayout.height)
+  })
+
   it('omits NaN, ±Infinity, negative, and non-number root extents so computeLayout stays finite', async () => {
     const render = vi.fn()
     const renderer: Renderer = { render, destroy: vi.fn() }
