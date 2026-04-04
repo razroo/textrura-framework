@@ -235,4 +235,31 @@ describe('CanvasRenderer.render wall time', () => {
     expect(renderer.lastRenderWallMs).toBe(0)
     spy.mockRestore()
   })
+
+  it('with layoutInspector, lastRenderWallMs spans the full frame including the HUD timing sample', () => {
+    Object.defineProperty(globalThis, 'window', {
+      value: { devicePixelRatio: 1 },
+      configurable: true,
+      writable: true,
+    })
+    const ctx = new FakeCtx()
+    const canvas = {
+      style: {} as Record<string, string>,
+      getContext: () => ctx,
+    } as unknown as HTMLCanvasElement
+
+    // render(): frame start, HUD pre-paint delta, final wall clock (must not stop at the HUD sample).
+    const stamps = [100, 102, 106]
+    let i = 0
+    const spy = vi.spyOn(performance, 'now').mockImplementation(() => stamps[i++] ?? stamps[stamps.length - 1]!)
+
+    const renderer = new CanvasRenderer({ canvas, layoutInspector: true })
+    const tree = box({ width: 10, height: 10 })
+    const layout = { x: 0, y: 0, width: 10, height: 10, children: [] }
+
+    renderer.render(layout, tree)
+
+    expect(renderer.lastRenderWallMs).toBeCloseTo(6, 5)
+    spy.mockRestore()
+  })
 })
