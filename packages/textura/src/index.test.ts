@@ -63,6 +63,18 @@ describe('box layout', () => {
     expect(row.children[0]!.x).toBeGreaterThan(row.children[1]!.x)
   })
 
+  test('owner direction rtl mirrors top-level flex row when nodes omit dir (document / root context)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 40,
+      flexDirection: 'row',
+      gap: 10,
+      children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+    }
+    const result = computeLayout(tree, { width: 200, height: 80, direction: 'rtl' })
+    expect(result.children[0]!.x).toBeGreaterThan(result.children[1]!.x)
+  })
+
   test('row layout with gap', () => {
     const tree: BoxNode = {
       width: 300,
