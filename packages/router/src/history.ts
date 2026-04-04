@@ -1,16 +1,27 @@
+/** Parsed location slice used by {@link HistoryAdapter} (pathname, query string, fragment). */
 export type RouterLocation = {
   pathname: string
   search: string
   hash: string
 }
 
+/**
+ * Emitted by {@link HistoryAdapter.listen} after navigation.
+ * Browser history uses `'pop'` for both `history.go` and the `popstate` event; memory history uses `'pop'` for `go` only.
+ */
 export type HistoryUpdate = {
   location: RouterLocation
   action: 'push' | 'replace' | 'pop'
 }
 
+/** Returned from {@link HistoryAdapter.listen}; call to stop receiving updates. */
 export type Unsubscribe = () => void
 
+/**
+ * Minimal history surface for the router: imperative navigation plus subscription.
+ * String arguments to {@link HistoryAdapter.push} / {@link HistoryAdapter.replace} are parsed with `new URL(to, base)`
+ * (relative paths resolve against an internal base); results normalize empty pathname to `'/'`.
+ */
 export interface HistoryAdapter {
   readonly location: RouterLocation
   push(to: string): void
@@ -19,6 +30,7 @@ export interface HistoryAdapter {
   listen(listener: (update: HistoryUpdate) => void): Unsubscribe
 }
 
+/** Optional injection of a browser-like `window` (tests, non-DOM hosts). */
 export type BrowserHistoryOptions = {
   window?: Pick<Window, 'location' | 'history' | 'addEventListener' | 'removeEventListener'>
 }
@@ -45,6 +57,13 @@ type MemoryHistoryOptions = {
   initialIndex?: number
 }
 
+/**
+ * In-memory stack for tests, SSR previews, and non-browser environments.
+ *
+ * - Empty `initialEntries` becomes a single `"/"` entry.
+ * - `initialIndex` is clamped to the stack; default is the last entry.
+ * - `go(0)` does not notify listeners.
+ */
 export function createMemoryHistory(options: MemoryHistoryOptions = {}): HistoryAdapter {
   const entries = (options.initialEntries ?? ['/']).map(parseToLocation)
   let index = Math.min(
@@ -92,6 +111,12 @@ export function createMemoryHistory(options: MemoryHistoryOptions = {}): History
   }
 }
 
+/**
+ * Wraps the real (or injected) `window.history` and `popstate`.
+ *
+ * `push` / `replace` update `history` state and notify listeners; `go` delegates to `history.go` (async relative to `popstate`).
+ * Throws if no `window` is available unless {@link BrowserHistoryOptions.window} is provided.
+ */
 export function createBrowserHistory(options: BrowserHistoryOptions = {}): HistoryAdapter {
   const windowLike =
     options.window ??
