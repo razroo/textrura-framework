@@ -59,6 +59,57 @@ describe('dispatchHit', () => {
     expect(dispatchHit(el, layout, 'onClick', 50, 25)).toEqual({ handled: false })
   })
 
+  describe('non-box roots: path and interactive-hit vs cursor resolution', () => {
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] as const }
+
+    it('hitPathAtPoint returns null for text/image/scene3d roots even when the point is inside bounds', () => {
+      const t = text({
+        text: 'hi',
+        font: '16px sans-serif',
+        lineHeight: 20,
+        width: 100,
+        height: 50,
+        cursor: 'text',
+      })
+      const img = image({ src: 'x.png', width: 100, height: 50, cursor: 'zoom-in' })
+      const s3 = scene3d({ objects: [], width: 100, height: 50, cursor: 'crosshair' })
+      expect(hitPathAtPoint(t, layout, 50, 25)).toBeNull()
+      expect(hitPathAtPoint(img, layout, 50, 25)).toBeNull()
+      expect(hitPathAtPoint(s3, layout, 50, 25)).toBeNull()
+    })
+
+    it('hasInteractiveHitAtPoint is false for text/image/scene3d roots (no box handlers on the root)', () => {
+      const t = text({
+        text: 'hi',
+        font: '16px sans-serif',
+        lineHeight: 20,
+        width: 100,
+        height: 50,
+      })
+      const img = image({ src: 'x.png', width: 100, height: 50 })
+      const s3 = scene3d({ objects: [], width: 100, height: 50 })
+      expect(hasInteractiveHitAtPoint(t, layout, 50, 25)).toBe(false)
+      expect(hasInteractiveHitAtPoint(img, layout, 50, 25)).toBe(false)
+      expect(hasInteractiveHitAtPoint(s3, layout, 50, 25)).toBe(false)
+    })
+
+    it('getCursorAtPoint still resolves cursor on text/image/scene3d roots when the point is inside', () => {
+      const t = text({
+        text: 'hi',
+        font: '16px sans-serif',
+        lineHeight: 20,
+        width: 100,
+        height: 50,
+        cursor: 'text',
+      })
+      const img = image({ src: 'x.png', width: 100, height: 50, cursor: 'zoom-in' })
+      const s3 = scene3d({ objects: [], width: 100, height: 50, cursor: 'crosshair' })
+      expect(getCursorAtPoint(t, layout, 50, 25)).toBe('text')
+      expect(getCursorAtPoint(img, layout, 50, 25)).toBe('zoom-in')
+      expect(getCursorAtPoint(s3, layout, 50, 25)).toBe('crosshair')
+    })
+  })
+
   it('merges extra metadata onto the HitEvent after base pointer fields', () => {
     let received: HitEvent | undefined
     const layout = { x: 10, y: 20, width: 100, height: 50, children: [] }
