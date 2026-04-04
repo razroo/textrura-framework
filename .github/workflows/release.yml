@@ -11,7 +11,6 @@ jobs:
       contents: read
       id-token: write
     env:
-      TEXTURA_VERSION: ^1.1.2
       CORE_DEPENDENT_DIRS: >-
         packages/renderer-canvas
         packages/renderer-terminal
@@ -22,6 +21,7 @@ jobs:
         packages/ui
         packages/router
       PUBLISH_PACKAGES: >-
+        textura
         @geometra/core
         @geometra/renderer-canvas
         @geometra/renderer-terminal
@@ -54,7 +54,7 @@ jobs:
       - name: Normalize publish-time dependencies
         run: |
           cd packages/core
-          npm pkg set "dependencies.textura=$TEXTURA_VERSION"
+          npm pkg set "dependencies.textura=^$VERSION"
           cd "$GITHUB_WORKSPACE"
           for dir in $CORE_DEPENDENT_DIRS; do
             cd "$dir"

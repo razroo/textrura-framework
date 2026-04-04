@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest'
 import {
   backspaceInput,
   deleteInput,
+  getInputSelectionText,
   insertInputText,
   moveInputCaret,
   moveInputCaretByWord,
   moveInputCaretToLineBoundary,
+  replaceInputSelection,
   type TextInputState,
 } from '../text-input.js'
 
@@ -90,6 +92,11 @@ describe('text-input invariants', () => {
       },
     }
 
+    expect(() => getInputSelectionText(corrupt.nodes, corrupt.selection)).not.toThrow()
+    // BigInt offsets are non-numbers → clamped to 0; selection collapses to the start of node 0.
+    expect(getInputSelectionText(corrupt.nodes, corrupt.selection)).toBe('')
+
+    assertStateInvariants(replaceInputSelection(corrupt.nodes, corrupt.selection, 'x'))
     assertStateInvariants(insertInputText(corrupt, 'x'))
     assertStateInvariants(backspaceInput(corrupt))
     assertStateInvariants(deleteInput(corrupt))

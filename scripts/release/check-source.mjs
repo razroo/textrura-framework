@@ -8,6 +8,7 @@ if (!version) {
 }
 
 const packages = [
+  ['textura', 'packages/textura/package.json'],
   ['@geometra/core', 'packages/core/package.json'],
   ['@geometra/renderer-canvas', 'packages/renderer-canvas/package.json'],
   ['@geometra/renderer-terminal', 'packages/renderer-terminal/package.json'],

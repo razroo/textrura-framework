@@ -1,34 +1,30 @@
 {
-  "name": "@geometra/core",
+  "name": "textura",
   "version": "1.5.0",
-  "description": "DOM-free UI framework core: components, signals, reconciler",
+  "description": "DOM-free layout engine combining Yoga flexbox with Pretext text measurement",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "https://github.com/razroo/geometra",
-    "directory": "packages/core"
+    "directory": "packages/textura"
   },
   "homepage": "https://razroo.github.io/geometra",
   "keywords": [
-    "ui",
-    "framework",
+    "layout",
+    "flexbox",
+    "yoga",
     "dom-free",
     "canvas",
-    "flexbox",
-    "signals",
-    "textura"
+    "text-measurement"
   ],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    },
-    "./node": {
-      "types": "./dist/node.d.ts",
-      "import": "./dist/node.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "files": [
@@ -36,12 +32,11 @@
   ],
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test": "bun test"
   },
   "dependencies": {
-    "textura": "^1.5.0"
-  },
-  "optionalDependencies": {
-    "@napi-rs/canvas": "^0.1.65"
+    "@chenglou/pretext": "^0.0.3",
+    "yoga-layout": "^3.2.1"
   }
 }

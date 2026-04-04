@@ -12,6 +12,7 @@ See **`GEOMETRY_SNAPSHOT_TESTING.md`** for layout JSON / geometry regression pat
 
 ## Architecture
 
+- **`packages/textura`** — DOM-free layout engine combining Yoga WASM flexbox with Pretext text measurement. `computeLayout()` takes a declarative tree and returns computed positions. Published to npm as `textura`.
 - **`packages/core`** — Signals reactivity, `box()`/`text()`/`image()`/`scene3d()` element constructors, hit-testing, text selection, SEO, `createApp()` (optional `Renderer.setFrameTimings` for layout ms), `waitForFonts`, font helpers. `scene3d()` carries declarative 3D object descriptors (`sphere`, `points`, `line`, `ring`, `ambientLight`, `directionalLight`, `group`) as plain JSON for WebSocket streaming.
 - **`packages/renderer-canvas`** — Canvas2D paint backend with text selection highlight rendering, optional layout debug overlay and focus ring
 - **`packages/renderer-terminal`** — ANSI terminal renderer
