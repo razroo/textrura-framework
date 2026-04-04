@@ -211,9 +211,16 @@ function dispatchHitRecursive(
 }
 
 /**
- * Dispatch a hit at `(x, y)` against the element tree for the given handler key
- * (e.g. `onClick`, `onPointerDown`, `onKeyDown`, composition events).
- * The deepest hit with a matching handler runs first; only one handler runs per call.
+ * Dispatch a **pointer-space** hit at `(x, y)` against the element tree for the given handler key.
+ * Intended slots: `onClick`, `onPointerDown` / `Up` / `Move`, and `onWheel` (same coordinate rules as
+ * {@link hitPathAtPoint}). The deepest hit with a matching handler runs first; only one handler runs per call.
+ *
+ * {@link import('./types.js').EventHandlers} also lists keyboard and composition keys for the focused
+ * element, but those are **not** routed by `(x, y)` here — use {@link import('./keyboard.js').dispatchKeyboardEvent}
+ * and {@link import('./keyboard.js').dispatchCompositionEvent} (or {@link import('./app.js').App.dispatchKey} /
+ * {@link import('./app.js').App.dispatchComposition} from `createApp`) so Tab, typing, and IME go to the
+ * focused target instead of whatever box lies under the pointer.
+ *
  * Optional `extra` is shallow-merged onto the `HitEvent` after base fields so callers
  * can pass modifier keys, `button`, wheel deltas, and other renderer-specific metadata.
  * For `onClick` only, the return value may include `focusTarget` for focus routing
