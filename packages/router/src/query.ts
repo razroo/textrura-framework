@@ -28,8 +28,14 @@ function encode(value: string): string {
  *
  * Any raw `#` and following characters are ignored (URL fragment delimiter), so accidental
  * `?a=1#hash` input still parses like `location.search`. Encoded `#` inside values (`%23`) is unchanged.
+ *
+ * Non-string input (e.g. `null` / `undefined` from loose callers or bad deserialization) returns an empty
+ * {@link ParsedQuery} without throwing — `startsWith` would otherwise throw on non-strings.
  */
 export function parseQuery(search: string): ParsedQuery {
+  if (typeof search !== 'string') {
+    return Object.create(null) as ParsedQuery
+  }
   let input = search.startsWith('?') ? search.slice(1) : search
   const hashIdx = input.indexOf('#')
   if (hashIdx >= 0) {

@@ -2,6 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { parseQuery, stringifyQuery, type QueryInput } from '../query.js'
 
 describe('query helpers', () => {
+  it('returns empty null-prototype result for non-string input without throwing', () => {
+    expect(parseQuery(null as never)).toEqual({})
+    expect(Object.getPrototypeOf(parseQuery(null as never))).toBeNull()
+    expect(parseQuery(undefined as never)).toEqual({})
+    expect(parseQuery(0 as never)).toEqual({})
+    expect(parseQuery(false as never)).toEqual({})
+    const sym = Symbol('q') as never
+    expect(() => parseQuery(sym)).not.toThrow()
+    expect(parseQuery(sym)).toEqual({})
+  })
+
   it('parses empty search string', () => {
     const q = parseQuery('')
     expect(q).toEqual({})
