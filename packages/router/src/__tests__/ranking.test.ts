@@ -41,4 +41,21 @@ describe('route ranking', () => {
     expect(scorePathPattern('/foo//bar')).toBeGreaterThan(scorePathPattern('/foo/bar'))
     expect(comparePatternSpecificity('/foo//bar', '/foo/bar')).toBeLessThan(0)
   })
+
+  it('scores empty and slash-only patterns as zero (same trim as buildPath / matchPath)', () => {
+    expect(scorePathPattern('')).toBe(0)
+    expect(scorePathPattern('/')).toBe(0)
+    expect(scorePathPattern('///')).toBe(0)
+  })
+
+  it('scores a lone splat segment (anonymous *) as least specific single segment', () => {
+    expect(scorePathPattern('*')).toBe(0)
+    expect(scorePathPattern('/*')).toBe(0)
+    expect(scorePathPattern('/users/:id')).toBeGreaterThan(scorePathPattern('/*'))
+  })
+
+  it('returns 0 from comparePatternSpecificity when score and depth tie (e.g. two static peers)', () => {
+    expect(comparePatternSpecificity('/a', '/b')).toBe(0)
+    expect(comparePatternSpecificity('/x/:id', '/y/:slug')).toBe(0)
+  })
 })
