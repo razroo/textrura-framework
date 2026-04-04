@@ -29,6 +29,25 @@ function getChildrenByZAsc(boxEl: BoxElement): number[] {
   if (n === 0) return []
   if (n === 1) return [0]
 
+  // Two children: compare z-index without map/sort allocations (common flex rows, label+control pairs).
+  if (n === 2) {
+    const z0 = zIndexOf(boxEl.children[0]!)
+    const z1 = zIndexOf(boxEl.children[1]!)
+    const asc = z0 <= z1 ? [0, 1] : [1, 0]
+    const cached = zIndexOrderCache.get(boxEl)
+    if (
+      cached &&
+      cached.zValues.length === 2 &&
+      cached.zValues[0] === z0 &&
+      cached.zValues[1] === z1
+    ) {
+      return cached.asc
+    }
+    const zValues = [z0, z1]
+    zIndexOrderCache.set(boxEl, { zValues, asc })
+    return asc
+  }
+
   const cached = zIndexOrderCache.get(boxEl)
   if (cached && cached.zValues.length === boxEl.children.length) {
     let unchanged = true
