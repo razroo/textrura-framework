@@ -546,6 +546,7 @@ describe('applyServerMessage', () => {
     } as unknown as ComputedLayout
 
     const badFrames: Msg[] = [
+      { type: 'frame', layout: null as unknown as ComputedLayout, tree: tree(), protocolVersion: 1 } as Msg,
       { type: 'frame', layout: layoutNoChildren, tree: tree(), protocolVersion: 1 } as Msg,
       { type: 'frame', layout: layoutChildrenObject, tree: tree(), protocolVersion: 1 } as Msg,
       { type: 'frame', layout: layout(), tree: [] as unknown as UIElement, protocolVersion: 1 } as Msg,
