@@ -28,7 +28,9 @@ fi
 # `verify-release-gate.mjs` also resolves paths canonically, so `packages/a/../b/x.test.ts` counts as the same
 # file as `packages/b/x.test.ts` for duplicate detection.
 # `npm run release:gate` runs `scripts/release/verify-release-gate.mjs`
-# first to fail fast on duplicates or missing paths. The allowlist evolves; read package.json instead of copying examples
+# first to fail fast on duplicates or missing paths, then the vitest allowlist, then `bun run test:terminal-input`
+# (@geometra/demo-terminal). The gate fails if `bun` is missing from PATH even when Node/npm work — install Bun or run
+# only the vitest segment locally when debugging. The allowlist evolves; read package.json instead of copying examples
 # from older prompts or transcripts.
 # Extend an allowlisted file when adding release-critical tests unless you intentionally widen the gate.
 # Layout/Yoga geometry regression: use `packages/core/src/__tests__/geometry-snapshot-ci.test.ts` (gate-listed)
@@ -151,7 +153,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
 
 4. Run the repo release gate from the repo root:
    npm run release:gate
-   If that fails, fix issues and re-run until it passes (or stop with a clear explanation if blocked by environment).
+   The gate ends with \`bun run test:terminal-input\` (see root package.json) — \`bun\` must be on PATH. If that fails, fix issues and re-run until it passes (or stop with a clear explanation if blocked by environment).
 
 5. If you made real changes: git add only what belongs to this task, then git commit with a conventional message (feat:/fix:/chore:/docs:/test:/perf:/refactor: as appropriate).
    ${PUSH_TEXT}
