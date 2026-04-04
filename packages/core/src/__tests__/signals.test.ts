@@ -140,6 +140,18 @@ describe('computed', () => {
     expect(evalCount).toBe(2)
   })
 
+  it('does not subscribe to signals read only via peek inside the derivation', () => {
+    const a = signal(1)
+    const b = signal(2)
+    const c = computed(() => a.peek() + b.value)
+    expect(c.value).toBe(3)
+    a.set(10)
+    // `a` is not a dependency — cached value stays until a tracked dep changes
+    expect(c.value).toBe(3)
+    b.set(5)
+    expect(c.value).toBe(15)
+  })
+
   it('drops inner signal deps when the computed branch changes', () => {
     const gate = signal(true)
     const x = signal(1)
