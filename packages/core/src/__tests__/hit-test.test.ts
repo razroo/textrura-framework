@@ -2327,6 +2327,61 @@ describe('getCursorAtPoint', () => {
     expect(getCursorAtPoint(parent, layout, 70, 30, 0, 0)).toBeNull()
     expect(getCursorAtPoint(parent, layout, 70, 30, 50, 0)).toBe('pointer')
   })
+
+  it('text, image, and scene3d leaves with pointerEvents none fall through to ancestor cursor', () => {
+    const leafText = text({
+      text: 'x',
+      font: '16px sans-serif',
+      lineHeight: 20,
+      width: 40,
+      height: 40,
+      pointerEvents: 'none',
+      cursor: 'text',
+    })
+    const parentText = box({ width: 100, height: 100, cursor: 'help' }, [leafText])
+    const layoutText = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 10, y: 10, width: 40, height: 40, children: [] as const }],
+    }
+    expect(getCursorAtPoint(parentText, layoutText, 25, 25)).toBe('help')
+
+    const leafImg = image({
+      src: 'a.png',
+      width: 40,
+      height: 40,
+      pointerEvents: 'none',
+      cursor: 'crosshair',
+    })
+    const parentImg = box({ width: 100, height: 100, cursor: 'cell' }, [leafImg])
+    const layoutImg = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 10, y: 10, width: 40, height: 40, children: [] as const }],
+    }
+    expect(getCursorAtPoint(parentImg, layoutImg, 25, 25)).toBe('cell')
+
+    const leaf3d = scene3d({
+      objects: [],
+      width: 40,
+      height: 40,
+      pointerEvents: 'none',
+      cursor: 'move',
+    })
+    const parent3d = box({ width: 100, height: 100, cursor: 'grab' }, [leaf3d])
+    const layout3d = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 10, y: 10, width: 40, height: 40, children: [] as const }],
+    }
+    expect(getCursorAtPoint(parent3d, layout3d, 25, 25)).toBe('grab')
+  })
 })
 
 describe('scroll and overflow clipping', () => {
