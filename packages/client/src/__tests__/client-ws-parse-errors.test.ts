@@ -821,6 +821,47 @@ describe('createClient WebSocket message parse errors', () => {
     expect(client.layout?.width).toBe(56)
   })
 
+  it('accepts JSON frame when protocolVersion is omitted (no version guard on the wire)', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+    const renders: ComputedLayout[] = []
+    const renderer: Renderer = {
+      render: (layout: ComputedLayout) => {
+        renders.push({ ...layout, children: layout.children })
+      },
+      destroy: () => {},
+    }
+
+    const client = createClient({
+      url: 'ws://mock.test',
+      renderer,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    sockets[0]!.emit('message', {
+      data: JSON.stringify({
+        type: 'frame',
+        layout: { x: 0, y: 0, width: 81, height: 82, children: [] },
+        tree: { kind: 'box', props: {}, children: [] },
+      }),
+    })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    expect(errors).toHaveLength(0)
+    expect(renders).toHaveLength(1)
+    expect(renders[0]?.width).toBe(81)
+    expect(client.layout?.width).toBe(81)
+  })
+
   it('invokes onError when JSON protocolVersion is newer than client, then accepts a valid frame', async () => {
     const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
     installMockWebSocket(sockets)
