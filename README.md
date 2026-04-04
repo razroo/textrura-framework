@@ -6,7 +6,7 @@
 
 https://github.com/user-attachments/assets/1610d856-3c7d-4fce-be42-1c43306e6520
 
-The client is the server. The server is the client. Geometra is a DOM-free frontend framework built on the [Textura](https://github.com/razroo/textura) layout engine where client and server are interchangeable — the same JSON geometry protocol powers both. Human and AI interaction is native to both sides. No browser layout engine. No DOM. Just computed geometry piped straight to render targets.
+The client is the server. The server is the client. Geometra is a DOM-free frontend framework built on the [Textura](packages/textura) layout engine where client and server are interchangeable — the same JSON geometry protocol powers both. Human and AI interaction is native to both sides. No browser layout engine. No DOM. Just computed geometry piped straight to render targets.
 
 AI agents interact with the server directly via the same JSON protocol the client uses — no browser middleman, no scraping, no hacks. Agents move 1000x faster because they skip the entire rendering pipeline. Multiple client/server instances can run inside a single client. This is singularity tech.
 
@@ -37,10 +37,12 @@ The framework replaces the entire browser rendering pipeline. Layout is computed
 
 Package docs:
 
+- `textura`: `packages/textura` — DOM-free Yoga WASM layout engine
 - `@geometra/core`: `packages/core/README.md`
 - `@geometra/renderer-canvas`: `packages/renderer-canvas/README.md`
 - `@geometra/renderer-terminal`: `packages/renderer-terminal/README.md`
 - `@geometra/renderer-webgpu`: `packages/renderer-webgpu/README.md`
+- `@geometra/renderer-three`: `packages/renderer-three` — Three.js hosts + scene3d
 - `@geometra/server`: `packages/server/README.md`
 - `@geometra/client`: `packages/client/README.md`
 - `@geometra/ui`: `packages/ui/README.md`
