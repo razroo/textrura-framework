@@ -187,17 +187,35 @@ describe('dispatchHit', () => {
     expect((received as HitEvent & { buttons: number }).buttons).toBe(4)
   })
 
-  it('zero-size box: only the origin corner is inside', () => {
+  it('zero-size box: only the origin corner is inside (dispatch + path + interactive + cursor)', () => {
     let fired = false
-    const el = box({ width: 0, height: 0, onClick: () => { fired = true } })
+    const el = box({
+      width: 0,
+      height: 0,
+      onClick: () => {
+        fired = true
+      },
+      cursor: 'pointer',
+    })
     const layout = { x: 10, y: 20, width: 0, height: 0, children: [] }
 
     expect(dispatchHit(el, layout, 'onClick', 10, 20).handled).toBe(true)
     expect(fired).toBe(true)
+    expect(hitPathAtPoint(el, layout, 10, 20)).toEqual([])
+    expect(hasInteractiveHitAtPoint(el, layout, 10, 20)).toBe(true)
+    expect(getCursorAtPoint(el, layout, 10, 20)).toBe('pointer')
 
     fired = false
     expect(dispatchHit(el, layout, 'onClick', 11, 20).handled).toBe(false)
     expect(fired).toBe(false)
+    expect(hitPathAtPoint(el, layout, 11, 20)).toBeNull()
+    expect(hasInteractiveHitAtPoint(el, layout, 11, 20)).toBe(false)
+    expect(getCursorAtPoint(el, layout, 11, 20)).toBeNull()
+
+    expect(dispatchHit(el, layout, 'onClick', 10, 21).handled).toBe(false)
+    expect(hitPathAtPoint(el, layout, 10, 21)).toBeNull()
+    expect(hasInteractiveHitAtPoint(el, layout, 10, 21)).toBe(false)
+    expect(getCursorAtPoint(el, layout, 10, 21)).toBeNull()
   })
 
   it('missing earlier child layout (sparse children array) still hit-tests later siblings', () => {
