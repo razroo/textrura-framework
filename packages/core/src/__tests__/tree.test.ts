@@ -269,7 +269,7 @@ describe('toLayoutTree', () => {
     expect(layout).not.toHaveProperty('dir')
   })
 
-  it('strips dir from text and image layout props (direction is resolved outside Yoga)', () => {
+  it('strips dir from text, image, and scene3d layout props (direction is resolved outside Yoga)', () => {
     const t = text({
       text: 'x',
       font: '14px sans-serif',
@@ -282,6 +282,14 @@ describe('toLayoutTree', () => {
 
     const img = image({ src: '/a.png', width: 8, height: 8, dir: 'ltr' })
     expect(toLayoutTree(img)).not.toHaveProperty('dir')
+
+    const s3 = scene3d({
+      width: 80,
+      height: 80,
+      dir: 'rtl',
+      objects: [sphere({ radius: 1 })],
+    })
+    expect(toLayoutTree(s3)).not.toHaveProperty('dir')
   })
 
   it('does not mutate live element.props when building the layout snapshot', () => {
