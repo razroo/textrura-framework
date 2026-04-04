@@ -756,6 +756,64 @@ describe('hitTestText', () => {
     expect(hitTestText(textNodes, 2, 5)).toEqual({ nodeIndex: 0, charOffset: 0 })
     expect(hitTestText(textNodes, 14, 5)).toEqual({ nodeIndex: 0, charOffset: 2 })
   })
+
+  it('non-finite element lineHeight skips vertical line bands and snaps to charOffset 0 without throwing', () => {
+    const nanLh: TextNodeInfo[] = [
+      {
+        element: {
+          kind: 'text' as const,
+          props: { text: 'ab', font: '14px sans-serif', lineHeight: Number.NaN as never },
+        },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 18,
+        index: 0,
+        lines: [{ text: 'ab', x: 0, y: 0, charOffsets: [0, 8], charWidths: [8, 8] }],
+      },
+    ]
+    expect(() => hitTestText(nanLh, 5, 5)).not.toThrow()
+    expect(hitTestText(nanLh, 5, 5)).toEqual({ nodeIndex: 0, charOffset: 0 })
+
+    const infLh: TextNodeInfo[] = [
+      {
+        element: {
+          kind: 'text' as const,
+          props: { text: 'ab', font: '14px sans-serif', lineHeight: Number.POSITIVE_INFINITY as never },
+        },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 18,
+        index: 0,
+        lines: [{ text: 'ab', x: 0, y: 0, charOffsets: [0, 8], charWidths: [8, 8] }],
+      },
+    ]
+    expect(() => hitTestText(infLh, 12, 5)).not.toThrow()
+    expect(hitTestText(infLh, 12, 5)).toEqual({ nodeIndex: 0, charOffset: 2 })
+
+    const multiNaN: TextNodeInfo[] = [
+      {
+        element: {
+          kind: 'text' as const,
+          props: { text: 'ab\ncd', font: '14px sans-serif', lineHeight: Number.NaN as never },
+        },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 36,
+        index: 0,
+        lines: [
+          { text: 'ab', x: 0, y: 0, charOffsets: [0, 8], charWidths: [8, 8] },
+          { text: 'cd', x: 0, y: 18, charOffsets: [0, 8], charWidths: [8, 8] },
+        ],
+      },
+    ]
+    expect(hitTestText(multiNaN, 4, 25)).toEqual({ nodeIndex: 0, charOffset: 0 })
+  })
 })
 
 describe('hitTestText direction mapping', () => {
