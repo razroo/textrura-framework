@@ -108,6 +108,17 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ ...base, height: -Infinity })).toBe(false)
   })
 
+  it('rejects bounds that overflow double range to ±Infinity (JSON exponent edge cases)', () => {
+    const base = { x: 0, y: 0, width: 10, height: 10, children: [] as [] }
+    expect(1e400).toBe(Infinity)
+    expect(layoutBoundsAreFinite({ ...base, width: 1e400 })).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, height: 1e400 })).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, x: 1e400 })).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, y: -1e400 })).toBe(false)
+    expect(Number.MAX_VALUE * 2).toBe(Infinity)
+    expect(layoutBoundsAreFinite({ ...base, width: Number.MAX_VALUE * 2 })).toBe(false)
+  })
+
   it('rejects non-number values (corrupt runtime / bad deserialization)', () => {
     const base = { x: 0, y: 0, width: 10, height: 10, children: [] as [] }
     expect(layoutBoundsAreFinite({ ...base, x: undefined as unknown as number })).toBe(false)
