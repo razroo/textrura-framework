@@ -733,6 +733,73 @@ describe('dispatchKeyboardEvent', () => {
     expect(receivedTarget).toBe(innerLayout)
   })
 
+  it('overwrites a bogus target on non-Tab keyboard partialEvent with the focused layout', () => {
+    let receivedTarget: ComputedLayout | null = null
+    const innerLayout = { x: 10, y: 20, width: 80, height: 40, children: [] as const }
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: [innerLayout],
+    }
+    const decoy = { x: 999, y: 888, width: 3, height: 3, children: [] as const }
+    const inner = box({ onKeyDown: e => { receivedTarget = e.target } }, [])
+    const tree = box({}, [inner])
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'a',
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+      target: decoy,
+    } as never)
+
+    expect(receivedTarget).toBe(innerLayout)
+    expect(receivedTarget).not.toBe(decoy)
+  })
+
+  it('overwrites a bogus target on composition partialEvent with the focused layout', () => {
+    let receivedTarget: ComputedLayout | null = null
+    const innerLayout = { x: 10, y: 20, width: 80, height: 40, children: [] as const }
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: [innerLayout],
+    }
+    const decoy = { x: 777, y: 666, width: 2, height: 2, children: [] as const }
+    const inner = box({ onCompositionUpdate: e => { receivedTarget = e.target } }, [])
+    const tree = box({}, [inner])
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    dispatchCompositionEvent(tree, layout, 'onCompositionUpdate', {
+      data: 'x',
+      target: decoy,
+    } as never)
+
+    expect(receivedTarget).toBe(innerLayout)
+    expect(receivedTarget).not.toBe(decoy)
+  })
+
   it('returns false for composition dispatch when nothing is focused', () => {
     clearFocus()
     const tree = box({ onCompositionUpdate: () => undefined }, [])
