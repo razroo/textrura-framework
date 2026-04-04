@@ -392,7 +392,7 @@ export function hitPathAtPoint(
  * Walk follows the same scroll and overflow clipping rules as {@link dispatchHit}. {@link hitPathAtPoint} only
  * returns box index paths, but cursor resolution also considers `text`, `image`, and `scene3d` nodes: when the point is inside
  * such a leaf’s layout and it is not `pointerEvents: 'none'`, its {@link import('./types.js').StyleProps.cursor}
- * is used (including a lone `text` / `image` / `scene3d` tree root). Boxes with `pointerEvents: 'none'` are skipped so hits
+ * is used (including a lone `text` / `image` / `scene3d` tree root). Boxes and leaves with `pointerEvents: 'none'` are skipped so hits
  * fall through to geometry behind, matching {@link hitPathAtPoint}.
  *
  * Root `offsetX` / `offsetY` follow {@link dispatchHit}: non-finite or non-number values are treated as `0`.

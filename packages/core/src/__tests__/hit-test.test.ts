@@ -3623,6 +3623,27 @@ describe('pointerEvents', () => {
     expect(getCursorAtPoint(root, layout, 10, 10)).toBe('pointer')
   })
 
+  it('pointerEvents none on nested text: getCursorAtPoint falls through to ancestor cursor (leaf pass-through)', () => {
+    const leaf = text({
+      text: 'hi',
+      font: '16px sans-serif',
+      lineHeight: 20,
+      width: 100,
+      height: 50,
+      cursor: 'text',
+      pointerEvents: 'none',
+    })
+    const parent = box({ width: 100, height: 50, cursor: 'pointer' }, [leaf])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 50,
+      children: [{ x: 0, y: 0, width: 100, height: 50, children: [] as const }],
+    }
+    expect(getCursorAtPoint(parent, layout, 50, 25)).toBe('pointer')
+  })
+
   it('pointerEvents none: click-to-focus targets keyboard-only box behind overlay (overlay excluded from hit stack)', () => {
     const back = box({ width: 50, height: 50, zIndex: 0, onKeyDown: () => undefined })
     const front = box({
