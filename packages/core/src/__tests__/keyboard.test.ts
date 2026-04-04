@@ -640,6 +640,51 @@ describe('dispatchKeyboardEvent', () => {
     ).toBe(false)
   })
 
+  it('Tab still returns true for non-finite root bounds (NaN/±Infinity); other keys and composition miss (layoutBoundsAreFinite parity)', () => {
+    const tabEvent = {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    } as const
+    const corruptRoots = [
+      { x: Number.NaN, y: 0, width: 100, height: 100, children: [] },
+      { x: 0, y: Number.POSITIVE_INFINITY, width: 100, height: 100, children: [] },
+      { x: 0, y: 0, width: Number.POSITIVE_INFINITY, height: 50, children: [] },
+      { x: 0, y: 0, width: 40, height: Number.NEGATIVE_INFINITY, children: [] },
+    ] as const
+
+    for (const corruptRoot of corruptRoots) {
+      clearFocus()
+      const clickTree = box({ onClick: () => undefined }, [])
+      expect(dispatchKeyboardEvent(clickTree, corruptRoot, 'onKeyDown', tabEvent)).toBe(true)
+      expect(focusedElement.peek()).toBeNull()
+
+      clearFocus()
+      let pressed = ''
+      const keyTree = box({ onKeyDown: e => { pressed = e.key } }, [])
+      expect(
+        dispatchKeyboardEvent(keyTree, corruptRoot, 'onKeyDown', {
+          key: 'a',
+          code: 'KeyA',
+          shiftKey: false,
+          ctrlKey: false,
+          metaKey: false,
+          altKey: false,
+        }),
+      ).toBe(false)
+      expect(pressed).toBe('')
+
+      clearFocus()
+      const compTree = box({ onCompositionUpdate: () => undefined }, [])
+      expect(
+        dispatchCompositionEvent(compTree, corruptRoot, 'onCompositionUpdate', { data: 'x' }),
+      ).toBe(false)
+    }
+  })
+
   it('dispatches composition events to focused element', () => {
     let value = ''
     const tree = box({ onCompositionUpdate: (e) => { value = e.data } }, [])
