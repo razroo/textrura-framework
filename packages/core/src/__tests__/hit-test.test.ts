@@ -2592,6 +2592,52 @@ describe('scroll and overflow clipping', () => {
     expect(hasInteractiveHitAtPoint(outer, layout, 20, 70)).toBe(true)
     expect(getCursorAtPoint(outer, layout, 20, 70)).toBe('pointer')
   })
+
+  it('nested overflow scroll: outer and inner scrollX + scrollY compose for dispatch, path, and locals', () => {
+    let localX = -1
+    let localY = -1
+    const btn = box({
+      width: 40,
+      height: 40,
+      cursor: 'pointer',
+      onClick: e => {
+        localX = e.localX ?? -999
+        localY = e.localY ?? -999
+      },
+    })
+    const inner = box(
+      { width: 100, height: 100, overflow: 'scroll', scrollX: 25, scrollY: 35 },
+      [btn],
+    )
+    const outer = box(
+      { width: 100, height: 100, overflow: 'scroll', scrollX: 20, scrollY: 15 },
+      [inner],
+    )
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        {
+          x: 30,
+          y: 40,
+          width: 100,
+          height: 100,
+          children: [{ x: 50, y: 80, width: 40, height: 40, children: [] as const }],
+        },
+      ],
+    }
+
+    // inner abs = (0 - 20 + 30, 0 - 15 + 40) = (10, 25)
+    // btn abs = (10 - 25 + 50, 25 - 35 + 80) = (35, 70)
+    expect(dispatchHit(outer, layout, 'onClick', 35, 70).handled).toBe(true)
+    expect(localX).toBe(0)
+    expect(localY).toBe(0)
+    expect(hitPathAtPoint(outer, layout, 35, 70)).toEqual([0, 0])
+    expect(hasInteractiveHitAtPoint(outer, layout, 35, 70)).toBe(true)
+    expect(getCursorAtPoint(outer, layout, 35, 70)).toBe('pointer')
+  })
 })
 
 describe('non-box leaves (text, image, scene3d)', () => {
