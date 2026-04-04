@@ -194,6 +194,29 @@ describe('text-input foundation', () => {
     expect(rtlRight.selection.focusOffset).toBe(0)
   })
 
+  it('steps horizontal caret movement in UTF-16 code units (astral emoji uses two steps)', () => {
+    const line = '😀a'
+    expect([...line].length).toBe(2)
+    expect(line.length).toBe(3)
+    const base: TextInputState = {
+      nodes: [line],
+      selection: { anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 0 },
+    }
+    const afterHighSurrogate = moveInputCaret(base, 'right')
+    expect(afterHighSurrogate.selection.focusOffset).toBe(1)
+    const afterEmoji = moveInputCaret(afterHighSurrogate, 'right')
+    expect(afterEmoji.selection.focusOffset).toBe(2)
+    const afterA = moveInputCaret(afterEmoji, 'right')
+    expect(afterA.selection.focusOffset).toBe(3)
+
+    const beforeA = moveInputCaret(afterA, 'left')
+    expect(beforeA.selection.focusOffset).toBe(2)
+    const beforeEmojiLow = moveInputCaret(beforeA, 'left')
+    expect(beforeEmojiLow.selection.focusOffset).toBe(1)
+    const atStart = moveInputCaret(beforeEmojiLow, 'left')
+    expect(atStart.selection.focusOffset).toBe(0)
+  })
+
   it('supports line boundary movement (Home/End semantics)', () => {
     const base: TextInputState = {
       nodes: ['abcd', 'efghij'],

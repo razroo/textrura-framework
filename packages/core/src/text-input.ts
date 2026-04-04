@@ -239,7 +239,14 @@ export function deleteInput(state: TextInputState): TextInputEditResult {
   }
 }
 
-/** Move caret by one character; optionally extend existing selection. */
+/**
+ * Move caret by one logical step horizontally or vertically; optionally extend selection.
+ *
+ * Horizontal moves advance one **UTF-16 code unit** (same indexing as `String` length and
+ * `TextInputState` offsets). Astral symbols encoded as surrogate pairs therefore need two
+ * ArrowLeft/ArrowRight steps; invalid lone surrogates are not repaired here (see roadmap notes
+ * on complex scripts).
+ */
 export function moveInputCaret(
   state: TextInputState,
   direction: 'left' | 'right' | 'up' | 'down',
@@ -326,7 +333,12 @@ export function moveInputCaret(
   }
 }
 
-/** Move caret by whole words (Ctrl/Alt-style navigation). */
+/**
+ * Move caret by whole words (Ctrl/Alt-style navigation).
+ *
+ * “Word” characters are ASCII letters, digits, and `_` only; other code units form gaps or
+ * punctuation runs. Offsets stay UTF-16 code units, matching {@link moveInputCaret}.
+ */
 export function moveInputCaretByWord(
   state: TextInputState,
   direction: 'left' | 'right',
