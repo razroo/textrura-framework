@@ -90,6 +90,23 @@ describe('geometry snapshot CI', () => {
     expect(roundLayout(layout)).toMatchSnapshot()
   })
 
+  it('stable rtl root row-reverse with gap and two text children (rounded)', async () => {
+    await init()
+    const tree = box(
+      { width: 200, height: 80, padding: 12, flexDirection: 'row-reverse', gap: 8 },
+      [
+        text({ text: 'A', font: '16px sans-serif', lineHeight: 20 }),
+        text({ text: 'B', font: '16px sans-serif', lineHeight: 20 }),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), {
+      width: 200,
+      height: 80,
+      direction: 'rtl',
+    })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
+
   it('stable ltr document: descendant dir rtl on inner flex row does not mirror Yoga (rounded)', async () => {
     await init()
     const item = { font: '16px sans-serif', lineHeight: 20 } as const
