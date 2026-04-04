@@ -204,6 +204,8 @@ function textNodeBoundsAreFinite(node: TextNodeInfo): boolean {
  * otherwise `null` (e.g. NaN, ±Infinity, BigInt, or non-numbers). Nodes with non-finite or negative-size bounds
  * are skipped (aligned with {@link import('./layout-bounds.js').layoutBoundsAreFinite}).
  *
+ * Returns `null` when `textNodes` is empty or no node’s bounds contain the point.
+ *
  * Vertical line bands are half-open between stacked lines so a y exactly on an interior boundary belongs to the
  * lower line; the **last** line’s bottom edge is inclusive so it matches {@link import('./hit-test.js').dispatchHit}
  * inclusive rect edges on the text node box.

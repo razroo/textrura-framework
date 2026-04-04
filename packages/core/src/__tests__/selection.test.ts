@@ -505,6 +505,11 @@ describe('getSelectedText', () => {
 })
 
 describe('hitTestText', () => {
+  it('returns null for an empty textNodes list', () => {
+    expect(hitTestText([], 0, 0)).toBeNull()
+    expect(hitTestText([], 10, 20)).toBeNull()
+  })
+
   it('returns null for non-finite pointer coordinates', () => {
     const textNodes: TextNodeInfo[] = [
       {
