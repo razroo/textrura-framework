@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Textura vs Yoga — DOM-free Layout Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Inter, sans-serif;
+      background: #09090b;
+      color: #e0e0e0;
+      min-height: 100vh;
+    }
+    .header {
+      text-align: center;
+      padding: 48px 20px 32px;
+    }
+    .header h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+    .header h1 span { color: #e94560; }
+    .header p {
+      font-size: 15px;
+      color: #71717a;
+      max-width: 640px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    .controls-bar {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      padding: 0 20px 28px;
+      align-items: center;
+    }
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .control-group label {
+      font-size: 12px;
+      font-weight: 500;
+      color: #71717a;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .control-group select, .control-group input[type="range"] {
+      background: #18181b;
+      border: 1px solid #27272a;
+      color: #e0e0e0;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 13px;
+      font-family: Inter, sans-serif;
+    }
+    .control-group select { cursor: pointer; }
+    .control-group input[type="range"] { width: 160px; accent-color: #e94560; }
+    .control-group .value {
+      font-size: 13px;
+      color: #fff;
+      font-variant-numeric: tabular-nums;
+      min-width: 44px;
+      text-align: right;
+    }
+
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 24px 48px;
+    }
+    .panel {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid #27272a;
+    }
+    .panel-title {
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .panel-title.yoga { color: #71717a; }
+    .panel-title.textura { color: #e94560; }
+    .panel-badge {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    .badge-warn { background: #422006; color: #fb923c; }
+    .badge-ok { background: #052e16; color: #4ade80; }
+    .panel-canvas {
+      display: block;
+      width: 100%;
+    }
+    .panel-footer {
+      padding: 12px 20px;
+      border-top: 1px solid #27272a;
+      font-size: 12px;
+      color: #52525b;
+      font-variant-numeric: tabular-nums;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .insight {
+      max-width: 1400px;
+      margin: 0 auto 48px;
+      padding: 0 24px;
+    }
+    .insight-box {
+      background: linear-gradient(135deg, #1a1025 0%, #18181b 100%);
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      padding: 24px 28px;
+    }
+    .insight-box h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e94560;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .insight-box p {
+      font-size: 14px;
+      color: #a1a1aa;
+      line-height: 1.7;
+    }
+    .insight-box p + p { margin-top: 8px; }
+    .insight-box strong { color: #e0e0e0; }
+    #insight-text p { transition: opacity 0.2s; }
+
+    .perf-bar {
+      max-width: 1400px;
+      margin: 0 auto 48px;
+      padding: 0 24px;
+    }
+    .perf-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .perf-card {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+    }
+    .perf-card .perf-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #fff;
+      font-variant-numeric: tabular-nums;
+    }
+    .perf-card .perf-value.accent { color: #e94560; }
+    .perf-card .perf-label {
+      font-size: 11px;
+      color: #71717a;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: 6px;
+    }
+
+    .morph-bar {
+      max-width: 1400px;
+      margin: 0 auto 24px;
+      padding: 0 24px;
+      display: none;
+    }
+    .morph-bar.active { display: block; }
+    .morph-inner {
+      background: linear-gradient(135deg, #0f1a2e 0%, #18181b 100%);
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      padding: 20px 28px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+    .morph-fps {
+      font-size: 36px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      min-width: 100px;
+    }
+    .morph-fps.good { color: #4ade80; }
+    .morph-fps.ok { color: #fb923c; }
+    .morph-fps.bad { color: #ef4444; }
+    .morph-fps-label {
+      font-size: 11px;
+      color: #71717a;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .morph-width-bar {
+      flex: 1;
+      height: 6px;
+      background: #27272a;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .morph-width-fill {
+      height: 100%;
+      background: #e94560;
+      border-radius: 3px;
+      transition: width 0.016s linear;
+    }
+    .morph-width-label {
+      font-size: 13px;
+      color: #a1a1aa;
+      font-variant-numeric: tabular-nums;
+      min-width: 60px;
+      text-align: right;
+    }
+    .morph-frame-graph {
+      display: flex;
+      align-items: flex-end;
+      gap: 1px;
+      height: 40px;
+    }
+    .morph-frame-graph .bar {
+      width: 3px;
+      background: #4ade80;
+      border-radius: 1px 1px 0 0;
+      min-height: 1px;
+    }
+    .morph-frame-graph .bar.slow { background: #fb923c; }
+    .morph-frame-graph .bar.jank { background: #ef4444; }
+
+    .vscroll-bar {
+      max-width: 1400px;
+      margin: 0 auto 24px;
+      padding: 0 24px;
+      display: none;
+    }
+    .vscroll-bar.active { display: block; }
+    .vscroll-inner {
+      background: linear-gradient(135deg, #0f1a2e 0%, #18181b 100%);
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      padding: 20px 28px;
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      flex-wrap: wrap;
+    }
+    .vscroll-stat { text-align: center; }
+    .vscroll-stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #fff;
+      font-variant-numeric: tabular-nums;
+    }
+    .vscroll-stat-value.good { color: #4ade80; }
+    .vscroll-stat-value.warn { color: #fb923c; }
+    .vscroll-stat-value.bad { color: #ef4444; }
+    .vscroll-stat-label {
+      font-size: 11px;
+      color: #71717a;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: 2px;
+    }
+    .vscroll-jump {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+    .vscroll-jump label {
+      font-size: 12px;
+      font-weight: 500;
+      color: #71717a;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .vscroll-jump input {
+      background: #18181b;
+      border: 1px solid #27272a;
+      color: #e0e0e0;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 13px;
+      font-family: Inter, sans-serif;
+      width: 90px;
+      font-variant-numeric: tabular-nums;
+    }
+    .vscroll-jump button {
+      background: #e94560;
+      border: none;
+      color: #fff;
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: Inter, sans-serif;
+      cursor: pointer;
+    }
+    .vscroll-jump button:hover { background: #d13a54; }
+
+    .aistream-bar {
+      max-width: 1400px;
+      margin: 0 auto 24px;
+      padding: 0 24px;
+      display: none;
+    }
+    .aistream-bar.active { display: block; }
+    .aistream-inner {
+      background: linear-gradient(135deg, #0f1a2e 0%, #18181b 100%);
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      padding: 20px 28px;
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      flex-wrap: wrap;
+    }
+    .aistream-btn {
+      background: #e94560;
+      border: none;
+      color: #fff;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: Inter, sans-serif;
+      cursor: pointer;
+      min-width: 110px;
+      text-align: center;
+    }
+    .aistream-btn:hover { background: #d13a54; }
+    .aistream-btn.running { background: #52525b; }
+    .aistream-progress {
+      flex: 1;
+      min-width: 120px;
+    }
+    .aistream-progress-track {
+      height: 6px;
+      background: #27272a;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .aistream-progress-fill {
+      height: 100%;
+      background: #e94560;
+      border-radius: 3px;
+      width: 0%;
+      transition: width 0.05s linear;
+    }
+
+    .synth-bar {
+      max-width: 1400px;
+      margin: 0 auto 24px;
+      padding: 0 24px;
+      display: none;
+    }
+    .synth-bar.active { display: block; }
+    .synth-inner {
+      background: linear-gradient(135deg, #0f1a2e 0%, #18181b 100%);
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      padding: 20px 28px;
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      flex-wrap: wrap;
+    }
+    .synth-toggle {
+      display: flex;
+      background: #27272a;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .synth-toggle button {
+      background: none;
+      border: none;
+      color: #71717a;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: Inter, sans-serif;
+      padding: 6px 14px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .synth-toggle button.active {
+      background: #e94560;
+      color: #fff;
+    }
+
+    .agent-bar, .worldmodel-bar {
+      max-width: 1400px;
+      margin: 0 auto 24px;
+      padding: 0 24px;
+      display: none;
+    }
+    .agent-bar.active, .worldmodel-bar.active { display: block; }
+    .agent-action-log {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      flex: 1;
+      min-width: 200px;
+      overflow: hidden;
+    }
+    .agent-action-tag {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+    .agent-action-tag.type { background: #1e3a5f; color: #60a5fa; }
+    .agent-action-tag.add { background: #052e16; color: #4ade80; }
+    .agent-action-tag.resize { background: #422006; color: #fb923c; }
+    .agent-action-tag.toggle { background: #2e1065; color: #c084fc; }
+    .agent-action-tag.remove { background: #450a0a; color: #f87171; }
+
+    .critic-bar {
+      max-width: 1400px;
+      margin: 0 auto 24px;
+      padding: 0 24px;
+      display: none;
+    }
+    .critic-bar.active { display: block; }
+    .critic-issue {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #a1a1aa;
+      padding: 4px 0;
+    }
+    .critic-issue .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .critic-issue .dot.error { background: #ef4444; }
+    .critic-issue .dot.fixed { background: #4ade80; }
+    .critic-issue.is-fixed { color: #52525b; text-decoration: line-through; }
+    .critic-issues-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      min-width: 200px;
+      max-height: 80px;
+      overflow-y: auto;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .topbar-install {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .topbar-install code {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 13px;
+      color: #e0e0e0;
+      font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, monospace;
+      user-select: all;
+      cursor: text;
+    }
+    .topbar-links {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .topbar-links a {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #a1a1aa;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .topbar-links a:hover { color: #fff; }
+    .topbar-links svg { width: 18px; height: 18px; fill: currentColor; }
+
+    .get-started {
+      max-width: 1400px;
+      margin: 0 auto 48px;
+      padding: 0 24px;
+    }
+    .get-started-box {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      padding: 28px 32px;
+    }
+    .get-started-box h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 16px;
+    }
+    .get-started-box pre {
+      background: #09090b;
+      border: 1px solid #27272a;
+      border-radius: 8px;
+      padding: 20px 24px;
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #e0e0e0;
+      font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, monospace;
+    }
+    .get-started-box pre .kw { color: #c084fc; }
+    .get-started-box pre .fn { color: #60a5fa; }
+    .get-started-box pre .str { color: #4ade80; }
+    .get-started-box pre .cmt { color: #52525b; }
+    .get-started-box pre .type { color: #fb923c; }
+
+    /* ── Responsive ─────────────────────────────────── */
+    @media (max-width: 900px) {
+      .comparison {
+        grid-template-columns: 1fr;
+      }
+      .perf-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    @media (max-width: 600px) {
+      .header { padding: 32px 16px 20px; }
+      .header h1 { font-size: 24px; }
+      .header p { font-size: 13px; }
+      .controls-bar { gap: 12px; padding: 0 16px 20px; }
+      .control-group input[type="range"] { width: 100px; }
+      .comparison { padding: 0 12px 32px; gap: 16px; }
+      .perf-grid { grid-template-columns: 1fr 1fr; }
+      .perf-card { padding: 14px; }
+      .perf-card .perf-value { font-size: 22px; }
+      .insight { padding: 0 12px; margin-bottom: 32px; }
+      .insight-box { padding: 18px 16px; }
+      .perf-bar { padding: 0 12px; margin-bottom: 32px; }
+      .get-started { padding: 0 12px; }
+      .get-started-box { padding: 20px 16px; }
+      .get-started-box pre { padding: 14px 12px; font-size: 12px; }
+      .topbar { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
+      .morph-inner, .vscroll-inner, .aistream-inner, .synth-inner {
+        padding: 16px;
+        gap: 16px;
+      }
+      .morph-bar, .vscroll-bar, .aistream-bar, .synth-bar,
+      .agent-bar, .worldmodel-bar, .critic-bar { padding: 0 12px; }
+      .vscroll-jump { margin-left: 0; width: 100%; }
+    }
+    @media (max-width: 400px) {
+      .perf-grid { grid-template-columns: 1fr; }
+      .controls-bar { flex-direction: column; align-items: stretch; }
+      .control-group { justify-content: space-between; }
+    }
+
+    .get-started-footer {
+      display: flex;
+      gap: 16px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+    .get-started-footer a {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #e94560;
+      text-decoration: none;
+      padding: 8px 16px;
+      border: 1px solid #e9456040;
+      border-radius: 8px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .get-started-footer a:hover {
+      background: #e9456015;
+      border-color: #e94560;
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-install">
+      <code>npm install textura</code>
+    </div>
+    <div class="topbar-links">
+      <a href="https://www.npmjs.com/package/textura" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24"><path d="M1.763 0C.786 0 0 .786 0 1.763v20.474C0 23.214.786 24 1.763 24h20.474c.977 0 1.763-.786 1.763-1.763V1.763C24 .786 23.214 0 22.237 0zM5.13 5.323l13.837.019-.009 13.836h-3.464l.01-10.382h-3.456L12.04 19.17H5.113z"/></svg>
+        npm
+      </a>
+      <a href="https://github.com/razroo/textura" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+        GitHub
+      </a>
+    </div>
+  </div>
+
+  <div class="header">
+    <h1><a href="https://github.com/facebook/yoga" target="_blank" rel="noopener" style="color:#71717a;text-decoration:none">Yoga</a> alone vs <span>Textura</span></h1>
+    <p><a href="https://github.com/facebook/yoga" target="_blank" rel="noopener" style="color:#a1a1aa;text-decoration:underline;text-underline-offset:2px">Yoga</a> computes flexbox layout but cannot measure text — it needs fixed heights or guesses.
+       Textura wires in <a href="https://www.npmjs.com/package/@chenglou/pretext" target="_blank" rel="noopener" style="color:#a1a1aa;text-decoration:underline;text-underline-offset:2px">Pretext</a>'s canvas-based text measurement so every node gets exact geometry. No DOM. No reflow.</p>
+  </div>
+
+  <div class="controls-bar">
+    <div class="control-group">
+      <label>Scenario</label>
+      <select id="scenario">
+        <option value="chat">Chat Messages</option>
+        <option value="cards">Content Cards</option>
+        <option value="i18n">Multilingual Feed</option>
+        <option value="article">Article Layout</option>
+        <option value="stress">Stress Test (200 items)</option>
+        <option value="morph">Responsive Morph (60fps)</option>
+        <option value="vscroll">Virtual Scroll (10k items)</option>
+        <option value="editor">Design Editor (drag to resize)</option>
+        <option value="aistream">AI Streaming Report</option>
+        <option value="synth">Synthetic UI Training Data</option>
+        <option value="agent">AI Agent Environment</option>
+        <option value="critic">AI Layout Critic</option>
+        <option value="worldmodel">Text World Model</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <label>Width</label>
+      <input type="range" id="width-slider" min="220" max="660" value="440" />
+      <span class="value" id="width-label">440px</span>
+    </div>
+    <div class="control-group">
+      <label>Font size</label>
+      <input type="range" id="font-slider" min="11" max="22" value="14" />
+      <span class="value" id="font-label">14px</span>
+    </div>
+  </div>
+
+  <div class="comparison">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title yoga">Yoga Alone (estimated heights)</span>
+        <span class="panel-badge badge-warn">text blind</span>
+      </div>
+      <canvas id="canvas-yoga" class="panel-canvas"></canvas>
+      <div class="panel-footer">
+        <span id="yoga-time">—</span>
+        <span id="yoga-nodes">—</span>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title textura">Textura (measured text)</span>
+        <span class="panel-badge badge-ok">pixel-accurate</span>
+      </div>
+      <canvas id="canvas-textura" class="panel-canvas"></canvas>
+      <div class="panel-footer">
+        <span id="textura-time">—</span>
+        <span id="textura-nodes">—</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="critic-bar" id="critic-bar">
+    <div class="synth-inner">
+      <button class="aistream-btn" id="critic-btn">Run Critic</button>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value bad" id="critic-found">0</div>
+        <div class="vscroll-stat-label">Issues found</div>
+      </div>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value good" id="critic-fixed">0</div>
+        <div class="vscroll-stat-label">Issues fixed</div>
+      </div>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value good" id="critic-time">—</div>
+        <div class="vscroll-stat-label">Analysis time</div>
+      </div>
+      <div class="critic-issues-list" id="critic-issues"></div>
+    </div>
+  </div>
+
+  <div class="agent-bar" id="agent-bar">
+    <div class="synth-inner">
+      <button class="aistream-btn" id="agent-btn">Run Agent</button>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value good" id="agent-steps">0</div>
+        <div class="vscroll-stat-label">Actions taken</div>
+      </div>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value good" id="agent-step-time">—</div>
+        <div class="vscroll-stat-label">Per-step layout</div>
+      </div>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value good" id="agent-throughput">—</div>
+        <div class="vscroll-stat-label">Steps / sec (max)</div>
+      </div>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value warn" id="agent-browser-compare">—</div>
+        <div class="vscroll-stat-label">vs Browser (~80ms)</div>
+      </div>
+      <div class="agent-action-log" id="agent-action-log"></div>
+    </div>
+  </div>
+
+  <div class="worldmodel-bar" id="worldmodel-bar">
+    <div class="synth-inner">
+      <button class="aistream-btn" id="wm-btn">Generate Rooms</button>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value good" id="wm-generated">0</div>
+        <div class="vscroll-stat-label">Rooms generated</div>
+      </div>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value good" id="wm-layout-time">—</div>
+        <div class="vscroll-stat-label">Layout time</div>
+      </div>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value warn" id="wm-bbox-errors">0</div>
+        <div class="vscroll-stat-label">Wrong heights (Yoga)</div>
+      </div>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value warn" id="wm-total-drift">0px</div>
+        <div class="vscroll-stat-label">Total height drift</div>
+      </div>
+    </div>
+    <div id="wm-token-output" style="max-width:1400px;margin:12px auto 0;padding:14px;background:#111114;border:1px solid #2a2a35;border-radius:8px;overflow-x:auto"></div>
+  </div>
+
+  <div class="synth-bar" id="synth-bar">
+    <div class="synth-inner">
+      <button class="aistream-btn" id="synth-btn">Generate</button>
+      <div class="synth-toggle">
+        <button class="active" id="synth-mode-visual">Visual</button>
+        <button id="synth-mode-bbox">Annotations</button>
+      </div>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value good" id="synth-count">0</div>
+        <div class="vscroll-stat-label">UIs generated</div>
+      </div>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value good" id="synth-rate">—</div>
+        <div class="vscroll-stat-label">Layouts / sec</div>
+      </div>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value good" id="synth-time">—</div>
+        <div class="vscroll-stat-label">Avg layout time</div>
+      </div>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value warn" id="synth-nodes">—</div>
+        <div class="vscroll-stat-label">Nodes per UI</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="aistream-bar" id="aistream-bar">
+    <div class="aistream-inner">
+      <button class="aistream-btn" id="aistream-btn">Generate</button>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value good" id="aistream-tokens">0</div>
+        <div class="vscroll-stat-label">Tokens streamed</div>
+      </div>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value good" id="aistream-layout-time">—</div>
+        <div class="vscroll-stat-label">Layout per token</div>
+      </div>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value bad" id="aistream-shift">0</div>
+        <div class="vscroll-stat-label">Yoga layout shifts</div>
+      </div>
+      <div class="aistream-progress">
+        <div class="vscroll-stat-label">Progress</div>
+        <div class="aistream-progress-track"><div class="aistream-progress-fill" id="aistream-progress"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="vscroll-bar" id="vscroll-bar">
+    <div class="vscroll-inner">
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value good" id="vscroll-count">—</div>
+        <div class="vscroll-stat-label">Items pre-computed</div>
+      </div>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value good" id="vscroll-time">—</div>
+        <div class="vscroll-stat-label">Computation time</div>
+      </div>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value bad" id="vscroll-drift">—</div>
+        <div class="vscroll-stat-label">Estimated item drift</div>
+      </div>
+      <div class="vscroll-stat">
+        <div class="vscroll-stat-value warn" id="vscroll-height-err">—</div>
+        <div class="vscroll-stat-label">Total height error</div>
+      </div>
+      <div class="vscroll-jump">
+        <label>Jump to item</label>
+        <input type="number" id="vscroll-jump-input" min="1" max="10000" value="5000" />
+        <button id="vscroll-jump-btn">Go</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="morph-bar" id="morph-bar">
+    <div class="morph-inner">
+      <div>
+        <div class="morph-fps good" id="morph-fps">—</div>
+        <div class="morph-fps-label">FPS (Textura)</div>
+      </div>
+      <div style="flex:1">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:11px;color:#71717a;text-transform:uppercase;letter-spacing:0.05em">Animated width</span>
+          <span class="morph-width-label" id="morph-width-label">—</span>
+        </div>
+        <div class="morph-width-bar"><div class="morph-width-fill" id="morph-width-fill" style="width:50%"></div></div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#71717a;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Frame times</div>
+        <div class="morph-frame-graph" id="morph-frame-graph"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="perf-bar">
+    <div class="perf-grid">
+      <div class="perf-card">
+        <div class="perf-value" id="stat-overlap">—</div>
+        <div class="perf-label">Yoga overlaps / clips</div>
+      </div>
+      <div class="perf-card">
+        <div class="perf-value accent" id="stat-height-diff">—</div>
+        <div class="perf-label">Yoga height error</div>
+      </div>
+      <div class="perf-card">
+        <div class="perf-value accent" id="stat-resize-time">—</div>
+        <div class="perf-label">Textura resize (cached)</div>
+      </div>
+      <div class="perf-card">
+        <div class="perf-value" id="stat-dom-time">—</div>
+        <div class="perf-label">DOM measurement</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="insight">
+    <div class="insight-box">
+      <h3>What you're seeing</h3>
+      <div id="insight-text"></div>
+    </div>
+  </div>
+
+  <div class="get-started">
+    <div class="get-started-box">
+      <h3>Get Started</h3>
+      <pre><span class="cmt">// Install</span>
+npm install textura
+
+<span class="cmt">// Use</span>
+<span class="kw">import</span> { <span class="fn">init</span>, <span class="fn">computeLayout</span> } <span class="kw">from</span> <span class="str">'textura'</span>
+
+<span class="kw">await</span> <span class="fn">init</span>()  <span class="cmt">// load Yoga WASM (once)</span>
+
+<span class="kw">const</span> tree = {
+  width: <span class="type">400</span>, flexDirection: <span class="str">'column'</span>, padding: <span class="type">16</span>, gap: <span class="type">8</span>,
+  children: [
+    { text: <span class="str">'Hello Textura'</span>, font: <span class="str">'700 24px Inter'</span>, lineHeight: <span class="type">32</span> },
+    { text: <span class="str">'Pixel-perfect layout without the DOM.'</span>, font: <span class="str">'16px Inter'</span>, lineHeight: <span class="type">24</span> },
+  ],
+}
+
+<span class="kw">const</span> layout = <span class="fn">computeLayout</span>(tree, { width: <span class="type">400</span> })
+<span class="cmt">// → { x, y, width, height, children: [{ x, y, width, height, text }, ...] }</span></pre>
+
+      <h3 style="margin-top:24px">MCP Server — AI Layout Analysis</h3>
+      <p style="font-size:14px;color:#a1a1aa;line-height:1.6;margin-bottom:12px">Give your AI coding agent layout vision. Detect text overflow, element overlap, small touch targets, and auto-fix issues — works with any framework.</p>
+      <pre><span class="cmt"># Claude Code — one command:</span>
+claude mcp add textura npx @razroo/textura-mcp
+
+<span class="cmt"># Or add to .mcp.json / Codex / Cursor / VS Code:</span>
+{
+  <span class="str">"mcpServers"</span>: {
+    <span class="str">"textura"</span>: {
+      <span class="str">"command"</span>: <span class="str">"npx"</span>,
+      <span class="str">"args"</span>: [<span class="str">"-y"</span>, <span class="str">"@razroo/textura-mcp"</span>]
+    }
+  }
+}</pre>
+      <p style="font-size:13px;color:#71717a;margin-top:8px">Tools: <code style="color:#e0e0e0">compute_layout</code> · <code style="color:#e0e0e0">analyze_layout</code> · <code style="color:#e0e0e0">validate_responsive</code> · <code style="color:#e0e0e0">fix_layout</code></p>
+
+      <div class="get-started-footer">
+        <a href="https://github.com/razroo/textura" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+          View on GitHub
+        </a>
+        <a href="https://www.npmjs.com/package/textura" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M1.763 0C.786 0 0 .786 0 1.763v20.474C0 23.214.786 24 1.763 24h20.474c.977 0 1.763-.786 1.763-1.763V1.763C24 .786 23.214 0 22.237 0zM5.13 5.323l13.837.019-.009 13.836h-3.464l.01-10.382h-3.456L12.04 19.17H5.113z"/></svg>
+          View on npm
+        </a>
+        <a href="https://www.npmjs.com/package/@razroo/textura-mcp" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M21.71 20.29l-5.4-5.4A7.92 7.92 0 0018 10a8 8 0 10-8 8 7.92 7.92 0 004.89-1.69l5.4 5.4a1 1 0 001.42 0 1 1 0 000-1.42zM4 10a6 6 0 116 6 6 6 0 01-6-6z"/></svg>
+          MCP on npm
+        </a>
+        <a href="https://github.com/razroo/textura#mcp-server--ai-layout-analysis" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-7 14H7v-2h5v2zm5-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+          Full setup docs
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./demo.ts"></script>
+</body>
+</html>
