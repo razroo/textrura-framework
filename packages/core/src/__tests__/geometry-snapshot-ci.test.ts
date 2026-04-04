@@ -561,4 +561,15 @@ describe('geometry snapshot CI', () => {
     const layout = computeLayout(toLayoutTree(tree), { width: 100, height: 44 })
     expect(roundLayout(layout)).toMatchSnapshot()
   })
+
+  it('stable row: equal flexGrow with flexBasis 0 splits free space between text children (rounded)', async () => {
+    await init()
+    const item = { font: '16px sans-serif', lineHeight: 20, height: 20, flexBasis: 0, flexGrow: 1 } as const
+    const tree = box(
+      { width: 220, height: 52, padding: 8, flexDirection: 'row', gap: 10 },
+      [text({ text: 'Left', ...item }), text({ text: 'Right', ...item })],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 220, height: 52 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
 })
