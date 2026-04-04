@@ -362,8 +362,14 @@ export function hitPathAtPoint(
 }
 
 /**
- * Resolve the deepest `cursor` style at `(x, y)` (boxes only; skips `pointerEvents: 'none'` the same way as
- * {@link hitPathAtPoint}). Scroll containers use the same clipping rules as {@link dispatchHit}.
+ * Resolve the deepest `cursor` style at `(x, y)`.
+ *
+ * Walk follows the same scroll and overflow clipping rules as {@link dispatchHit}. {@link hitPathAtPoint} only
+ * returns box index paths, but cursor resolution also considers `text` and `image` nodes: when the point is inside
+ * such a leaf’s layout and it is not `pointerEvents: 'none'`, its {@link import('./types.js').StyleProps.cursor}
+ * is used (including a lone `text` / `image` tree root). Boxes with `pointerEvents: 'none'` are skipped so hits
+ * fall through to geometry behind, matching {@link hitPathAtPoint}.
+ *
  * Root `offsetX` / `offsetY` follow {@link dispatchHit}: non-finite or non-number values are treated as `0`.
  * Non-finite or non-number `x` / `y` return `null`.
  *
