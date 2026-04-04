@@ -325,6 +325,27 @@ describe('toLayoutTree', () => {
     expect(childLayout).toMatchObject({ width: 50, height: 50, dir: 'rtl' })
   })
 
+  it('omits root dir:auto and forwards dir:auto on descendants for Yoga inherit semantics', () => {
+    const inner = box({ width: 50, height: 50, dir: 'auto' })
+    const root = box({ width: 100, height: 100, dir: 'auto' }, [inner])
+    const layout = toLayoutTree(root) as BoxLayoutNode
+    expect(layout).not.toHaveProperty('dir')
+    expect(layout.children[0]).toMatchObject({ width: 50, height: 50, dir: 'auto' })
+
+    const t = text({
+      text: 'x',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      width: 10,
+      height: 18,
+      dir: 'auto',
+    })
+    const wrapped = box({ width: 200, height: 200 }, [t])
+    const wrapLayout = toLayoutTree(wrapped) as BoxLayoutNode
+    expect(wrapLayout).not.toHaveProperty('dir')
+    expect(wrapLayout.children[0]).toHaveProperty('dir', 'auto')
+  })
+
   it('does not mutate live element.props when building the layout snapshot', () => {
     const root = box(
       {
