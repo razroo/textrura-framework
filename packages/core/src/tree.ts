@@ -47,8 +47,9 @@ function stripStyleProps(props: Record<string, unknown>): Record<string, unknown
  *
  * Strips everything that is not consumed by Textura layout: colors, borders, opacity, cursor,
  * `pointerEvents`, `zIndex`, `overflow` / `scrollX` / `scrollY`, `boxShadow`, `gradient`,
- * `selectable`, `dir`, and image `src` / `alt` / `objectFit`. Remaining props are flex and
- * sizing fields that belong in the layout pipeline.
+ * `selectable`, `dir`, image `src` / `alt` / `objectFit`, and scene3d host fields (`background`,
+ * `objects`, `fov`, `near`, `far`, `cameraPosition`, `cameraTarget`, `orbitControls`, `maxPixelRatio`).
+ * Remaining props are flex and sizing fields that belong in the layout pipeline.
  *
  * Per-node `dir` is intentionally stripped from layout nodes: Yoga/Textura receives one document
  * direction from {@link import('./app.js').createApp}'s {@link import('./app.js').AppOptions.layoutDirection}

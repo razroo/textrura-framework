@@ -125,6 +125,8 @@ export function image(props: ImageProps): ImageElement {
  * The `objects` array describes the scene graph using plain serializable data;
  * a Three.js-capable renderer (e.g. `@geometra/renderer-three`) builds the live scene from these descriptors.
  * Flex and sizing props feed {@link import('./tree.js').toLayoutTree} — the element reserves layout space like a box.
+ * 3D and host props (`background`, `objects`, camera settings, `orbitControls`, `maxPixelRatio`) plus the same
+ * paint-only style metadata as other elements are stripped from the layout snapshot; renderers read them from the live tree.
  */
 export function scene3d(props: Scene3dProps): Scene3dElement {
   const { key, semantic, ...rest } = props
