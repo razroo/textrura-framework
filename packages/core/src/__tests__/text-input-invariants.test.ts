@@ -105,4 +105,24 @@ describe('text-input invariants', () => {
     assertStateInvariants(moveInputCaretByWord(corrupt, 'left', false))
     assertStateInvariants(moveInputCaretToLineBoundary(corrupt, 'start', false))
   })
+
+  it('clamps corrupt undefined, null, and boxed-number selection fields without throwing', () => {
+    const corrupt: TextInputState = {
+      nodes: ['a'],
+      selection: {
+        anchorNode: undefined as unknown as number,
+        anchorOffset: Object(2) as unknown as number,
+        focusNode: null as unknown as number,
+        focusOffset: 1,
+      },
+    }
+
+    expect(() => getInputSelectionText(corrupt.nodes, corrupt.selection)).not.toThrow()
+    // Non-number indices/offsets clamp to 0; range (0,0)–(0,1) selects the single grapheme.
+    expect(getInputSelectionText(corrupt.nodes, corrupt.selection)).toBe('a')
+
+    assertStateInvariants(replaceInputSelection(corrupt.nodes, corrupt.selection, 'xy'))
+    assertStateInvariants(insertInputText(corrupt, 'z'))
+    assertStateInvariants(moveInputCaret(corrupt, 'right', false))
+  })
 })
