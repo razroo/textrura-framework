@@ -12,6 +12,19 @@ import type {
   OrbitControlsConfig,
 } from '@geometra/core'
 
+/** True when `a` and `b` have the same discriminated `type` and matching nested `group` arity/shape. */
+function sameObjectStructure(a: Scene3dObject, b: Scene3dObject): boolean {
+  if (a.type !== b.type) return false
+  if (a.type !== 'group') return true
+  const ga = a
+  const gb = b as Scene3dGroup
+  if (ga.objects.length !== gb.objects.length) return false
+  for (let i = 0; i < ga.objects.length; i++) {
+    if (!sameObjectStructure(ga.objects[i]!, gb.objects[i]!)) return false
+  }
+  return true
+}
+
 /**
  * Managed Three.js object: the live `Object3D` plus the descriptor it was built from.
  * When the descriptor changes, the object is disposed and rebuilt.
@@ -121,6 +134,7 @@ export class Scene3dManager {
     if (!this.orbitControls && this.orbitControlsModule) {
       this.orbitControls = new this.orbitControlsModule.OrbitControls(this.camera, canvas)
       this.orbitControls.enableDamping = true
+      this.orbitControls.enableZoom = false
     }
 
     if (!this.orbitControls && !this.orbitControlsModule) {
@@ -130,6 +144,7 @@ export class Scene3dManager {
         if (!this.orbitControls) {
           this.orbitControls = new mod.OrbitControls(this.camera, canvas)
           this.orbitControls.enableDamping = true
+          this.orbitControls.enableZoom = false
           this.applyOrbitConfig(config)
         }
       })
@@ -335,8 +350,30 @@ function updateThreeObject(
       updateDirectionalLight(object as THREE.DirectionalLight, newDesc)
       break
     case 'group':
-      // Groups require full reconciliation of children — handled by rebuild path
+      updateGroup(object as THREE.Group, _oldDesc as Scene3dGroup, newDesc as Scene3dGroup)
       break
+  }
+}
+
+function updateGroup(group: THREE.Group, oldDesc: Scene3dGroup, newDesc: Scene3dGroup): void {
+  if (newDesc.position) {
+    group.position.set(newDesc.position[0], newDesc.position[1], newDesc.position[2])
+  }
+  if (!sameObjectStructure(oldDesc, newDesc) || group.children.length !== newDesc.objects.length) {
+    for (const child of [...group.children]) {
+      group.remove(child)
+      disposeObject(child)
+    }
+    for (const childDesc of newDesc.objects) {
+      group.add(createThreeObject(childDesc))
+    }
+    return
+  }
+  for (let i = 0; i < newDesc.objects.length; i++) {
+    const ch = group.children[i]
+    if (ch) {
+      updateThreeObject(ch, oldDesc.objects[i]!, newDesc.objects[i]!)
+    }
   }
 }
 
