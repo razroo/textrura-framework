@@ -1,9 +1,19 @@
 import { access, readFile } from 'node:fs/promises'
 import { constants as fsConstants } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..')
+
+/** Stable repo-relative path for duplicate checks; rejects `..` segments that escape `root`. */
+function canonicalPackagesTestPath(rel) {
+  const abs = resolve(root, rel)
+  const back = relative(root, abs)
+  if (back.startsWith('..') || back === '') {
+    throw new Error(`release:gate: vitest path must resolve inside repo root: ${rel}`)
+  }
+  return back.split('\\').join('/')
+}
 
 async function main() {
   const raw = await readFile(join(root, 'package.json'), 'utf8')
@@ -31,13 +41,16 @@ async function main() {
     throw new Error('release:gate: no packages/**/*.test.ts paths found (gate misconfigured)')
   }
 
-  const seen = new Set()
+  const seen = new Map()
   for (const rel of paths) {
-    if (seen.has(rel)) {
-      throw new Error(`release:gate: duplicate vitest entry "${rel}" (vitest would run it twice)`)
+    const canonical = canonicalPackagesTestPath(rel)
+    if (seen.has(canonical)) {
+      throw new Error(
+        `release:gate: duplicate vitest entry after path resolution "${canonical}" (listed as "${seen.get(canonical)}" and "${rel}"; vitest would run it twice)`,
+      )
     }
-    seen.add(rel)
-    const abs = join(root, rel)
+    seen.set(canonical, rel)
+    const abs = resolve(root, rel)
     try {
       await access(abs, fsConstants.R_OK)
     } catch {

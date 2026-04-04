@@ -25,6 +25,8 @@ fi
 # ordered, so a file can appear early in the vitest argv list while you only eyeball a later segment.
 # Example: `packages/core/src/__tests__/layout-bounds.test.ts` is often the *first* vitest path (before
 # keyboard.test.ts); inserting it again after keyboard duplicates the entry and fails verify-release-gate.mjs.
+# `verify-release-gate.mjs` also resolves paths canonically, so `packages/a/../b/x.test.ts` counts as the same
+# file as `packages/b/x.test.ts` for duplicate detection.
 # `npm run release:gate` runs `scripts/release/verify-release-gate.mjs`
 # first to fail fast on duplicates or missing paths. The allowlist evolves; read package.json instead of copying examples
 # from older prompts or transcripts.
