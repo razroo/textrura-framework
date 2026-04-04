@@ -12,6 +12,30 @@ function sceneContentRoot(scene: THREE.Scene): THREE.Group {
 }
 
 describe('Scene3dManager', () => {
+  it('clears scene content when objects becomes empty', () => {
+    const scene = new THREE.Scene()
+    const camera = new THREE.PerspectiveCamera()
+    const mgr = new Scene3dManager(scene, camera)
+
+    mgr.sync(
+      scene3d({
+        width: 100,
+        height: 80,
+        objects: [sphere({ color: 0xff0000 })],
+      }),
+    )
+    expect(sceneContentRoot(scene).children.length).toBe(1)
+
+    mgr.sync(
+      scene3d({
+        width: 100,
+        height: 80,
+        objects: [],
+      }),
+    )
+    expect(sceneContentRoot(scene).children.length).toBe(0)
+  })
+
   it('updates nested sphere props when wrapped in a group (in-place)', () => {
     const scene = new THREE.Scene()
     const camera = new THREE.PerspectiveCamera()
