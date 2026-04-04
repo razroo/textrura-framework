@@ -16,6 +16,7 @@ jobs:
         packages/renderer-canvas
         packages/renderer-terminal
         packages/renderer-webgpu
+        packages/renderer-three
         packages/server
         packages/client
         packages/ui
@@ -25,6 +26,7 @@ jobs:
         @geometra/renderer-canvas
         @geometra/renderer-terminal
         @geometra/renderer-webgpu
+        @geometra/renderer-three
         @geometra/server
         @geometra/client
         @geometra/ui
@@ -59,6 +61,11 @@ jobs:
             npm pkg set "dependencies.@geometra/core=^$VERSION"
             cd "$GITHUB_WORKSPACE"
           done
+          # renderer-three also depends on client and renderer-canvas
+          cd packages/renderer-three
+          npm pkg set "dependencies.@geometra/client=^$VERSION"
+          npm pkg set "dependencies.@geometra/renderer-canvas=^$VERSION"
+          cd "$GITHUB_WORKSPACE"
 
       - name: Install dependencies
         run: bun install
