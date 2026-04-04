@@ -78,6 +78,41 @@ describe('collectTextNodes', () => {
     expect(results[1].direction).toBe('ltr')
   })
 
+  it('inherits rtl through nested dir:auto on boxes and text (matches resolveElementDirection)', () => {
+    const el = box({ width: 220, height: 40, dir: 'rtl' }, [
+      box({ width: 200, height: 40, dir: 'auto' }, [
+        text({
+          text: 'Auto child',
+          font: '14px sans-serif',
+          lineHeight: 18,
+          width: 100,
+          height: 18,
+          dir: 'auto',
+        }),
+      ]),
+    ])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 220,
+      height: 40,
+      children: [
+        {
+          x: 0,
+          y: 0,
+          width: 200,
+          height: 40,
+          children: [{ x: 0, y: 0, width: 100, height: 18, children: [] }],
+        },
+      ],
+    }
+
+    const results: TextNodeInfo[] = []
+    collectTextNodes(el, layout, 0, 0, results)
+    expect(results).toHaveLength(1)
+    expect(results[0].direction).toBe('rtl')
+  })
+
   it('skips element children with no matching layout child (partial or stale geometry)', () => {
     const el = box({ width: 200, height: 100 }, [
       text({ text: 'Kept', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
