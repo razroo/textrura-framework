@@ -33,6 +33,23 @@ describe('webgpu renderer smoke', () => {
     expect(ctx.calls[0]).toEqual({ x: 0, y: 0, w: 100, h: 40, color: '#112233' })
   })
 
+  it('pre-init 2d fallback clears 1×1 when root layout bounds are non-finite (NaN width)', () => {
+    const ctx = new Fake2DContext()
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: (kind: string) => (kind === '2d' ? ctx : null),
+    } as unknown as HTMLCanvasElement
+
+    const renderer = new WebGPURenderer({ canvas, background: '#112233' })
+    const tree = box({ width: 100, height: 40 }, [])
+    const layout: ComputedLayout = { x: 0, y: 0, width: Number.NaN, height: 40, children: [] }
+    renderer.render(layout, tree)
+
+    expect(ctx.calls).toHaveLength(1)
+    expect(ctx.calls[0]).toEqual({ x: 0, y: 0, w: 1, h: 1, color: '#112233' })
+  })
+
   it('reports unsupported when navigator has no gpu', () => {
     vi.stubGlobal('navigator', {} as Navigator)
     expect(WebGPURenderer.isSupported()).toBe(false)
@@ -106,5 +123,51 @@ describe('webgpu renderer smoke', () => {
     renderer.render(layout, tree)
 
     expect(onFallbackNeeded).toHaveBeenCalledWith(1)
+  })
+
+  it('after init, clamps canvas backing store to 1×1 when root layout width is NaN', async () => {
+    vi.stubGlobal('navigator', {
+      gpu: {
+        getPreferredCanvasFormat: () => 'bgra8unorm',
+        requestAdapter: async () => ({
+          requestDevice: async () => ({
+            createShaderModule: () => ({}),
+            createRenderPipeline: () => ({}),
+            createCommandEncoder: () => ({
+              beginRenderPass: () => ({ setPipeline: () => {}, setVertexBuffer: () => {}, draw: () => {}, end: () => {} }),
+              finish: () => ({}),
+            }),
+            queue: { writeBuffer: () => {}, submit: () => {} },
+            createBuffer: () => ({ destroy: () => {} }),
+          }),
+        }),
+      },
+    } as unknown as Navigator)
+
+    const currentTexture = { createView: () => ({}) }
+    const context = {
+      configure: () => {},
+      getCurrentTexture: () => currentTexture,
+    }
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: (kind: string) => (kind === 'webgpu' ? context : null),
+    } as unknown as HTMLCanvasElement
+
+    const renderer = new WebGPURenderer({ canvas })
+    await renderer.init()
+
+    const tree = box({ width: 100, height: 40, backgroundColor: '#ff0000' }, [])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: Number.NaN,
+      height: 40,
+      children: [],
+    }
+    expect(() => renderer.render(layout, tree)).not.toThrow()
+    expect(canvas.width).toBe(1)
+    expect(canvas.height).toBe(1)
   })
 })

@@ -1,5 +1,5 @@
 import type { ComputedLayout } from 'textura'
-import type { Renderer, UIElement } from '@geometra/core'
+import { finiteNumberOrZero, layoutBoundsAreFinite, type Renderer, type UIElement } from '@geometra/core'
 
 export interface WebGPURendererOptions {
   canvas: HTMLCanvasElement
@@ -16,6 +16,17 @@ export interface WebGPURendererOptions {
  * WebGPU capability checks and fallback paths. Full paint parity with
  * renderer-canvas is tracked as follow-up work.
  */
+/** Root/backing-store size: at least 1×1; non-finite or negative layout from Yoga/JSON never poisons canvas or NDC math. */
+function safeCanvasExtent(layout: ComputedLayout): { w: number; h: number } {
+  if (!layoutBoundsAreFinite(layout)) {
+    return { w: 1, h: 1 }
+  }
+  return {
+    w: Math.max(1, Math.round(layout.width)),
+    h: Math.max(1, Math.round(layout.height)),
+  }
+}
+
 export class WebGPURenderer implements Renderer {
   private canvas: HTMLCanvasElement
   private background: string
@@ -69,14 +80,16 @@ export class WebGPURenderer implements Renderer {
         throw new Error('WebGPURenderer is not initialized. Call init() first.')
       }
       ctx.fillStyle = this.background
-      ctx.fillRect(0, 0, layout.width, layout.height)
+      const { w, h } = safeCanvasExtent(layout)
+      ctx.fillRect(0, 0, w, h)
       return
     }
     const device = this.device!
     const context = this.context!
     const pipeline = this.pipeline!
-    this.canvas.width = Math.max(1, Math.round(layout.width))
-    this.canvas.height = Math.max(1, Math.round(layout.height))
+    const { w: canvasW, h: canvasH } = safeCanvasExtent(layout)
+    this.canvas.width = canvasW
+    this.canvas.height = canvasH
 
     const rects: number[] = []
     const unsupported = { count: 0 }
@@ -189,6 +202,10 @@ fn fs_main(@location(0) color: vec4f) -> @location(0) vec4f {
     out: number[],
     unsupported: { count: number },
   ): void {
+    if (!layoutBoundsAreFinite(layout)) {
+      unsupported.count++
+      return
+    }
     const x = offsetX + layout.x
     const y = offsetY + layout.y
     const w = layout.width
@@ -202,8 +219,8 @@ fn fs_main(@location(0) color: vec4f) -> @location(0) vec4f {
       } else if (gradient || borderRadius || boxShadow) {
         unsupported.count++
       }
-      const childOffsetX = x - (element.props.scrollX ?? 0)
-      const childOffsetY = y - (element.props.scrollY ?? 0)
+      const childOffsetX = x - finiteNumberOrZero(element.props.scrollX)
+      const childOffsetY = y - finiteNumberOrZero(element.props.scrollY)
       for (let i = 0; i < element.children.length; i++) {
         const childLayout = layout.children[i]
         if (childLayout) {
