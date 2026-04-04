@@ -3871,4 +3871,40 @@ describe('Yoga-computed row layout and hit routing (document direction)', () => 
     expect(hitPathAtPoint(root, layout, bx, cy)).toEqual([1])
     expect(getCursorAtPoint(root, layout, bx, cy)).toBe('pointer')
   })
+
+  it('LTR document: hasInteractiveHitAtPoint follows row geometry', () => {
+    const first = box({ width: 50, height: 50, onClick: () => {} })
+    const second = box({ width: 50, height: 50, onClick: () => {} })
+    const root = box({ width: 100, height: 50, flexDirection: 'row' }, [first, second])
+    const layout = computeLayout(toLayoutTree(root), { width: 100, height: 50, direction: 'ltr' })
+
+    const a = layout.children[0]!
+    const b = layout.children[1]!
+    expect(a.x).toBeLessThan(b.x)
+    const cy = a.y + a.height / 2
+    const ax = a.x + a.width / 2
+    const bx = b.x + b.width / 2
+
+    expect(hasInteractiveHitAtPoint(root, layout, ax, cy)).toBe(true)
+    expect(hasInteractiveHitAtPoint(root, layout, bx, cy)).toBe(true)
+    expect(hasInteractiveHitAtPoint(root, layout, -1, cy)).toBe(false)
+  })
+
+  it('RTL document: hasInteractiveHitAtPoint follows mirrored row geometry', () => {
+    const first = box({ width: 50, height: 50, onClick: () => {} })
+    const second = box({ width: 50, height: 50, onClick: () => {} })
+    const root = box({ width: 100, height: 50, flexDirection: 'row' }, [first, second])
+    const layout = computeLayout(toLayoutTree(root), { width: 100, height: 50, direction: 'rtl' })
+
+    const a = layout.children[0]!
+    const b = layout.children[1]!
+    expect(a.x).toBeGreaterThan(b.x)
+    const cy = a.y + a.height / 2
+    const ax = a.x + a.width / 2
+    const bx = b.x + b.width / 2
+
+    expect(hasInteractiveHitAtPoint(root, layout, ax, cy)).toBe(true)
+    expect(hasInteractiveHitAtPoint(root, layout, bx, cy)).toBe(true)
+    expect(hasInteractiveHitAtPoint(root, layout, layout.width + 1, cy)).toBe(false)
+  })
 })
