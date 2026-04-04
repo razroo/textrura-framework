@@ -634,11 +634,16 @@ describe('applyServerMessage', () => {
   it('rejects frame when root layout bounds fail layoutBoundsAreFinite (no state, render, or metrics)', () => {
     type Msg = Parameters<typeof applyServerMessage>[2]
     const b = 1n as unknown as number
+    const negSub = -Number.MIN_VALUE
+    expect(negSub).toBeLessThan(0)
     const badLayouts = [
       { x: Number.NaN, y: 0, width: 10, height: 10, children: [] },
       { x: 0, y: 0, width: Number.POSITIVE_INFINITY, height: 10, children: [] },
       { x: 0, y: 0, width: 10, height: -1, children: [] },
       { x: 0, y: 0, width: b, height: 10, children: [] },
+      { x: 0, y: 0, width: negSub, height: 10, children: [] },
+      { x: 0, y: 0, width: 10, height: '10' as unknown as number, children: [] },
+      { x: Object(0) as unknown as number, y: 0, width: 10, height: 10, children: [] },
     ] as unknown as ComputedLayout[]
 
     for (const badLayout of badLayouts) {
