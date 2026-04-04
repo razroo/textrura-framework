@@ -17,7 +17,8 @@ function finiteOr(n: number, fallback: number): number {
  * Keep the selected row index visible inside a fixed-size virtual window.
  *
  * @param totalRows — Non-negative row count; negative values are treated as zero.
- * @param windowSize — Visible row count; values below 1 are clamped to 1.
+ * @param windowSize — Visible row count; values below 1 are clamped to 1. Non-integer finite values are floored
+ * so `start` / `end` stay whole row indices (same as counting visible list rows).
  * @param selected — Desired selection index; clamped into `[0, totalRows - 1]`.
  * @param currentStart — Current window start index; clamped into valid range before adjusting for selection.
  * Non-finite arguments use the same defaults as empty/reset UI state (`0` rows, window `1`, selection/start `0`).
@@ -29,7 +30,7 @@ export function syncVirtualWindow(
   currentStart: number,
 ): VirtualWindowState {
   const safeTotal = Math.max(0, finiteOr(totalRows, 0))
-  const safeWindow = Math.max(1, finiteOr(windowSize, 1))
+  const safeWindow = Math.max(1, Math.floor(finiteOr(windowSize, 1)))
   const maxIndex = Math.max(0, safeTotal - 1)
   const nextSelected = Math.max(0, Math.min(maxIndex, finiteOr(selected, 0)))
   const maxStart = Math.max(0, safeTotal - safeWindow)

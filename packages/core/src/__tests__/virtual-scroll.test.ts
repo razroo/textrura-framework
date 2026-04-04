@@ -36,6 +36,15 @@ describe('syncVirtualWindow', () => {
     expect(syncVirtualWindow(5, -2, 4, 0)).toEqual({ start: 4, end: 4, selected: 4 })
   })
 
+  it('floors fractional windowSize so start/end stay whole row indices (matches integer window semantics)', () => {
+    expect(syncVirtualWindow(10, 2.9, 5, 0)).toEqual(syncVirtualWindow(10, 2, 5, 0))
+    expect(syncVirtualWindow(8, 1.25, 3, 0)).toEqual(syncVirtualWindow(8, 1, 3, 0))
+    const r = syncVirtualWindow(20, 3.99, 11, 0)
+    expect(Number.isInteger(r.start)).toBe(true)
+    expect(Number.isInteger(r.end)).toBe(true)
+    expect(r.end - r.start).toBeLessThanOrEqual(3)
+  })
+
   it('clamps selected below zero and above last index', () => {
     expect(syncVirtualWindow(8, 3, -10, 0)).toEqual({ start: 0, end: 2, selected: 0 })
     expect(syncVirtualWindow(8, 3, 999, 0)).toEqual({ start: 5, end: 7, selected: 7 })
