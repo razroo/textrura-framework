@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { ComputedLayout } from 'textura'
 import { toSemanticHTML } from '../seo.js'
 import { toAccessibilityTree, type AccessibilityNode } from '../a11y.js'
@@ -18,18 +20,23 @@ function flattenRoles(node: AccessibilityNode, out: string[] = []): string[] {
   return out
 }
 
+const fixtureDir = fileURLToPath(new URL('../../../../fixtures/renderer-agnostic/', import.meta.url))
+const fixtureNames = readdirSync(fixtureDir)
+  .filter(name => name.endsWith('.json'))
+  .sort()
+
 describe('renderer-agnostic fixtures', () => {
-  it('produces expected semantic and accessibility output from shared fixtures', () => {
-    const fixture = JSON.parse(
-      readFileSync(new URL('../../../../fixtures/renderer-agnostic/basic-card.json', import.meta.url), 'utf8'),
-    ) as Fixture
+  for (const name of fixtureNames) {
+    it(`produces expected semantic and accessibility output (${name})`, () => {
+      const fixture = JSON.parse(readFileSync(join(fixtureDir, name), 'utf8')) as Fixture
 
-    const semantic = toSemanticHTML(fixture.tree)
-    for (const token of fixture.expectedSemanticIncludes) {
-      expect(semantic).toContain(token)
-    }
+      const semantic = toSemanticHTML(fixture.tree)
+      for (const token of fixture.expectedSemanticIncludes) {
+        expect(semantic).toContain(token)
+      }
 
-    const a11y = toAccessibilityTree(fixture.tree, fixture.layout)
-    expect(flattenRoles(a11y)).toEqual(fixture.expectedA11yRoles)
-  })
+      const a11y = toAccessibilityTree(fixture.tree, fixture.layout)
+      expect(flattenRoles(a11y)).toEqual(fixture.expectedA11yRoles)
+    })
+  }
 })

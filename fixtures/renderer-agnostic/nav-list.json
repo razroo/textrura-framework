@@ -1,0 +1,70 @@
+{
+  "tree": {
+    "kind": "box",
+    "props": { "width": 200, "height": 120 },
+    "semantic": { "tag": "nav" },
+    "children": [
+      {
+        "kind": "box",
+        "props": { "width": 200, "height": 100 },
+        "semantic": { "tag": "ul" },
+        "children": [
+          {
+            "kind": "box",
+            "props": { "width": 180, "height": 24 },
+            "semantic": { "tag": "li" },
+            "children": [
+              {
+                "kind": "text",
+                "props": { "text": "Home", "font": "14px sans-serif", "lineHeight": 18 }
+              }
+            ]
+          },
+          {
+            "kind": "box",
+            "props": { "width": 180, "height": 24 },
+            "semantic": { "tag": "li" },
+            "children": [
+              {
+                "kind": "text",
+                "props": { "text": "About", "font": "14px sans-serif", "lineHeight": 18 }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "layout": {
+    "x": 0,
+    "y": 0,
+    "width": 200,
+    "height": 120,
+    "children": [
+      {
+        "x": 0,
+        "y": 0,
+        "width": 200,
+        "height": 100,
+        "children": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 180,
+            "height": 24,
+            "children": [{ "x": 0, "y": 0, "width": 40, "height": 18, "children": [] }]
+          },
+          {
+            "x": 0,
+            "y": 28,
+            "width": 180,
+            "height": 24,
+            "children": [{ "x": 0, "y": 0, "width": 48, "height": 18, "children": [] }]
+          }
+        ]
+      }
+    ]
+  },
+  "expectedSemanticIncludes": ["<nav", "<ul", "<li>", "Home", "About", "</nav>"],
+  "expectedA11yRoles": ["navigation", "list", "listitem", "text", "listitem", "text"]
+}
