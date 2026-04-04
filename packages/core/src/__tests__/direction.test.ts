@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { box, image, scene3d, sphere, text } from '../elements.js'
-import { resolveDirectionValue, resolveElementDirection } from '../direction.js'
+import { resolveDirectionValue, resolveElementDirection, type ResolvedDirection } from '../direction.js'
 import { toLayoutTree } from '../tree.js'
 
 describe('direction model', () => {
@@ -9,6 +9,15 @@ describe('direction model', () => {
     expect(resolveDirectionValue(undefined, 'rtl')).toBe('rtl')
     expect(resolveDirectionValue('auto', 'ltr')).toBe('ltr')
     expect(resolveDirectionValue('auto', 'rtl')).toBe('rtl')
+  })
+
+  it('uses default ltr parent when the parent argument is omitted or undefined (JS default parameters)', () => {
+    expect(resolveDirectionValue('auto')).toBe('ltr')
+    expect(resolveDirectionValue(undefined)).toBe('ltr')
+    expect(resolveDirectionValue('auto', undefined as unknown as ResolvedDirection)).toBe('ltr')
+    const autoEl = box({ width: 1, height: 1, dir: 'auto' })
+    expect(resolveElementDirection(autoEl)).toBe('ltr')
+    expect(resolveElementDirection(autoEl, undefined as unknown as ResolvedDirection)).toBe('ltr')
   })
 
   it('treats unknown dir strings like auto (inherit parent), for runtime or serialized trees', () => {
