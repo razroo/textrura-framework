@@ -4061,4 +4061,42 @@ describe('Yoga-computed row layout and hit routing (document direction)', () => 
     expect(hasInteractiveHitAtPoint(root, layout, ax, ay)).toBe(true)
     expect(hasInteractiveHitAtPoint(root, layout, bx, by)).toBe(true)
   })
+
+  it('RTL document: nested flex row with dir auto inherits owner direction; dispatchHit follows mirrored geometry', () => {
+    const log: string[] = []
+    const first = box({ width: 50, height: 50, cursor: 'pointer', onClick: () => { log.push('dom-first') } })
+    const second = box({ width: 50, height: 50, cursor: 'pointer', onClick: () => { log.push('dom-second') } })
+    const innerRow = box(
+      { width: 200, height: 50, flexDirection: 'row', dir: 'auto' },
+      [first, second],
+    )
+    const root = box({ width: 200, height: 100, flexDirection: 'column' }, [innerRow])
+    const layout = computeLayout(toLayoutTree(root), { width: 200, height: 100, direction: 'rtl' })
+
+    const rowLayout = layout.children[0]!
+    expect(rowLayout.children.length).toBe(2)
+    const a = rowLayout.children[0]!
+    const b = rowLayout.children[1]!
+    expect(a.x).toBeGreaterThan(b.x)
+
+    const rx = layout.x + rowLayout.x
+    const ry = layout.y + rowLayout.y
+    const ax = rx + a.x + a.width / 2
+    const ay = ry + a.y + a.height / 2
+    const bx = rx + b.x + b.width / 2
+    const by = ry + b.y + b.height / 2
+
+    dispatchHit(root, layout, 'onClick', ax, ay)
+    expect(log).toEqual(['dom-first'])
+    log.length = 0
+    dispatchHit(root, layout, 'onClick', bx, by)
+    expect(log).toEqual(['dom-second'])
+
+    expect(hitPathAtPoint(root, layout, ax, ay)).toEqual([0, 0])
+    expect(hitPathAtPoint(root, layout, bx, by)).toEqual([0, 1])
+    expect(getCursorAtPoint(root, layout, ax, ay)).toBe('pointer')
+    expect(getCursorAtPoint(root, layout, bx, by)).toBe('pointer')
+    expect(hasInteractiveHitAtPoint(root, layout, ax, ay)).toBe(true)
+    expect(hasInteractiveHitAtPoint(root, layout, bx, by)).toBe(true)
+  })
 })
