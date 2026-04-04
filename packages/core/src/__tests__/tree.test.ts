@@ -127,6 +127,14 @@ describe('toLayoutTree', () => {
     expect(layout).toHaveProperty('gap', 8)
   })
 
+  it('preserves display for Textura/Yoga (layout visibility, not paint-only metadata)', () => {
+    const none = box({ width: 100, height: 50, display: 'none' })
+    expect(toLayoutTree(none)).toMatchObject({ width: 100, height: 50, display: 'none' })
+
+    const flex = box({ width: 40, height: 40, display: 'flex' })
+    expect(toLayoutTree(flex)).toMatchObject({ width: 40, height: 40, display: 'flex' })
+  })
+
   it('strips src, alt, objectFit from image', () => {
     const el = image({
       src: 'https://example.com/img.png',
