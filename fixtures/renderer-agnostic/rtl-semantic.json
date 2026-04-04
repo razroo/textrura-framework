@@ -1,0 +1,59 @@
+{
+  "tree": {
+    "kind": "box",
+    "props": { "width": 400, "height": 200, "dir": "rtl" },
+    "semantic": { "tag": "main" },
+    "children": [
+      {
+        "kind": "box",
+        "props": { "width": 380, "height": 120, "dir": "ltr" },
+        "semantic": { "tag": "section" },
+        "children": [
+          {
+            "kind": "text",
+            "props": {
+              "text": "Mixed direction",
+              "font": "16px Inter",
+              "lineHeight": 22,
+              "dir": "auto"
+            },
+            "semantic": { "tag": "p" }
+          }
+        ]
+      },
+      {
+        "kind": "image",
+        "props": { "src": "/logo.png", "width": 48, "height": 48, "alt": "Logo", "dir": "rtl" },
+        "semantic": {}
+      }
+    ]
+  },
+  "layout": {
+    "x": 0,
+    "y": 0,
+    "width": 400,
+    "height": 200,
+    "children": [
+      {
+        "x": 10,
+        "y": 10,
+        "width": 380,
+        "height": 120,
+        "children": [{ "x": 8, "y": 8, "width": 220, "height": 22, "children": [] }]
+      },
+      { "x": 10, "y": 140, "width": 48, "height": 48, "children": [] }
+    ]
+  },
+  "expectedSemanticIncludes": [
+    "dir=\"rtl\"",
+    "dir=\"ltr\"",
+    "dir=\"auto\"",
+    "<main",
+    "<section",
+    "<p",
+    "Mixed direction",
+    "<img",
+    "/logo.png"
+  ],
+  "expectedA11yRoles": ["main", "region", "text", "img"]
+}
