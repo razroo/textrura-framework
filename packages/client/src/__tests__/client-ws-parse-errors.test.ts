@@ -3023,4 +3023,40 @@ describe('createHeadlessClient', () => {
 
     client.close()
   })
+
+  it('applies GEOM v1 binary frames to layout and tree without a caller-supplied renderer', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+    const errors: unknown[] = []
+
+    const client = createHeadlessClient({
+      url: 'ws://mock.test',
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    const buf = encodeGeomV1JsonPayload(
+      JSON.stringify({
+        type: 'frame',
+        layout: { x: 0, y: 0, width: 93, height: 94, children: [] },
+        tree: { kind: 'box', props: {}, children: [] } satisfies UIElement,
+        protocolVersion: 1,
+      }),
+    )
+    sockets[0]!.emit('message', { data: buf })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    expect(errors).toHaveLength(0)
+    expect(client.layout?.width).toBe(93)
+    expect(client.layout?.height).toBe(94)
+    expect(client.tree?.kind).toBe('box')
+
+    client.close()
+  })
 })
