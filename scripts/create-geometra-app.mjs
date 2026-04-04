@@ -66,7 +66,7 @@ const TEMPLATES = {
         ],
         notes: [
           'The browser client listens on Vite and connects to the Geometra server on ws://localhost:3300.',
-          'Open the URL printed by Vite, then click the canvas once to focus keyboard forwarding.',
+          'Open the URL printed by Vite, then focus the canvas with Tab or a click so keyboard forwarding works.',
         ],
       }),
     }),
@@ -476,7 +476,7 @@ function createFullStackHtml(appName) {
   </style>
 </head>
 <body>
-  <canvas id="app"></canvas>
+  <canvas id="app" tabindex="0"></canvas>
   <script type="module" src="./client.ts"></script>
 </body>
 </html>
