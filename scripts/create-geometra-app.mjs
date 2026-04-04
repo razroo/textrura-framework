@@ -108,6 +108,7 @@ const TEMPLATES = {
         notes: [
           'The server listens on ws://localhost:8080.',
           'The browser client only paints frames; it does not run a layout engine.',
+          'The host page is a full-viewport canvas; window resize is forwarded to the server.',
         ],
       }),
     }),
@@ -133,7 +134,10 @@ const TEMPLATES = {
         template: 'canvas-local',
         description: 'This starter runs layout and paint locally in the browser with no server transport layer.',
         commands: ['npm install', 'npm run dev', 'npm run check', 'npm run build'],
-        notes: ['Open the Vite URL and click inside the canvas to interact with the app.'],
+        notes: [
+          'The host page is a full-viewport canvas; layout tracks window resize.',
+          'Open the Vite URL and click inside the canvas to interact with the app.',
+        ],
       }),
     }),
     nextSteps: ['npm install', 'npm run dev'],
@@ -383,57 +387,26 @@ function createCanvasHtml(appName) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${title}</title>
   <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+    }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      background: radial-gradient(circle at top, #1e293b 0%, #0f172a 45%, #020617 100%);
-      color: #e2e8f0;
-      font-family: Inter, system-ui, sans-serif;
-    }
-    main {
-      width: min(92vw, 720px);
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      padding: 24px;
-      border-radius: 24px;
-      border: 1px solid rgba(148, 163, 184, 0.2);
-      background: rgba(15, 23, 42, 0.82);
-      box-shadow: 0 24px 80px rgba(2, 6, 23, 0.45);
-    }
-    h1 {
-      margin: 0;
-      font-size: 24px;
-      letter-spacing: -0.04em;
-    }
-    p {
-      margin: 0;
-      color: #94a3b8;
-      line-height: 1.5;
-      font-size: 14px;
+      overflow: hidden;
+      background: #0f172a;
     }
     canvas {
       display: block;
-      width: 100%;
-      height: auto;
-      border-radius: 18px;
-      border: 1px solid rgba(148, 163, 184, 0.18);
-      background: #0f172a;
+      width: 100vw;
+      height: 100vh;
+      outline: none;
     }
   </style>
 </head>
 <body>
-  <main>
-    <div>
-      <h1>${title}</h1>
-      <p>Local layout and paint in one process. No DOM layout engine. Just geometry into a canvas.</p>
-    </div>
-    <canvas id="app" width="480" height="260"></canvas>
-  </main>
-
+  <canvas id="app" tabindex="0"></canvas>
   <script type="module" src="./app.ts"></script>
 </body>
 </html>
@@ -449,63 +422,26 @@ function createThinClientHtml(appName) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${title}</title>
   <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+    }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      background: linear-gradient(180deg, #020617 0%, #0f172a 100%);
-      color: #e2e8f0;
-      font-family: Inter, system-ui, sans-serif;
-    }
-    main {
-      width: min(92vw, 760px);
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      padding: 24px;
-    }
-    h1 {
-      margin: 0;
-      font-size: 24px;
-      letter-spacing: -0.04em;
-    }
-    p {
-      margin: 0;
-      color: #94a3b8;
-      line-height: 1.5;
-      font-size: 14px;
-      max-width: 660px;
-    }
-    .canvas-shell {
-      padding: 16px;
-      border-radius: 22px;
-      border: 1px solid rgba(148, 163, 184, 0.16);
-      background: rgba(15, 23, 42, 0.82);
-      box-shadow: 0 24px 80px rgba(2, 6, 23, 0.45);
+      overflow: hidden;
+      background: #111827;
     }
     canvas {
       display: block;
-      width: 100%;
-      height: auto;
-      border-radius: 16px;
-      border: 1px solid rgba(51, 65, 85, 0.92);
-      background: #111827;
+      width: 100vw;
+      height: 100vh;
+      outline: none;
     }
   </style>
 </head>
 <body>
-  <main>
-    <div>
-      <h1>${title}</h1>
-      <p>This browser client only paints frames. Layout and state live on the Geometra server at ws://localhost:8080.</p>
-    </div>
-    <div class="canvas-shell">
-      <canvas id="app" width="700" height="400"></canvas>
-    </div>
-  </main>
-
+  <canvas id="app" tabindex="0"></canvas>
   <script type="module" src="./client.ts"></script>
 </body>
 </html>
