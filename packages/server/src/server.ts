@@ -35,8 +35,13 @@ export interface TexturaServerOptions {
   port?: number
   /** Root width. Default: 800. */
   width?: number
-  /** Root height. Default: 600. */
-  height?: number
+  /**
+   * Root height. Default: 600.
+   * Set to `'auto'` to let Yoga compute intrinsic height from content.
+   * When auto, the root layout height reflects content size and clients
+   * can read it from the frame's `layout.height`.
+   */
+  height?: number | 'auto'
   /** Called on errors during layout computation or broadcasting. */
   onError?: (error: unknown) => void
   /**
@@ -147,7 +152,8 @@ export async function createServer(
   const port = options.port ?? 3100
   const wsPathNormalized = normalizeWsPath(options.wsPath ?? DEFAULT_GEOMETRA_WS_PATH)
   let width = options.width ?? 800
-  let height = options.height ?? 600
+  const autoHeight = options.height === 'auto'
+  let height: number | undefined = autoHeight ? undefined : (typeof options.height === 'number' ? options.height : 600)
 
   const clients = new Set<WebSocket>()
   const needsResync = new Set<WebSocket>()
@@ -333,7 +339,9 @@ export async function createServer(
             clientBinaryFraming.set(ws, true)
           }
           width = Math.max(1, msg.width)
-          height = Math.max(1, msg.height)
+          if (!autoHeight) {
+            height = Math.max(1, msg.height)
+          }
           prevLayout = null
           computeAndBroadcast()
         }

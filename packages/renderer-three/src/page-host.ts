@@ -15,8 +15,13 @@ export interface GeometraPageSection {
   id: string
   /** WebSocket URL for the Geometra server view. */
   url: string
-  /** Fixed height in CSS pixels. The server should compute layout at this height. */
-  height: number
+  /**
+   * Height in CSS pixels, or `'auto'` to size from server-computed layout.
+   * When `'auto'`, the section resizes to match the root `layout.height` from
+   * the first server frame (requires `height: 'auto'` on the corresponding
+   * `createGeometraServer`).
+   */
+  height: number | 'auto'
   /** Enable binary framing for the WebSocket. */
   binaryFraming?: boolean
   /** Renderer options (background color, etc.). */
@@ -44,9 +49,10 @@ function createSectionCanvas(
   section: GeometraPageSection,
   win: Window,
 ): { wrapper: HTMLDivElement; handle: BrowserCanvasClientHandle } {
+  const isAutoHeight = section.height === 'auto'
   const wrapper = doc.createElement('div')
   wrapper.style.width = '100%'
-  wrapper.style.height = `${section.height}px`
+  wrapper.style.height = isAutoHeight ? '0' : `${section.height}px`
   wrapper.style.minWidth = '0'
   wrapper.dataset.geometraSection = section.id
 
@@ -66,6 +72,24 @@ function createSectionCanvas(
       ...section.rendererOptions,
     },
   })
+
+  // Auto-height: poll the client's layout for the computed root height
+  if (isAutoHeight) {
+    let lastHeight = 0
+    const checkHeight = () => {
+      const layout = handle.client.layout
+      if (layout && layout.height > 0 && layout.height !== lastHeight) {
+        lastHeight = layout.height
+        wrapper.style.height = `${layout.height}px`
+      }
+    }
+    // Check on each animation frame until we get a height, then periodically
+    const poll = () => {
+      checkHeight()
+      win.requestAnimationFrame(poll)
+    }
+    win.requestAnimationFrame(poll)
+  }
 
   return { wrapper, handle }
 }
