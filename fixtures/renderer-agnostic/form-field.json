@@ -1,0 +1,60 @@
+{
+  "tree": {
+    "kind": "box",
+    "props": { "width": 320, "height": 200 },
+    "semantic": { "tag": "form", "ariaLabel": "Login form" },
+    "children": [
+      {
+        "kind": "box",
+        "props": { "width": 300, "height": 24 },
+        "semantic": { "tag": "label", "ariaLabel": "Email address" },
+        "children": []
+      },
+      {
+        "kind": "box",
+        "props": { "width": 300, "height": 32 },
+        "semantic": { "tag": "input", "ariaLabel": "Email entry" },
+        "children": []
+      },
+      {
+        "kind": "box",
+        "props": { "width": 120, "height": 36 },
+        "semantic": { "tag": "button", "ariaLabel": "Submit login" },
+        "children": [
+          {
+            "kind": "text",
+            "props": { "text": "Continue", "font": "14px Inter", "lineHeight": 18 }
+          }
+        ]
+      }
+    ]
+  },
+  "layout": {
+    "x": 0,
+    "y": 0,
+    "width": 320,
+    "height": 200,
+    "children": [
+      { "x": 8, "y": 8, "width": 300, "height": 24, "children": [] },
+      { "x": 8, "y": 40, "width": 300, "height": 32, "children": [] },
+      {
+        "x": 8,
+        "y": 84,
+        "width": 120,
+        "height": 36,
+        "children": [{ "x": 12, "y": 8, "width": 60, "height": 18, "children": [] }]
+      }
+    ]
+  },
+  "expectedSemanticIncludes": [
+    "<form",
+    "Login form",
+    "<label",
+    "Email address",
+    "<input",
+    "Email entry",
+    "Continue",
+    "</form>"
+  ],
+  "expectedA11yRoles": ["form", "label", "textbox", "button", "text"]
+}
