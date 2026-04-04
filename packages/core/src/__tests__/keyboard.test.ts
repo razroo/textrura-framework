@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import type { ComputedLayout } from 'textura'
 import { box } from '../elements.js'
 import { dispatchKeyboardEvent, dispatchCompositionEvent } from '../keyboard.js'
 import { clearFocus, collectFocusOrder, focusedElement, setFocus } from '../focus.js'
@@ -702,6 +703,34 @@ describe('dispatchKeyboardEvent', () => {
     const handled = dispatchCompositionEvent(tree, layout, 'onCompositionUpdate', { data: 'に' })
     expect(handled).toBe(true)
     expect(value).toBe('に')
+  })
+
+  it('injects focused ComputedLayout as composition event target (parity with keyboard dispatch)', () => {
+    let receivedTarget: ComputedLayout | null = null
+    const innerLayout = { x: 10, y: 20, width: 80, height: 40, children: [] as const }
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: [innerLayout],
+    }
+    const inner = box({ onCompositionStart: e => { receivedTarget = e.target } }, [])
+    const tree = box({}, [inner])
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    expect(focusedElement.peek()?.layout).toBe(innerLayout)
+
+    const handled = dispatchCompositionEvent(tree, layout, 'onCompositionStart', { data: '' })
+    expect(handled).toBe(true)
+    expect(receivedTarget).toBe(innerLayout)
   })
 
   it('returns false for composition dispatch when nothing is focused', () => {

@@ -53,6 +53,18 @@ export function dispatchKeyboardEvent(
 /**
  * Dispatch IME composition events to the focused element.
  *
+ * Uses the same {@link import('./focus.js').resolveFocusedTarget} resolution as
+ * {@link dispatchKeyboardEvent} (non-Tab keys): there must be a current focus target whose layout
+ * passes {@link import('./layout-bounds.js').layoutBoundsAreFinite} along the path from the tree root.
+ *
+ * The handler receives a full {@link CompositionHitEvent}: `target` is always the focused box’s
+ * {@link ComputedLayout}, regardless of fields present on `partialEvent` (only `data` is taken from
+ * the partial event today, but callers should omit `target` and let this function set it).
+ *
+ * @param tree - Root of the UI tree (same as keyboard dispatch).
+ * @param layout - Computed layout parallel to `tree`.
+ * @param eventType - `onCompositionStart`, `onCompositionUpdate`, or `onCompositionEnd`.
+ * @param partialEvent - Fields merged before `target` is set; must not rely on a pre-set `target`.
  * @returns `true` when the focused target has a handler for `eventType` and it runs; `false` when
  * there is no resolved focus target or no matching composition handler.
  */
