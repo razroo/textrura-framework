@@ -503,4 +503,23 @@ describe('geometry snapshot CI', () => {
     const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 140 })
     expect(roundLayout(layout)).toMatchSnapshot()
   })
+
+  it('stable column with asymmetric per-edge padding and text child (rounded)', async () => {
+    await init()
+    const tree = box(
+      {
+        width: 200,
+        height: 100,
+        paddingLeft: 14,
+        paddingRight: 6,
+        paddingTop: 10,
+        paddingBottom: 4,
+        flexDirection: 'column',
+        gap: 6,
+      },
+      [text({ text: 'Body', font: '14px sans-serif', lineHeight: 18, width: 160, height: 18 })],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 100 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
 })

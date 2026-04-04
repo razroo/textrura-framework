@@ -35,6 +35,24 @@ exports[`geometry snapshot CI > stable column flex with gap and two text childre
 }
 `;
 
+exports[`geometry snapshot CI > stable column with asymmetric per-edge padding and text child (rounded) 1`] = `
+{
+  "children": [
+    {
+      "children": [],
+      "height": 18,
+      "width": 160,
+      "x": 14,
+      "y": 10,
+    },
+  ],
+  "height": 100,
+  "width": 200,
+  "x": 0,
+  "y": 0,
+}
+`;
+
 exports[`geometry snapshot CI > stable column with in-flow text and absolutely positioned box (rounded) 1`] = `
 {
   "children": [
