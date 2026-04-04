@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { ComputedLayout } from 'textura'
 import { box, text } from '../elements.js'
-import { dispatchHit, getCursorAtPoint, hitPathAtPoint } from '../hit-test.js'
+import { dispatchHit, getCursorAtPoint, hasInteractiveHitAtPoint, hitPathAtPoint } from '../hit-test.js'
 import { getInputCaretGeometry } from '../text-input.js'
 import type { TextNodeInfo } from '../selection.js'
 
@@ -119,6 +119,53 @@ describe('core perf smoke', () => {
 
     expect(best).toBeGreaterThan(0)
     expect(best).toBeLessThanOrEqual(800)
+  })
+
+  it('hasInteractiveHitAtPoint stays fast with many z-ordered siblings (collectHits + handler scan)', () => {
+    const cols = 20
+    const rows = 10
+    const n = cols * rows
+    const leaves = Array.from({ length: n }, (_, i) =>
+      box(
+        {
+          width: 40,
+          height: 20,
+          zIndex: (i * 11) % 41,
+          onPointerMove: () => i,
+        },
+        [],
+      ),
+    )
+    const tree = box({ width: 1000, height: 1000 }, leaves)
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 1000,
+      height: 1000,
+      children: leaves.map((_l, i) => ({
+        x: (i % cols) * 44,
+        y: Math.floor(i / cols) * 24,
+        width: 40,
+        height: 20,
+        children: [],
+      })),
+    }
+
+    for (let i = 0; i < 400; i++) {
+      hasInteractiveHitAtPoint(tree, layout, (i % cols) * 44 + 1, (i % rows) * 24 + 1)
+    }
+
+    let best = Number.POSITIVE_INFINITY
+    for (let run = 0; run < 3; run++) {
+      const start = nowMs()
+      for (let i = 0; i < 2500; i++) {
+        hasInteractiveHitAtPoint(tree, layout, (i % cols) * 44 + 1, (i % rows) * 24 + 1)
+      }
+      best = Math.min(best, nowMs() - start)
+    }
+
+    expect(best).toBeGreaterThan(0)
+    expect(best).toBeLessThanOrEqual(600)
   })
 
   it('caret geometry lookup scales across many measured lines', () => {
