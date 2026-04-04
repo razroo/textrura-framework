@@ -717,6 +717,34 @@ describe('applyServerMessage', () => {
     expect(renders).toHaveLength(0)
   })
 
+  it('accepts data when channel is non-empty after trim and passes the original string to onData', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const dataCalls: Array<{ channel: string; payload: unknown }> = []
+    const metrics: ClientFrameMetrics[] = []
+    type Msg = Parameters<typeof applyServerMessage>[2]
+
+    applyServerMessage(
+      state,
+      renderer,
+      {
+        type: 'data',
+        channel: '  geom.padded  ',
+        payload: { n: 1 },
+        protocolVersion: 1,
+      } as unknown as Msg,
+      undefined,
+      m => metrics.push(m),
+      { decodeMs: 0 },
+      (ch, pl) => dataCalls.push({ channel: ch, payload: pl }),
+    )
+
+    expect(dataCalls).toEqual([{ channel: '  geom.padded  ', payload: { n: 1 } }])
+    expect(renders).toHaveLength(0)
+    expect(metrics).toHaveLength(1)
+    expect(metrics[0]!.messageType).toBe('data')
+  })
+
   it('rejects data messages whose payload is not JSON-serializable plain data (no render, onData not called)', () => {
     const { renderer, renders } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
