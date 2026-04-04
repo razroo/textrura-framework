@@ -61,6 +61,12 @@ describe('direction model', () => {
     expect(resolveDirectionValue('rtl', 'nope' as never)).toBe('rtl')
   })
 
+  it('treats boxed String parentDirection as invalid (normalize uses strict === rtl; inherit becomes ltr)', () => {
+    expect(resolveDirectionValue('auto', Object('rtl') as never)).toBe('ltr')
+    expect(resolveDirectionValue(undefined, Object('rtl') as never)).toBe('ltr')
+    expect(resolveDirectionValue('rtl', Object('rtl') as never)).toBe('rtl')
+  })
+
   it('respects explicit ltr/rtl values', () => {
     expect(resolveDirectionValue('ltr', 'rtl')).toBe('ltr')
     expect(resolveDirectionValue('rtl', 'ltr')).toBe('rtl')
