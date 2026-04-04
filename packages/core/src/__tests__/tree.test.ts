@@ -322,4 +322,38 @@ describe('toLayoutTree', () => {
     expect(textLayout).not.toHaveProperty('key')
     expect(textLayout).not.toHaveProperty('semantic')
   })
+
+  it('strips scene3d scene/camera props and paint metadata from scene3d leaves', () => {
+    const el = scene3d({
+      width: 320,
+      height: 200,
+      padding: 4,
+      background: 0x222222,
+      objects: [sphere({ radius: 1 }), ambientLight()],
+      fov: 40,
+      near: 0.1,
+      far: 1000,
+      cameraPosition: [0, 1, 4],
+      cameraTarget: [0, 0, 0],
+      orbitControls: { minDistance: 1 },
+      maxPixelRatio: 1.5,
+      backgroundColor: '#000',
+      cursor: 'grab',
+      dir: 'ltr',
+    })
+    const layout = toLayoutTree(el) as Record<string, unknown>
+    expect(layout).toMatchObject({ width: 320, height: 200, padding: 4 })
+    expect(layout).not.toHaveProperty('background')
+    expect(layout).not.toHaveProperty('objects')
+    expect(layout).not.toHaveProperty('fov')
+    expect(layout).not.toHaveProperty('near')
+    expect(layout).not.toHaveProperty('far')
+    expect(layout).not.toHaveProperty('cameraPosition')
+    expect(layout).not.toHaveProperty('cameraTarget')
+    expect(layout).not.toHaveProperty('orbitControls')
+    expect(layout).not.toHaveProperty('maxPixelRatio')
+    expect(layout).not.toHaveProperty('backgroundColor')
+    expect(layout).not.toHaveProperty('cursor')
+    expect(layout).not.toHaveProperty('dir')
+  })
 })

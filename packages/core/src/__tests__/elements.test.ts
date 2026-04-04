@@ -223,11 +223,11 @@ describe('scene3d', () => {
       orbitControls: { damping: 0.08 },
       maxPixelRatio: 2,
       key: 's1',
-      semantic: { role: 'img', label: 'preview' },
+      semantic: { role: 'img', ariaLabel: 'preview' },
     })
     expect(el.kind).toBe('scene3d')
     expect(el.key).toBe('s1')
-    expect(el.semantic).toEqual({ role: 'img', label: 'preview' })
+    expect(el.semantic).toEqual({ role: 'img', ariaLabel: 'preview' })
     expect(el.props).toMatchObject({
       width: 200,
       height: 120,
