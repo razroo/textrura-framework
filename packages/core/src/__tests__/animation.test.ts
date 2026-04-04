@@ -224,11 +224,22 @@ describe('animation timeline', () => {
     expect(timeline.state()).toBe('running')
     expect(timeline.step(Number.POSITIVE_INFINITY)).toBe(50)
 
+    expect(() => timeline.step('10' as unknown as number)).not.toThrow()
+    expect(timeline.step('10' as unknown as number)).toBe(50)
+    expect(timeline.value.peek()).toBe(50)
+    expect(() => timeline.step(1n as unknown as number)).not.toThrow()
+    expect(timeline.step(1n as unknown as number)).toBe(50)
+    expect(() => timeline.step(Object(16) as unknown as number)).not.toThrow()
+    expect(timeline.step(Object(16) as unknown as number)).toBe(50)
+
     const props = createPropertyTimeline({ x: 0 })
     props.to({ x: 100 }, 1000, easing.linear)
     props.step(400)
     expect(props.values.x.peek()).toBe(40)
     expect(props.step(Number.NaN).x).toBe(40)
+    expect(props.values.x.peek()).toBe(40)
+    expect(() => props.step('9' as unknown as number)).not.toThrow()
+    expect(props.step('9' as unknown as number).x).toBe(40)
     expect(props.values.x.peek()).toBe(40)
   })
 
