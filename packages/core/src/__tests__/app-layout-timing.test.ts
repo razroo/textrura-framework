@@ -427,6 +427,26 @@ describe('createApp layout timing', () => {
     expect(seen.every(ms => ms >= 0)).toBe(true)
   })
 
+  it('passes the measured layout delta when performance.now advances monotonically', async () => {
+    let step = 0
+    const spy = vi.spyOn(performance, 'now').mockImplementation(() => {
+      step++
+      return step === 1 ? 1_000 : 1_012.5
+    })
+    try {
+      const setFrameTimings = vi.fn()
+      const renderer: Renderer = {
+        setFrameTimings,
+        render: vi.fn(),
+        destroy: vi.fn(),
+      }
+      await createApp(() => box({ width: 40, height: 20 }, []), renderer, { width: 100, height: 50 })
+      expect(setFrameTimings).toHaveBeenCalledWith({ layoutMs: 12.5 })
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
   it('does not require setFrameTimings; render still runs', async () => {
     const render = vi.fn()
     const renderer: Renderer = {
