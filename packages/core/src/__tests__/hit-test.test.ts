@@ -1,7 +1,23 @@
-import { describe, it, expect } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
+import { init, computeLayout } from 'textura'
 import { dispatchHit, getCursorAtPoint, hasInteractiveHitAtPoint, hitPathAtPoint } from '../hit-test.js'
 import { box, image, scene3d, text } from '../elements.js'
+import { toLayoutTree } from '../tree.js'
 import type { HitEvent, KeyboardHitEvent } from '../types.js'
+
+if (typeof globalThis.OffscreenCanvas === 'undefined') {
+  ;(globalThis as unknown as { OffscreenCanvas: unknown }).OffscreenCanvas = class {
+    getContext(type: string) {
+      if (type !== '2d') return null
+      return {
+        font: '',
+        measureText(value: string) {
+          return { width: value.length * 8 }
+        },
+      }
+    }
+  }
+}
 
 describe('dispatchHit', () => {
   it('hit inside a box fires handler', () => {
@@ -3677,5 +3693,51 @@ describe('pointerEvents', () => {
     const root2 = box({ width: 100, height: 100 }, [back2, corrupt])
     dispatchHit(root2, layout, 'onClick', 10, 10)
     expect(log2).toEqual(['corrupt'])
+  })
+})
+
+describe('Yoga-computed row layout and hit routing (document direction)', () => {
+  beforeAll(async () => {
+    await init()
+  })
+
+  it('LTR document: flex row places DOM-first child at a smaller x; dispatchHit follows geometry', () => {
+    const log: string[] = []
+    const first = box({ width: 50, height: 50, onClick: () => { log.push('dom-first') } })
+    const second = box({ width: 50, height: 50, onClick: () => { log.push('dom-second') } })
+    const root = box({ width: 100, height: 50, flexDirection: 'row' }, [first, second])
+    const layout = computeLayout(toLayoutTree(root), { width: 100, height: 50, direction: 'ltr' })
+
+    expect(layout.children.length).toBe(2)
+    const a = layout.children[0]!
+    const b = layout.children[1]!
+    expect(a.x).toBeLessThan(b.x)
+
+    const cy = a.y + a.height / 2
+    dispatchHit(root, layout, 'onClick', a.x + a.width / 2, cy)
+    expect(log).toEqual(['dom-first'])
+    log.length = 0
+    dispatchHit(root, layout, 'onClick', b.x + b.width / 2, cy)
+    expect(log).toEqual(['dom-second'])
+  })
+
+  it('RTL document: flex row mirrors along x; DOM-first child has a larger x; dispatchHit follows geometry', () => {
+    const log: string[] = []
+    const first = box({ width: 50, height: 50, onClick: () => { log.push('dom-first') } })
+    const second = box({ width: 50, height: 50, onClick: () => { log.push('dom-second') } })
+    const root = box({ width: 100, height: 50, flexDirection: 'row' }, [first, second])
+    const layout = computeLayout(toLayoutTree(root), { width: 100, height: 50, direction: 'rtl' })
+
+    expect(layout.children.length).toBe(2)
+    const a = layout.children[0]!
+    const b = layout.children[1]!
+    expect(a.x).toBeGreaterThan(b.x)
+
+    const cy = a.y + a.height / 2
+    dispatchHit(root, layout, 'onClick', a.x + a.width / 2, cy)
+    expect(log).toEqual(['dom-first'])
+    log.length = 0
+    dispatchHit(root, layout, 'onClick', b.x + b.width / 2, cy)
+    expect(log).toEqual(['dom-second'])
   })
 })
