@@ -381,7 +381,8 @@ export function extractFontFamiliesFromCSSFont(font: string): string[] {
  * Order is first-seen in a depth-first preorder walk (later duplicates are skipped).
  * `image` and `scene3d` leaves carry no `font` shorthand and are skipped (siblings under the same parent are still walked).
  * Boxes with a missing or non-array `children` field are treated as empty (no throw) so bad
- * deserialization cannot take down font collection.
+ * deserialization cannot take down font collection. `null`, `undefined`, and non-object entries
+ * inside `children` are skipped so sparse or corrupted arrays never throw during the walk.
  * `null`, `undefined`, and non-object roots return an empty list so loose runtime data never throws
  * on property access.
  */
@@ -402,7 +403,10 @@ export function collectFontFamiliesFromTree(root: UIElement): string[] {
     }
     const { children } = el
     if (!Array.isArray(children)) return
-    for (const c of children) walk(c)
+    for (const c of children) {
+      if (c == null || typeof c !== 'object') continue
+      walk(c)
+    }
   }
   walk(root)
   return [...out]

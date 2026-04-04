@@ -847,6 +847,18 @@ describe('collectFontFamiliesFromTree', () => {
     Object.assign(parent, { children: {} as unknown as typeof parent.children })
     expect(collectFontFamiliesFromTree(parent)).toEqual([])
   })
+
+  it('skips null, undefined, and non-object children and still collects following text nodes', () => {
+    const good = text({ text: 'b', font: '14px Inter', lineHeight: 20 })
+    const parent = box({}, [
+      null as unknown as UIElement,
+      undefined as unknown as UIElement,
+      0 as unknown as UIElement,
+      'x' as unknown as UIElement,
+      good,
+    ])
+    expect(collectFontFamiliesFromTree(parent)).toEqual(['Inter'])
+  })
 })
 
 describe('waitForFonts', () => {
