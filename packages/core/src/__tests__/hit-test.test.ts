@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { dispatchHit, getCursorAtPoint, hasInteractiveHitAtPoint, hitPathAtPoint } from '../hit-test.js'
-import { box, image, text } from '../elements.js'
+import { box, image, scene3d, text } from '../elements.js'
 import type { HitEvent, KeyboardHitEvent } from '../types.js'
 
 describe('dispatchHit', () => {
@@ -2569,7 +2569,7 @@ describe('scroll and overflow clipping', () => {
   })
 })
 
-describe('non-box leaves (text and image)', () => {
+describe('non-box leaves (text, image, scene3d)', () => {
   it('click over text dispatches parent box onClick (leaves do not capture pointer hits)', () => {
     let parentFired = false
     const label = text({ text: 'Hi', font: '14px Inter', lineHeight: 20 })
@@ -2599,6 +2599,25 @@ describe('non-box leaves (text and image)', () => {
       width: 80,
       height: 80,
       children: [{ x: 8, y: 8, width: 32, height: 32, children: [] }],
+    }
+
+    dispatchHit(root, layout, 'onClick', 20, 20)
+    expect(parentFired).toBe(true)
+    expect(hasInteractiveHitAtPoint(root, layout, 20, 20)).toBe(true)
+    expect(hitPathAtPoint(root, layout, 20, 20)).toEqual([])
+    expect(getCursorAtPoint(root, layout, 20, 20)).toBeNull()
+  })
+
+  it('click over scene3d dispatches parent box onClick', () => {
+    let parentFired = false
+    const view = scene3d({ width: 48, height: 48, objects: [] })
+    const root = box({ width: 80, height: 80, onClick: () => { parentFired = true } }, [view])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 80,
+      height: 80,
+      children: [{ x: 6, y: 6, width: 48, height: 48, children: [] }],
     }
 
     dispatchHit(root, layout, 'onClick', 20, 20)
@@ -2654,6 +2673,45 @@ describe('non-box leaves (text and image)', () => {
     expect(getCursorAtPoint(root, layout, 12, 14)).toBe('pointer')
   })
 
+  it('getCursorAtPoint falls back to parent cursor when point is over scene3d only', () => {
+    const view = scene3d({ width: 48, height: 48, objects: [] })
+    const root = box({ width: 80, height: 80, cursor: 'pointer' }, [view])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 80,
+      height: 80,
+      children: [{ x: 6, y: 6, width: 48, height: 48, children: [] }],
+    }
+    expect(getCursorAtPoint(root, layout, 20, 20)).toBe('pointer')
+  })
+
+  it('getCursorAtPoint prefers scene3d leaf cursor over parent', () => {
+    const view = scene3d({ width: 48, height: 48, objects: [], cursor: 'grab' })
+    const root = box({ width: 100, height: 100, cursor: 'pointer' }, [view])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 10, y: 10, width: 48, height: 48, children: [] }],
+    }
+    expect(getCursorAtPoint(root, layout, 24, 24)).toBe('grab')
+  })
+
+  it('pointerEvents none on scene3d falls through to parent cursor', () => {
+    const view = scene3d({ width: 48, height: 48, objects: [], pointerEvents: 'none' })
+    const root = box({ width: 100, height: 100, cursor: 'pointer' }, [view])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 10, y: 10, width: 48, height: 48, children: [] }],
+    }
+    expect(getCursorAtPoint(root, layout, 24, 24)).toBe('pointer')
+  })
+
   it('text as tree root: no pointer hit targets (only box nodes participate in collectHits)', () => {
     const root = text({ text: 'Hi', font: '14px Inter', lineHeight: 20 })
     const layout = { x: 0, y: 0, width: 50, height: 20, children: [] }
@@ -2692,6 +2750,26 @@ describe('non-box leaves (text and image)', () => {
     expect(hitPathAtPoint(root, layout, 16, 16)).toBeNull()
     expect(hasInteractiveHitAtPoint(root, layout, 16, 16)).toBe(false)
     expect(getCursorAtPoint(root, layout, 16, 16)).toBe('pointer')
+  })
+
+  it('scene3d as tree root: no pointer hit targets', () => {
+    const root = scene3d({ width: 64, height: 64, objects: [] })
+    const layout = { x: 0, y: 0, width: 64, height: 64, children: [] }
+
+    expect(dispatchHit(root, layout, 'onClick', 32, 32).handled).toBe(false)
+    expect(hitPathAtPoint(root, layout, 32, 32)).toBeNull()
+    expect(hasInteractiveHitAtPoint(root, layout, 32, 32)).toBe(false)
+    expect(getCursorAtPoint(root, layout, 32, 32)).toBeNull()
+  })
+
+  it('scene3d as tree root: explicit cursor still resolves (StyleProps parity; no pointer handlers on scene3d)', () => {
+    const root = scene3d({ width: 64, height: 64, objects: [], cursor: 'crosshair' })
+    const layout = { x: 0, y: 0, width: 64, height: 64, children: [] }
+
+    expect(dispatchHit(root, layout, 'onClick', 32, 32).handled).toBe(false)
+    expect(hitPathAtPoint(root, layout, 32, 32)).toBeNull()
+    expect(hasInteractiveHitAtPoint(root, layout, 32, 32)).toBe(false)
+    expect(getCursorAtPoint(root, layout, 32, 32)).toBe('crosshair')
   })
 })
 
