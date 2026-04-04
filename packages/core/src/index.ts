@@ -2,8 +2,9 @@
  * @packageDocumentation
  * Public entry for `@geometra/core`: reactive primitives, element constructors, app mount, layout-tree
  * conversion, hit-testing, focus and keyboard/composition dispatch, text selection and input, web font
- * helpers, animation and virtual-scroll utilities, SEO and accessibility snapshots, and shared element
- * types (`UIElement`, `Renderer`, `FrameTimings`, …).
+ * helpers, animation and virtual-scroll utilities, SEO and accessibility snapshots,
+ * {@link import('./focus-candidates.js').hasFocusCandidateHandlers} for parity with Tab / click-to-focus
+ * routing, and shared element types (`UIElement`, `Renderer`, `FrameTimings`, …).
  *
  * Geometra keeps a single declarative tree across canvas, terminal, and server-driven clients; this file
  * is the supported import surface. Optional `Renderer.setFrameTimings` receives layout wall time after
@@ -45,6 +46,7 @@ export {
 // Focus management
 export { focusedElement, setFocus, clearFocus, focusNext, focusPrev, collectFocusOrder } from './focus.js'
 export type { FocusTarget } from './focus.js'
+export { hasFocusCandidateHandlers } from './focus-candidates.js'
 export { trapFocusStep } from './focus-trap.js'
 export { dispatchCompositionEvent, dispatchKeyboardEvent } from './keyboard.js'
 

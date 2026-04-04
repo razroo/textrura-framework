@@ -10,6 +10,7 @@ import {
   resolveFocusedTarget,
 } from '../focus.js'
 import { hasFocusCandidateHandlers } from '../focus-candidates.js'
+import { hasFocusCandidateHandlers as hasFocusFromIndex } from '../index.js'
 import type { ComputedLayout } from 'textura'
 import type { BoxElement } from '../types.js'
 
@@ -631,6 +632,10 @@ describe('focusNext / focusPrev interaction', () => {
 
 describe('hasFocusCandidateHandlers', () => {
   const noop = () => {}
+
+  it('matches the package entry re-export', () => {
+    expect(hasFocusFromIndex).toBe(hasFocusCandidateHandlers)
+  })
 
   it('is false for undefined and empty handlers', () => {
     expect(hasFocusCandidateHandlers(undefined)).toBe(false)
