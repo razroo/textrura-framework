@@ -75,6 +75,39 @@ describe('dispatchHit', () => {
     expect(dispatchHit(el, layout, 'onClick', 50, 25)).toEqual({ handled: false })
   })
 
+  it('non-box roots: corrupt root layout is a miss for all hit queries (layoutBoundsAreFinite before kind rules)', () => {
+    const base = { x: 0, y: 0, width: 100, height: 50, children: [] as const }
+    const badLayouts = [
+      { ...base, width: Number.NaN },
+      { ...base, height: -1 },
+      { ...base, x: 1n as unknown as number },
+    ] as const
+
+    const t = text({
+      text: 'hi',
+      font: '16px sans-serif',
+      lineHeight: 20,
+      width: 100,
+      height: 50,
+      cursor: 'text',
+    })
+    const img = image({ src: 'x.png', width: 100, height: 50, cursor: 'zoom-in' })
+    const s3 = scene3d({ objects: [], width: 100, height: 50, cursor: 'crosshair' })
+
+    for (const bad of badLayouts) {
+      for (const el of [t, img, s3]) {
+        expect(() => dispatchHit(el, bad, 'onClick', 50, 25)).not.toThrow()
+        expect(dispatchHit(el, bad, 'onClick', 50, 25)).toEqual({ handled: false })
+        expect(() => hitPathAtPoint(el, bad, 50, 25)).not.toThrow()
+        expect(hitPathAtPoint(el, bad, 50, 25)).toBeNull()
+        expect(() => hasInteractiveHitAtPoint(el, bad, 50, 25)).not.toThrow()
+        expect(hasInteractiveHitAtPoint(el, bad, 50, 25)).toBe(false)
+        expect(() => getCursorAtPoint(el, bad, 50, 25)).not.toThrow()
+        expect(getCursorAtPoint(el, bad, 50, 25)).toBeNull()
+      }
+    }
+  })
+
   describe('non-box roots: path and interactive-hit vs cursor resolution', () => {
     const layout = { x: 0, y: 0, width: 100, height: 50, children: [] as const }
 
