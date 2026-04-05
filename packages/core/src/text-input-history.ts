@@ -82,7 +82,12 @@ export function pushTextInputHistory(
   }
 }
 
-/** Move `present` to `future`, restore the latest `past` entry as `present`, or no-op if `past` is empty. */
+/**
+ * Move `present` onto `future`, restore the latest `past` entry as `present`, or return `history` unchanged if `past` is empty.
+ *
+ * @param history — Current stacks; `present` and popped `past` entries are cloned so callers can mutate the returned `present` without corrupting the stacks.
+ * @returns A new {@link TextInputHistoryState} with one fewer `past` entry, or the same reference when `past` is empty.
+ */
 export function undoTextInputHistory(history: TextInputHistoryState): TextInputHistoryState {
   if (history.past.length === 0) return history
   const past = [...history.past]
@@ -94,7 +99,12 @@ export function undoTextInputHistory(history: TextInputHistoryState): TextInputH
   }
 }
 
-/** Move `present` to `past`, restore the next `future` entry as `present`, or no-op if `future` is empty. */
+/**
+ * Move `present` onto `past`, restore the next `future` entry as `present`, or return `history` unchanged if `future` is empty.
+ *
+ * @param history — Current stacks; restored `present` and remaining `future` entries are cloned.
+ * @returns A new {@link TextInputHistoryState} with one fewer `future` entry, or the same reference when `future` is empty.
+ */
 export function redoTextInputHistory(history: TextInputHistoryState): TextInputHistoryState {
   if (history.future.length === 0) return history
   const [next, ...future] = history.future

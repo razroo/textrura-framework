@@ -445,6 +445,10 @@ describe('text-input foundation', () => {
 
     history = redoTextInputHistory(history)
     expect(history.present.nodes).toEqual(['hello!'])
+
+    history = redoTextInputHistory(history)
+    expect(history.present.nodes).toEqual(['hello!?'])
+    expect(history.future).toHaveLength(0)
   })
 
   it('supports copy/cut/paste flow with selection and history', () => {
