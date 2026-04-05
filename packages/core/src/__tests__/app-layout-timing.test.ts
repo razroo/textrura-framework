@@ -1720,6 +1720,13 @@ describe('performance now helpers', () => {
     spy.mockRestore()
   })
 
+  it('safePerformanceNowMs and readPerformanceNow return 0 when now returns bigint (typeof guard; no numeric coercion)', () => {
+    const spy = vi.spyOn(performance, 'now').mockReturnValue(1n as unknown as number)
+    expect(safePerformanceNowMs()).toBe(0)
+    expect(readPerformanceNow()).toBe(0)
+    spy.mockRestore()
+  })
+
   it('return 0 when globalThis.performance is undefined or null', () => {
     for (const perf of [undefined, null] as const) {
       vi.stubGlobal('performance', perf as unknown as Performance)
