@@ -1559,6 +1559,44 @@ describe('createApp waitForFonts', () => {
     }
   })
 
+  it('treats negative fontLoadTimeoutMs like waitForFonts (falls back to 10_000 ms)', async () => {
+    vi.useFakeTimers()
+    const load = vi.fn(() => new Promise<void>(() => {}))
+    const ready = new Promise<void>(() => {})
+    vi.stubGlobal('document', { fonts: { load, ready } })
+    const renderer: Renderer = {
+      render: vi.fn(),
+      destroy: vi.fn(),
+    }
+    try {
+      const p = createApp(
+        () =>
+          box({ width: 100, height: 50 }, [
+            text({
+              text: 'hi',
+              font: '14px SlowFace, sans-serif',
+              lineHeight: 20,
+              width: 10,
+              height: 20,
+            }),
+          ]),
+        renderer,
+        { width: 200, height: 100, waitForFonts: true, fontLoadTimeoutMs: -50 },
+      )
+      await vi.advanceTimersByTimeAsync(9_999)
+      await expect(
+        Promise.race([p, new Promise<string>(resolve => queueMicrotask(() => resolve('not-yet')))]),
+      ).resolves.toBe('not-yet')
+      await vi.advanceTimersByTimeAsync(1)
+      await p
+      expect(load).toHaveBeenCalledWith('16px SlowFace')
+      expect(renderer.render).toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('treats non-finite fontLoadTimeoutMs like waitForFonts (±Infinity falls back to 10_000 ms)', async () => {
     vi.useFakeTimers()
     const load = vi.fn(() => new Promise<void>(() => {}))
