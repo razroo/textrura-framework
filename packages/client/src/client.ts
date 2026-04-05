@@ -71,8 +71,10 @@ function isJsonSerializableValue(v: unknown): boolean {
   return false
 }
 
+/** Plain JSON object shape (`JSON.parse` yields `Object.prototype` only — rejects `Object.create(null)`, arrays, Dates, etc.). */
 function isPlainLayoutTreeValue(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === 'object' && !Array.isArray(v)
+  if (v === null || typeof v !== 'object' || Array.isArray(v)) return false
+  return Object.getPrototypeOf(v) === Object.prototype
 }
 
 function isOptionalFiniteNumberField(record: Record<string, unknown>, key: string): boolean {
@@ -250,7 +252,8 @@ function applyPatches(layout: ComputedLayout, patches: ServerPatch['patches']): 
  * walk stops and any `x` / `y` / `width` / `height` fields apply to that last resolved node (often the
  * root). This is intentional lenient behavior and does not call `onError`.
  *
- * When the payload is not a plain object (including JSON array roots, which are `typeof` `"object"`),
+ * When the payload is not a plain JSON object (including JSON array roots, which are `typeof` `"object"`,
+ * and objects with a null or exotic prototype, which `JSON.parse` never produces),
  * or is missing a well-formed `type` (`frame` with object
  * `layout`/`tree`, `patch` with a `patches` array of objects that each include an integer `path` and
  * only finite numeric `x`/`y` and non-negative finite `width`/`height` when those fields are present,

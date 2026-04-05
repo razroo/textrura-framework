@@ -554,7 +554,7 @@ describe('applyServerMessage', () => {
     expect(metrics).toHaveLength(0)
   })
 
-  it('rejects frame when root layout.children is missing or not an array, or tree is not a plain object', () => {
+  it('rejects frame when root layout.children is missing or not an array, or tree is not a JSON-plain object', () => {
     const { renderer, renders } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
     const errors: string[] = []
@@ -572,10 +572,25 @@ describe('applyServerMessage', () => {
       children: {} as unknown as ComputedLayout[],
     } as unknown as ComputedLayout
 
+    const layoutNullProto = Object.assign(Object.create(null), {
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+      children: [],
+    }) as unknown as ComputedLayout
+    const treeNullProto = Object.assign(Object.create(null), {
+      kind: 'box',
+      props: {},
+      children: [],
+    }) as unknown as UIElement
+
     const badFrames: Msg[] = [
       { type: 'frame', layout: null as unknown as ComputedLayout, tree: tree(), protocolVersion: 1 } as Msg,
       { type: 'frame', layout: layoutNoChildren, tree: tree(), protocolVersion: 1 } as Msg,
       { type: 'frame', layout: layoutChildrenObject, tree: tree(), protocolVersion: 1 } as Msg,
+      { type: 'frame', layout: layoutNullProto, tree: tree(), protocolVersion: 1 } as Msg,
+      { type: 'frame', layout: layout(), tree: treeNullProto, protocolVersion: 1 } as Msg,
       { type: 'frame', layout: layout(), tree: [] as unknown as UIElement, protocolVersion: 1 } as Msg,
       { type: 'frame', layout: layout(), tree: null as unknown as UIElement, protocolVersion: 1 } as Msg,
     ]
@@ -634,6 +649,11 @@ describe('applyServerMessage', () => {
       {
         type: 'patch',
         patches: [{ path: [], height: '10' as unknown as number }],
+        protocolVersion: 1,
+      } as unknown as Msg,
+      {
+        type: 'patch',
+        patches: [Object.assign(Object.create(null), { path: [] })],
         protocolVersion: 1,
       } as unknown as Msg,
       { type: 'patch', patches: [[{ path: [] }]], protocolVersion: 1 } as unknown as Msg,
