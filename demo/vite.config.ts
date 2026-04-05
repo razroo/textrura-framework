@@ -6,6 +6,7 @@ export default defineConfig({
   base: './',
   resolve: {
     alias: {
+      'textura': path.resolve(import.meta.dirname, '../packages/textura/src/index.ts'),
       '@geometra/core': path.resolve(import.meta.dirname, '../packages/core/src/index.ts'),
       '@geometra/client': path.resolve(import.meta.dirname, '../packages/client/src/index.ts'),
       '@geometra/renderer-canvas': path.resolve(import.meta.dirname, '../packages/renderer-canvas/src/index.ts'),

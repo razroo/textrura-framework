@@ -17,7 +17,7 @@ let lastNodeCount = 0
 let lastHotPaths = '-'
 
 function countNodes(el: UIElement): number {
-  if (el.kind === 'text' || el.kind === 'image') return 1
+  if (el.kind === 'text' || el.kind === 'image' || el.kind === 'scene3d') return 1
   return 1 + el.children.reduce((sum, c) => sum + countNodes(c), 0)
 }
 
