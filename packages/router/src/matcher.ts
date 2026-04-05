@@ -127,6 +127,9 @@ function matchRecursive(
  * - An empty `pattern` (`''`) parses to zero segments and matches only the root pathname (`/` or `''` after
  *   normalization), with empty `params`. Any non-root path misses.
  *
+ * @param pattern - Route pattern (`:id`, optional `?` segments, `*` splat); leading `/` optional.
+ * @param pathname - Path to match; `?` and `#` are stripped before comparison. Trailing `/` is normalized
+ *   away, so `/users/` yields the same segments as `/users` (no empty trailing segment).
  * @returns `{ params }` on success, or `null` when the pathname does not match.
  */
 export function matchPath(pattern: string, pathname: string): RouteMatch | null {

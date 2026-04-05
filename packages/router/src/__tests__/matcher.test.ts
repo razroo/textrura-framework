@@ -57,6 +57,12 @@ describe('route matcher', () => {
     expect(matchPath('/users/:name', '/users/alice%20bob/')).toEqual({ params: { name: 'alice bob' } })
   })
 
+  it('normalizes trailing slash on pathname so there is no empty final segment (/users/ ≡ /users)', () => {
+    expect(matchPath('/users/:id', '/users/42/')).toEqual({ params: { id: '42' } })
+    expect(matchPath('/users/:id', '/users/')).toBeNull()
+    expect(matchPath('/a/b', '/a/b/')).toEqual({ params: {} })
+  })
+
   it('strips search and hash from pathname before matching', () => {
     expect(matchPath('/users/:id', '/users/42?tab=settings')).toEqual({ params: { id: '42' } })
     expect(matchPath('/users/:id', '/users/42#section')).toEqual({ params: { id: '42' } })
