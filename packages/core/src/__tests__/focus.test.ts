@@ -12,7 +12,7 @@ import {
 import { hasFocusCandidateHandlers } from '../focus-candidates.js'
 import { hasFocusCandidateHandlers as hasFocusFromIndex } from '../index.js'
 import type { ComputedLayout } from 'textura'
-import type { BoxElement } from '../types.js'
+import type { BoxElement, EventHandlers } from '../types.js'
 
 function makeLayout(overrides: Partial<ComputedLayout> = {}): ComputedLayout {
   return { x: 0, y: 0, width: 100, height: 100, children: [], ...overrides }
@@ -714,5 +714,25 @@ describe('hasFocusCandidateHandlers', () => {
 
   it('is true when pointer and focus handlers are combined', () => {
     expect(hasFocusCandidateHandlers({ onPointerDown: noop, onKeyDown: noop })).toBe(true)
+  })
+
+  it('treats explicit undefined focus slots as absent (truthy handlers only)', () => {
+    expect(
+      hasFocusCandidateHandlers({
+        onClick: undefined,
+        onKeyDown: undefined,
+        onKeyUp: undefined,
+        onCompositionStart: undefined,
+        onCompositionUpdate: undefined,
+        onCompositionEnd: undefined,
+      }),
+    ).toBe(false)
+    expect(hasFocusCandidateHandlers({ onClick: undefined, onKeyDown: noop })).toBe(true)
+  })
+
+  it('reads focus handlers from a null-prototype object (e.g. Object.assign onto Object.create(null))', () => {
+    const handlers = Object.assign(Object.create(null), { onKeyDown: noop }) as EventHandlers
+    expect(Object.getPrototypeOf(handlers)).toBeNull()
+    expect(hasFocusCandidateHandlers(handlers)).toBe(true)
   })
 })

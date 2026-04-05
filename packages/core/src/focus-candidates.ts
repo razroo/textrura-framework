@@ -12,6 +12,9 @@ import type { EventHandlers } from './types.js'
  *
  * Keep in sync with {@link import('./focus.js').collectFocusOrder}, {@link import('./focus-trap.js').trapFocusStep},
  * and `dispatchHit`’s `focusTarget` rule (deepest matching handler for the event type).
+ *
+ * Only **truthy** handler values count: an explicit `undefined` slot behaves like a missing key (handy when
+ * merging optional handler maps at runtime).
  */
 export function hasFocusCandidateHandlers(handlers: EventHandlers | undefined): boolean {
   return !!(
