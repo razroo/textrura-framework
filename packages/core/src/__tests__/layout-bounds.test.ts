@@ -446,6 +446,18 @@ describe('pointInInclusiveLayoutRect', () => {
     ).not.toThrow()
     expect(pointInInclusiveLayoutRect(0, 0n as unknown as number, 0, 0, 10, 10)).toBe(false)
   })
+
+  it('returns false for bigint rect origin or size without throwing (corrupt abs layout / bad coercion)', () => {
+    const b = 3n as unknown as number
+    expect(() => pointInInclusiveLayoutRect(0, 0, b, 0, 10, 10)).not.toThrow()
+    expect(pointInInclusiveLayoutRect(0, 0, b, 0, 10, 10)).toBe(false)
+    expect(() => pointInInclusiveLayoutRect(0, 0, 0, b, 10, 10)).not.toThrow()
+    expect(pointInInclusiveLayoutRect(0, 0, 0, b, 10, 10)).toBe(false)
+    expect(() => pointInInclusiveLayoutRect(0, 0, 0, 0, b, 10)).not.toThrow()
+    expect(pointInInclusiveLayoutRect(0, 0, 0, 0, b, 10)).toBe(false)
+    expect(() => pointInInclusiveLayoutRect(0, 0, 0, 0, 10, b)).not.toThrow()
+    expect(pointInInclusiveLayoutRect(0, 0, 0, 0, 10, b)).toBe(false)
+  })
 })
 
 describe('finiteNumberOrZero', () => {
