@@ -429,6 +429,23 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(5, 0, 0, 0, 10, -0)).toBe(true)
     expect(pointInInclusiveLayoutRect(5, 1, 0, 0, 10, -0)).toBe(false)
   })
+
+  it('returns false for boxed pointer coordinates (Number.isFinite is false; must not coerce)', () => {
+    expect(Number.isFinite(Object(5) as unknown as number)).toBe(false)
+    expect(pointInInclusiveLayoutRect(Object(5) as unknown as number, 0, 0, 0, 10, 10)).toBe(false)
+    expect(pointInInclusiveLayoutRect(0, Object(5) as unknown as number, 0, 0, 10, 10)).toBe(false)
+  })
+
+  it('returns false for bigint pointer coords without throwing (non-Number; Number.isFinite is false)', () => {
+    expect(() =>
+      pointInInclusiveLayoutRect(0n as unknown as number, 0, 0, 0, 10, 10),
+    ).not.toThrow()
+    expect(pointInInclusiveLayoutRect(0n as unknown as number, 0, 0, 0, 10, 10)).toBe(false)
+    expect(() =>
+      pointInInclusiveLayoutRect(0, 0n as unknown as number, 0, 0, 10, 10),
+    ).not.toThrow()
+    expect(pointInInclusiveLayoutRect(0, 0n as unknown as number, 0, 0, 10, 10)).toBe(false)
+  })
 })
 
 describe('finiteNumberOrZero', () => {
