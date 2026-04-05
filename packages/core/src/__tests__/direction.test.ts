@@ -211,4 +211,11 @@ describe('resolveComputeLayoutDirection', () => {
     const ltrRoot = box({ width: 1, height: 1, dir: 'ltr' })
     expect(resolveComputeLayoutDirection(Object('ltr') as never, ltrRoot)).toBe('ltr')
   })
+
+  it('ignores Symbol host values (only primitive ltr/rtl strings win), deriving from the root', () => {
+    const rtlRoot = box({ width: 1, height: 1, dir: 'rtl' })
+    expect(resolveComputeLayoutDirection(Symbol('rtl') as never, rtlRoot)).toBe('rtl')
+    const ltrRoot = box({ width: 1, height: 1, dir: 'ltr' })
+    expect(resolveComputeLayoutDirection(Symbol('ltr') as never, ltrRoot)).toBe('ltr')
+  })
 })
