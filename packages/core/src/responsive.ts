@@ -110,12 +110,17 @@ export function breakpoint<B extends BreakpointMap>(
  * const cols = responsive(viewport.width, { sm: 1, md: 2, lg: 3 }, { sm: 0, md: 640, lg: 1024 })
  * cols.value // 2 when viewport is 800px
  * ```
+ *
+ * @returns A computed that reads `values[activeBreakpoint]`. The result is `undefined` when `values` has no
+ *   entry for the active name (for example a partial map, or {@link breakpoint} falling back to a tier that
+ *   was not listed in `values`). When `breakpoints` is empty, {@link breakpoint} yields `''`; include a `''`
+ *   key in `values` if you need a defined value in that degenerate case.
  */
 export function responsive<B extends BreakpointMap, V>(
   width: Signal<number> | Computed<number>,
-  values: Record<keyof B & string, V>,
+  values: Partial<Record<keyof B & string, V>>,
   breakpoints: B,
-): Computed<V> {
+): Computed<V | undefined> {
   const bp = breakpoint(width, breakpoints)
   return computed(() => values[bp.value])
 }
