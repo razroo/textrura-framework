@@ -1,6 +1,6 @@
-import { describe, test, expect, beforeAll, afterAll } from 'bun:test'
-import { init, destroy, computeLayout } from './index.ts'
-import type { BoxNode, TextNode } from './index.ts'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { init, destroy, computeLayout } from '../index.js'
+import type { BoxNode, TextNode } from '../index.js'
 
 beforeAll(async () => {
   await init()
@@ -11,7 +11,7 @@ afterAll(() => {
 })
 
 describe('box layout', () => {
-  test('single box with fixed dimensions', () => {
+  it('single box with fixed dimensions', () => {
     const result = computeLayout({ width: 200, height: 100 })
     expect(result.x).toBe(0)
     expect(result.y).toBe(0)
@@ -20,7 +20,7 @@ describe('box layout', () => {
     expect(result.children).toEqual([])
   })
 
-  test('column layout with two fixed children', () => {
+  it('column layout with two fixed children', () => {
     const tree: BoxNode = {
       width: 300,
       flexDirection: 'column',
@@ -39,7 +39,7 @@ describe('box layout', () => {
     expect(result.children[1]!.height).toBe(70)
   })
 
-  test('nested row with dir rtl mirrors flex child order under ltr owner direction', () => {
+  it('nested row with dir rtl mirrors flex child order under ltr owner direction', () => {
     const tree: BoxNode = {
       width: 200,
       height: 80,
@@ -63,7 +63,7 @@ describe('box layout', () => {
     expect(row.children[0]!.x).toBeGreaterThan(row.children[1]!.x)
   })
 
-  test('owner direction rtl mirrors top-level flex row when nodes omit dir (document / root context)', () => {
+  it('owner direction rtl mirrors top-level flex row when nodes omit dir (document / root context)', () => {
     const tree: BoxNode = {
       width: 200,
       height: 40,
@@ -75,7 +75,7 @@ describe('box layout', () => {
     expect(result.children[0]!.x).toBeGreaterThan(result.children[1]!.x)
   })
 
-  test('nested row with dir auto inherits rtl owner direction and mirrors flex children', () => {
+  it('nested row with dir auto inherits rtl owner direction and mirrors flex children', () => {
     const tree: BoxNode = {
       width: 200,
       height: 80,
@@ -99,7 +99,7 @@ describe('box layout', () => {
     expect(row.children[0]!.x).toBeGreaterThan(row.children[1]!.x)
   })
 
-  test('nested row with dir auto under ltr owner keeps ltr flex child order', () => {
+  it('nested row with dir auto under ltr owner keeps ltr flex child order', () => {
     const tree: BoxNode = {
       width: 200,
       height: 80,
@@ -123,7 +123,7 @@ describe('box layout', () => {
     expect(row.children[0]!.x).toBeLessThan(row.children[1]!.x)
   })
 
-  test('row layout with gap', () => {
+  it('row layout with gap', () => {
     const tree: BoxNode = {
       width: 300,
       flexDirection: 'row',
@@ -138,7 +138,7 @@ describe('box layout', () => {
     expect(result.children[1]!.x).toBe(110)
   })
 
-  test('padding affects child position', () => {
+  it('padding affects child position', () => {
     const tree: BoxNode = {
       width: 300,
       padding: 20,
@@ -150,7 +150,7 @@ describe('box layout', () => {
     expect(result.height).toBe(90)
   })
 
-  test('flexGrow distributes space', () => {
+  it('flexGrow distributes space', () => {
     const tree: BoxNode = {
       width: 300,
       flexDirection: 'row',
@@ -164,7 +164,7 @@ describe('box layout', () => {
     expect(result.children[1]!.width).toBe(200)
   })
 
-  test('absolute positioning', () => {
+  it('absolute positioning', () => {
     const tree: BoxNode = {
       width: 300,
       height: 300,
@@ -184,7 +184,7 @@ describe('box layout', () => {
     expect(result.children[0]!.width).toBe(50)
   })
 
-  test('justify content space-between', () => {
+  it('justify content space-between', () => {
     const tree: BoxNode = {
       width: 300,
       flexDirection: 'row',
@@ -199,7 +199,7 @@ describe('box layout', () => {
     expect(result.children[1]!.x).toBe(250)
   })
 
-  test('align items center', () => {
+  it('align items center', () => {
     const tree: BoxNode = {
       width: 300,
       height: 100,
@@ -211,7 +211,7 @@ describe('box layout', () => {
     expect(result.children[0]!.y).toBe(35)
   })
 
-  test('margin creates space between siblings', () => {
+  it('margin creates space between siblings', () => {
     const tree: BoxNode = {
       width: 300,
       flexDirection: 'column',
@@ -225,7 +225,7 @@ describe('box layout', () => {
     expect(result.height).toBe(120)
   })
 
-  test('nested flex containers', () => {
+  it('nested flex containers', () => {
     const tree: BoxNode = {
       width: 400,
       flexDirection: 'column',
@@ -249,9 +249,8 @@ describe('box layout', () => {
 })
 
 // Text measurement tests require a canvas context (browser environment).
-// These are documented here as the expected behavior but skipped in Bun.
 describe('text layout (requires browser)', () => {
-  test.skip('text node measures height from content', () => {
+  it.skip('text node measures height from content', () => {
     const tree: TextNode = {
       text: 'Hello world',
       font: '16px sans-serif',
@@ -265,7 +264,7 @@ describe('text layout (requires browser)', () => {
     expect(result.lineCount).toBe(1)
   })
 
-  test.skip('text wraps to multiple lines in narrow container', () => {
+  it.skip('text wraps to multiple lines in narrow container', () => {
     const longText =
       'This is a fairly long paragraph of text that should definitely wrap to multiple lines when constrained to a narrow width.'
     const tree: TextNode = {
@@ -279,7 +278,7 @@ describe('text layout (requires browser)', () => {
     expect(result.height).toBe(result.lineCount! * 20)
   })
 
-  test.skip('text inside a flex container', () => {
+  it.skip('text inside a flex container', () => {
     const tree: BoxNode = {
       width: 400,
       padding: 10,
@@ -298,7 +297,7 @@ describe('text layout (requires browser)', () => {
     expect(result.height).toBe(78)
   })
 
-  test.skip('text in row layout gets intrinsic width, not container width', () => {
+  it.skip('text in row layout gets intrinsic width, not container width', () => {
     const tree: BoxNode = {
       width: 600,
       flexDirection: 'row',
@@ -314,9 +313,7 @@ describe('text layout (requires browser)', () => {
     const result = computeLayout(tree)
     const textChild = result.children[0]!
     const caretChild = result.children[1]!
-    // Text should be much narrower than the 600px container
     expect(textChild.width).toBeLessThan(100)
-    // Caret should be positioned right after the text, not at the far right
     expect(caretChild.x).toBeLessThan(120)
   })
 })

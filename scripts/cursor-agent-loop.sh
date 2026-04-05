@@ -17,6 +17,9 @@ fi
 # Textura, animation beyond helpers, extra render targets). Otherwise prefer one scoped change under
 # packages/ (tests, perf in hit-test/text/layout paths, types, public JSDoc, or
 # `rg 'TODO|FIXME|HACK' packages`; a clean TODO grep is normal — pick a north-star bucket anyway).
+# `vitest.fast.config.ts` (used by `npm run test` / quality.yml "Fast tests") includes only
+# `packages/*/src/__tests__/**/*.test.ts`. Tests colocated as `packages/<pkg>/src/*.test.ts` are skipped by
+# that glob until moved under `src/__tests__/` (or the include pattern is intentionally widened).
 # Root `npm run release:gate` allowlists specific vitest entry files (see package.json), not every
 # `packages/*/src/__tests__/**/*.test.ts` that `npm run test` / vitest.fast.config.ts includes — a file
 # passing `vitest.fast` does not imply it runs in CI gate; check package.json before assuming coverage ships.
