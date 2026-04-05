@@ -818,4 +818,38 @@ describe('text layout (Pretext + canvas measureText)', () => {
     expect(ltr.width).toBe(50)
     expect(rtl.height).toBe(ltr.height)
   })
+
+  it('row: flexGrow with flexBasis 0 fills remaining main-axis space (flex-1 / basis-0 pattern)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 40,
+      flexDirection: 'row',
+      children: [
+        { width: 40, height: 40 },
+        { flexGrow: 1, flexShrink: 1, flexBasis: 0, height: 40 },
+      ],
+    }
+    const result = computeLayout(tree)
+    expect(result.children[0]!.width).toBe(40)
+    expect(result.children[1]!.width).toBe(160)
+    expect(result.children[0]!.x).toBe(0)
+    expect(result.children[1]!.x).toBe(40)
+  })
+
+  it('row: flexGrow with flexBasis auto grows from declared width as flex base', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 40,
+      flexDirection: 'row',
+      children: [
+        { width: 40, height: 40 },
+        { width: 30, flexGrow: 1, flexShrink: 1, flexBasis: 'auto', height: 40 },
+      ],
+    }
+    const result = computeLayout(tree)
+    expect(result.children[0]!.width).toBe(40)
+    expect(result.children[1]!.width).toBe(160)
+    expect(result.children[0]!.x).toBe(0)
+    expect(result.children[1]!.x).toBe(40)
+  })
 })
