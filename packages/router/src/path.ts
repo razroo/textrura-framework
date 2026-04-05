@@ -46,12 +46,17 @@ function wellFormedSplatRemainder(value: string | number): string {
   return trimSlashes(raw)
 }
 
-/** True when a param value should participate in the path (non-finite numbers and `bigint` omitted; mirrors `stringifyQuery` in `query.ts`). */
-function paramValuePresent(value: string | number | null | undefined): boolean {
+/**
+ * True when a param value should participate in the path. Only **primitive** `string` and finite
+ * `number` count — same scalar guard as {@link import('./query.js').stringifyQuery} (no `boolean`,
+ * boxed numbers, objects, symbols, `bigint`, or non-finite doubles).
+ */
+function paramValuePresent(value: string | number | null | undefined): value is string | number {
   if (value == null || value === '') return false
   if (typeof value === 'bigint') return false
-  if (typeof value === 'number' && !Number.isFinite(value)) return false
-  return true
+  if (typeof value === 'number') return Number.isFinite(value)
+  if (typeof value === 'string') return true
+  return false
 }
 
 /**
@@ -59,8 +64,9 @@ function paramValuePresent(value: string | number | null | undefined): boolean {
  * dynamic `:id` and optional `:id?` are filled from `params`; splat `*rest` (or a lone `*`, key `'*'`)
  * inserts the remainder with internal slashes preserved (slashes are not percent-encoded; string values are still
  * passed through `String.prototype.toWellFormed` so lone surrogates match `:param` / query parity). For optional segments, `null`, `undefined`,
- * empty string, a non-finite number (`NaN`, `±Infinity`), or a `BigInt` omits the segment (same as leaving the key unset).
- * Required dynamic and splat params throw when missing, empty, non-finite numeric, or `BigInt`. `:param` values are
+ * empty string, a non-finite number (`NaN`, `±Infinity`), a `BigInt`, or any value that is not a primitive
+ * string or finite number (`boolean`, boxed numbers, plain objects, symbols, …) omits the segment (same as leaving the key unset).
+ * Required dynamic and splat params throw when missing, empty, or when the value fails that scalar guard. `:param` values are
  * percent-encoded after `String.prototype.toWellFormed` (parity with `stringifyQuery` in `query.ts`).
  * Leading and trailing slashes on `pattern` are trimmed before building.
  */

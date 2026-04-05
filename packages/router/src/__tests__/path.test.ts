@@ -111,6 +111,37 @@ describe('path generation', () => {
     )
   })
 
+  it('omits optional path params when the value is boolean, boxed number, or object (scalar guard; parity with query stringify)', () => {
+    expect(buildPath('/users/:id?', { id: true as unknown as string })).toBe('/users')
+    expect(buildPath('/users/:id?', { id: false as unknown as string })).toBe('/users')
+    expect(buildPath('/a/:seg?/c', { seg: {} as unknown as string })).toBe('/a/c')
+    expect(buildPath('/u/:x?', { x: Object(7) as unknown as number })).toBe('/u')
+  })
+
+  it('throws for required path params when the value is boolean, boxed number, or plain object', () => {
+    expect(() =>
+      buildPath('/users/:id', { id: true as unknown as string } as PathParams<'/users/:id'>),
+    ).toThrow('Missing required path param: id')
+    expect(() =>
+      buildPath('/n/:x', { x: Object(3) as unknown as number } as PathParams<'/n/:x'>),
+    ).toThrow('Missing required path param: x')
+    expect(() =>
+      buildPath('/o/:y', { y: { v: 1 } as unknown as string } as PathParams<'/o/:y'>),
+    ).toThrow('Missing required path param: y')
+  })
+
+  it('throws for splat params when the value is boolean, boxed number, or object', () => {
+    expect(() =>
+      buildPath('/docs/*rest', { rest: false as unknown as string } as PathParams<'/docs/*rest'>),
+    ).toThrow('Missing required splat param: rest')
+    expect(() =>
+      buildPath('/*', { '*': Object('hi') as unknown as string } as PathParams<'/*'>),
+    ).toThrow('Missing required splat param: *')
+    expect(() =>
+      buildPath('/p/*s', { s: { a: 1 } as unknown as string } as PathParams<'/p/*s'>),
+    ).toThrow('Missing required splat param: s')
+  })
+
   it('builds path with multiple dynamic segments', () => {
     expect(buildPath('/users/:userId/posts/:postId', { userId: 'a', postId: 2 })).toBe(
       '/users/a/posts/2',
