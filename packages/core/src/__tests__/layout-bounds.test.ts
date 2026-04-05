@@ -602,6 +602,15 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(max, 0, -max, 0)).toBeNull()
     expect(scrollSafeChildOffsets(0, max, 0, -max)).toBeNull()
   })
+
+  it('returns null when abs origin is non-finite (corrupt layout chain; must not walk children with NaN/∞ offsets)', () => {
+    expect(scrollSafeChildOffsets(Number.NaN, 0, 0, 0)).toBeNull()
+    expect(scrollSafeChildOffsets(0, Number.NaN, 0, 0)).toBeNull()
+    expect(scrollSafeChildOffsets(Number.POSITIVE_INFINITY, 0, 0, 0)).toBeNull()
+    expect(scrollSafeChildOffsets(0, Number.NEGATIVE_INFINITY, 0, 0)).toBeNull()
+    // Scroll is coerced to 0; still non-finite abs poisons the difference.
+    expect(scrollSafeChildOffsets(Number.NaN, 10, Number.NaN, Number.POSITIVE_INFINITY)).toBeNull()
+  })
 })
 
 describe('finiteNumberOrZero', () => {
