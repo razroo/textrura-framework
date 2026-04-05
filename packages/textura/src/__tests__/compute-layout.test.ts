@@ -202,6 +202,24 @@ describe('box layout', () => {
     expect(result.children[0]!.x).toBeGreaterThan(result.children[1]!.x)
   })
 
+  it('owner direction rtl does not invert top-level column main-axis stacking (y order matches ltr)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 200,
+      flexDirection: 'column',
+      children: [
+        { width: 200, height: 30 },
+        { width: 200, height: 40 },
+      ],
+    }
+    const ltr = computeLayout(tree, { width: 200, height: 200, direction: 'ltr' })
+    const rtl = computeLayout(tree, { width: 200, height: 200, direction: 'rtl' })
+    expect(rtl.children[0]!.y).toBe(ltr.children[0]!.y)
+    expect(rtl.children[1]!.y).toBe(ltr.children[1]!.y)
+    expect(rtl.children[0]!.x).toBe(ltr.children[0]!.x)
+    expect(rtl.children[1]!.x).toBe(ltr.children[1]!.x)
+  })
+
   it('malformed owner direction at runtime falls back to LTR (only exact "rtl" mirrors the row)', () => {
     const tree: BoxNode = {
       width: 200,
