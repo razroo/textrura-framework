@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { streamText } from '../stream-text.js'
-import { effect } from '../signals.js'
+import { batch, effect } from '../signals.js'
 
 describe('streamText', () => {
   it('starts with initial value', () => {
@@ -112,6 +112,25 @@ describe('streamText', () => {
     // Should have coalesced into one signal update
     expect(updateCount).toBe(2)
     expect(s.value).toBe('abc')
+  })
+
+  it('appends inside a root batch still notify only after the microtask (buffer grows sync; signal deferred)', async () => {
+    const s = streamText()
+    let runs = 0
+    effect(() => {
+      void s.value
+      runs++
+    })
+    expect(runs).toBe(1)
+    batch(() => {
+      s.append('a')
+      s.append('b')
+      expect(s.signal.peek()).toBe('')
+    })
+    expect(runs).toBe(1)
+    await Promise.resolve()
+    expect(runs).toBe(2)
+    expect(s.value).toBe('ab')
   })
 
   it('ignores empty append', async () => {
