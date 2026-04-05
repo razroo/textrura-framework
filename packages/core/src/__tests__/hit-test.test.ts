@@ -1314,6 +1314,28 @@ describe('dispatchHit', () => {
     expect(log).toEqual(['front'])
   })
 
+  it('overlapping siblings: equal z-index on two children prefers later source order (two-child fast path)', () => {
+    const log: string[] = []
+    const first = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('first') } })
+    const second = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('second') } })
+    const root = box({ width: 100, height: 100 }, [first, second])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['second'])
+    expect(hitPathAtPoint(root, layout, 10, 10)).toEqual([1])
+    expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(true)
+  })
+
   it('overlapping siblings: three children hit order updates when z-index values change (sort-path cache)', () => {
     const log: string[] = []
     const low = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('low') } })
