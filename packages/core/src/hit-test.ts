@@ -52,6 +52,29 @@ function getChildrenByZAsc(boxEl: BoxElement): number[] {
     return asc
   }
 
+  // Three children with identical z-index: stable paint order matches source order; avoid map/sort allocations.
+  if (n === 3) {
+    const z0 = zIndexOf(boxEl.children[0]!)
+    const z1 = zIndexOf(boxEl.children[1]!)
+    const z2 = zIndexOf(boxEl.children[2]!)
+    if (z0 === z1 && z1 === z2) {
+      const cached = zIndexOrderCache.get(boxEl)
+      if (
+        cached &&
+        cached.zValues.length === 3 &&
+        cached.zValues[0] === z0 &&
+        cached.zValues[1] === z1 &&
+        cached.zValues[2] === z2
+      ) {
+        return cached.asc
+      }
+      const zValues = [z0, z1, z2]
+      const asc = [0, 1, 2]
+      zIndexOrderCache.set(boxEl, { zValues, asc })
+      return asc
+    }
+  }
+
   const cached = zIndexOrderCache.get(boxEl)
   if (cached && cached.zValues.length === boxEl.children.length) {
     let unchanged = true
