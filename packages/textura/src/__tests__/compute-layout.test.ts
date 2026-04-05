@@ -912,6 +912,56 @@ describe('text layout (Pretext + canvas measureText)', () => {
     expect(result.children[0]!.x).toBe(0)
     expect(result.children[1]!.x).toBe(40)
   })
+
+  it('row: minWidth raises a child width below the minimum', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 40,
+      flexDirection: 'row',
+      children: [
+        { width: 20, height: 40, minWidth: 80 },
+        { width: 40, height: 40 },
+      ],
+    }
+    const result = computeLayout(tree)
+    expect(result.children[0]!.width).toBe(80)
+    expect(result.children[0]!.x).toBe(0)
+    expect(result.children[1]!.x).toBe(80)
+    expect(result.children[1]!.width).toBe(40)
+  })
+
+  it('row: maxWidth clamps a declared width', () => {
+    const tree: BoxNode = {
+      width: 300,
+      height: 40,
+      flexDirection: 'row',
+      children: [{ width: 200, height: 40, maxWidth: 100 }],
+    }
+    const result = computeLayout(tree)
+    expect(result.children[0]!.width).toBe(100)
+  })
+
+  it('column: minHeight raises a child height below the minimum', () => {
+    const tree: BoxNode = {
+      width: 100,
+      height: 200,
+      flexDirection: 'column',
+      children: [{ width: 100, height: 10, minHeight: 60 }],
+    }
+    const result = computeLayout(tree)
+    expect(result.children[0]!.height).toBe(60)
+  })
+
+  it('column: maxHeight clamps a declared height', () => {
+    const tree: BoxNode = {
+      width: 100,
+      height: 300,
+      flexDirection: 'column',
+      children: [{ width: 100, height: 200, maxHeight: 80 }],
+    }
+    const result = computeLayout(tree)
+    expect(result.children[0]!.height).toBe(80)
+  })
 })
 
 describe('engine init contract', () => {
