@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { init, computeLayout } from 'textura'
 import { dispatchHit, getCursorAtPoint, hasInteractiveHitAtPoint, hitPathAtPoint } from '../hit-test.js'
+import { pointInInclusiveLayoutRect } from '../layout-bounds.js'
 import { box, image, scene3d, text } from '../elements.js'
 import { toLayoutTree } from '../tree.js'
 import type { HitEvent, KeyboardHitEvent } from '../types.js'
@@ -559,6 +560,37 @@ describe('dispatchHit', () => {
       expect(hasInteractiveHitAtPoint(el, bad, 50, 25)).toBe(false)
       expect(getCursorAtPoint(el, bad, 50, 25)).toBeNull()
     }
+  })
+
+  it('nested layout: finite child bounds with abs origin + width overflow is a miss (inclusive right edge guard)', () => {
+    const max = Number.MAX_VALUE
+    let fired = false
+    const inner = box({
+      width: 1e307,
+      height: 100,
+      cursor: 'pointer',
+      onClick: () => {
+        fired = true
+      },
+    })
+    const root = box({ width: max, height: 100 }, [inner])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: max,
+      height: 100,
+      children: [{ x: max, y: 0, width: 1e307, height: 100, children: [] as const }],
+    }
+
+    expect(pointInInclusiveLayoutRect(max, 50, max, 0, 1e307, 100)).toBe(false)
+
+    expect(() => dispatchHit(root, layout, 'onClick', max, 50)).not.toThrow()
+    expect(dispatchHit(root, layout, 'onClick', max, 50).handled).toBe(false)
+    expect(fired).toBe(false)
+
+    expect(hitPathAtPoint(root, layout, max, 50)).toEqual([])
+    expect(hasInteractiveHitAtPoint(root, layout, max, 50)).toBe(false)
+    expect(getCursorAtPoint(root, layout, max, 50)).toBeNull()
   })
 
   it('corrupt earlier sibling layout does not throw and still allows hits on later siblings', () => {
