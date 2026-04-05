@@ -228,6 +228,19 @@ describe('query helpers', () => {
     expect(stringifyQuery(inArray)).toBe('?tag=x')
   })
 
+  it('omits non-primitive runtime values (objects, boxed primitives, Date) without throwing', () => {
+    const solo = { x: { nested: 1 } } as unknown as QueryInput
+    expect(stringifyQuery(solo)).toBe('')
+    const mixed = { a: 'ok', x: { y: 2 } } as unknown as QueryInput
+    expect(stringifyQuery(mixed)).toBe('?a=ok')
+    expect(stringifyQuery({ d: new Date(0) } as unknown as QueryInput)).toBe('')
+    expect(stringifyQuery({ n: Object(7) as unknown as number })).toBe('')
+    expect(stringifyQuery({ s: Object('hi') as unknown as string })).toBe('')
+    expect(stringifyQuery({ b: Object(true) as unknown as boolean })).toBe('')
+    const arr = { tag: ['a', { o: 1 } as unknown as string, 'b'] } as unknown as QueryInput
+    expect(stringifyQuery(arr)).toBe('?tag=a&tag=b')
+  })
+
   it('omits non-finite entries inside arrays while preserving finite values', () => {
     expect(stringifyQuery({ mix: [Number.NaN, 'a', Number.POSITIVE_INFINITY, 3] })).toBe('?mix=a&mix=3')
     expect(stringifyQuery({ mix: ['a', Number.parseFloat('1e400'), 3] })).toBe('?mix=a&mix=3')

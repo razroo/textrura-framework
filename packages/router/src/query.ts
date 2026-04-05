@@ -67,6 +67,9 @@ export function parseQuery(search: string): ParsedQuery {
  * Skips `null` and `undefined`; array values become repeated keys. Booleans become `"true"` / `"false"`.
  * Skips non-finite numbers (`NaN`, `±Infinity`) and `bigint` values so accidental numeric garbage does not produce query pairs
  * (parity with {@link import('./path.js').buildPath} optional param omission).
+ * At runtime only **primitive** `string`, `number`, and `boolean` values are emitted — objects (including boxed
+ * primitives, `Date`, plain records, and arrays mistaken for scalar entries) are skipped so corrupt deserialization
+ * cannot yield `...=[object Object]` pairs.
  * Keys and string values are normalized with `String.prototype.toWellFormed` before percent-encoding so
  * ill-formed lone UTF-16 surrogates cannot throw from `encodeURIComponent`.
  * Returns `""` when there are no pairs to emit.
@@ -83,8 +86,14 @@ export function stringifyQuery(query: QueryInput): string {
     for (const value of values) {
       if (value == null) continue
       if (typeof value === 'bigint') continue
-      if (typeof value === 'number' && !Number.isFinite(value)) continue
-      pairs.push(`${encode(key)}=${encode(String(value))}`)
+      if (typeof value === 'number') {
+        if (!Number.isFinite(value)) continue
+        pairs.push(`${encode(key)}=${encode(String(value))}`)
+      } else if (typeof value === 'boolean') {
+        pairs.push(`${encode(key)}=${encode(String(value))}`)
+      } else if (typeof value === 'string') {
+        pairs.push(`${encode(key)}=${encode(value)}`)
+      }
     }
   }
 
