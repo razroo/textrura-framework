@@ -1,7 +1,11 @@
 import type { ComputedLayout } from 'textura'
 import type { UIElement, TextElement } from './types.js'
 import { resolveElementDirection, type ResolvedDirection } from './direction.js'
-import { finiteNumberOrZero, layoutBoundsAreFinite } from './layout-bounds.js'
+import {
+  finiteNumberOrZero,
+  layoutBoundsAreFinite,
+  pointInInclusiveLayoutRect,
+} from './layout-bounds.js'
 
 /** Info about a rendered text node's position and content. */
 export interface TextNodeInfo {
@@ -224,6 +228,10 @@ function textNodeBoundsAreFinite(node: TextNodeInfo): boolean {
  * Vertical line bands are half-open between stacked lines so a y exactly on an interior boundary belongs to the
  * lower line; the **last** line’s bottom edge is inclusive so it matches {@link import('./hit-test.js').dispatchHit}
  * inclusive rect edges on the text node box.
+ *
+ * Node bounds use {@link pointInInclusiveLayoutRect} (same as pointer hit-testing) so `x + width` / `y + height`
+ * overflow to non-finite edges cannot admit stray coordinates — naive `px <= x + width` would mis-classify when
+ * the sum is `±Infinity`.
  */
 export function hitTestText(
   textNodes: TextNodeInfo[],
@@ -234,8 +242,7 @@ export function hitTestText(
 
   for (const node of textNodes) {
     if (!textNodeBoundsAreFinite(node)) continue
-    // Check if point is within the text node's bounding box
-    if (px < node.x || px > node.x + node.width || py < node.y || py > node.y + node.height) {
+    if (!pointInInclusiveLayoutRect(px, py, node.x, node.y, node.width, node.height)) {
       continue
     }
 

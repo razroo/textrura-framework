@@ -797,6 +797,25 @@ describe('hitTestText', () => {
     expect(hitTestText(textNodes, 12, 18)).toEqual({ nodeIndex: 0, charOffset: 2 })
   })
 
+  it('returns null when x+width overflows to Infinity (aligned with pointInInclusiveLayoutRect; naive sum would admit corners)', () => {
+    const max = Number.MAX_VALUE
+    expect(max + max).toBe(Infinity)
+    const textNodes: TextNodeInfo[] = [
+      {
+        element: { kind: 'text' as const, props: { text: 'ab', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: max,
+        y: 0,
+        width: max,
+        height: 18,
+        index: 0,
+        lines: [{ text: 'ab', x: max, y: 0, charOffsets: [0, 8], charWidths: [8, 8] }],
+      },
+    ]
+    expect(hitTestText(textNodes, max, 5)).toBeNull()
+    expect(hitTestText(textNodes, max - 1, 5)).toBeNull()
+  })
+
   it('keeps half-open bands between stacked lines so a shared y boundary hits the upper line only', () => {
     const textNodes: TextNodeInfo[] = [
       {
