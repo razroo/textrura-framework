@@ -316,6 +316,10 @@ describe('toLayoutTree', () => {
     expect(toLayoutTree(row, true)).not.toHaveProperty('dir')
     expect(toLayoutTree(row, false)).toHaveProperty('dir', 'rtl')
 
+    const autoRow = box({ width: 100, height: 40, flexDirection: 'row', dir: 'auto' })
+    expect(toLayoutTree(autoRow, true)).not.toHaveProperty('dir')
+    expect(toLayoutTree(autoRow, false)).toHaveProperty('dir', 'auto')
+
     const t = text({
       text: 'x',
       font: '14px sans-serif',
@@ -327,9 +331,24 @@ describe('toLayoutTree', () => {
     expect(toLayoutTree(t, true)).not.toHaveProperty('dir')
     expect(toLayoutTree(t, false)).toHaveProperty('dir', 'rtl')
 
+    const tAuto = text({
+      text: 'x',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      width: 10,
+      height: 18,
+      dir: 'auto',
+    })
+    expect(toLayoutTree(tAuto, true)).not.toHaveProperty('dir')
+    expect(toLayoutTree(tAuto, false)).toHaveProperty('dir', 'auto')
+
     const img = image({ src: '/a.png', width: 8, height: 8, dir: 'ltr' })
     expect(toLayoutTree(img, true)).not.toHaveProperty('dir')
     expect(toLayoutTree(img, false)).toHaveProperty('dir', 'ltr')
+
+    const imgAuto = image({ src: '/a.png', width: 8, height: 8, dir: 'auto' })
+    expect(toLayoutTree(imgAuto, true)).not.toHaveProperty('dir')
+    expect(toLayoutTree(imgAuto, false)).toHaveProperty('dir', 'auto')
 
     const s3 = scene3d({
       width: 80,
@@ -339,6 +358,15 @@ describe('toLayoutTree', () => {
     })
     expect(toLayoutTree(s3, true)).not.toHaveProperty('dir')
     expect(toLayoutTree(s3, false)).toHaveProperty('dir', 'rtl')
+
+    const s3Auto = scene3d({
+      width: 80,
+      height: 80,
+      dir: 'auto',
+      objects: [sphere({ radius: 1 })],
+    })
+    expect(toLayoutTree(s3Auto, true)).not.toHaveProperty('dir')
+    expect(toLayoutTree(s3Auto, false)).toHaveProperty('dir', 'auto')
   })
 
   it('omits dir on root text, image, and scene3d layout snapshots', () => {
