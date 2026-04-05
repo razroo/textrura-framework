@@ -497,6 +497,25 @@ describe('geometry snapshot CI', () => {
     expect(roundLayout(layout)).toMatchSnapshot()
   })
 
+  it('stable column with in-flow text and relatively positioned box with top/left (rounded)', async () => {
+    await init()
+    const tree = box(
+      { width: 200, height: 100, padding: 6, flexDirection: 'column', gap: 4 },
+      [
+        text({ text: 'Hello', font: '14px sans-serif', lineHeight: 18, width: 80, height: 18 }),
+        box({
+          position: 'relative',
+          top: 5,
+          left: 7,
+          width: 44,
+          height: 26,
+        }),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 100 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
+
   it('stable column with in-flow text and absolutely positioned box via right/bottom (rounded)', async () => {
     await init()
     const tree = box(

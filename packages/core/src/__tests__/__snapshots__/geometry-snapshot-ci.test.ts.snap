@@ -103,6 +103,31 @@ exports[`geometry snapshot CI > stable column with in-flow text and absolutely p
 }
 `;
 
+exports[`geometry snapshot CI > stable column with in-flow text and relatively positioned box with top/left (rounded) 1`] = `
+{
+  "children": [
+    {
+      "children": [],
+      "height": 18,
+      "width": 80,
+      "x": 6,
+      "y": 6,
+    },
+    {
+      "children": [],
+      "height": 26,
+      "width": 44,
+      "x": 13,
+      "y": 33,
+    },
+  ],
+  "height": 100,
+  "width": 200,
+  "x": 0,
+  "y": 0,
+}
+`;
+
 exports[`geometry snapshot CI > stable column with mixed alignSelf on fixed-width text children (rounded) 1`] = `
 {
   "children": [
