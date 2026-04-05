@@ -750,6 +750,33 @@ describe('createApp layout timing', () => {
     }
   })
 
+  it('passes layoutMs 0 when globalThis.performance getter throws on access (hostile sealed global)', async () => {
+    const desc = Object.getOwnPropertyDescriptor(globalThis, 'performance')
+    try {
+      Object.defineProperty(globalThis, 'performance', {
+        configurable: true,
+        enumerable: desc?.enumerable ?? true,
+        get() {
+          throw new Error('performance access denied')
+        },
+      })
+      const setFrameTimings = vi.fn()
+      const renderer: Renderer = {
+        setFrameTimings,
+        render: vi.fn(),
+        destroy: vi.fn(),
+      }
+      await createApp(() => box({ width: 40, height: 20 }, []), renderer, { width: 100, height: 50 })
+      expect(setFrameTimings).toHaveBeenCalledWith({ layoutMs: 0 })
+    } finally {
+      if (desc) {
+        Object.defineProperty(globalThis, 'performance', desc)
+      } else {
+        Reflect.deleteProperty(globalThis, 'performance')
+      }
+    }
+  })
+
   it('clamps negative layout deltas to 0 when performance.now uses negative finite values (hostile polyfill)', async () => {
     let step = 0
     const spy = vi.spyOn(performance, 'now').mockImplementation(() => {
