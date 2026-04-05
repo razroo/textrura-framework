@@ -138,6 +138,38 @@ describe('applyServerMessage', () => {
     expect(state.layout?.width).toBe(55)
   })
 
+  it('accepts fractional protocolVersion when still <= client cap (JSON number semantics)', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const errors: string[] = []
+
+    applyServerMessage(
+      state,
+      renderer,
+      { type: 'frame', layout: layout(0, 0, 88, 77), tree: tree(), protocolVersion: 0.5 },
+      err => errors.push(String(err)),
+    )
+    expect(errors).toHaveLength(0)
+    expect(renders).toHaveLength(1)
+    expect(state.layout?.width).toBe(88)
+  })
+
+  it('rejects fractional protocolVersion when above client cap (treated as newer wire revision)', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const errors: string[] = []
+
+    applyServerMessage(
+      state,
+      renderer,
+      { type: 'frame', layout: layout(), tree: tree(), protocolVersion: 1.0001 },
+      err => errors.push(String(err)),
+    )
+    expect(errors[0]).toContain('newer than client protocol')
+    expect(state.layout).toBeNull()
+    expect(renders).toHaveLength(0)
+  })
+
   it('rejects non-finite protocolVersion on frame (fail closed; no render)', () => {
     const { renderer, renders } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
