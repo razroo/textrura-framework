@@ -3841,6 +3841,34 @@ describe('z-index sort cache invalidation', () => {
     expect(log).toEqual(['front'])
   })
 
+  it('recomputes sibling order when a third child is appended to a two-child parent (two-child fast-path cache length mismatch)', () => {
+    const log: string[] = []
+    const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } })
+    const mid = box({ width: 50, height: 50, zIndex: 5, onClick: () => { log.push('mid') } })
+    const root = box({ width: 100, height: 100 }, [back, mid])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] as const },
+        { x: 0, y: 0, width: 50, height: 50, children: [] as const },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['mid'])
+    log.length = 0
+
+    const top = box({ width: 50, height: 50, zIndex: 10, onClick: () => { log.push('top') } })
+    root.children.push(top)
+    layout.children.push({ x: 0, y: 0, width: 50, height: 50, children: [] as const })
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['top'])
+  })
+
   it('recomputes sibling order when shrinking three children to two by removing the middle (stale multi-child cache)', () => {
     const log: string[] = []
     const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } })
