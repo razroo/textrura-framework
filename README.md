@@ -32,7 +32,7 @@ The framework replaces the entire browser rendering pipeline. Layout is computed
 | `@geometra/renderer-webgpu` | WebGPU renderer scaffold (capability detection + initialization surface) |
 | `@geometra/server` | Server-side layout engine with WebSocket geometry streaming (versioned protocol) |
 | `@geometra/client` | Thin client that receives pre-computed geometry and paints it (versioned protocol checks) |
-| `@geometra/ui` | Starter UI primitives built on `@geometra/core`: form controls, overlays, lists, tables, trees, and command surfaces |
+| `@geometra/ui` | 31-component UI library: button, input, textarea, checkbox, radio, switch, slider, select, combobox, dialog, sheet, accordion, tabs, card, badge, alert, toast, progress, skeleton, avatar, separator, breadcrumb, pagination, menu, command palette, data table, tree view, list |
 | `@geometra/router` | Renderer-agnostic data router: nested routes, loaders/actions, redirects, blockers, lazy/prefetch, protocol-aware navigation |
 | `@geometra/tw` | Tailwind-style utility classes — converts class strings like `"flex-row p-4 bg-blue-500"` into Geometra props |
 
