@@ -216,6 +216,38 @@ describe('box layout', () => {
     expect(rowLtr.children[0]!.x).toBeLessThan(rowLtr.children[1]!.x)
   })
 
+  it('nested row with trimmed or cased dir strings inherits owner direction (only exact ltr/rtl are explicit)', () => {
+    const makeTree = (dir: string): BoxNode => ({
+      width: 200,
+      height: 80,
+      flexDirection: 'column',
+      children: [
+        {
+          width: 200,
+          height: 40,
+          flexDirection: 'row',
+          gap: 10,
+          dir: dir as never,
+          children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+        },
+      ],
+    })
+    const bogus = makeTree('bogus')
+    for (const dir of ['rtl ', 'RTL', 'ltr ']) {
+      const tree = makeTree(dir)
+      const ltrOwner = computeLayout(tree, { width: 200, height: 80, direction: 'ltr' })
+      const rowLtr = ltrOwner.children[0]!
+      const bogusLtr = computeLayout(bogus, { width: 200, height: 80, direction: 'ltr' }).children[0]!
+      expect(rowLtr.children[0]!.x).toBe(bogusLtr.children[0]!.x)
+      expect(rowLtr.children[1]!.x).toBe(bogusLtr.children[1]!.x)
+      const rtlOwner = computeLayout(tree, { width: 200, height: 80, direction: 'rtl' })
+      const rowRtl = rtlOwner.children[0]!
+      const bogusRtl = computeLayout(bogus, { width: 200, height: 80, direction: 'rtl' }).children[0]!
+      expect(rowRtl.children[0]!.x).toBe(bogusRtl.children[0]!.x)
+      expect(rowRtl.children[1]!.x).toBe(bogusRtl.children[1]!.x)
+    }
+  })
+
   it('column with dir rtl aligns flex-start children to the cross-axis start (physical right under ltr owner)', () => {
     const tree: BoxNode = {
       width: 200,
