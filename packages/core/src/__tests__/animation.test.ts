@@ -80,6 +80,24 @@ describe('normalizeSpringConfig', () => {
     expect(normalizeSpringConfig({ mass: 2 })).toEqual({ stiffness: 170, damping: 26, mass: 2 })
     expect(normalizeSpringConfig({})).toEqual({ stiffness: 170, damping: 26, mass: 1 })
   })
+
+  it('uses defaults for BigInt or boxed Number spring fields (strict typeof number)', () => {
+    expect(() => normalizeSpringConfig({ mass: 2n as never })).not.toThrow()
+    expect(normalizeSpringConfig({ mass: 2n as never })).toEqual({ stiffness: 170, damping: 26, mass: 1 })
+    expect(normalizeSpringConfig({ stiffness: 50n as never })).toEqual({
+      stiffness: 170,
+      damping: 26,
+      mass: 1,
+    })
+    expect(normalizeSpringConfig({ damping: 8n as never })).toEqual({
+      stiffness: 170,
+      damping: 26,
+      mass: 1,
+    })
+    expect(normalizeSpringConfig({ mass: Object(2) as never })).toMatchObject({ mass: 1 })
+    expect(normalizeSpringConfig({ stiffness: Object(100) as never })).toMatchObject({ stiffness: 170 })
+    expect(normalizeSpringConfig({ damping: Object(5) as never })).toMatchObject({ damping: 26 })
+  })
 })
 
 describe('motion preference', () => {

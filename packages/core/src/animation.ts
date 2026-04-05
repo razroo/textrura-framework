@@ -282,6 +282,7 @@ const DEFAULT_SPRING_MASS = 1
  * negative stiffness (which would push away from the target or explode the state).
  * Damping may be `0` (undamped). Stiffness `0` is treated as invalid and falls back to the default
  * so the spring still has a restoring force toward the target.
+ * Each field must be a primitive `number`; `BigInt` and boxed `Number` objects use defaults (strict `typeof` check).
  */
 export function normalizeSpringConfig(config: {
   stiffness?: number
