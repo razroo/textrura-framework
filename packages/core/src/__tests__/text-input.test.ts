@@ -365,6 +365,39 @@ describe('text-input foundation', () => {
     expect(atEnd?.x).toBe(10)
   })
 
+  it('getInputCaretGeometry falls back to line origin when charOffsets/charWidths are empty', () => {
+    const textNodes: TextNodeInfo[] = [
+      {
+        element: { kind: 'text', props: { text: 'hi', font: '14px Inter', lineHeight: 18 } },
+        direction: 'ltr',
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 18,
+        index: 0,
+        lines: [{ text: 'hi', x: 10, y: 20, charOffsets: [], charWidths: [] }],
+      },
+    ]
+
+    const atStart = getInputCaretGeometry(textNodes, {
+      anchorNode: 0,
+      anchorOffset: 0,
+      focusNode: 0,
+      focusOffset: 0,
+    })
+    const atEnd = getInputCaretGeometry(textNodes, {
+      anchorNode: 0,
+      anchorOffset: 2,
+      focusNode: 0,
+      focusOffset: 2,
+    })
+
+    expect(atStart?.x).toBe(10)
+    expect(atEnd?.x).toBe(10)
+    expect(atStart?.y).toBe(20)
+    expect(atEnd?.y).toBe(20)
+  })
+
   it('getInputCaretGeometry tolerates BigInt focus offset without throwing', () => {
     const textNodes: TextNodeInfo[] = [
       {
