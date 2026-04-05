@@ -799,6 +799,7 @@ export interface CardOptions {
   children?: UIElement[]
   borderColor?: string
   backgroundColor?: string
+  gap?: number
 }
 
 export function card(options: CardOptions = {}): UIElement {
@@ -809,7 +810,7 @@ export function card(options: CardOptions = {}): UIElement {
     )
   }
   if (options.children && options.children.length > 0) {
-    sections.push(box({ padding: 14 }, options.children))
+    sections.push(box({ padding: 14, gap: options.gap ?? 10 }, options.children))
   }
   if (options.footer) {
     sections.push(
@@ -849,7 +850,7 @@ export function badge(label: string, options: BadgeOptions = {}): UIElement {
   return box(
     {
       paddingLeft: 8, paddingRight: 8, paddingTop: 2, paddingBottom: 2,
-      borderRadius: 9999, backgroundColor: s.bg, alignSelf: 'flex-start',
+      borderRadius: 9999, backgroundColor: s.bg,
     },
     [text({ text: label, font: 'bold 11px Inter', lineHeight: 14, color: s.color })],
   )
@@ -979,8 +980,11 @@ export function progress(value: number, options: ProgressOptions = {}): UIElemen
   }
   children.push(
     box(
-      { height: 6, borderRadius: 3, backgroundColor: '#334155', overflow: 'hidden' },
-      [box({ width: clamped, height: 6, borderRadius: 3, backgroundColor: '#2563eb' }, [])],
+      { flexDirection: 'row', height: 6, borderRadius: 3, backgroundColor: '#334155', overflow: 'hidden' },
+      [
+        box({ flexGrow: Math.max(clamped, 0.001), minWidth: 0, height: 6, borderRadius: 3, backgroundColor: '#2563eb' }),
+        box({ flexGrow: Math.max(100 - clamped, 0.001), minWidth: 0, height: 6 }),
+      ],
     ),
   )
   return box(
