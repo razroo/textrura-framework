@@ -206,6 +206,17 @@ describe('resolveComputeLayoutDirection', () => {
     expect(resolveComputeLayoutDirection('' as never, rtlRoot)).toBe('rtl')
   })
 
+  it('ignores object, array, and boolean host layoutDirection (strict primitive check only), deriving from the root', () => {
+    const rtlRoot = box({ width: 1, height: 1, flexDirection: 'row', dir: 'rtl' }, [])
+    expect(resolveComputeLayoutDirection({} as never, rtlRoot)).toBe('rtl')
+    expect(resolveComputeLayoutDirection([] as never, rtlRoot)).toBe('rtl')
+    expect(resolveComputeLayoutDirection(false as never, rtlRoot)).toBe('rtl')
+    expect(resolveComputeLayoutDirection(true as never, rtlRoot)).toBe('rtl')
+    const ltrRoot = box({ width: 1, height: 1, flexDirection: 'row', dir: 'ltr' }, [])
+    expect(resolveComputeLayoutDirection({ v: 'rtl' } as never, ltrRoot)).toBe('ltr')
+    expect(resolveComputeLayoutDirection([ 'rtl' ] as never, ltrRoot)).toBe('ltr')
+  })
+
   it('ignores trimmed or wrong-case rtl/ltr strings (strict equality; parity with Textura ComputeOptions.direction)', () => {
     const rtlRoot = box({ width: 1, height: 1, flexDirection: 'row', dir: 'rtl' }, [])
     const ltrRoot = box({ width: 1, height: 1, flexDirection: 'row', dir: 'ltr' }, [])
