@@ -374,6 +374,15 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(101, 0, 0, 0, 100, 50)).toBe(false)
   })
 
+  it('treats IEEE -0 pointer coordinates like +0 on inclusive min edges (subtle float sign)', () => {
+    expect(Object.is(-0, 0)).toBe(false)
+    expect(-0 < 0).toBe(false)
+    expect(pointInInclusiveLayoutRect(-0, 0, 0, 0, 100, 50)).toBe(true)
+    expect(pointInInclusiveLayoutRect(0, -0, 0, 0, 100, 50)).toBe(true)
+    expect(pointInInclusiveLayoutRect(-0, -0, 0, 0, 100, 50)).toBe(true)
+    expect(pointInInclusiveLayoutRect(-0, -0, -0, -0, 10, 10)).toBe(true)
+  })
+
   it('supports negative absolute origins (Yoga can emit negative x/y for positioned subtrees)', () => {
     // Rect [-10, -5] x [-20, -15] inclusive
     expect(pointInInclusiveLayoutRect(-10, -20, -10, -20, 5, 5)).toBe(true)
