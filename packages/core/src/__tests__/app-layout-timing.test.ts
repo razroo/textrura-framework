@@ -1352,6 +1352,36 @@ describe('createApp onError', () => {
     expect(setFrameTimings).not.toHaveBeenCalled()
   })
 
+  it('invokes onError and skips render and setFrameTimings when computeLayout throws during initial update', async () => {
+    const onError = vi.fn()
+    const err = new Error('initial layout failed')
+    const spy = vi.spyOn(textura, 'computeLayout').mockImplementation(() => {
+      throw err
+    })
+    try {
+      const render = vi.fn()
+      const setFrameTimings = vi.fn()
+      const renderer: Renderer = {
+        setFrameTimings,
+        render,
+        destroy: vi.fn(),
+      }
+      const app = await createApp(() => box({ width: 10, height: 10 }, []), renderer, {
+        width: 100,
+        height: 50,
+        onError,
+      })
+      expect(onError).toHaveBeenCalledTimes(1)
+      expect(onError).toHaveBeenCalledWith(err)
+      expect(render).not.toHaveBeenCalled()
+      expect(setFrameTimings).not.toHaveBeenCalled()
+      expect(app.tree).toBeNull()
+      expect(app.layout).toBeNull()
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
   it('invokes onError when render throws after layout; setFrameTimings runs before render', async () => {
     const onError = vi.fn()
     const err = new Error('render failed')
@@ -1418,7 +1448,9 @@ describe('createApp onError', () => {
       return orig(tree, opts)
     })
     try {
+      const setFrameTimings = vi.fn()
       const renderer: Renderer = {
+        setFrameTimings,
         render: vi.fn(),
         destroy: vi.fn(),
       }
@@ -1429,12 +1461,14 @@ describe('createApp onError', () => {
       })
       expect(layoutCalls).toBe(1)
       expect(renderer.render).toHaveBeenCalledTimes(1)
+      expect(setFrameTimings).toHaveBeenCalledTimes(1)
       expect((app.tree!.props as { width: number }).width).toBe(40)
 
       width.set(44)
       expect(layoutCalls).toBe(2)
       expect(onError).toHaveBeenCalledTimes(1)
       expect(renderer.render).toHaveBeenCalledTimes(1)
+      expect(setFrameTimings).toHaveBeenCalledTimes(1)
       expect((app.tree!.props as { width: number }).width).toBe(40)
     } finally {
       spy.mockRestore()
