@@ -346,7 +346,7 @@ describe('box layout', () => {
       { ...base, dir: 'rtl' },
       { ...base, dir: 'auto' },
       { ...base, dir: 'bogus' as never },
-      { ...base, dir: null as never },
+      { ...base, dir: null },
     ]
     for (const tree of variants) {
       const r = computeLayout(tree, { width: 220, height: 60 })
@@ -661,7 +661,7 @@ describe('box layout', () => {
           height: 40,
           flexDirection: 'row',
           gap: 10,
-          dir: null as never,
+          dir: null,
           children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
         },
       ],
