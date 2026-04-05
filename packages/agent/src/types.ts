@@ -37,6 +37,8 @@ export interface AgentState {
   readonly streamingText: StreamText
   /** Last error message, if any. */
   readonly error: Signal<string | null>
+  /** Dynamic UI panels keyed by name. The default key is `'main'`. */
+  readonly panels: Signal<Map<string, UIElement>>
 }
 
 // ---------------------------------------------------------------------------
@@ -52,6 +54,12 @@ export interface AgentCallbacks {
   setStatus(status: AgentStatus): void
   /** Finalize the current response and add it to message history. */
   done(metadata?: Record<string, unknown>): void
+  /** Display a UIElement in the content panel. Default key is `'main'`. */
+  showUI(element: UIElement): void
+  /** Display a UIElement in a named content panel. */
+  showUI(key: string, element: UIElement): void
+  /** Remove a content panel. Default key is `'main'`. */
+  clearUI(key?: string): void
 }
 
 // ---------------------------------------------------------------------------

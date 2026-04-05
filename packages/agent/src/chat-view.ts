@@ -115,6 +115,8 @@ export function chatView(
     const status = state.status.value
     const streaming = state.streamingText.value
     const error = state.error.value
+    const panelMap = state.panels.value
+    const hasPanel = panelMap.size > 0
 
     // Message list
     const messageElements: UIElement[] = messages.map((m) =>
@@ -129,34 +131,15 @@ export function chatView(
     // Status indicator
     const statusText = statusLabel(status)
 
-    return box(
+    // Chat column (messages + status + error)
+    const chatColumn = box(
       {
         flexDirection: 'column',
-        width: '100%' as unknown as number,
-        height: '100%' as unknown as number,
-        backgroundColor: '#0f172a',
+        flexGrow: 1,
+        flexBasis: 0,
+        minWidth: 0,
       },
       [
-        // Header
-        box(
-          {
-            paddingLeft: 16,
-            paddingRight: 16,
-            paddingTop: 12,
-            paddingBottom: 12,
-            borderColor: '#1e293b',
-            borderWidth: 1,
-          },
-          [
-            text({
-              text: title,
-              font: 'bold 16px Inter, system-ui',
-              lineHeight: 22,
-              color: '#f8fafc',
-            }),
-          ],
-        ),
-
         // Messages area
         box(
           {
@@ -187,11 +170,7 @@ export function chatView(
         ...(error
           ? [
               box(
-                {
-                  paddingLeft: 16,
-                  paddingRight: 16,
-                  paddingBottom: 4,
-                },
+                { paddingLeft: 16, paddingRight: 16, paddingBottom: 4 },
                 [
                   text({
                     text: error,
@@ -203,6 +182,63 @@ export function chatView(
               ),
             ]
           : []),
+      ],
+    )
+
+    // Content panel column (only when panels exist)
+    const mainContent: UIElement = hasPanel
+      ? box(
+          { flexDirection: 'row', flexGrow: 1, gap: 1 },
+          [
+            chatColumn,
+            box(
+              {
+                flexDirection: 'column',
+                flexGrow: 1,
+                flexBasis: 0,
+                minWidth: 0,
+                gap: 8,
+                padding: 16,
+                borderColor: '#1e293b',
+                borderWidth: 1,
+                overflow: 'scroll',
+              },
+              [...panelMap.values()],
+            ),
+          ],
+        )
+      : chatColumn
+
+    return box(
+      {
+        flexDirection: 'column',
+        width: '100%' as unknown as number,
+        height: '100%' as unknown as number,
+        backgroundColor: '#0f172a',
+      },
+      [
+        // Header
+        box(
+          {
+            paddingLeft: 16,
+            paddingRight: 16,
+            paddingTop: 12,
+            paddingBottom: 12,
+            borderColor: '#1e293b',
+            borderWidth: 1,
+          },
+          [
+            text({
+              text: title,
+              font: 'bold 16px Inter, system-ui',
+              lineHeight: 22,
+              color: '#f8fafc',
+            }),
+          ],
+        ),
+
+        // Main content (chat-only or split with panels)
+        mainContent,
 
         // Input area
         box(

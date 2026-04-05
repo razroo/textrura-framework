@@ -6,6 +6,7 @@
  */
 
 import { signal, batch, streamText } from '@geometra/core'
+import type { UIElement } from '@geometra/core'
 import { createServer } from '@geometra/server'
 import { chatView } from './chat-view.js'
 import type {
@@ -41,12 +42,14 @@ export async function createAgentApp(options: AgentAppOptions): Promise<AgentApp
   const status = signal<AgentStatus>('idle')
   const error = signal<string | null>(null)
   const streaming = streamText()
+  const panels = signal<Map<string, UIElement>>(new Map())
 
   const state: AgentState = {
     messages,
     status,
     streamingText: streaming,
     error,
+    panels,
   }
 
   // ---- System prompt -------------------------------------------------------
@@ -111,6 +114,21 @@ export async function createAgentApp(options: AgentAppOptions): Promise<AgentApp
           streaming.done() // reset to not-streaming after clear
           status.set('idle')
         })
+        server.update()
+      },
+      showUI(...args: [UIElement] | [string, UIElement]): void {
+        const [key, element] = args.length === 1 ? ['main', args[0]] : args
+        const next = new Map(panels.peek())
+        next.set(key, element)
+        panels.set(next)
+        server.update()
+      },
+      clearUI(key = 'main'): void {
+        const current = panels.peek()
+        if (!current.has(key)) return
+        const next = new Map(current)
+        next.delete(key)
+        panels.set(next)
         server.update()
       },
     }
