@@ -28,4 +28,19 @@ describe('protocol binary conformance', () => {
     // Server (Node Buffer) and client (ArrayBuffer / view) decoders must agree on the v1 envelope.
     expect(decodeBinaryFrameJsonClient(buf)).toBe(asText)
   })
+
+  it('server and client decoders agree on a v1 frame embedded in a larger buffer (non-zero byteOffset)', () => {
+    const frame = JSON.parse(
+      readFileSync(new URL(`../../../../fixtures/protocol/v1/patch.json`, import.meta.url), 'utf8'),
+    )
+    const asText = JSON.stringify(frame)
+    const buf = encodeBinaryFrameJson(asText)
+    const raw = new Uint8Array(buf)
+    const prefix = 11
+    const combined = new Uint8Array(prefix + raw.byteLength + 9)
+    combined.set(raw, prefix)
+    const view = combined.subarray(prefix, prefix + raw.byteLength)
+    expect(decodeBinaryFrameJson(view)).toBe(asText)
+    expect(decodeBinaryFrameJsonClient(view)).toBe(asText)
+  })
 })
