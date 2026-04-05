@@ -153,6 +153,15 @@ describe('route matcher', () => {
     expect(matchPath('/:/x', '/a/y')).toBeNull()
   })
 
+  it('optional lone colon param (:?) captures one segment or is skipped when absent', () => {
+    expect(matchPath('/:?', '/a')).toEqual({ params: { '': 'a' } })
+    expect(matchPath('/:?', '/')).toEqual({ params: {} })
+    expect(matchPath('/:?', '')).toEqual({ params: {} })
+    expect(matchPath('/:?/tail', '/a/tail')).toEqual({ params: { '': 'a' } })
+    expect(matchPath('/:?/tail', '/tail')).toEqual({ params: {} })
+    expect(matchPath('/:?/tail', '/a')).toBeNull()
+  })
+
   it('splat consumes the entire remainder; pattern segments after the splat are ignored', () => {
     expect(matchPath('/docs/*/:id', '/docs/foo/bar')).toEqual({
       params: { '*': 'foo/bar' },
