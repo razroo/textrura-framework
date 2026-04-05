@@ -197,6 +197,11 @@ describe('resolveComputeLayoutDirection', () => {
     expect(resolveComputeLayoutDirection(undefined, rtlRoot)).toBe('rtl')
   })
 
+  it('defaults to ltr when the option is omitted and the root box has no dir (document default)', () => {
+    const plainRoot = box({ width: 1, height: 1 })
+    expect(resolveComputeLayoutDirection(undefined, plainRoot)).toBe('ltr')
+  })
+
   it('ignores auto and other non-ltr/rtl host values like createApp (root dir wins)', () => {
     const rtlRoot = box({ width: 1, height: 1, flexDirection: 'row', dir: 'rtl' }, [])
     expect(resolveComputeLayoutDirection('auto' as never, rtlRoot)).toBe('rtl')
