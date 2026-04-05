@@ -63,6 +63,16 @@ describe('path generation', () => {
     expect(buildPath('/a/:seg?/c', { seg: Number.NEGATIVE_INFINITY })).toBe('/a/c')
   })
 
+  it('includes whitespace-only optional path params (only null, undefined, and empty string omit; see paramValuePresent)', () => {
+    expect(buildPath('/users/:id?', { id: '   ' })).toBe('/users/%20%20%20')
+    expect(buildPath('/a/:seg?/c', { seg: '\t\n' })).toBe('/a/%09%0A/c')
+    expect(buildPath('/users/:id?', { id: '\uFEFF' })).toBe('/users/%EF%BB%BF')
+  })
+
+  it('includes whitespace-only required path params', () => {
+    expect(buildPath('/users/:id', { id: ' ' })).toBe('/users/%20')
+  })
+
   it('throws for required path params when the value is a non-finite number', () => {
     expect(() =>
       buildPath('/users/:id', { id: Number.NaN } as PathParams<'/users/:id'>),
