@@ -101,11 +101,13 @@ export interface LayoutPatch {
 /**
  * Coalesce multiple patches on the same path (last write wins per field).
  * Paths are keyed by joining indices with `.` (e.g. `[1,23]` → `"1.23"`, `[12,3]` → `"12.3"`) so distinct nodes never alias.
+ * Entries with a missing or non-array `path` (including `null` list slots) are skipped so corrupt hand-built batches cannot throw.
  */
 export function coalescePatches(patches: LayoutPatch[]): LayoutPatch[] {
   const byPath = new Map<string, LayoutPatch>()
   const order: string[] = []
   for (const patch of patches) {
+    if (patch == null || !Array.isArray(patch.path)) continue
     const key = patch.path.join('.')
     if (!byPath.has(key)) {
       byPath.set(key, { path: [...patch.path] })

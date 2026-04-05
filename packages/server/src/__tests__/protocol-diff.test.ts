@@ -332,4 +332,34 @@ describe('coalescePatches', () => {
       { path: [0], x: 1, height: 9 },
     ])
   })
+
+  it('skips null/undefined entries and patches without an array path (hand-built / corrupt streams)', () => {
+    expect(
+      coalescePatches([
+        null as unknown as LayoutPatch,
+        undefined as unknown as LayoutPatch,
+        { path: null as unknown as number[], x: 1 },
+        { path: undefined as unknown as number[], y: 2 },
+        { path: '0' as unknown as number[], width: 9 },
+        { path: [1], height: 3 },
+      ]),
+    ).toEqual([{ path: [1], height: 3 }])
+  })
+
+  it('skips corrupt entries without throwing so valid patches in the same batch still coalesce', () => {
+    expect(() =>
+      coalescePatches([
+        { path: [0], x: 1 },
+        { path: Object.create(null) as unknown as number[] },
+        { path: [0], y: 2 },
+      ]),
+    ).not.toThrow()
+    expect(
+      coalescePatches([
+        { path: [0], x: 1 },
+        { path: Object.create(null) as unknown as number[] },
+        { path: [0], y: 2 },
+      ]),
+    ).toEqual([{ path: [0], x: 1, y: 2 }])
+  })
 })
