@@ -1,6 +1,6 @@
 {
   "name": "@geometra/server",
-  "version": "1.10.6",
+  "version": "1.10.7",
   "description": "Server-side layout engine with WebSocket geometry streaming",
   "license": "MIT",
   "type": "module",

@@ -671,13 +671,6 @@ export class CanvasRenderer implements Renderer {
       ctx.fillRect(x, y, _width, _height)
     }
 
-    // Clip text rendering to its layout bounds so text doesn't bleed
-    // past allocated width into parent padding areas
-    ctx.save()
-    ctx.beginPath()
-    ctx.rect(x, y, _width, _height)
-    ctx.clip()
-
     ctx.font = font
     ctx.textBaseline = 'top'
 
@@ -729,8 +722,6 @@ export class CanvasRenderer implements Renderer {
     if (isSelectable) {
       this.textNodeIndex++
     }
-
-    ctx.restore()
 
     if (opacity !== undefined) ctx.globalAlpha = 1
   }
