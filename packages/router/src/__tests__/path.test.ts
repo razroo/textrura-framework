@@ -47,6 +47,16 @@ describe('path generation', () => {
     expect(buildPath('' as const, {} as PathParams<''>)).toBe('/')
   })
 
+  it('optional-only pattern collapses to root when the param is omitted', () => {
+    expect(buildPath('/:id?', {} as PathParams<'/:id?'>)).toBe('/')
+    expect(buildPath(':id?', {} as PathParams<':id?'>)).toBe('/')
+  })
+
+  it('optional-only pattern includes the segment when the param is present', () => {
+    expect(buildPath('/:id?', { id: 'home' })).toBe('/home')
+    expect(buildPath(':id?', { id: 42 })).toBe('/42')
+  })
+
   it('normalizes patterns that are only slashes to root', () => {
     expect(buildPath('//', {})).toBe('/')
     expect(buildPath('///', {})).toBe('/')
