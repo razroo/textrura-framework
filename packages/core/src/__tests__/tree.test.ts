@@ -332,6 +332,14 @@ describe('toLayoutTree', () => {
     expect(layout.children[0]).toMatchObject({ width: 50, height: 50, dir: 'sideways-lr' })
   })
 
+  it('forwards JSON null dir on nested boxes for Textura (malformed deserialization; core resolves like auto)', () => {
+    const inner = box({ width: 50, height: 50, dir: null as never })
+    const root = box({ width: 100, height: 100 }, [inner])
+    const layout = toLayoutTree(root) as BoxLayoutNode
+    expect(layout).not.toHaveProperty('dir')
+    expect(layout.children[0]).toMatchObject({ width: 50, height: 50, dir: null })
+  })
+
   it('omits root dir:auto and forwards dir:auto on descendants for Yoga inherit semantics', () => {
     const inner = box({ width: 50, height: 50, dir: 'auto' })
     const root = box({ width: 100, height: 100, dir: 'auto' }, [inner])

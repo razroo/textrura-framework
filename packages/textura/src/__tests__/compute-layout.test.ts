@@ -235,6 +235,45 @@ describe('box layout', () => {
     expect(rowLtr.children[0]!.x).toBeLessThan(rowLtr.children[1]!.x)
   })
 
+  it('nested row with dir null inherits owner direction like auto (JSON null from loose deserialization)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'column',
+      children: [
+        {
+          width: 200,
+          height: 40,
+          flexDirection: 'row',
+          gap: 10,
+          dir: null as never,
+          children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+        },
+      ],
+    }
+    const bogus: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'column',
+      children: [
+        {
+          width: 200,
+          height: 40,
+          flexDirection: 'row',
+          gap: 10,
+          dir: 'bogus' as never,
+          children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+        },
+      ],
+    }
+    for (const dir of ['ltr', 'rtl'] as const) {
+      const nullRow = computeLayout(tree, { width: 200, height: 80, direction: dir }).children[0]!
+      const bogusRow = computeLayout(bogus, { width: 200, height: 80, direction: dir }).children[0]!
+      expect(nullRow.children[0]!.x).toBe(bogusRow.children[0]!.x)
+      expect(nullRow.children[1]!.x).toBe(bogusRow.children[1]!.x)
+    }
+  })
+
   it('nested row with trimmed or cased dir strings inherits owner direction (only exact ltr/rtl are explicit)', () => {
     const makeTree = (dir: string): BoxNode => ({
       width: 200,
