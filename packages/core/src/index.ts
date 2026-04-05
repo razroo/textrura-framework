@@ -37,7 +37,11 @@ export type { ResolvedDirection } from './direction.js'
 // Hit testing
 export { dispatchHit, getCursorAtPoint, hasInteractiveHitAtPoint, hitPathAtPoint } from './hit-test.js'
 export type { HitDispatchResult } from './hit-test.js'
-export { finiteNumberOrZero, layoutBoundsAreFinite } from './layout-bounds.js'
+export {
+  finiteNumberOrZero,
+  layoutBoundsAreFinite,
+  pointInInclusiveLayoutRect,
+} from './layout-bounds.js'
 
 // Web fonts (browser)
 export {

@@ -1,7 +1,11 @@
 import type { ComputedLayout } from 'textura'
 import type { UIElement, BoxElement, EventHandlers, HitEvent } from './types.js'
 import { hasFocusCandidateHandlers } from './focus-candidates.js'
-import { finiteNumberOrZero, layoutBoundsAreFinite } from './layout-bounds.js'
+import {
+  finiteNumberOrZero,
+  layoutBoundsAreFinite,
+  pointInInclusiveLayoutRect,
+} from './layout-bounds.js'
 
 interface HitTarget {
   layout: ComputedLayout
@@ -115,7 +119,7 @@ function collectHits(
     const { overflow, scrollX, scrollY } = element.props
     if (overflow === 'hidden' || overflow === 'scroll') {
       // Point must be inside the box to hit children
-      if (x < absX || x > absX + layout.width || y < absY || y > absY + layout.height) {
+      if (!pointInInclusiveLayoutRect(x, y, absX, absY, layout.width, layout.height)) {
         return
       }
     }
@@ -123,13 +127,7 @@ function collectHits(
     childOffsetY -= finiteNumberOrZero(scrollY)
   }
 
-  const inside =
-    x >= absX &&
-    x <= absX + layout.width &&
-    y >= absY &&
-    y <= absY + layout.height
-
-  if (!inside) return
+  if (!pointInInclusiveLayoutRect(x, y, absX, absY, layout.width, layout.height)) return
 
   if (element.kind === 'box') {
     const boxEl = element as BoxElement
@@ -167,18 +165,14 @@ function dispatchHitRecursive(
 
   const { overflow, scrollX, scrollY } = boxEl.props
   if (overflow === 'hidden' || overflow === 'scroll') {
-    if (x < absX || x > absX + layout.width || y < absY || y > absY + layout.height) {
+    if (!pointInInclusiveLayoutRect(x, y, absX, absY, layout.width, layout.height)) {
       return { handled: false }
     }
   }
 
-  const inside =
-    x >= absX &&
-    x <= absX + layout.width &&
-    y >= absY &&
-    y <= absY + layout.height
-
-  if (!inside) return { handled: false }
+  if (!pointInInclusiveLayoutRect(x, y, absX, absY, layout.width, layout.height)) {
+    return { handled: false }
+  }
 
   let focusTarget: HitDispatchResult['focusTarget']
   const childOffsetX = absX - finiteNumberOrZero(scrollX)
@@ -369,19 +363,13 @@ function rootedLayoutPointContainment(
   if (element.kind === 'box') {
     const { overflow } = element.props
     if (overflow === 'hidden' || overflow === 'scroll') {
-      if (x < absX || x > absX + layout.width || y < absY || y > absY + layout.height) {
+      if (!pointInInclusiveLayoutRect(x, y, absX, absY, layout.width, layout.height)) {
         return null
       }
     }
   }
 
-  const inside =
-    x >= absX &&
-    x <= absX + layout.width &&
-    y >= absY &&
-    y <= absY + layout.height
-
-  if (!inside) return null
+  if (!pointInInclusiveLayoutRect(x, y, absX, absY, layout.width, layout.height)) return null
   return { absX, absY }
 }
 

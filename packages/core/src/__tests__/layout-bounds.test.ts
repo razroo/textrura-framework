@@ -1,6 +1,10 @@
 import type { ComputedLayout } from 'textura'
 import { describe, it, expect } from 'vitest'
-import { finiteNumberOrZero, layoutBoundsAreFinite } from '../layout-bounds.js'
+import {
+  finiteNumberOrZero,
+  layoutBoundsAreFinite,
+  pointInInclusiveLayoutRect,
+} from '../layout-bounds.js'
 
 const emptyChildren = [] as const
 
@@ -348,6 +352,34 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite([] as unknown as ComputedLayout)).toBe(false)
     expect(layoutBoundsAreFinite([0, 0, 10, 10] as unknown as ComputedLayout)).toBe(false)
     expect(layoutBoundsAreFinite(new Uint32Array(4) as unknown as ComputedLayout)).toBe(false)
+  })
+})
+
+describe('pointInInclusiveLayoutRect', () => {
+  it('matches inclusive edges for ordinary rects', () => {
+    expect(pointInInclusiveLayoutRect(0, 0, 0, 0, 100, 50)).toBe(true)
+    expect(pointInInclusiveLayoutRect(100, 50, 0, 0, 100, 50)).toBe(true)
+    expect(pointInInclusiveLayoutRect(-1, 0, 0, 0, 100, 50)).toBe(false)
+    expect(pointInInclusiveLayoutRect(101, 0, 0, 0, 100, 50)).toBe(false)
+  })
+
+  it('zero-size rect hits only the origin corner', () => {
+    expect(pointInInclusiveLayoutRect(3, 3, 3, 3, 0, 0)).toBe(true)
+    expect(pointInInclusiveLayoutRect(3.001, 3, 3, 3, 0, 0)).toBe(false)
+  })
+
+  it('returns false when abs origin + size overflows to Infinity (naive sum would accept all finite x)', () => {
+    const max = Number.MAX_VALUE
+    expect(max + max).toBe(Infinity)
+    expect(pointInInclusiveLayoutRect(0, 0, max, 0, max, 10)).toBe(false)
+    expect(pointInInclusiveLayoutRect(max, 0, 0, 0, max, 10)).toBe(true)
+  })
+
+  it('returns false for non-finite pointer coords or negative width/height', () => {
+    expect(pointInInclusiveLayoutRect(Number.NaN, 0, 0, 0, 1, 1)).toBe(false)
+    expect(pointInInclusiveLayoutRect(0, Infinity, 0, 0, 1, 1)).toBe(false)
+    expect(pointInInclusiveLayoutRect(0, 0, 0, 0, -1, 1)).toBe(false)
+    expect(pointInInclusiveLayoutRect(0, 0, 0, 0, 1, -0.5)).toBe(false)
   })
 })
 

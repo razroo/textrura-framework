@@ -47,3 +47,38 @@ export function layoutBoundsAreFinite(layout: ComputedLayout): boolean {
     height >= 0
   )
 }
+
+/**
+ * Inclusive axis-aligned rect test for pointer-style coordinates: `x` in `[absX, absX + width]`,
+ * `y` in `[absY, absY + height]`, with `width` / `height` ≥ 0 (degenerate zero-size rects hit only the origin corner).
+ *
+ * Returns `false` when the summed right or bottom edge overflows to non-finite values — with IEEE doubles,
+ * two large finite operands can still produce `±Infinity`, and naive `x <= absX + width` would then accept
+ * every finite `x`. Shared by hit-testing and overflow clipping so behavior stays consistent.
+ */
+export function pointInInclusiveLayoutRect(
+  x: number,
+  y: number,
+  absX: number,
+  absY: number,
+  width: number,
+  height: number,
+): boolean {
+  if (
+    !Number.isFinite(x) ||
+    !Number.isFinite(y) ||
+    !Number.isFinite(absX) ||
+    !Number.isFinite(absY) ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width < 0 ||
+    height < 0
+  ) {
+    return false
+  }
+  if (x < absX || y < absY) return false
+  const right = absX + width
+  const bottom = absY + height
+  if (!Number.isFinite(right) || !Number.isFinite(bottom)) return false
+  return x <= right && y <= bottom
+}
