@@ -541,6 +541,7 @@ describe('dispatchHit', () => {
       },
       cursor: 'pointer',
     })
+    expect(fired).toBe(false)
     const finite = { x: 0, y: 0, width: 100, height: 50 }
     const missingChildren = { ...finite } as unknown as ComputedLayout
     const nullChildren = { ...finite, children: null } as unknown as ComputedLayout

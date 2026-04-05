@@ -383,7 +383,6 @@ describe('pointInInclusiveLayoutRect', () => {
 
   it('treats IEEE -0 pointer coordinates like +0 on inclusive min edges (subtle float sign)', () => {
     expect(Object.is(-0, 0)).toBe(false)
-    expect(-0 < 0).toBe(false)
     expect(pointInInclusiveLayoutRect(-0, 0, 0, 0, 100, 50)).toBe(true)
     expect(pointInInclusiveLayoutRect(0, -0, 0, 0, 100, 50)).toBe(true)
     expect(pointInInclusiveLayoutRect(-0, -0, 0, 0, 100, 50)).toBe(true)
