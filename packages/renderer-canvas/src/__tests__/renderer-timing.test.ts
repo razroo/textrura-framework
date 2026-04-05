@@ -18,7 +18,7 @@ class FakeCtx {
   save(): void {}
   restore(): void {}
   strokeRect(): void {}
-  fillText(): void {}
+  fillText(_text: string, _x: number, _y: number): void {}
   measureText(s: string): { width: number } {
     return { width: s.length * 8 }
   }
@@ -65,6 +65,24 @@ describe('CanvasRenderer.setFrameTimings', () => {
     expect(renderer.lastLayoutWallMs).toBe(0)
     renderer.setFrameTimings({ layoutMs: 4.25 })
     expect(renderer.lastLayoutWallMs).toBe(4.25)
+  })
+
+  it('normalizes layoutMs IEEE -0 to +0 (Math.max collapses -0; HUD uses toFixed on lastLayoutWallMs)', () => {
+    Object.defineProperty(globalThis, 'window', {
+      value: { devicePixelRatio: 1 },
+      configurable: true,
+      writable: true,
+    })
+    const ctx = new FakeCtx()
+    const canvas = {
+      style: {} as Record<string, string>,
+      getContext: () => ctx,
+    } as unknown as HTMLCanvasElement
+
+    const renderer = new CanvasRenderer({ canvas })
+    renderer.setFrameTimings({ layoutMs: -0 })
+    expect(Object.is(renderer.lastLayoutWallMs, -0)).toBe(false)
+    expect(1 / renderer.lastLayoutWallMs).toBe(Infinity)
   })
 
   it('treats non-number layoutMs (bigint, string, boolean) as 0 without throwing', () => {
