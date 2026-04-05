@@ -430,6 +430,35 @@ describe('coalescePatches', () => {
     ).toEqual([{ path: [0], x: 1, y: 2 }])
   })
 
+  it('skips paths JSON.stringify rejects (BigInt segment) without throwing; other patches still merge', () => {
+    expect(() =>
+      coalescePatches([
+        { path: [0, 1n] as unknown as number[], x: 1 },
+        { path: [2], y: 3 },
+        { path: [0], width: 4 },
+      ]),
+    ).not.toThrow()
+    expect(
+      coalescePatches([
+        { path: [0, 1n] as unknown as number[], x: 1 },
+        { path: [2], y: 3 },
+        { path: [0], width: 4 },
+      ]),
+    ).toEqual([
+      { path: [2], y: 3 },
+      { path: [0], width: 4 },
+    ])
+  })
+
+  it('skips circular path arrays without throwing (JSON.stringify throws on cycles)', () => {
+    const cyclic: number[] = [0]
+    cyclic.push(cyclic as unknown as number)
+    expect(() =>
+      coalescePatches([{ path: cyclic, x: 1 }, { path: [1], y: 2 }]),
+    ).not.toThrow()
+    expect(coalescePatches([{ path: cyclic, x: 1 }, { path: [1], y: 2 }])).toEqual([{ path: [1], y: 2 }])
+  })
+
   it('ignores unknown patch keys; merged results only carry path and finite geometry fields', () => {
     const merged = coalescePatches([
       { path: [0], x: 1, rotation: 45, meta: { id: 'a' } } as unknown as LayoutPatch,
