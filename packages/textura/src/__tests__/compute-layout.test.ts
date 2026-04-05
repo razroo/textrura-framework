@@ -118,6 +118,32 @@ describe('box layout', () => {
     expect(upper.children[1]!.x).toBe(ltr.children[1]!.x)
   })
 
+  it('root dir rtl on the tree node mirrors a top-level row even when ComputeOptions.direction is ltr', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 40,
+      flexDirection: 'row',
+      gap: 10,
+      dir: 'rtl',
+      children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+    }
+    const result = computeLayout(tree, { width: 200, height: 80, direction: 'ltr' })
+    expect(result.children[0]!.x).toBeGreaterThan(result.children[1]!.x)
+  })
+
+  it('root dir ltr on the tree node keeps ltr flex order even when ComputeOptions.direction is rtl', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 40,
+      flexDirection: 'row',
+      gap: 10,
+      dir: 'ltr',
+      children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+    }
+    const result = computeLayout(tree, { width: 200, height: 80, direction: 'rtl' })
+    expect(result.children[0]!.x).toBeLessThan(result.children[1]!.x)
+  })
+
   it('nested row with dir auto inherits rtl owner direction and mirrors flex children', () => {
     const tree: BoxNode = {
       width: 200,
