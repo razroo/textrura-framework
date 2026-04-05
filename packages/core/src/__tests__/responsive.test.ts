@@ -173,6 +173,14 @@ describe('responsive edge cases', () => {
     const cols = responsive(w, { sm: 1, md: 2, lg: 3 }, {} as typeof bps)
     expect(cols.value).toBeUndefined()
   })
+
+  it('empty breakpoints pair with a \'\' values entry so responsive stays defined (degenerate config)', () => {
+    const w = signal(800)
+    const cols = responsive(w, { '': 'fallback' } as Partial<Record<string, string>>, {} as typeof bps)
+    expect(cols.value).toBe('fallback')
+    w.set(320)
+    expect(cols.value).toBe('fallback')
+  })
 })
 
 describe('breakpoint duplicate thresholds', () => {
