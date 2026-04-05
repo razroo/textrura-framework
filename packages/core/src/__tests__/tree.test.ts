@@ -149,6 +149,48 @@ describe('toLayoutTree', () => {
     expect(layout).toHaveProperty('gap', 8)
   })
 
+  it('preserves flex sizing and alignment props for Textura (grow/shrink/basis, min/max, aspect ratio)', () => {
+    const el = box({
+      width: 200,
+      height: 100,
+      flexGrow: 1,
+      flexShrink: 2,
+      flexBasis: 0,
+      minWidth: 40,
+      maxWidth: 180,
+      minHeight: 10,
+      maxHeight: 90,
+      aspectRatio: 2,
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      alignSelf: 'flex-end',
+      flexWrap: 'wrap',
+      alignContent: 'stretch',
+      rowGap: 4,
+      columnGap: 6,
+    })
+    const layout = toLayoutTree(el)
+    expect(layout).toMatchObject({
+      width: 200,
+      height: 100,
+      flexGrow: 1,
+      flexShrink: 2,
+      flexBasis: 0,
+      minWidth: 40,
+      maxWidth: 180,
+      minHeight: 10,
+      maxHeight: 90,
+      aspectRatio: 2,
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      alignSelf: 'flex-end',
+      flexWrap: 'wrap',
+      alignContent: 'stretch',
+      rowGap: 4,
+      columnGap: 6,
+    })
+  })
+
   it('preserves display for Textura/Yoga (layout visibility, not paint-only metadata)', () => {
     const none = box({ width: 100, height: 50, display: 'none' })
     expect(toLayoutTree(none)).toMatchObject({ width: 100, height: 50, display: 'none' })
