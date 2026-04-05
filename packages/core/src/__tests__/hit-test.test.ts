@@ -2639,6 +2639,19 @@ describe('getCursorAtPoint', () => {
     expect(getCursorAtPoint(parent, layout, 20, 20)).toBe('grab')
   })
 
+  it('treats empty-string cursor on a nested scene3d leaf as unset so an ancestor box cursor wins', () => {
+    const leaf = scene3d({ width: 40, height: 40, objects: [], cursor: '' })
+    const parent = box({ width: 100, height: 100, cursor: 'crosshair' }, [leaf])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    }
+    expect(getCursorAtPoint(parent, layout, 20, 20)).toBe('crosshair')
+  })
+
   it('empty-string cursor on a deep chain falls through to the first non-empty ancestor', () => {
     const leaf = box({ width: 20, height: 20, cursor: '' })
     const mid = box({ width: 50, height: 50, cursor: '' }, [leaf])

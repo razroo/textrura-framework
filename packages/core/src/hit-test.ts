@@ -73,6 +73,14 @@ function getChildrenByZAsc(boxEl: BoxElement): number[] {
  * `focusTarget` is only populated for `onClick` (see {@link dispatchHit}).
  */
 export interface HitDispatchResult {
+  /**
+   * True when a handler ran for the requested `eventType` on the deepest matching box (pointer, wheel,
+   * `onClick`, or synthetic keyboard/composition routing in tests).
+   *
+   * False when the point missed, layout was invalid, `pointerEvents: 'none'` blocked the target, or no
+   * handler was registered — except for `onClick`, where `focusTarget` may still be set for click-to-focus
+   * on a focusable box without an `onClick` handler.
+   */
   handled: boolean
   /**
    * Present only when `dispatchHit` was called with `'onClick'`: the deepest focusable box under the point
