@@ -196,6 +196,17 @@ describe('breakpoint non-finite min-width', () => {
     expect(breakpoint(w, mdFirst).value).toBe('lg')
     expect(breakpoint(w, lgFirst).value).toBe('lg')
   })
+
+  it('when every threshold is non-finite, falls back to the last name in stable descending sort (no tier matches)', () => {
+    const w = signal(800)
+    const bps = { first: Number.NaN, second: Number.POSITIVE_INFINITY, third: Number.NaN }
+    expect(breakpoint(w, bps).value).toBe('third')
+  })
+
+  it('ignores positive infinity thresholds for matching so a finite zero tier still wins', () => {
+    const bps = { sm: 0, bogus: Number.POSITIVE_INFINITY }
+    expect(breakpoint(signal(2000), bps).value).toBe('sm')
+  })
 })
 
 describe('createViewport edge cases', () => {
@@ -216,6 +227,16 @@ describe('createViewport edge cases', () => {
     vp.resize(400, 300)
     expect(vp.width.value).toBe(400)
     expect(vp.height.value).toBe(300)
+  })
+
+  it('resize maps bigint dimensions to 0 without throwing (finiteNumberOrZero typeof guard)', () => {
+    const vp = createViewport(800, 600)
+    expect(() => vp.resize(1024n as unknown as number, 200)).not.toThrow()
+    expect(vp.width.value).toBe(0)
+    expect(vp.height.value).toBe(200)
+    expect(() => vp.resize(300, 99n as unknown as number)).not.toThrow()
+    expect(vp.width.value).toBe(300)
+    expect(vp.height.value).toBe(0)
   })
 
   it('preserves IEEE negative zero on init and resize (finiteNumberOrZero parity with layout math)', () => {
