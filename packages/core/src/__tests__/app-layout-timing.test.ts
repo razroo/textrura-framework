@@ -556,6 +556,54 @@ describe('createApp non-box roots (layout + direction resolution)', () => {
     expect(layoutBoundsAreFinite(sceneLayout)).toBe(true)
   })
 
+  it('passes resolveComputeLayoutDirection into Textura for non-box roots (owner direction from root dir)', async () => {
+    const orig = textura.computeLayout.bind(textura)
+    const directions: Array<'ltr' | 'rtl'> = []
+    const spy = vi.spyOn(textura, 'computeLayout').mockImplementation((tree, opts) => {
+      directions.push(opts.direction)
+      return orig(tree, opts)
+    })
+    try {
+      const renderer: Renderer = { render: vi.fn(), destroy: vi.fn() }
+
+      await createApp(
+        () =>
+          text({
+            text: 'hi',
+            font: '16px sans-serif',
+            lineHeight: 20,
+            width: 120,
+            height: 24,
+            dir: 'rtl',
+          }),
+        renderer,
+        { width: 200, height: 80 },
+      )
+
+      await createApp(
+        () => image({ src: '/x.png', width: 64, height: 48, dir: 'ltr' }),
+        renderer,
+        { width: 200, height: 80 },
+      )
+
+      await createApp(
+        () => scene3d({ width: 80, height: 60, objects: [], dir: 'auto' }),
+        renderer,
+        { width: 200, height: 80 },
+      )
+
+      await createApp(
+        () => scene3d({ width: 80, height: 60, objects: [], dir: 'rtl' }),
+        renderer,
+        { width: 200, height: 80 },
+      )
+    } finally {
+      spy.mockRestore()
+    }
+
+    expect(directions).toEqual(['rtl', 'ltr', 'ltr', 'rtl'])
+  })
+
   it('exposes the live non-box tree on the app after mount', async () => {
     const renderer: Renderer = {
       render: vi.fn(),
