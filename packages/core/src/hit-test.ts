@@ -112,35 +112,23 @@ function collectHits(
   const absX = offsetX + layout.x
   const absY = offsetY + layout.y
 
-  // Apply scroll offset for scroll containers
-  let childOffsetX = absX
-  let childOffsetY = absY
-  if (element.kind === 'box') {
-    const { overflow, scrollX, scrollY } = element.props
-    if (overflow === 'hidden' || overflow === 'scroll') {
-      // Point must be inside the box to hit children
-      if (!pointInInclusiveLayoutRect(x, y, absX, absY, layout.width, layout.height)) {
-        return
-      }
-    }
-    childOffsetX -= finiteNumberOrZero(scrollX)
-    childOffsetY -= finiteNumberOrZero(scrollY)
-  }
-
   if (!pointInInclusiveLayoutRect(x, y, absX, absY, layout.width, layout.height)) return
 
-  if (element.kind === 'box') {
-    const boxEl = element as BoxElement
-    const passThrough = boxEl.props.pointerEvents === 'none'
-    if (boxEl.handlers && !passThrough) {
-      results.push({ layout, handlers: boxEl.handlers, element: boxEl, absX, absY })
-    }
+  if (element.kind !== 'box') return
 
-    for (const i of getChildrenByZAsc(boxEl)) {
-      const childLayout = layout.children[i]
-      if (childLayout) {
-        collectHits(boxEl.children[i]!, childLayout, x, y, childOffsetX, childOffsetY, results)
-      }
+  const boxEl = element as BoxElement
+  const childOffsetX = absX - finiteNumberOrZero(boxEl.props.scrollX)
+  const childOffsetY = absY - finiteNumberOrZero(boxEl.props.scrollY)
+
+  const passThrough = boxEl.props.pointerEvents === 'none'
+  if (boxEl.handlers && !passThrough) {
+    results.push({ layout, handlers: boxEl.handlers, element: boxEl, absX, absY })
+  }
+
+  for (const i of getChildrenByZAsc(boxEl)) {
+    const childLayout = layout.children[i]
+    if (childLayout) {
+      collectHits(boxEl.children[i]!, childLayout, x, y, childOffsetX, childOffsetY, results)
     }
   }
 }
@@ -163,13 +151,7 @@ function dispatchHitRecursive(
   const absX = offsetX + layout.x
   const absY = offsetY + layout.y
 
-  const { overflow, scrollX, scrollY } = boxEl.props
-  if (overflow === 'hidden' || overflow === 'scroll') {
-    if (!pointInInclusiveLayoutRect(x, y, absX, absY, layout.width, layout.height)) {
-      return { handled: false }
-    }
-  }
-
+  const { scrollX, scrollY } = boxEl.props
   if (!pointInInclusiveLayoutRect(x, y, absX, absY, layout.width, layout.height)) {
     return { handled: false }
   }
@@ -341,11 +323,11 @@ export function hasInteractiveHitAtPoint(
 
 /**
  * Root-anchored containment for {@link hitPathAtPoint} and {@link getCursorAtPoint}: finite pointer coords,
- * finite layout bounds, optional overflow clip on boxes, then the same inclusive rect test as {@link collectHits}.
+ * finite layout bounds, then the same inclusive rect test as {@link collectHits} (scroll clipping uses the
+ * parent’s layout rect; child coordinates apply scroll in the recursive walk).
  * Returns the node’s absolute origin `(absX, absY)` when the point hits the layout rect.
  */
 function rootedLayoutPointContainment(
-  element: UIElement,
   layout: ComputedLayout,
   x: number,
   y: number,
@@ -359,15 +341,6 @@ function rootedLayoutPointContainment(
   const oy = finiteNumberOrZero(offsetY)
   const absX = ox + layout.x
   const absY = oy + layout.y
-
-  if (element.kind === 'box') {
-    const { overflow } = element.props
-    if (overflow === 'hidden' || overflow === 'scroll') {
-      if (!pointInInclusiveLayoutRect(x, y, absX, absY, layout.width, layout.height)) {
-        return null
-      }
-    }
-  }
 
   if (!pointInInclusiveLayoutRect(x, y, absX, absY, layout.width, layout.height)) return null
   return { absX, absY }
@@ -400,7 +373,7 @@ export function hitPathAtPoint(
   offsetX = 0,
   offsetY = 0,
 ): number[] | null {
-  const hit = rootedLayoutPointContainment(element, layout, x, y, offsetX, offsetY)
+  const hit = rootedLayoutPointContainment(layout, x, y, offsetX, offsetY)
   if (!hit) return null
   const { absX, absY } = hit
 
@@ -457,7 +430,7 @@ export function getCursorAtPoint(
   offsetX = 0,
   offsetY = 0,
 ): string | null {
-  const hit = rootedLayoutPointContainment(element, layout, x, y, offsetX, offsetY)
+  const hit = rootedLayoutPointContainment(layout, x, y, offsetX, offsetY)
   if (!hit) return null
   const { absX, absY } = hit
 
