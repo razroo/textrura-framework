@@ -925,6 +925,8 @@ describe('applyServerMessage', () => {
       Object.create(null),
       { n: 1n },
       { nested: Object.assign(Object.create(null), { x: 1 }) },
+      { boxedNum: Object(3) },
+      { boxedStr: Object('x') },
     ]
 
     for (const payload of badPayloads) {
