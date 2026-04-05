@@ -113,6 +113,28 @@ describe('motion preference', () => {
     expect(getMotionPreference()).toBe('full')
     setMotionPreference('full')
   })
+
+  it('only the primitive string reduced wins (strict equality; boxed or wrong-type payloads normalize to full)', () => {
+    setMotionPreference('reduced')
+    setMotionPreference(null as never)
+    expect(getMotionPreference()).toBe('full')
+
+    setMotionPreference('reduced')
+    setMotionPreference(false as never)
+    expect(getMotionPreference()).toBe('full')
+
+    setMotionPreference('reduced')
+    setMotionPreference(0 as never)
+    expect(getMotionPreference()).toBe('full')
+
+    setMotionPreference('reduced')
+    setMotionPreference(Object('reduced') as never)
+    expect(getMotionPreference()).toBe('full')
+
+    setMotionPreference('reduced')
+    setMotionPreference('REDUCED' as never)
+    expect(getMotionPreference()).toBe('full')
+  })
 })
 
 describe('transition()', () => {
