@@ -74,6 +74,9 @@ function breakpointSortKey(minWidth: number): number {
  * Entries whose minimum width is not a finite number are ignored for matching
  * (`w >= NaN` is always false) but still participate in fallback ordering via a
  * stable sort key so `Object.entries` order alone cannot flip results.
+ *
+ * An **empty** `breakpoints` object returns a computed that is always `''` (no tiers to match);
+ * pair with {@link responsive} only if the values map defines `''`, otherwise values resolve to `undefined`.
  */
 export function breakpoint<B extends BreakpointMap>(
   width: Signal<number> | Computed<number>,
@@ -83,6 +86,10 @@ export function breakpoint<B extends BreakpointMap>(
   const sorted = Object.entries(breakpoints).sort(
     (a, b) => breakpointSortKey(b[1]) - breakpointSortKey(a[1]),
   )
+  if (sorted.length === 0) {
+    // Empty maps are a degenerate config (e.g. bad deserialization). Avoid `sorted.at(-1)![0]`, which throws.
+    return computed(() => '' as keyof B & string)
+  }
   const fallback = sorted[sorted.length - 1]![0] as keyof B & string
 
   return computed(() => {

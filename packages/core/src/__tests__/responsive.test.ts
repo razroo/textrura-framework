@@ -133,6 +133,14 @@ describe('breakpoint edge cases', () => {
     // No min <= 50; fallback is the name tied to the smallest threshold (100 → "a").
     expect(breakpoint(w, tight).value).toBe('a')
   })
+
+  it('empty breakpoint map returns stable empty string without throwing (corrupt / degenerate config)', () => {
+    const w = signal(100)
+    const bp = breakpoint(w, {})
+    expect(bp.value).toBe('')
+    w.set(0)
+    expect(bp.value).toBe('')
+  })
 })
 
 describe('responsive edge cases', () => {
@@ -157,6 +165,12 @@ describe('responsive edge cases', () => {
       { sm: 1, md: 2 } as { sm: number; md: number; lg: number },
       bps,
     )
+    expect(cols.value).toBeUndefined()
+  })
+
+  it('empty breakpoints yield undefined from responsive when values omit the empty-string key', () => {
+    const w = signal(800)
+    const cols = responsive(w, { sm: 1, md: 2, lg: 3 }, {} as typeof bps)
     expect(cols.value).toBeUndefined()
   })
 })
