@@ -13,8 +13,13 @@ export type TwResult = FlexProps & StyleProps
  * ```
  *
  * Accepts one or more class strings. Last class wins on conflicts.
- * Unknown classes are silently ignored.
+ * Unknown classes are silently ignored. Non-string arguments are skipped at runtime so corrupt spreads
+ * (e.g. `Symbol` values) cannot make `Array#join` throw.
  */
 export function tw(...classes: string[]): TwResult {
-  return parseClasses(classes.join(' '))
+  const parts: string[] = []
+  for (const c of classes) {
+    if (typeof c === 'string') parts.push(c)
+  }
+  return parseClasses(parts.join(' '))
 }

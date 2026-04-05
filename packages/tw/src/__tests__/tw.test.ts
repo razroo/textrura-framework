@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { tw } from '../index.js'
+import { parseClasses } from '../parser.js'
 
 describe('tw()', () => {
   describe('basic API', () => {
@@ -27,6 +28,29 @@ describe('tw()', () => {
         flexDirection: 'row',
         padding: 16,
       })
+    })
+
+    it('ignores non-string runtime arguments (avoids join throwing on Symbol)', () => {
+      expect(tw('flex-row', null as unknown as string, 'p-4')).toEqual({
+        flexDirection: 'row',
+        padding: 16,
+      })
+      expect(tw('flex-col', undefined as unknown as string)).toEqual({ flexDirection: 'column' })
+      expect(tw(0 as unknown as string, 'gap-2')).toEqual({ gap: 8 })
+      expect(tw(Symbol('x') as unknown as string, 'p-2')).toEqual({ padding: 8 })
+    })
+
+    it('returns empty object when every argument is a non-string', () => {
+      expect(tw(null as unknown as string, undefined as unknown as string)).toEqual({})
+    })
+  })
+
+  describe('parseClasses', () => {
+    it('returns empty props for non-string input without throwing', () => {
+      expect(parseClasses(null as unknown as string)).toEqual({})
+      expect(parseClasses(undefined as unknown as string)).toEqual({})
+      expect(parseClasses(1 as unknown as string)).toEqual({})
+      expect(parseClasses(Symbol('x') as unknown as string)).toEqual({})
     })
   })
 
