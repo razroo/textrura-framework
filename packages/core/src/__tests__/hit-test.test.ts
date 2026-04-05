@@ -1513,6 +1513,30 @@ describe('dispatchHit', () => {
     expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(true)
   })
 
+  it('overlapping siblings: non-numeric zIndex coerces to 0 (no string parsing; corrupt runtime props)', () => {
+    const log: string[] = []
+    const low = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('low') } })
+    const bogusHigh = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('bogusHigh') } })
+    ;(bogusHigh.props as { zIndex: unknown }).zIndex = '100'
+    const mid = box({ width: 50, height: 50, zIndex: 1, onClick: () => { log.push('mid') } })
+    const root = box({ width: 100, height: 100 }, [low, bogusHigh, mid])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['mid'])
+    expect(hitPathAtPoint(root, layout, 10, 10)).toEqual([2])
+  })
+
   it('overlapping siblings: three children with partial z-index ties still prefer highest z (general sort path, not identical-z fast path)', () => {
     const log: string[] = []
     const lowA = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('lowA') } })
