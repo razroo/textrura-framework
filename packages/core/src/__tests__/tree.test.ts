@@ -369,6 +369,16 @@ describe('toLayoutTree', () => {
     expect(toLayoutTree(s3Auto, false)).toHaveProperty('dir', 'auto')
   })
 
+  it('isLayoutRoot false forwards JSON null and unknown dir strings for Textura inherit (root still omits dir)', () => {
+    const nullDir = box({ width: 10, height: 10, dir: null as never })
+    expect(toLayoutTree(nullDir, true)).not.toHaveProperty('dir')
+    expect(toLayoutTree(nullDir, false)).toHaveProperty('dir', null)
+
+    const bogus = box({ width: 10, height: 10, dir: 'sideways-lr' as never })
+    expect(toLayoutTree(bogus, true)).not.toHaveProperty('dir')
+    expect(toLayoutTree(bogus, false)).toHaveProperty('dir', 'sideways-lr')
+  })
+
   it('omits dir on root text, image, and scene3d layout snapshots', () => {
     const t = text({
       text: 'x',
