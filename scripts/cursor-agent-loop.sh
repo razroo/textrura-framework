@@ -54,6 +54,11 @@ fi
 # input tests, perf hot paths, docs accuracy) before shipping.
 # Ignore `[ ]` in RELEASE_CHECKLIST.md / v1-release-checklist.md
 # (maintainer release steps, not framework backlog).
+# A few `packages/*/src/__tests__/**/*.test.ts` files stay outside `release:gate` on purpose (browser/visual
+# canvas suites, long server stress/integration): e.g. renderer-canvas `browser-client`, `input-forwarding`,
+# `visual-regression`; server `server-rapid-update-integration`, `server-transport-stress`. Compare `find
+# packages -path '*/src/__tests__/*.test.ts'` to package.json `release:gate` argv when unsure; run vitest on
+# those paths locally when editing those surfaces.
 #
 # Prerequisites:
 #   - Cursor Agent CLI: https://cursor.com/install (`agent` on PATH)
