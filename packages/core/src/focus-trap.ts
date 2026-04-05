@@ -15,8 +15,10 @@ function collectFocusable(element: UIElement, layout: ComputedLayout, out: Focus
   if (hasFocusCandidateHandlers(element.handlers)) {
     out.push({ element, layout })
   }
-  for (let i = 0; i < element.children.length; i++) {
-    const child = element.children[i]
+  const kids = element.children
+  const n = Array.isArray(kids) ? kids.length : 0
+  for (let i = 0; i < n; i++) {
+    const child = kids[i]
     const childLayout = layout.children[i]
     if (child && childLayout) collectFocusable(child, childLayout, out)
   }
@@ -31,7 +33,9 @@ function resolveSubtree(
   let lo: ComputedLayout = layout
   for (const idx of path) {
     if (el.kind !== 'box') return null
-    const nextEl = el.children[idx]
+    const kids = el.children
+    if (!Array.isArray(kids)) return null
+    const nextEl = kids[idx]
     const nextLo = lo.children[idx]
     if (!nextEl || !nextLo) return null
     el = nextEl
@@ -46,14 +50,16 @@ function resolveSubtree(
  *
  * Focusables are boxes with any of `onClick`, `onKeyDown`, `onKeyUp`,
  * `onCompositionStart`, `onCompositionUpdate`, or `onCompositionEnd`, in tree order (same rule as
- * {@link collectFocusOrder}, including skipping corrupt layout bounds).
+ * {@link collectFocusOrder}, including skipping corrupt layout bounds and treating non-array
+ * `children` as empty).
  *
  * When the current {@link focusedElement} is missing or not inside the trap list, `'next'`
  * jumps to the first focusable and `'prev'` to the last — so focus can enter the trap from
  * outside without clearing focus first.
  *
  * @param scopePath — Indices from the tree root to the trap root box (inclusive). Invalid
- *   paths (out-of-range index, non-box node, or empty focusable list under the subtree) yield `false`.
+ *   paths (out-of-range index, non-box node, non-array `children` on a box along the path, or empty
+ *   focusable list under the subtree) yield `false`.
  * @returns `true` if focus was moved, `false` if the scope is invalid or contains no focusables.
  */
 export function trapFocusStep(

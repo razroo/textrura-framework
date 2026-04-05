@@ -56,6 +56,48 @@ describe('trapFocusStep', () => {
     expect(trapFocusStep(tree, layout, [0, 1], 'next')).toBe(false)
   })
 
+  it('returns false when the scope path descends through a box with non-array children', () => {
+    const inner = box({ onKeyDown: () => undefined }, [])
+    const modal = box({}, [inner])
+    ;(modal as unknown as { children: unknown }).children = null
+    const tree = box({}, [modal])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: [
+        {
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          children: [{ x: 0, y: 0, width: 50, height: 40, children: [] }],
+        },
+      ],
+    }
+    expect(() => trapFocusStep(tree, layout, [0, 0], 'next')).not.toThrow()
+    expect(trapFocusStep(tree, layout, [0, 0], 'next')).toBe(false)
+  })
+
+  it('treats non-array children on the trap root as empty when stepping focus', () => {
+    const inner = box({ onKeyDown: () => undefined }, [])
+    const modal = box({ width: 100, height: 100, onKeyDown: () => undefined }, [inner])
+    ;(modal as unknown as { children: unknown }).children = null
+    const tree = box({}, [modal])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 100, height: 100, children: [] }],
+    }
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
+    expect(focusedElement.peek()!.element).toBe(modal)
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
+    expect(focusedElement.peek()!.element).toBe(modal)
+  })
+
   it('returns false for negative, fractional, or non-finite scope indices without throwing', () => {
     const inner = box({ onKeyDown: () => undefined }, [])
     const tree = box({}, [inner])

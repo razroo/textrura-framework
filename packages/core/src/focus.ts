@@ -30,6 +30,8 @@ export function clearFocus(): void {
  * A box is focusable when it defines any of `onClick`, `onKeyDown`, `onKeyUp`,
  * `onCompositionStart`, `onCompositionUpdate`, or `onCompositionEnd`.
  * Non-box leaves (`text`, `image`, `scene3d`) are ignored — only `box` nodes participate in this walk.
+ * Boxes with a missing or non-array `children` field are treated as leaf boxes (no throw) so bad
+ * deserialization cannot take down focus walks.
  * Skips boxes whose layout bounds are non-finite or have negative width/height, and does not walk
  * their subtrees — same rule as hit-testing so corrupt geometry cannot enter focus order.
  *
@@ -57,10 +59,12 @@ function collectFocusable(
     if (hasFocusCandidateHandlers(element.handlers)) {
       results.push({ element, layout })
     }
-    for (let i = 0; i < element.children.length; i++) {
+    const kids = element.children
+    const n = Array.isArray(kids) ? kids.length : 0
+    for (let i = 0; i < n; i++) {
       const childLayout = layout.children[i]
       if (childLayout) {
-        collectFocusable(element.children[i]!, childLayout, results)
+        collectFocusable(kids[i]!, childLayout, results)
       }
     }
   }

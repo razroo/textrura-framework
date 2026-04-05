@@ -240,6 +240,20 @@ describe('collectFocusOrder', () => {
     expect(order).toHaveLength(1)
     expect(order[0]!.element).toBe(second)
   })
+
+  it('treats non-array box.children as empty without throwing (corrupt runtime tree)', () => {
+    const inner = box({ width: 10, height: 10, onClick: () => {} })
+    const root = box({ width: 100, height: 100, onClick: () => {} }, [inner])
+    ;(root as unknown as { children: unknown }).children = null
+    const layout = {
+      ...makeLayout(),
+      children: [makeLayout({ width: 10, height: 10 })],
+    }
+    expect(() => collectFocusOrder(root, layout)).not.toThrow()
+    const order = collectFocusOrder(root, layout)
+    expect(order).toHaveLength(1)
+    expect(order[0]!.element).toBe(root)
+  })
 })
 
 describe('focusNext', () => {
