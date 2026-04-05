@@ -55,7 +55,9 @@ if (url.startsWith('ws://') || url.startsWith('wss://')) {
         try {
           const jsRes = await fetch(jsUrl)
           const js = await jsRes.text()
-          const jsWsRe = /["'`](\/geometra-ws[^"'`]*?)["'`]/g
+          // Match /geometra-ws paths anywhere — they may appear inside
+          // template literals like `${var}/geometra-ws-header`
+          const jsWsRe = /(\/geometra-ws(?:-[a-z]+)*)/g
           while ((m = jsWsRe.exec(js)) !== null) paths.add(m[1]!)
         } catch { /* skip failed JS fetches */ }
       }
