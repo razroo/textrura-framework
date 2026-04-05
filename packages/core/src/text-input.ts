@@ -434,18 +434,22 @@ export function moveInputCaretToLineBoundary(
 
 /**
  * Compute caret geometry from measured text lines for a collapsed selection.
+ * Non-finite anchor/focus offsets are coerced to `0` before the collapsed check (same as
+ * {@link finiteNumberOrZero}) so corrupt values cannot suppress the caret at offset 0.
  * Returns null when selection is expanded or text metrics are unavailable.
  */
 export function getInputCaretGeometry(
   textNodes: TextNodeInfo[],
   selection: SelectionRange,
 ): CaretGeometry | null {
-  if (!isCollapsedSelection(selection)) return null
+  const anchorOff = finiteNumberOrZero(selection.anchorOffset)
+  const focusOff = finiteNumberOrZero(selection.focusOffset)
+  if (selection.anchorNode !== selection.focusNode || anchorOff !== focusOff) return null
   const node = textNodes[selection.focusNode]
   if (!node || node.lines.length === 0) return null
 
   const maxOffset = node.element.props.text.length
-  const targetOffset = clamp(finiteNumberOrZero(selection.focusOffset), 0, maxOffset)
+  const targetOffset = clamp(focusOff, 0, maxOffset)
   let traversed = 0
 
   for (const line of node.lines) {

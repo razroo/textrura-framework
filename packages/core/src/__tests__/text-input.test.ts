@@ -422,6 +422,28 @@ describe('text-input foundation', () => {
     expect(caret?.x).toBe(10)
   })
 
+  it('getInputCaretGeometry coerces non-finite numeric focusOffset to 0 (parity with finiteNumberOrZero)', () => {
+    const textNodes: TextNodeInfo[] = [
+      {
+        element: { kind: 'text', props: { text: 'ab', font: '14px Inter', lineHeight: 18 } },
+        direction: 'ltr',
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 18,
+        index: 0,
+        lines: [{ text: 'ab', x: 10, y: 20, charOffsets: [0, 5], charWidths: [5, 5] }],
+      },
+    ]
+    const base = { anchorNode: 0, anchorOffset: 0, focusNode: 0 }
+    for (const focusOffset of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      const caret = getInputCaretGeometry(textNodes, { ...base, focusOffset })
+      expect(caret).not.toBeNull()
+      expect(caret?.offset).toBe(0)
+      expect(caret?.x).toBe(10)
+    }
+  })
+
   it('supports undo/redo history for edits', () => {
     let history = createTextInputHistory({
       nodes: ['hello'],
