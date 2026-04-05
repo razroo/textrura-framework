@@ -436,6 +436,23 @@ describe('box layout', () => {
     expect(result.children[1]!.x).toBe(250)
   })
 
+  it('row with dir rtl mirrors justifyContent flex-end main axis under ltr owner', () => {
+    const base = {
+      width: 300,
+      height: 50,
+      flexDirection: 'row' as const,
+      justifyContent: 'flex-end' as const,
+      children: [{ width: 50, height: 50 }, { width: 50, height: 50 }],
+    }
+    const ltr = computeLayout({ ...base, dir: 'ltr' }, { width: 300, height: 50, direction: 'ltr' })
+    expect(ltr.children[0]!.x).toBe(200)
+    expect(ltr.children[1]!.x).toBe(250)
+
+    const rtl = computeLayout({ ...base, dir: 'rtl' }, { width: 300, height: 50, direction: 'ltr' })
+    expect(rtl.children[0]!.x).toBe(50)
+    expect(rtl.children[1]!.x).toBe(0)
+  })
+
   it('align items center', () => {
     const tree: BoxNode = {
       width: 300,
