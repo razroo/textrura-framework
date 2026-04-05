@@ -12,6 +12,8 @@ function normalizeResolvedDirection(value: unknown): ResolvedDirection {
  * serialized props) inherit {@link parentDirection}. Document-level direction for Yoga flex rows is set
  * separately via {@link import('./app.js').createApp}'s `layoutDirection` option (see `AppOptions` in `app.js`).
  * Non-`ltr` / non-`rtl` {@link parentDirection} values (bad callers or deserialized state) fall back to `ltr`.
+ *
+ * @returns Resolved `ltr` or `rtl` for layout, text, and hit-testing.
  */
 export function resolveDirectionValue(
   dir: Direction | undefined,
@@ -49,6 +51,9 @@ export function resolveElementDirection(
  * @param layoutDirection — Host override (`createServer` / `createApp` option), or any runtime garbage; only `'ltr'` / `'rtl'` count.
  * @param root — Live view root used when the override is absent or invalid. Any {@link UIElement} kind
  *   (`box`, `text`, `image`, `scene3d`) may be the root; `dir` is read from {@link UIElement.props} the same way.
+ *
+ * @returns Yoga / Textura owner direction: primitive `'ltr'` or `'rtl'` from the host when valid, otherwise
+ *   {@link resolveElementDirection} on `root` with document default `'ltr'`.
  */
 export function resolveComputeLayoutDirection(
   layoutDirection: unknown,
