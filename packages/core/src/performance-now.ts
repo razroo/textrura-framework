@@ -21,13 +21,16 @@ export function safePerformanceNowMs(): number {
 /**
  * Read `globalThis.performance.now()` when available, otherwise `0`.
  * Does **not** coerce NaN/±Infinity — callers compute deltas and clamp like pre-guard canvas code.
+ * Non-number returns from `now` (broken polyfills, mistaken host shims) become `0` so paint timing
+ * math cannot receive strings or objects.
  * Never throws (covers missing `performance`, missing `now`, or a throwing implementation).
  */
 export function readPerformanceNow(): number {
   try {
     const perf = globalThis.performance
     if (perf && typeof perf.now === 'function') {
-      return perf.now()
+      const t = perf.now()
+      return typeof t === 'number' ? t : 0
     }
   } catch {
     // ignore

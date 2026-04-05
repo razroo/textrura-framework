@@ -1697,4 +1697,18 @@ describe('performance now helpers', () => {
     expect(readPerformanceNow()).toBe(Number.NEGATIVE_INFINITY)
     neg.mockRestore()
   })
+
+  it('readPerformanceNow returns 0 when performance.now returns a non-number (hostile polyfill)', () => {
+    const str = vi.spyOn(performance, 'now').mockReturnValue('1' as unknown as number)
+    expect(readPerformanceNow()).toBe(0)
+    str.mockRestore()
+
+    const undef = vi.spyOn(performance, 'now').mockReturnValue(undefined as unknown as number)
+    expect(readPerformanceNow()).toBe(0)
+    undef.mockRestore()
+
+    const obj = vi.spyOn(performance, 'now').mockReturnValue({} as unknown as number)
+    expect(readPerformanceNow()).toBe(0)
+    obj.mockRestore()
+  })
 })
