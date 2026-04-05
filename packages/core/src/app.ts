@@ -8,14 +8,8 @@ import { effect } from './signals.js'
 import { focusedElement, setFocus } from './focus.js'
 import { collectFontFamiliesFromTree, resolveFontLoadTimeoutMs, waitForFonts } from './fonts.js'
 import { dispatchKeyboardEvent, dispatchCompositionEvent } from './keyboard.js'
+import { finiteRootExtent } from './layout-bounds.js'
 import { safePerformanceNowMs } from './performance-now.js'
-
-/** Only finite, non-negative numbers become Textura root constraints; otherwise the key is omitted (unconstrained). */
-function finiteRootExtent(value: number | undefined): number | undefined {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined
-  const v = Object.is(value, -0) ? 0 : value
-  return v >= 0 ? v : undefined
-}
 
 export interface AppOptions {
   /**

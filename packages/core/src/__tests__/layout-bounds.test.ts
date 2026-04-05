@@ -2,6 +2,7 @@ import type { ComputedLayout } from 'textura'
 import { describe, it, expect } from 'vitest'
 import {
   finiteNumberOrZero,
+  finiteRootExtent,
   layoutBoundsAreFinite,
   pointInInclusiveLayoutRect,
 } from '../layout-bounds.js'
@@ -514,6 +515,37 @@ describe('pointInInclusiveLayoutRect', () => {
       expect(() => pointInInclusiveLayoutRect(5, 5, 0, 0, 10, bad)).not.toThrow()
       expect(pointInInclusiveLayoutRect(5, 5, 0, 0, 10, bad)).toBe(false)
     }
+  })
+})
+
+describe('finiteRootExtent', () => {
+  it('returns undefined for omitted or non-finite values (unconstrained root)', () => {
+    expect(finiteRootExtent(undefined)).toBeUndefined()
+    expect(finiteRootExtent(Number.NaN)).toBeUndefined()
+    expect(finiteRootExtent(Number.POSITIVE_INFINITY)).toBeUndefined()
+    expect(finiteRootExtent(Number.NEGATIVE_INFINITY)).toBeUndefined()
+  })
+
+  it('returns undefined for non-number runtime values without coercion', () => {
+    expect(finiteRootExtent('100' as unknown as number)).toBeUndefined()
+    expect(finiteRootExtent(1n as unknown as number)).toBeUndefined()
+    expect(finiteRootExtent(Object(50) as unknown as number)).toBeUndefined()
+  })
+
+  it('returns undefined for negative sizes', () => {
+    expect(finiteRootExtent(-1)).toBeUndefined()
+    expect(finiteRootExtent(-Number.MIN_VALUE)).toBeUndefined()
+  })
+
+  it('maps IEEE −0 to +0 and returns 0 (valid non-negative root)', () => {
+    expect(Object.is(finiteRootExtent(-0)!, -0)).toBe(false)
+    expect(finiteRootExtent(-0)).toBe(0)
+  })
+
+  it('returns finite non-negative extents including zero and large magnitudes', () => {
+    expect(finiteRootExtent(0)).toBe(0)
+    expect(finiteRootExtent(Number.MIN_VALUE)).toBe(Number.MIN_VALUE)
+    expect(finiteRootExtent(Number.MAX_VALUE)).toBe(Number.MAX_VALUE)
   })
 })
 

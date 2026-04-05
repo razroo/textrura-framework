@@ -39,6 +39,7 @@ export { dispatchHit, getCursorAtPoint, hasInteractiveHitAtPoint, hitPathAtPoint
 export type { HitDispatchResult } from './hit-test.js'
 export {
   finiteNumberOrZero,
+  finiteRootExtent,
   layoutBoundsAreFinite,
   pointInInclusiveLayoutRect,
 } from './layout-bounds.js'

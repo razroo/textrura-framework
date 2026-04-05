@@ -20,6 +20,23 @@ export function finiteNumberOrZero(value: unknown): number {
 }
 
 /**
+ * Optional Textura root width/height from host options: only finite, non-negative numbers become
+ * constraints; otherwise the key is omitted (unconstrained layout).
+ *
+ * IEEE **−0** is normalized to **+0** so serializers cannot thread signed zero into Yoga constraints.
+ * Non-numbers, NaN, and ±Infinity yield `undefined` (same rule as `typeof` + `Number.isFinite`, so boxed
+ * numbers and bigint never coerce).
+ *
+ * @param value — Typically `AppOptions.width` / `height`; accepts `unknown` so corrupt runtime options
+ *   cannot slip through widened casts.
+ */
+export function finiteRootExtent(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined
+  const v = Object.is(value, -0) ? 0 : value
+  return v >= 0 ? v : undefined
+}
+
+/**
  * Reject NaN, ±Infinity, and negative sizes so corrupt layout cannot invert rects or poison
  * coordinate math. Shared by hit-testing, focus order, and focus traps.
  *
