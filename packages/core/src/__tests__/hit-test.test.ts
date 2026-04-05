@@ -3298,6 +3298,31 @@ describe('scroll and overflow clipping', () => {
     expect(getCursorAtPoint(parent, layout, 45, 40)).toBe('grab')
   })
 
+  it('overflow scroll: MAX_VALUE origin plus -MAX_VALUE scrollX overflows child offset; descendants are not hit', () => {
+    let childFired = false
+    const child = box({
+      width: 50,
+      height: 50,
+      onClick: () => {
+        childFired = true
+      },
+    })
+    const max = Number.MAX_VALUE
+    const parent = box({ width: 100, height: 100, overflow: 'scroll', scrollX: -max }, [child])
+    const layout = {
+      x: max,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 10, y: 10, width: 50, height: 50, children: [] }],
+    }
+    // Parent absX = max is finite; child paint offset = max - (-max) = Infinity → pointInInclusiveLayoutRect rejects.
+    expect(max - -max).toBe(Infinity)
+    dispatchHit(parent, layout, 'onClick', max, 50)
+    expect(childFired).toBe(false)
+    expect(() => getCursorAtPoint(parent, layout, max, 50)).not.toThrow()
+  })
+
   it('hitPathAtPoint resolves path under scrollX', () => {
     const child = box({ width: 50, height: 50 })
     const parent = box({ width: 100, height: 100, overflow: 'scroll', scrollX: 40 }, [child])
