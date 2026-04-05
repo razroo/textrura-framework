@@ -474,6 +474,43 @@ describe('@geometra/ui input', () => {
     expect(seenOffset).toBeLessThanOrEqual(5)
   })
 
+  it('maps click localX to exact caret offset using headless 8px-per-char measurement (Node)', () => {
+    const offsets: number[] = []
+    const el = input('abcd', '', {
+      focused: true,
+      onCaretOffsetChange: (o) => offsets.push(o),
+    })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+
+    // paddingLeft is 10; measurement uses localX - 10 (see input() handleClick).
+    el.handlers?.onClick?.({
+      x: 0,
+      y: 0,
+      localX: 18, // clampedX 8 → second glyph (index 1)
+      target: {} as HitEvent['target'],
+    })
+    expect(offsets).toEqual([1])
+
+    offsets.length = 0
+    el.handlers?.onClick?.({
+      x: 0,
+      y: 0,
+      localX: 22, // clampedX 12 → third glyph (index 2)
+      target: {} as HitEvent['target'],
+    })
+    expect(offsets).toEqual([2])
+
+    // Same as localX: 22 when localX is omitted (pointerX = e.localX ?? e.x).
+    offsets.length = 0
+    el.handlers?.onClick?.({
+      x: 22,
+      y: 0,
+      target: {} as HitEvent['target'],
+    })
+    expect(offsets).toEqual([2])
+  })
+
   it('calls onSelectAll instead of onKeyDown when Cmd+A is pressed', () => {
     let selectAllCalled = false
     let keyDownCalled = false
