@@ -55,6 +55,13 @@ describe('box', () => {
     expect(el.handlers).toBeUndefined()
   })
 
+  it('leaves unrecognized on* callbacks on props (only known EventHandlers destructure into handlers)', () => {
+    const noop = () => {}
+    const el = box({ width: 1, height: 1, onUnknown: noop } as never)
+    expect(el.handlers).toBeUndefined()
+    expect((el.props as Record<string, unknown>).onUnknown).toBe(noop)
+  })
+
   it('preserves key and semantic alongside layout props', () => {
     const el = box(
       { width: 2, height: 2, key: 'k1', semantic: { role: 'button' } },
