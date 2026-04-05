@@ -288,15 +288,17 @@ export class CanvasRenderer implements Renderer {
   }
 
   private computeTextNodeLines(node: TextNodeInfo): void {
-    const { lineHeight, font, text } = node.element.props
+    const { lineHeight, font, text, whiteSpace } = node.element.props
+    const shouldWrap = whiteSpace === 'normal' || whiteSpace === 'pre-wrap'
     const width = Math.max(1, Math.round(node.width * 1000) / 1000)
-    const cacheKey = `${font}|${lineHeight}|${width}|${text}`
+    const wrapKey = shouldWrap ? 'w' : 'n'
+    const cacheKey = `${wrapKey}|${font}|${lineHeight}|${width}|${text}`
     let cached = this.textLineCache.get(cacheKey)
 
     if (!cached) {
       const { ctx } = this
       ctx.font = font
-      const wrappedLines = this.wrapText(text, width)
+      const wrappedLines = shouldWrap ? this.wrapText(text, width) : [text]
       cached = wrappedLines.map((lineText) => {
         const charOffsets: number[] = []
         const charWidths: number[] = []
