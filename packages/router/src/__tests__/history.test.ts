@@ -35,10 +35,14 @@ describe('history adapters', () => {
     expect(updates).toEqual([])
   })
 
-  it('memory history treats NaN delta as a no-op (does not corrupt stack index)', () => {
+  it('memory history treats non-finite delta as a no-op (does not corrupt stack index)', () => {
     const history = createMemoryHistory({ initialEntries: ['/a', '/b'] })
     expect(history.location.pathname).toBe('/b')
     history.go(Number.NaN)
+    expect(history.location.pathname).toBe('/b')
+    history.go(Number.POSITIVE_INFINITY)
+    expect(history.location.pathname).toBe('/b')
+    history.go(Number.NEGATIVE_INFINITY)
     expect(history.location.pathname).toBe('/b')
     history.go(-1)
     expect(history.location.pathname).toBe('/a')
@@ -140,6 +144,10 @@ describe('history adapters', () => {
     expect(history.location).toEqual({ pathname: '/users/2', search: '', hash: '' })
 
     history.go(-1)
+    expect(goCalls).toEqual([-1])
+
+    history.go(Number.POSITIVE_INFINITY)
+    history.go(Number.NaN)
     expect(goCalls).toEqual([-1])
 
     for (const listener of popListeners) listener()

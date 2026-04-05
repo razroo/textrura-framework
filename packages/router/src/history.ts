@@ -63,6 +63,7 @@ type MemoryHistoryOptions = {
  * - Empty `initialEntries` becomes a single `"/"` entry.
  * - `initialIndex` is clamped to the stack; default is the last entry.
  * - `go(0)` does not notify listeners.
+ * - Non-finite `delta` (`NaN`, `±Infinity`) is a no-op (does not move the index or notify).
  */
 export function createMemoryHistory(options: MemoryHistoryOptions = {}): HistoryAdapter {
   const entries = (options.initialEntries ?? ['/']).map(parseToLocation)
@@ -99,9 +100,9 @@ export function createMemoryHistory(options: MemoryHistoryOptions = {}): History
       notify('replace')
     },
     go(delta: number) {
-      if (Number.isNaN(delta)) return
+      if (!Number.isFinite(delta)) return
       const sum = index + delta
-      if (Number.isNaN(sum)) return
+      if (!Number.isFinite(sum)) return
       const nextIndex = Math.max(0, Math.min(sum, entries.length - 1))
       if (nextIndex === index) return
       index = nextIndex
@@ -118,6 +119,7 @@ export function createMemoryHistory(options: MemoryHistoryOptions = {}): History
  * Wraps the real (or injected) `window.history` and `popstate`.
  *
  * `push` / `replace` update `history` state and notify listeners; `go` delegates to `history.go` (async relative to `popstate`).
+ * Non-finite `delta` is ignored so corrupt host data never reaches the native history API.
  * Throws if no `window` is available unless {@link BrowserHistoryOptions.window} is provided.
  */
 export function createBrowserHistory(options: BrowserHistoryOptions = {}): HistoryAdapter {
@@ -159,6 +161,7 @@ export function createBrowserHistory(options: BrowserHistoryOptions = {}): Histo
       notify('replace')
     },
     go(delta: number) {
+      if (!Number.isFinite(delta)) return
       windowLike.history.go(delta)
     },
     listen(listener: (update: HistoryUpdate) => void): Unsubscribe {
