@@ -56,6 +56,27 @@ describe('streamText', () => {
     expect(s.streaming).toBe(false)
   })
 
+  it('done() after append does not double-notify the signal when the coalescing microtask runs', async () => {
+    const s = streamText()
+    let runs = 0
+    effect(() => {
+      void s.signal.value
+      runs++
+    })
+    expect(runs).toBe(1)
+    s.append('x')
+    expect(s.signal.peek()).toBe('')
+    s.done()
+    expect(s.value).toBe('x')
+    expect(s.streaming).toBe(false)
+    // One notification from done()'s synchronous s.set(buffer); pending microtask must not flush a second
+    // identical value (signal.set uses Object.is dedupe).
+    expect(runs).toBe(2)
+    await Promise.resolve()
+    expect(s.value).toBe('x')
+    expect(runs).toBe(2)
+  })
+
   it('streaming is true initially and false after done()', () => {
     const s = streamText()
     expect(s.streaming).toBe(true)
