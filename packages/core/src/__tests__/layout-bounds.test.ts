@@ -363,6 +363,14 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(101, 0, 0, 0, 100, 50)).toBe(false)
   })
 
+  it('supports negative absolute origins (Yoga can emit negative x/y for positioned subtrees)', () => {
+    // Rect [-10, -5] x [-20, -15] inclusive
+    expect(pointInInclusiveLayoutRect(-10, -20, -10, -20, 5, 5)).toBe(true)
+    expect(pointInInclusiveLayoutRect(-5, -15, -10, -20, 5, 5)).toBe(true)
+    expect(pointInInclusiveLayoutRect(-11, -20, -10, -20, 5, 5)).toBe(false)
+    expect(pointInInclusiveLayoutRect(-5, -14, -10, -20, 5, 5)).toBe(false)
+  })
+
   it('zero-size rect hits only the origin corner', () => {
     expect(pointInInclusiveLayoutRect(3, 3, 3, 3, 0, 0)).toBe(true)
     expect(pointInInclusiveLayoutRect(3.001, 3, 3, 3, 0, 0)).toBe(false)
