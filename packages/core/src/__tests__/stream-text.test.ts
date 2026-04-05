@@ -169,4 +169,16 @@ describe('streamText', () => {
     expect(s.value).toBe('late')
     expect(s.streaming).toBe(false)
   })
+
+  it('set() after done() replaces text synchronously while streaming stays false', () => {
+    const s = streamText()
+    s.append('a')
+    s.done()
+    expect(s.streaming).toBe(false)
+    expect(s.value).toBe('a')
+    s.set('replaced')
+    expect(s.value).toBe('replaced')
+    expect(s.signal.peek()).toBe('replaced')
+    expect(s.streaming).toBe(false)
+  })
 })
