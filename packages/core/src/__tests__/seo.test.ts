@@ -98,6 +98,24 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('<p dir="ltr">')
   })
 
+  it('omits dir when props.dir is not an exact primitive ltr/rtl/auto (no trim; padded or boxed strings)', () => {
+    expect(toSemanticHTML(box({ width: 10, height: 10, dir: ' rtl ' as never }))).not.toContain('dir="')
+    expect(toSemanticHTML(box({ width: 10, height: 10, dir: Object('rtl') as never }))).not.toContain(
+      'dir="',
+    )
+    const withText = box({ width: 50, height: 20 }, [
+      text({
+        text: 'x',
+        font: '14px sans-serif',
+        lineHeight: 18,
+        width: 10,
+        height: 18,
+        dir: 'ltr\n' as never,
+      }),
+    ])
+    expect(toSemanticHTML(withText)).not.toContain('dir="')
+  })
+
   it('emits dir on image elements', () => {
     const el = box({ width: 100, height: 100 }, [
       image({ src: '/a.png', width: 10, height: 10, alt: 'x', dir: 'auto' }),
