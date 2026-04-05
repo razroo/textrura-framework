@@ -663,7 +663,7 @@ export class CanvasRenderer implements Renderer {
     _height: number,
   ): void {
     const { ctx } = this
-    const { text, font, color, backgroundColor, lineHeight, opacity, selectable } = element.props
+    const { text, font, color, backgroundColor, lineHeight, opacity, selectable, whiteSpace } = element.props
 
     if (opacity !== undefined) ctx.globalAlpha = opacity
 
@@ -675,7 +675,7 @@ export class CanvasRenderer implements Renderer {
     ctx.font = font
     ctx.textBaseline = 'top'
 
-    const lines = this.wrapText(text, _width)
+    const lines = whiteSpace === 'nowrap' ? [text] : this.wrapText(text, _width)
     const textColor = color ?? '#000000'
 
     const isSelectable = selectable !== false

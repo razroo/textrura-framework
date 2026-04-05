@@ -100,7 +100,7 @@ export interface TextElement {
     text: string
     font: string
     lineHeight: number
-    whiteSpace?: 'normal' | 'pre-wrap'
+    whiteSpace?: 'normal' | 'pre-wrap' | 'nowrap'
     /** Text is selectable by default. Set to false to disable. */
     selectable?: boolean
   }

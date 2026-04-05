@@ -25,7 +25,7 @@ type TextProps = FlexProps & StyleProps & DirectionProps & {
   text: string
   font: string
   lineHeight: number
-  whiteSpace?: 'normal' | 'pre-wrap'
+  whiteSpace?: 'normal' | 'pre-wrap' | 'nowrap'
   selectable?: boolean
   key?: string
   semantic?: SemanticProps

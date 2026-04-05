@@ -95,7 +95,7 @@ export interface TextNode extends FlexProps {
   /** Line height in pixels */
   lineHeight: number
   /** Pretext whiteSpace mode */
-  whiteSpace?: 'normal' | 'pre-wrap'
+  whiteSpace?: 'normal' | 'pre-wrap' | 'nowrap'
 }
 
 /** A container (box) node that can have children. */

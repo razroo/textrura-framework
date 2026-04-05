@@ -204,6 +204,7 @@ function buildNode(desc: LayoutNode): BuildResult {
 
   if (isTextNode(desc)) {
     const whiteSpace = desc.whiteSpace
+    const nowrap = whiteSpace === 'nowrap'
     const font = desc.font
     const text = desc.text
     const lineHeight = desc.lineHeight
@@ -219,16 +220,20 @@ function buildNode(desc: LayoutNode): BuildResult {
         _height: number,
         _heightMode: MeasureMode,
       ) => {
-        const opts = whiteSpace ? { whiteSpace } : undefined
+        // For 'nowrap', pass no whiteSpace option to pretext (uses 'normal')
+        // but force maxWidth to be huge so text never wraps
+        const opts = (whiteSpace && !nowrap) ? { whiteSpace } : undefined
 
         let maxWidth: number
-        if (widthMode === MeasureMode.Exactly || widthMode === MeasureMode.AtMost) {
+        if (nowrap) {
+          maxWidth = 1e7
+        } else if (widthMode === MeasureMode.Exactly || widthMode === MeasureMode.AtMost) {
           maxWidth = width
         } else {
           maxWidth = 1e7
         }
 
-        if (widthMode === MeasureMode.Exactly) {
+        if (widthMode === MeasureMode.Exactly && !nowrap) {
           const prepared = prepare(text, font, opts)
           const result = layout(prepared, maxWidth, lineHeight)
           lastLineCount = result.lineCount
@@ -246,9 +251,11 @@ function buildNode(desc: LayoutNode): BuildResult {
         const height = lineCount * lineHeight
 
         const reportedWidth =
-          widthMode === MeasureMode.AtMost
-            ? Math.min(contentWidth, width)
-            : contentWidth
+          nowrap
+            ? contentWidth
+            : widthMode === MeasureMode.AtMost
+              ? Math.min(contentWidth, width)
+              : contentWidth
 
         return { width: reportedWidth, height }
       },
