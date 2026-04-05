@@ -1201,6 +1201,53 @@ describe('box layout', () => {
     expect(result.children[1]!.x).toBe(250)
   })
 
+  it('justify content space-around', () => {
+    const tree: BoxNode = {
+      width: 300,
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      children: [
+        { width: 50, height: 50 },
+        { width: 50, height: 50 },
+      ],
+    }
+    const result = computeLayout(tree)
+    expect(result.children[0]!.x).toBe(50)
+    expect(result.children[1]!.x).toBe(200)
+  })
+
+  it('justify content space-evenly', () => {
+    const tree: BoxNode = {
+      width: 300,
+      flexDirection: 'row',
+      justifyContent: 'space-evenly',
+      children: [
+        { width: 50, height: 50 },
+        { width: 50, height: 50 },
+      ],
+    }
+    const result = computeLayout(tree)
+    expect(result.children[0]!.x).toBe(67)
+    expect(result.children[1]!.x).toBe(183)
+  })
+
+  it('row with dir rtl mirrors justifyContent space-around main axis under ltr owner', () => {
+    const base = {
+      width: 300,
+      height: 50,
+      flexDirection: 'row' as const,
+      justifyContent: 'space-around' as const,
+      children: [{ width: 50, height: 50 }, { width: 50, height: 50 }],
+    }
+    const ltr = computeLayout({ ...base, dir: 'ltr' }, { width: 300, height: 50, direction: 'ltr' })
+    expect(ltr.children[0]!.x).toBe(50)
+    expect(ltr.children[1]!.x).toBe(200)
+
+    const rtl = computeLayout({ ...base, dir: 'rtl' }, { width: 300, height: 50, direction: 'ltr' })
+    expect(rtl.children[0]!.x).toBe(200)
+    expect(rtl.children[1]!.x).toBe(50)
+  })
+
   it('row with dir rtl mirrors justifyContent flex-end main axis under ltr owner', () => {
     const base = {
       width: 300,
