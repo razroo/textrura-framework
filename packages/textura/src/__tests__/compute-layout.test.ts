@@ -399,6 +399,41 @@ describe('box layout', () => {
     expect(rtl.children[1]!.x).toBe(rtl.children[0]!.x)
   })
 
+  it('row with flexWrap wrap-reverse and dir rtl mirrors main-axis x like wrap (cross-axis reversed per line)', () => {
+    const rtlTree: BoxNode = {
+      width: 150,
+      height: 100,
+      flexDirection: 'row',
+      flexWrap: 'wrap-reverse',
+      gap: 10,
+      dir: 'rtl',
+      children: [
+        { width: 80, height: 30 },
+        { width: 80, height: 30 },
+      ],
+    }
+    const ltrTree: BoxNode = { ...rtlTree, dir: 'ltr' }
+    const opts = { width: 150, height: 100, direction: 'ltr' as const }
+    const rtlRev = computeLayout(rtlTree, opts)
+    const ltrRev = computeLayout(ltrTree, opts)
+    const rtlPlainWrap = computeLayout({ ...rtlTree, flexWrap: 'wrap' }, opts)
+    const ltrPlainWrap = computeLayout({ ...ltrTree, flexWrap: 'wrap' }, opts)
+
+    expect(ltrRev.children[0]!.y).not.toBe(ltrRev.children[1]!.y)
+    expect(rtlRev.children[0]!.y).toBe(ltrRev.children[0]!.y)
+    expect(rtlRev.children[1]!.y).toBe(ltrRev.children[1]!.y)
+
+    // wrap-reverse stacks flex lines on the opposite cross side vs wrap
+    expect(ltrRev.children[0]!.y).not.toBe(ltrPlainWrap.children[0]!.y)
+
+    // RTL main-start is physical right on every line; x matches plain wrap for the same dir
+    expect(rtlRev.children[0]!.x).toBe(rtlPlainWrap.children[0]!.x)
+    expect(rtlRev.children[1]!.x).toBe(rtlPlainWrap.children[1]!.x)
+    expect(ltrRev.children[0]!.x).toBe(ltrPlainWrap.children[0]!.x)
+    expect(ltrRev.children[1]!.x).toBe(ltrPlainWrap.children[1]!.x)
+    expect(rtlRev.children[0]!.x + rtlRev.children[0]!.width).toBe(150)
+  })
+
   it('row-reverse swaps main-axis order relative to row under ltr document owner', () => {
     const rowTree: BoxNode = {
       width: 200,
