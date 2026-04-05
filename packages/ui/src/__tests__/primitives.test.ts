@@ -2,14 +2,28 @@ import { describe, it, expect } from 'vitest'
 import type { HitEvent, KeyboardHitEvent } from '../../../core/src/types.js'
 import { box, text } from '../../../core/src/index.js'
 import {
+  accordion,
+  alert,
+  avatar,
+  badge,
+  breadcrumb,
+  card,
   checkbox,
   comboboxField,
   commandPalette,
   dataTable,
   menu,
+  pagination,
+  progress,
   radio,
   selectControl,
+  separator,
+  sheet,
+  skeleton,
+  slider,
+  switchControl,
   tabs,
+  textarea,
   toast,
   treeView,
 } from '../index.js'
@@ -216,5 +230,244 @@ describe('@geometra/ui primitives', () => {
     if (!opt || opt.kind !== 'box') return
     opt.handlers?.onClick?.({ x: 0, y: 0, target: {} as HitEvent['target'] })
     expect(picked).toBe('foo')
+  })
+
+  it('card renders header, body, and footer sections', () => {
+    const el = card({
+      header: text({ text: 'Title', font: '13px Inter', lineHeight: 18, color: '#fff' }),
+      children: [text({ text: 'Body', font: '13px Inter', lineHeight: 18, color: '#fff' })],
+      footer: text({ text: 'Footer', font: '13px Inter', lineHeight: 18, color: '#fff' }),
+    })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.children).toHaveLength(3)
+  })
+
+  it('card without header/footer renders only body', () => {
+    const el = card({
+      children: [text({ text: 'Body', font: '13px Inter', lineHeight: 18, color: '#fff' })],
+    })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.children).toHaveLength(1)
+  })
+
+  it('badge renders with variant styling', () => {
+    const el = badge('New', { variant: 'success' })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.props.backgroundColor).toBe('#14532d')
+    expect(el.children).toHaveLength(1)
+    expect(el.children[0]?.kind).toBe('text')
+  })
+
+  it('separator renders horizontal by default', () => {
+    const el = separator()
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.props.height).toBe(1)
+    expect(el.semantic?.role).toBe('separator')
+  })
+
+  it('separator renders vertical when specified', () => {
+    const el = separator({ direction: 'vertical' })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.props.width).toBe(1)
+  })
+
+  it('avatar shows initials from name', () => {
+    const el = avatar('John Doe', { size: 40 })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.props.width).toBe(40)
+    expect(el.props.borderRadius).toBe(20)
+    if (el.children[0]?.kind === 'text') {
+      expect(el.children[0].props.text).toBe('JD')
+    }
+  })
+
+  it('alert renders with dismiss button when onDismiss provided', () => {
+    let dismissed = false
+    const el = alert('Error occurred', { variant: 'error', title: 'Oops', onDismiss: () => { dismissed = true } })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.semantic?.role).toBe('alert')
+    expect(el.children).toHaveLength(3)
+    const dismiss = el.children[2]
+    if (dismiss?.kind === 'box') {
+      dismiss.handlers?.onClick?.({ x: 0, y: 0, target: {} as HitEvent['target'] })
+      expect(dismissed).toBe(true)
+    }
+  })
+
+  it('alert without dismiss has no dismiss button', () => {
+    const el = alert('Info message')
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.children).toHaveLength(2)
+  })
+
+  it('progress renders with semantic role', () => {
+    const el = progress(75, { label: 'Loading' })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.semantic?.role).toBe('progressbar')
+  })
+
+  it('skeleton renders with default dimensions', () => {
+    const el = skeleton()
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.props.width).toBe(100)
+    expect(el.props.height).toBe(16)
+  })
+
+  it('skeleton accepts custom dimensions', () => {
+    const el = skeleton({ width: 200, height: 24, borderRadius: 8 })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.props.width).toBe(200)
+    expect(el.props.height).toBe(24)
+    expect(el.props.borderRadius).toBe(8)
+  })
+
+  it('breadcrumb renders items with separators', () => {
+    let clicked = false
+    const el = breadcrumb([
+      { label: 'Home', onClick: () => { clicked = true } },
+      { label: 'Products' },
+      { label: 'Widget' },
+    ])
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.semantic?.tag).toBe('nav')
+    expect(el.children).toHaveLength(5)
+    const first = el.children[0]
+    if (first?.kind === 'box') {
+      first.handlers?.onClick?.({ x: 0, y: 0, target: {} as HitEvent['target'] })
+      expect(clicked).toBe(true)
+    }
+  })
+
+  it('pagination emits page change on click', () => {
+    let page = -1
+    const el = pagination({ page: 3, totalPages: 10, onPageChange: (p) => { page = p } })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    const prev = el.children[0]
+    if (prev?.kind === 'box') {
+      prev.handlers?.onClick?.({ x: 0, y: 0, target: {} as HitEvent['target'] })
+      expect(page).toBe(2)
+    }
+  })
+
+  it('pagination disables prev on first page', () => {
+    const el = pagination({ page: 1, totalPages: 5, onPageChange: () => {} })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    const prev = el.children[0]
+    if (prev?.kind === 'box') {
+      expect(prev.handlers?.onClick).toBeUndefined()
+    }
+  })
+
+  it('switchControl toggles on click and keyboard', () => {
+    let val: boolean | null = null
+    const el = switchControl({ checked: false, onChange: (v) => { val = v }, label: 'Dark mode' })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.semantic?.role).toBe('switch')
+    el.handlers?.onClick?.({ x: 0, y: 0, target: {} as HitEvent['target'] })
+    expect(val).toBe(true)
+    val = null
+    el.handlers?.onKeyDown?.({
+      key: 'Enter', code: 'Enter',
+      shiftKey: false, ctrlKey: false, metaKey: false, altKey: false,
+      target: {} as KeyboardHitEvent['target'],
+    })
+    expect(val).toBe(true)
+  })
+
+  it('switchControl disabled does not toggle', () => {
+    let val: boolean | null = null
+    const el = switchControl({ checked: false, onChange: (v) => { val = v }, disabled: true })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    el.handlers?.onClick?.({ x: 0, y: 0, target: {} as HitEvent['target'] })
+    expect(val).toBeNull()
+  })
+
+  it('textarea renders placeholder when empty', () => {
+    const el = textarea('', 'Type here...')
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.semantic?.tag).toBe('textarea')
+    if (el.children[0]?.kind === 'text') {
+      expect(el.children[0].props.text).toBe('Type here...')
+    }
+  })
+
+  it('textarea renders value with pre-wrap', () => {
+    const el = textarea('Hello\nWorld', '')
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    if (el.children[0]?.kind === 'text') {
+      expect(el.children[0].props.text).toBe('Hello\nWorld')
+      expect(el.children[0].props.whiteSpace).toBe('pre-wrap')
+    }
+  })
+
+  it('slider fires onChange on click', () => {
+    let val = -1
+    const el = slider({ value: 50, min: 0, max: 100, onChange: (v) => { val = v }, label: 'Volume' })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.semantic?.role).toBe('slider')
+    el.handlers?.onClick?.({ x: 100, y: 0, localX: 100, target: {} as HitEvent['target'] })
+    expect(val).toBeGreaterThanOrEqual(0)
+  })
+
+  it('accordion toggles sections on click', () => {
+    let toggled = ''
+    const contentEl = text({ text: 'Content', font: '13px Inter', lineHeight: 18, color: '#fff' })
+    const el = accordion(
+      [
+        { id: 'a', title: 'Section A', content: contentEl },
+        { id: 'b', title: 'Section B', content: contentEl },
+      ],
+      { expandedIds: new Set(['a']), onToggle: (id) => { toggled = id } },
+    )
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    const firstSection = el.children[0]
+    if (firstSection?.kind === 'box') {
+      const header = firstSection.children[0]
+      if (header?.kind === 'box') {
+        header.handlers?.onClick?.({ x: 0, y: 0, target: {} as HitEvent['target'] })
+        expect(toggled).toBe('a')
+      }
+    }
+  })
+
+  it('sheet returns hidden box when closed', () => {
+    const el = sheet({ open: false })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.props.display).toBe('none')
+  })
+
+  it('sheet renders overlay with close on backdrop click', () => {
+    let closed = false
+    const el = sheet({ open: true, title: 'Settings', onClose: () => { closed = true } })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.props.position).toBe('absolute')
+    expect(el.children).toHaveLength(2)
+    const backdrop = el.children[0]
+    if (backdrop?.kind === 'box') {
+      backdrop.handlers?.onClick?.({ x: 0, y: 0, target: {} as HitEvent['target'] })
+      expect(closed).toBe(true)
+    }
   })
 })
