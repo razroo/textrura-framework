@@ -201,6 +201,25 @@ describe('streamText', () => {
     expect(s.value).toBe('hello world')
   })
 
+  it('set("") clears synchronously and keeps streaming true (distinct from clear() which resets streaming)', () => {
+    const s = streamText('hello')
+    expect(s.streaming).toBe(true)
+    s.set('')
+    expect(s.value).toBe('')
+    expect(s.signal.peek()).toBe('')
+    expect(s.streaming).toBe(true)
+  })
+
+  it('append then set("") before microtask clears the pending buffer so the flush cannot resurrect chunks', async () => {
+    const s = streamText()
+    s.append('gone')
+    s.set('')
+    expect(s.signal.peek()).toBe('')
+    await Promise.resolve()
+    expect(s.value).toBe('')
+    expect(s.signal.peek()).toBe('')
+  })
+
   it('append() then set() before microtask replaces buffer and drops pending chunks from the signal', async () => {
     const s = streamText()
     s.append('gone')
