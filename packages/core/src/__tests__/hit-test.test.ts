@@ -4543,6 +4543,34 @@ describe('Yoga-computed row layout and hit routing (document direction)', () => 
     expect(log).toEqual(['dom-second'])
   })
 
+  it('RTL document: flex row-reverse matches LTR row geometry (main-start parity); dispatchHit follows DOM order', () => {
+    const log: string[] = []
+    const first = box({ width: 50, height: 50, onClick: () => { log.push('dom-first') } })
+    const second = box({ width: 50, height: 50, onClick: () => { log.push('dom-second') } })
+    const root = box({ width: 110, height: 50, flexDirection: 'row-reverse', gap: 10 }, [first, second])
+    const layout = computeLayout(toLayoutTree(root), { width: 110, height: 50, direction: 'rtl' })
+
+    const rowRef = box(
+      { width: 110, height: 50, flexDirection: 'row', gap: 10 },
+      [box({ width: 50, height: 50 }), box({ width: 50, height: 50 })],
+    )
+    const layoutLtrRow = computeLayout(toLayoutTree(rowRef), { width: 110, height: 50, direction: 'ltr' })
+    expect(layout.children.length).toBe(2)
+    expect(layoutLtrRow.children.length).toBe(2)
+    const a = layout.children[0]!
+    const b = layout.children[1]!
+    expect(a.x).toBe(layoutLtrRow.children[0]!.x)
+    expect(b.x).toBe(layoutLtrRow.children[1]!.x)
+    expect(a.x).toBeLessThan(b.x)
+
+    const cy = a.y + a.height / 2
+    dispatchHit(root, layout, 'onClick', a.x + a.width / 2, cy)
+    expect(log).toEqual(['dom-first'])
+    log.length = 0
+    dispatchHit(root, layout, 'onClick', b.x + b.width / 2, cy)
+    expect(log).toEqual(['dom-second'])
+  })
+
   it('LTR document: hitPathAtPoint and getCursorAtPoint follow row geometry', () => {
     const first = box({ width: 50, height: 50, cursor: 'crosshair' })
     const second = box({ width: 50, height: 50, cursor: 'pointer' })
