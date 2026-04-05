@@ -207,6 +207,34 @@ describe('dispatchHit', () => {
     expect((received as HitEvent & { buttons: number }).buttons).toBe(4)
   })
 
+  it('extra cannot override x, y, localX, localY, or target (hit geometry always wins)', () => {
+    let received: HitEvent | undefined
+    const layout = { x: 10, y: 20, width: 100, height: 50, children: [] }
+    const fakeTarget = { x: 0, y: 0, width: 1, height: 1, children: [] }
+    const el = box({
+      width: 100,
+      height: 50,
+      onPointerDown: e => {
+        received = e
+      },
+    })
+
+    dispatchHit(el, layout, 'onPointerDown', 50, 40, {
+      x: 999,
+      y: 888,
+      localX: 777,
+      localY: 666,
+      target: fakeTarget,
+    } as Record<string, unknown>)
+
+    expect(received).toBeDefined()
+    expect(received!.x).toBe(50)
+    expect(received!.y).toBe(40)
+    expect(received!.localX).toBe(40)
+    expect(received!.localY).toBe(20)
+    expect(received!.target).toBe(layout)
+  })
+
   it('zero-size box: only the origin corner is inside (dispatch + path + interactive + cursor)', () => {
     let fired = false
     const el = box({
