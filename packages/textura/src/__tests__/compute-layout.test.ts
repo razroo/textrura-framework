@@ -190,6 +190,44 @@ describe('box layout', () => {
     expect(row.children[0]!.x).toBeGreaterThan(row.children[1]!.x)
   })
 
+  it('nested row with dir rtl mirrors text-leaf flex order under ltr owner direction', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'column',
+      children: [
+        {
+          width: 200,
+          height: 40,
+          flexDirection: 'row',
+          gap: 10,
+          dir: 'rtl',
+          children: [
+            {
+              text: 'a',
+              font: '16px sans-serif',
+              lineHeight: 20,
+              width: 50,
+              height: 30,
+            },
+            {
+              text: 'bbbb',
+              font: '16px sans-serif',
+              lineHeight: 20,
+              width: 50,
+              height: 30,
+            },
+          ],
+        },
+      ],
+    }
+    const result = computeLayout(tree, { width: 200, height: 80, direction: 'ltr' })
+    const row = result.children[0]!
+    expect(row.children[0]!.x).toBeGreaterThan(row.children[1]!.x)
+    expect(row.children[0]!.text).toBe('a')
+    expect(row.children[1]!.text).toBe('bbbb')
+  })
+
   it('owner direction rtl mirrors top-level flex row when nodes omit dir (document / root context)', () => {
     const tree: BoxNode = {
       width: 200,
