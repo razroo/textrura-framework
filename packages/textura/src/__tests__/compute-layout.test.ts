@@ -163,6 +163,27 @@ describe('box layout', () => {
     expect(result.children[0]!.x).toBeLessThan(result.children[1]!.x)
   })
 
+  it('root dir auto inherits ComputeOptions.direction for a top-level row (same geometry as omitting dir)', () => {
+    const base: BoxNode = {
+      width: 200,
+      height: 40,
+      flexDirection: 'row',
+      gap: 10,
+      children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+    }
+    const omittedRtl = computeLayout(base, { width: 200, height: 80, direction: 'rtl' })
+    const autoRtl = computeLayout({ ...base, dir: 'auto' }, { width: 200, height: 80, direction: 'rtl' })
+    expect(autoRtl.children[0]!.x).toBe(omittedRtl.children[0]!.x)
+    expect(autoRtl.children[1]!.x).toBe(omittedRtl.children[1]!.x)
+    expect(autoRtl.children[0]!.x).toBeGreaterThan(autoRtl.children[1]!.x)
+
+    const omittedLtr = computeLayout(base, { width: 200, height: 80, direction: 'ltr' })
+    const autoLtr = computeLayout({ ...base, dir: 'auto' }, { width: 200, height: 80, direction: 'ltr' })
+    expect(autoLtr.children[0]!.x).toBe(omittedLtr.children[0]!.x)
+    expect(autoLtr.children[1]!.x).toBe(omittedLtr.children[1]!.x)
+    expect(autoLtr.children[0]!.x).toBeLessThan(autoLtr.children[1]!.x)
+  })
+
   it('nested row with dir auto inherits rtl owner direction and mirrors flex children', () => {
     const tree: BoxNode = {
       width: 200,
