@@ -91,6 +91,33 @@ describe('box layout', () => {
     expect(result.children[0]!.x).toBeGreaterThan(result.children[1]!.x)
   })
 
+  it('malformed owner direction at runtime falls back to LTR (only exact "rtl" mirrors the row)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 40,
+      flexDirection: 'row',
+      gap: 10,
+      children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+    }
+    const ltr = computeLayout(tree, { width: 200, height: 80, direction: 'ltr' })
+    const rtl = computeLayout(tree, { width: 200, height: 80, direction: 'rtl' })
+    const trimmed = computeLayout(tree, {
+      width: 200,
+      height: 80,
+      direction: 'rtl ' as never,
+    })
+    const upper = computeLayout(tree, {
+      width: 200,
+      height: 80,
+      direction: 'RTL' as never,
+    })
+    expect(rtl.children[0]!.x).toBeGreaterThan(rtl.children[1]!.x)
+    expect(trimmed.children[0]!.x).toBe(ltr.children[0]!.x)
+    expect(trimmed.children[1]!.x).toBe(ltr.children[1]!.x)
+    expect(upper.children[0]!.x).toBe(ltr.children[0]!.x)
+    expect(upper.children[1]!.x).toBe(ltr.children[1]!.x)
+  })
+
   it('nested row with dir auto inherits rtl owner direction and mirrors flex children', () => {
     const tree: BoxNode = {
       width: 200,

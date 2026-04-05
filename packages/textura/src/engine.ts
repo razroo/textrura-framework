@@ -314,6 +314,9 @@ export interface ComputeOptions {
    * omitting `dir` on the layout-tree root so this option stays authoritative for the host root.
    *
    * Default: `'ltr'`.
+   *
+   * Runtime: only the exact string `'rtl'` selects RTL; any other value (including `'RTL'`, whitespace,
+   * or corrupted deserialization) falls back to LTR — same as omitting `direction`.
    */
   direction?: 'ltr' | 'rtl'
 }
