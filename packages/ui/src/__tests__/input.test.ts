@@ -432,6 +432,26 @@ describe('@geometra/ui input', () => {
     expect(caretIdx).toBeLessThan(placeholderIdx)
   })
 
+  it('calls onCaretOffsetChange with 0 on click when value is empty', () => {
+    let seen = -1
+    const el = input('', 'Name', {
+      focused: true,
+      onCaretOffsetChange: (o) => {
+        seen = o
+      },
+    })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+
+    el.handlers?.onClick?.({
+      x: 50,
+      y: 5,
+      localX: 99,
+      target: { x: 0, y: 0, width: 200, height: 30, children: [] } as HitEvent['target'],
+    })
+    expect(seen).toBe(0)
+  })
+
   it('maps click x position to caret offset via callback', () => {
     let seenOffset = -1
     const el = input('Charlie', 'Name', {
