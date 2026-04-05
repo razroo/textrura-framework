@@ -50,6 +50,26 @@ describe('dispatchHit', () => {
     expect(fired).toBe(true)
   })
 
+  it('hit on top-left inclusive edge fires handler', () => {
+    let fired = false
+    const el = box({ width: 100, height: 50, onClick: () => { fired = true } })
+    const layout = { x: 0, y: 0, width: 100, height: 50, children: [] }
+
+    const result = dispatchHit(el, layout, 'onClick', 0, 0)
+    expect(result.handled).toBe(true)
+    expect(fired).toBe(true)
+  })
+
+  it('hit on translated min corner uses inclusive layout x/y (abs origin edges)', () => {
+    let fired = false
+    const el = box({ width: 30, height: 40, onClick: () => { fired = true } })
+    const layout = { x: 10, y: 20, width: 30, height: 40, children: [] }
+
+    const result = dispatchHit(el, layout, 'onClick', 10, 20)
+    expect(result.handled).toBe(true)
+    expect(fired).toBe(true)
+  })
+
   it('non-box root (text): pointer inside layout does not dispatch handlers', () => {
     const el = text({
       text: 'hi',
