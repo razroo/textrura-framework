@@ -126,6 +126,37 @@ describe('demo input scenario smoke', () => {
     expect(order).toEqual(['keyDown'])
   })
 
+  it('uiInput forwards Ctrl+A and Meta+A to onKeyDown when onSelectAll is omitted (custom select-all)', () => {
+    const keys: string[] = []
+    const el = uiInput('abc', 'field', {
+      focused: true,
+      onKeyDown: (e) => keys.push(`${e.ctrlKey ? 'ctrl+' : ''}${e.metaKey ? 'meta+' : ''}${e.key}`),
+    })
+    expect(el.kind).toBe('box')
+
+    const target = {} as KeyboardHitEvent['target']
+    el.handlers?.onKeyDown?.({
+      key: 'a',
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: true,
+      metaKey: false,
+      altKey: false,
+      target,
+    })
+    el.handlers?.onKeyDown?.({
+      key: 'A',
+      code: 'KeyA',
+      shiftKey: true,
+      ctrlKey: false,
+      metaKey: true,
+      altKey: false,
+      target,
+    })
+
+    expect(keys).toEqual(['ctrl+a', 'meta+A'])
+  })
+
   it('disabled uiInput omits pointer and keyboard handlers (no accidental input when non-interactive)', () => {
     let calls = 0
     const el = uiInput('hi', 'field', {
