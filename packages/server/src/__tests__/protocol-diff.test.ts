@@ -298,6 +298,28 @@ describe('coalescePatches', () => {
     ).toEqual([{ path: [1], x: 7 }])
   })
 
+  it('ignores boxed Number and bigint geometry fields (only finite primitive numbers merge)', () => {
+    expect(
+      coalescePatches([
+        { path: [0], x: 10, y: 1 },
+        {
+          path: [0],
+          x: Object(20) as unknown as number,
+          y: Object(30) as unknown as number,
+          width: 5n as unknown as number,
+          height: Object(40) as unknown as number,
+        },
+      ]),
+    ).toEqual([{ path: [0], x: 10, y: 1 }])
+
+    expect(
+      coalescePatches([
+        { path: [1], x: Object(1) as unknown as number },
+        { path: [1], x: 2 },
+      ]),
+    ).toEqual([{ path: [1], x: 2 }])
+  })
+
   it('coalesces burst updates to the root path (empty path segment)', () => {
     const merged = coalescePatches([
       { path: [], x: 1 },
