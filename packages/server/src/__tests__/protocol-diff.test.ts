@@ -320,4 +320,16 @@ describe('coalescePatches', () => {
       { path: [1, undefined, 3], y: 2 },
     ])
   })
+
+  it('accepts a path-only first patch; later entries add fields (hand-built / burst edge)', () => {
+    expect(coalescePatches([{ path: [0, 1] }, { path: [0, 1], x: 3, y: 4 }])).toEqual([
+      { path: [0, 1], x: 3, y: 4 },
+    ])
+  })
+
+  it('path-only follow-up does not clear prior coalesced fields', () => {
+    expect(coalescePatches([{ path: [0], x: 1, height: 9 }, { path: [0] }])).toEqual([
+      { path: [0], x: 1, height: 9 },
+    ])
+  })
 })
