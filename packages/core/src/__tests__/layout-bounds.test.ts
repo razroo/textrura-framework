@@ -386,6 +386,13 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(0, 0, 0, 0, -1, 1)).toBe(false)
     expect(pointInInclusiveLayoutRect(0, 0, 0, 0, 1, -0.5)).toBe(false)
   })
+
+  it('returns false when rect origin or size arguments are non-finite (corrupt abs layout)', () => {
+    expect(pointInInclusiveLayoutRect(0, 0, Number.NaN, 0, 1, 1)).toBe(false)
+    expect(pointInInclusiveLayoutRect(0, 0, 0, Number.POSITIVE_INFINITY, 1, 1)).toBe(false)
+    expect(pointInInclusiveLayoutRect(0, 0, 0, 0, Number.NaN, 1)).toBe(false)
+    expect(pointInInclusiveLayoutRect(0, 0, 0, 0, 1, Number.NEGATIVE_INFINITY)).toBe(false)
+  })
 })
 
 describe('finiteNumberOrZero', () => {
