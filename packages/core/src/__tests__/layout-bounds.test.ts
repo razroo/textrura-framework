@@ -393,6 +393,18 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(0, 0, 0, 0, Number.NaN, 1)).toBe(false)
     expect(pointInInclusiveLayoutRect(0, 0, 0, 0, 1, Number.NEGATIVE_INFINITY)).toBe(false)
   })
+
+  it('treats IEEE negative zero width and height like +0 (width < 0 is false for -0; matches layoutBoundsAreFinite)', () => {
+    expect(Object.is(-0, 0)).toBe(false)
+    // Collapsed to vertical segment x=0, y in [0, 10]
+    expect(pointInInclusiveLayoutRect(0, 0, 0, 0, -0, 10)).toBe(true)
+    expect(pointInInclusiveLayoutRect(0, 5, 0, 0, -0, 10)).toBe(true)
+    expect(pointInInclusiveLayoutRect(1, 5, 0, 0, -0, 10)).toBe(false)
+    // Collapsed to horizontal segment y=0, x in [0, 10]
+    expect(pointInInclusiveLayoutRect(0, 0, 0, 0, 10, -0)).toBe(true)
+    expect(pointInInclusiveLayoutRect(5, 0, 0, 0, 10, -0)).toBe(true)
+    expect(pointInInclusiveLayoutRect(5, 1, 0, 0, 10, -0)).toBe(false)
+  })
 })
 
 describe('finiteNumberOrZero', () => {
