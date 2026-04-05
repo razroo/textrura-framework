@@ -45,7 +45,8 @@ export interface StyleProps {
   cursor?: CursorProp
   /**
    * Z-index for paint ordering among siblings. Higher values paint on top.
-   * Non-finite values (`NaN`, `±Infinity`) are treated as `0` for hit-testing and renderer paint order.
+   * Non-finite numbers and non-number runtime values are normalized to `0` for hit-testing and renderer
+   * paint order (same rule as {@link import('./layout-bounds.js').finiteNumberOrZero}).
    */
   zIndex?: number
   /**

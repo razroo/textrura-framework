@@ -426,3 +426,47 @@ describe('CanvasRenderer layoutInspector inspectorProbe', () => {
     expect(fillText.mock.calls.some(args => String(args[0]).startsWith('hit ['))).toBe(true)
   })
 })
+
+describe('CanvasRenderer sibling zIndex paint order', () => {
+  it('treats non-finite zIndex like 0 so higher finite z paints on top (matches hit-test stacking)', () => {
+    class RecordingCtx extends FakeCtx {
+      fills: Array<{ style: string; x: number; y: number; w: number; h: number }> = []
+      override fillRect(x: number, y: number, w: number, h: number): void {
+        this.fills.push({ style: String(this.fillStyle), x, y, w, h })
+      }
+    }
+
+    Object.defineProperty(globalThis, 'window', {
+      value: { devicePixelRatio: 1 },
+      configurable: true,
+      writable: true,
+    })
+    const ctx = new RecordingCtx()
+    const canvas = {
+      style: {} as Record<string, string>,
+      getContext: () => ctx,
+    } as unknown as HTMLCanvasElement
+
+    const renderer = new CanvasRenderer({ canvas })
+    const tree = box({ width: 100, height: 100, backgroundColor: '#ffffff' }, [
+      box({ width: 100, height: 100, backgroundColor: '#ff0000', zIndex: Number.NaN }),
+      box({ width: 100, height: 100, backgroundColor: '#0000ff', zIndex: 1 }),
+    ])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 100, height: 100, children: [] },
+        { x: 0, y: 0, width: 100, height: 100, children: [] },
+      ],
+    }
+
+    renderer.render(layout, tree)
+
+    const childFills = ctx.fills.filter(f => f.style === '#ff0000' || f.style === '#0000ff')
+    expect(childFills.length).toBe(2)
+    expect(childFills[1]!.style).toBe('#0000ff')
+  })
+})

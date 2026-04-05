@@ -24,8 +24,7 @@ interface ZIndexCacheEntry {
 const zIndexOrderCache = new WeakMap<BoxElement, ZIndexCacheEntry>()
 
 function zIndexOf(el: UIElement): number {
-  const z = el.props.zIndex
-  return typeof z === 'number' && Number.isFinite(z) ? z : 0
+  return finiteNumberOrZero(el.props.zIndex)
 }
 
 function getChildrenByZAsc(boxEl: BoxElement): number[] {

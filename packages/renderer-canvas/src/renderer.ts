@@ -22,6 +22,7 @@ import {
   hitPathAtPoint,
   collectFocusOrder,
   readPerformanceNow,
+  finiteNumberOrZero,
 } from '@geometra/core'
 
 export interface CanvasRendererOptions {
@@ -333,7 +334,7 @@ export class CanvasRenderer implements Renderer {
   }
 
   private zIndexOf(element: UIElement): number {
-    return (element.props as Record<string, unknown>).zIndex as number | undefined ?? 0
+    return finiteNumberOrZero((element.props as Record<string, unknown>).zIndex)
   }
 
   private getChildrenByZAsc(box: BoxElement): number[] {

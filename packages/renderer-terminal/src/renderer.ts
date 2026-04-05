@@ -1,5 +1,6 @@
 import type { ComputedLayout } from 'textura'
 import type { Renderer, UIElement, BoxElement, TextElement, ImageElement } from '@geometra/core'
+import { finiteNumberOrZero } from '@geometra/core'
 
 export interface TerminalRendererOptions {
   /** Terminal columns. Default: process.stdout.columns. */
@@ -108,8 +109,8 @@ export class TerminalRenderer implements Renderer {
       const hasZIndex = element.children.some(c => (c.props as Record<string, unknown>).zIndex !== undefined)
       if (hasZIndex) {
         indices.sort((a, b) => {
-          const zA = (element.children[a]!.props as Record<string, unknown>).zIndex as number | undefined ?? 0
-          const zB = (element.children[b]!.props as Record<string, unknown>).zIndex as number | undefined ?? 0
+          const zA = finiteNumberOrZero((element.children[a]!.props as Record<string, unknown>).zIndex)
+          const zB = finiteNumberOrZero((element.children[b]!.props as Record<string, unknown>).zIndex)
           return zA - zB
         })
       }
