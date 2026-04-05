@@ -46,6 +46,48 @@ export function button(label: string, onClick?: EventHandlers['onClick']): UIEle
   )
 }
 
+// ---------------------------------------------------------------------------
+// Link
+// ---------------------------------------------------------------------------
+
+export interface LinkOptions {
+  /** Font CSS shorthand (default: '12px Inter'). */
+  font?: string
+  /** Text color (default: '#38bdf8' — cyan). */
+  color?: string
+  /** Line height in pixels (default: 16). */
+  lineHeight?: number
+  /** Open in new tab (default: true). */
+  newTab?: boolean
+}
+
+/**
+ * Inline text link that opens a URL on click.
+ *
+ * Renders with link-style color and pointer cursor. Clicking opens the
+ * href via `window.open`.
+ */
+export function link(label: string, href: string, options: LinkOptions = {}): UIElement {
+  const {
+    font = '12px Inter',
+    color = '#38bdf8',
+    lineHeight = 16,
+    newTab = true,
+  } = options
+  return box(
+    {
+      cursor: 'pointer',
+      onClick: () => {
+        if (typeof window !== 'undefined') {
+          window.open(href, newTab ? '_blank' : '_self', newTab ? 'noopener,noreferrer' : undefined)
+        }
+      },
+      semantic: { tag: 'a', role: 'link', ariaLabel: label },
+    },
+    [text({ text: label, font, lineHeight, color })],
+  )
+}
+
 export interface InputOptions {
   /** When true, the field is non-interactive: no caret, keyboard, pointer, or composition handlers. */
   disabled?: boolean
