@@ -612,4 +612,17 @@ describe('geometry snapshot CI', () => {
     const layout = computeLayout(toLayoutTree(tree), { width: 220, height: 52 })
     expect(roundLayout(layout)).toMatchSnapshot()
   })
+
+  it('stable row with square aspectRatio box and text sibling (rounded)', async () => {
+    await init()
+    const tree = box(
+      { width: 200, height: 100, padding: 8, flexDirection: 'row', gap: 8, alignItems: 'center' },
+      [
+        box({ width: 40, aspectRatio: 1 }),
+        text({ text: 'Side', font: '16px sans-serif', lineHeight: 20, width: 48, height: 20 }),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 100 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
 })
