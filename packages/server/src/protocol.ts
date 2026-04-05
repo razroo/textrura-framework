@@ -130,12 +130,17 @@ export function coalescePatches(patches: LayoutPatch[]): LayoutPatch[] {
  * only uses patches when the UI tree JSON is unchanged (`createServer` sends full `frame` messages
  * whenever the tree changes), so callers should not rely on this function across structural layout
  * mismatches.
+ *
+ * When `prev` and `next` are the same object reference (including a shared child subtree), returns
+ * `[]` immediately without walking — safe for immutable layout snapshots.
  */
 export function diffLayout(
   prev: ComputedLayout,
   next: ComputedLayout,
   path: number[] = [],
 ): LayoutPatch[] {
+  if (prev === next) return []
+
   const patches: LayoutPatch[] = []
 
   const patch: LayoutPatch = { path }

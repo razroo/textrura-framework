@@ -76,6 +76,18 @@ describe('diffLayout', () => {
     expect(patches).toEqual([])
   })
 
+  it('returns no patches when prev and next are the same layout reference (shared immutable subtree)', () => {
+    const layout = makeBaseLayout()
+    expect(diffLayout(layout, layout)).toEqual([])
+  })
+
+  it('skips walking a child subtree when both sides reuse the same child reference', () => {
+    const shared: TestLayout = { x: 0, y: 0, width: 50, height: 20, children: [] }
+    const prev: TestLayout = { x: 0, y: 0, width: 100, height: 100, children: [shared] }
+    const next: TestLayout = { x: 5, y: 0, width: 100, height: 100, children: [shared] }
+    expect(diffLayout(prev, next)).toEqual([{ path: [], x: 5 }])
+  })
+
   it('compares children pairwise by index and ignores trailing extras on prev (no removal patches)', () => {
     const prev: TestLayout = {
       x: 0,
