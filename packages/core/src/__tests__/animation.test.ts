@@ -9,6 +9,12 @@ import {
   transition,
 } from '../animation.js'
 
+// Module-level motion preference is shared across the worker; reset so failures or
+// ordering changes cannot leak `reduced` into other test files.
+afterEach(() => {
+  setMotionPreference('full')
+})
+
 describe('easing presets', () => {
   it('maps t=0 to 0 and t=1 to 1 for bundled easing curves', () => {
     for (const fn of [easing.linear, easing.easeIn, easing.easeOut, easing.easeInOut] as const) {
