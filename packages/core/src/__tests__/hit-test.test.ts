@@ -4019,6 +4019,31 @@ describe('hasInteractiveHitAtPoint', () => {
     expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(false)
   })
 
+  it('treats explicit undefined pointer slots like missing keys (merged handler maps at runtime)', () => {
+    const noop = () => {}
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }],
+    } as const
+
+    const pointerChild = box({ width: 40, height: 40, onPointerDown: noop })
+    Object.assign(pointerChild.handlers!, { onClick: undefined })
+    expect(hasInteractiveHitAtPoint(box({ width: 100, height: 100 }, [pointerChild]), layout, 10, 10)).toBe(
+      true,
+    )
+
+    const keyChild = box({ width: 40, height: 40, onKeyDown: noop })
+    Object.assign(keyChild.handlers!, { onClick: undefined })
+    const keyRoot = box({ width: 100, height: 100 }, [keyChild])
+    expect(hasInteractiveHitAtPoint(keyRoot, layout, 10, 10)).toBe(false)
+    const click = dispatchHit(keyRoot, layout, 'onClick', 10, 10)
+    expect(click.handled).toBe(false)
+    expect(click.focusTarget?.element).toBe(keyChild)
+  })
+
   it('ignores other key- and composition-only handlers for hover hit-test', () => {
     const layoutBase = {
       x: 0,
