@@ -1030,9 +1030,13 @@ describe('dispatchHit', () => {
     const keyDownOnly = box({ width: 100, height: 50, onKeyDown: () => undefined })
     const keyUpOnly = box({ width: 100, height: 50, onKeyUp: () => undefined })
     const compStartOnly = box({ width: 100, height: 50, onCompositionStart: () => undefined })
+    const compUpdateOnly = box({ width: 100, height: 50, onCompositionUpdate: () => undefined })
+    const compEndOnly = box({ width: 100, height: 50, onCompositionEnd: () => undefined })
     expect(hasInteractiveHitAtPoint(keyDownOnly, layout, 50, 25)).toBe(false)
     expect(hasInteractiveHitAtPoint(keyUpOnly, layout, 50, 25)).toBe(false)
     expect(hasInteractiveHitAtPoint(compStartOnly, layout, 50, 25)).toBe(false)
+    expect(hasInteractiveHitAtPoint(compUpdateOnly, layout, 50, 25)).toBe(false)
+    expect(hasInteractiveHitAtPoint(compEndOnly, layout, 50, 25)).toBe(false)
   })
 
   it('merges extra fields into the hit event', () => {
