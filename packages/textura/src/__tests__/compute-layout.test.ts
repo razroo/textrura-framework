@@ -139,6 +139,30 @@ describe('box layout', () => {
     expect(row.children[0]!.x).toBeLessThan(row.children[1]!.x)
   })
 
+  it('nested row with unknown dir inherits owner direction like auto (malformed serialized dir)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'column',
+      children: [
+        {
+          width: 200,
+          height: 40,
+          flexDirection: 'row',
+          gap: 10,
+          dir: 'bogus' as never,
+          children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+        },
+      ],
+    }
+    const rtl = computeLayout(tree, { width: 200, height: 80, direction: 'rtl' })
+    const rowRtl = rtl.children[0]!
+    expect(rowRtl.children[0]!.x).toBeGreaterThan(rowRtl.children[1]!.x)
+    const ltr = computeLayout(tree, { width: 200, height: 80, direction: 'ltr' })
+    const rowLtr = ltr.children[0]!
+    expect(rowLtr.children[0]!.x).toBeLessThan(rowLtr.children[1]!.x)
+  })
+
   it('column with dir rtl aligns flex-start children to the cross-axis start (physical right under ltr owner)', () => {
     const tree: BoxNode = {
       width: 200,
