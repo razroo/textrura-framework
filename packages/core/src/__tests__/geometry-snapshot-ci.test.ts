@@ -123,6 +123,29 @@ describe('geometry snapshot CI', () => {
     expect(roundLayout(layout)).toMatchSnapshot()
   })
 
+  it('stable ltr document: inner flex row with non-ltr/rtl dir uses Yoga inherit (ltr from parent) (rounded)', async () => {
+    await init()
+    const item = { font: '16px sans-serif', lineHeight: 20 } as const
+    const tree = box(
+      { width: 200, height: 80, padding: 12 },
+      [
+        box(
+          {
+            width: 176,
+            height: 56,
+            flexDirection: 'row',
+            gap: 8,
+            // Serialized or hand-built trees may carry unknown strings; Textura maps these to Inherit.
+            dir: 'bogus' as never,
+          },
+          [text({ text: 'A', ...item }), text({ text: 'B', ...item })],
+        ),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 80 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
+
   it('stable ltr document: descendant dir rtl on inner flex column (rounded)', async () => {
     await init()
     const item = { font: '16px sans-serif', lineHeight: 20 } as const
