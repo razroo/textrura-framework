@@ -206,6 +206,12 @@ describe('query helpers', () => {
     expect(parseQuery('?n=0')).toEqual({ n: '0' })
   })
 
+  it('stringifies IEEE negative zero like zero (finite; String(-0) is "0") and round-trips as string', () => {
+    expect(Object.is(-0, 0)).toBe(false)
+    expect(stringifyQuery({ n: -0 })).toBe('?n=0')
+    expect(parseQuery('?n=0')).toEqual({ n: '0' })
+  })
+
   it('omits non-finite numbers (NaN, ±Infinity, and double overflow to Infinity)', () => {
     const jsonExponentOverflow = Number.parseFloat('1e400')
     expect(stringifyQuery({ n: Number.NaN })).toBe('')
