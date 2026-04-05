@@ -207,6 +207,20 @@ describe('animation timeline', () => {
     setMotionPreference('full')
   })
 
+  it('lazily targeted keys jump immediately under reduced motion (ensureTimeline path)', () => {
+    setMotionPreference('reduced')
+    const props = createPropertyTimeline({ x: 0 })
+    expect(props.values).not.toHaveProperty('z')
+    props.to({ x: 40, z: 99 }, 600, easing.linear)
+    expect(props.values.x.peek()).toBe(40)
+    expect(props.values.z.peek()).toBe(99)
+    expect(props.state()).toBe('finished')
+    props.step(200)
+    expect(props.values.x.peek()).toBe(40)
+    expect(props.values.z.peek()).toBe(99)
+    setMotionPreference('full')
+  })
+
   it('clamps non-positive duration to 1ms so step() always has a defined progress scale', () => {
     const timeline = createTweenTimeline(0)
     timeline.to(100, 0, easing.linear)
