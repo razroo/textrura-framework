@@ -118,6 +118,25 @@ describe('box layout', () => {
     expect(upper.children[1]!.x).toBe(ltr.children[1]!.x)
   })
 
+  it('explicit undefined owner direction in options matches omitted direction (LTR flex row)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 40,
+      flexDirection: 'row',
+      gap: 10,
+      children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+    }
+    const omitted = computeLayout(tree, { width: 200, height: 80 })
+    const explicitUndefined = computeLayout(tree, {
+      width: 200,
+      height: 80,
+      direction: undefined,
+    })
+    expect(explicitUndefined.children[0]!.x).toBe(omitted.children[0]!.x)
+    expect(explicitUndefined.children[1]!.x).toBe(omitted.children[1]!.x)
+    expect(explicitUndefined.children[0]!.x).toBeLessThan(explicitUndefined.children[1]!.x)
+  })
+
   it('root dir rtl on the tree node mirrors a top-level row even when ComputeOptions.direction is ltr', () => {
     const tree: BoxNode = {
       width: 200,
