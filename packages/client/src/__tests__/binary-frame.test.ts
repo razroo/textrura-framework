@@ -249,4 +249,16 @@ describe('client binary frame decode', () => {
     expect(isBinaryFrameArrayBuffer(i8)).toBe(true)
     expect(decodeBinaryFrameJson(i8)).toBe(json)
   })
+
+  it('decodes a v1 frame when the same bytes are exposed as Float16Array (ArrayBuffer.isView parity)', () => {
+    if (typeof Float16Array === 'undefined') return
+    const json = '{"type":"patch","patches":[]}'
+    const frame = new Uint8Array(encodeBinaryFrameJsonV1(json))
+    const len16h = Math.ceil(frame.byteLength / 2) * 2
+    const buf16h = new ArrayBuffer(len16h)
+    new Uint8Array(buf16h).set(frame)
+    const f16 = new Float16Array(buf16h)
+    expect(isBinaryFrameArrayBuffer(f16)).toBe(true)
+    expect(decodeBinaryFrameJson(f16)).toBe(json)
+  })
 })
