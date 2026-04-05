@@ -89,6 +89,24 @@ describe('streamText', () => {
     expect(s.value).toBe('x')
   })
 
+  it('ignores non-string append without throwing (hostile / mistyped chunks)', async () => {
+    const s = streamText('x')
+    s.append(null as unknown as string)
+    s.append(undefined as unknown as string)
+    s.append(42 as unknown as string)
+    s.append({} as unknown as string)
+    await Promise.resolve()
+    expect(s.value).toBe('x')
+  })
+
+  it('clear before pending microtask flush leaves empty value (buffer and signal stay aligned)', async () => {
+    const s = streamText()
+    s.append('gone')
+    s.clear()
+    await Promise.resolve()
+    expect(s.value).toBe('')
+  })
+
   it('done() on an empty stream sets streaming false without changing value', () => {
     const s = streamText()
     s.done()

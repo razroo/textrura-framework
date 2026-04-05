@@ -14,7 +14,10 @@ export interface StreamText {
   readonly value: string
   /** Underlying signal for direct use in view functions. */
   readonly signal: Signal<string>
-  /** Append text. Coalesces rapid calls into a single signal update per microtask. */
+  /**
+   * Append text. Coalesces rapid calls into a single signal update per microtask.
+   * Non-string values are ignored so corrupt host data cannot stringify as `[object Object]`.
+   */
   append(chunk: string): void
   /** Replace the entire text content. */
   set(text: string): void
@@ -58,7 +61,7 @@ export function streamText(initial = ''): StreamText {
     },
     signal: s,
     append(chunk: string): void {
-      if (chunk.length === 0) return
+      if (typeof chunk !== 'string' || chunk.length === 0) return
       buffer += chunk
       scheduleFlush()
     },
