@@ -1,23 +1,24 @@
 {
-  "name": "@geometra/renderer-canvas",
+  "name": "@geometra/cli",
   "version": "1.13.0",
-  "description": "Canvas2D renderer for Geometra — the singularity frontend framework",
+  "description": "CLI to view any Geometra-powered site in the terminal",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "https://github.com/razroo/geometra",
-    "directory": "packages/renderer-canvas"
+    "directory": "packages/cli"
   },
   "homepage": "https://razroo.github.io/geometra",
   "keywords": [
     "geometra",
-    "singularity",
-    "renderer",
-    "canvas",
-    "dom-free",
-    "ai-native"
+    "cli",
+    "terminal",
+    "tui"
   ],
+  "bin": {
+    "geometra": "./dist/bin.js"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -34,7 +35,13 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
-    "@geometra/client": "^1.6.0",
-    "@geometra/core": "^1.6.0"
+    "@geometra/core": "^1.12.0",
+    "@geometra/renderer-terminal": "^1.12.0",
+    "textura": "^1.11.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.0"
   }
 }
