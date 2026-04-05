@@ -150,12 +150,22 @@ describe('breakpoint duplicate thresholds', () => {
 })
 
 describe('createViewport edge cases', () => {
-  it('stores non-finite dimensions as given (hosts may sanitize); breakpoint still falls back safely', () => {
+  it('coerces non-finite initial dimensions to zero (parity with layout / hit-test guards)', () => {
     const vp = createViewport(Number.NaN, Number.POSITIVE_INFINITY)
-    expect(vp.width.value).toBeNaN()
-    expect(vp.height.value).toBe(Number.POSITIVE_INFINITY)
+    expect(vp.width.value).toBe(0)
+    expect(vp.height.value).toBe(0)
     const bps = { sm: 0, md: 640, lg: 1024 }
     expect(breakpoint(vp.width, bps).value).toBe('sm')
     expect(breakpoint(signal(Number.NEGATIVE_INFINITY), bps).value).toBe('sm')
+  })
+
+  it('coerces non-finite resize arguments to zero without throwing', () => {
+    const vp = createViewport(800, 600)
+    vp.resize(Number.NaN, Number.POSITIVE_INFINITY)
+    expect(vp.width.value).toBe(0)
+    expect(vp.height.value).toBe(0)
+    vp.resize(400, 300)
+    expect(vp.width.value).toBe(400)
+    expect(vp.height.value).toBe(300)
   })
 })

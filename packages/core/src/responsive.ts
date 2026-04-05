@@ -6,6 +6,7 @@
  * apps (server updates viewport signals when clients send resize messages).
  */
 
+import { finiteNumberOrZero } from './layout-bounds.js'
 import { signal, computed } from './signals.js'
 import type { Signal, Computed } from './signals.js'
 
@@ -27,16 +28,20 @@ export interface Viewport {
  *
  * In a browser you can wire it to `window` resize events; in a server-driven
  * app the server updates it when a client sends a `resize` message.
+ *
+ * Width and height are coerced with {@link finiteNumberOrZero} on creation and on
+ * {@link Viewport.resize} so corrupt or non-finite values from deserialized resize
+ * payloads cannot poison layout breakpoints.
  */
 export function createViewport(initialWidth: number, initialHeight: number): Viewport {
-  const w = signal(initialWidth)
-  const h = signal(initialHeight)
+  const w = signal(finiteNumberOrZero(initialWidth))
+  const h = signal(finiteNumberOrZero(initialHeight))
   return {
     width: w,
     height: h,
     resize(width: number, height: number): void {
-      w.set(width)
-      h.set(height)
+      w.set(finiteNumberOrZero(width))
+      h.set(finiteNumberOrZero(height))
     },
   }
 }
