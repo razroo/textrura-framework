@@ -415,6 +415,8 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(0, 0, Number.NaN, 0, 1, 1)).toBe(false)
     expect(pointInInclusiveLayoutRect(0, 0, 0, Number.POSITIVE_INFINITY, 1, 1)).toBe(false)
     expect(pointInInclusiveLayoutRect(0, 0, 0, 0, Number.NaN, 1)).toBe(false)
+    expect(pointInInclusiveLayoutRect(0, 0, 0, 0, Number.POSITIVE_INFINITY, 1)).toBe(false)
+    expect(pointInInclusiveLayoutRect(0, 0, 0, 0, 1, Number.POSITIVE_INFINITY)).toBe(false)
     expect(pointInInclusiveLayoutRect(0, 0, 0, 0, 1, Number.NEGATIVE_INFINITY)).toBe(false)
   })
 
