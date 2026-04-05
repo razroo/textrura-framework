@@ -33,6 +33,11 @@ async function main() {
       'release:gate: package.json scripts.release:gate must invoke test:terminal-input (@geometra/demo-terminal input suite)',
     )
   }
+  if (!/\bvitest\s+run\b/.test(gate)) {
+    throw new Error(
+      'release:gate: scripts.release:gate must include `vitest run` (allowlisted suites); `vitest` alone is watch-mode and must not ship as the gate',
+    )
+  }
 
   const segments = gate.split(/\s+&&\s+/).map(s => s.trim())
   const lastSegment = segments[segments.length - 1] ?? ''
