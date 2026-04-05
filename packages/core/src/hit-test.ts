@@ -234,11 +234,14 @@ function dispatchHitRecursive(
  * Intended slots: `onClick`, `onPointerDown` / `Up` / `Move`, and `onWheel` (same coordinate rules as
  * {@link hitPathAtPoint}). The deepest hit with a matching handler runs first; only one handler runs per call.
  *
- * {@link import('./types.js').EventHandlers} also lists keyboard and composition keys for the focused
- * element, but those are **not** routed by `(x, y)` here — use {@link import('./keyboard.js').dispatchKeyboardEvent}
- * and {@link import('./keyboard.js').dispatchCompositionEvent} (or {@link import('./app.js').App.dispatchKey} /
- * {@link import('./app.js').App.dispatchComposition} from `createApp`) so Tab, typing, and IME go to the
- * focused target instead of whatever box lies under the pointer.
+ * {@link import('./types.js').EventHandlers} also lists keyboard and composition keys. For **real** apps,
+ * those should go to the **focused** element via {@link import('./keyboard.js').dispatchKeyboardEvent} and
+ * {@link import('./keyboard.js').dispatchCompositionEvent} (or {@link import('./app.js').App.dispatchKey} /
+ * {@link import('./app.js').App.dispatchComposition} from `createApp`) — not pointer-based routing.
+ * For **synthetic** hosts, tests, or tooling, `eventType` may still be any `keyof EventHandlers`: the deepest
+ * box under `(x, y)` with that slot set runs once, and `extra` is merged into the same event object as pointer
+ * dispatch (`x`, `y`, `localX`, `localY`, `target` always win after `extra`). `focusTarget` is only populated
+ * for `onClick` (keyboard/composition keys never set it).
  *
  * Optional `extra` is shallow-merged first; `x`, `y`, `localX`, `localY`, and `target` are then
  * set from the hit so corrupt or mistaken keys in `extra` cannot override pointer geometry or layout.
@@ -259,7 +262,8 @@ function dispatchHitRecursive(
  *
  * @param element - Root of the UI tree (typically a `box`).
  * @param layout - Computed layout node parallel to `element` (same shape as Yoga/Textura output).
- * @param eventType - Which handler slot to dispatch (e.g. `onClick`, `onPointerDown`).
+ * @param eventType - Which handler slot to dispatch (`onClick`, pointer/wheel keys, or — for synthetic routing —
+ *   keyboard/composition keys from {@link import('./types.js').EventHandlers}).
  * @param x - Pointer X in the same space as `layout` (after root offsets).
  * @param y - Pointer Y in the same space as `layout` (after root offsets).
  * @param extra - Optional fields shallow-merged onto the {@link HitEvent} after `x`, `y`, `localX`, `localY`, and `target`.
