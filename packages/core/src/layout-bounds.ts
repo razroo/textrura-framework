@@ -29,8 +29,11 @@ export function finiteNumberOrZero(value: unknown): number {
  * @param layout — Bounds from Textura/Yoga {@link ComputedLayout} output.
  * @returns `true` when `x`, `y`, `width`, and `height` are finite and both dimensions are `>= 0`.
  *
- * Only this node's own fields are inspected; {@link ComputedLayout.children} entries are not
- * validated recursively. Callers walking a tree should check each visited layout when needed.
+ * `x` / `y` / `width` / `height` are read with normal property access (destructuring), so inherited
+ * **enumerable** values on the prototype chain are observed the same as own fields — typical
+ * {@link ComputedLayout} snapshots from Textura use plain objects with own fields only.
+ * {@link ComputedLayout.children} is not validated recursively. Callers walking a tree should check
+ * each visited layout when needed.
  */
 export function layoutBoundsAreFinite(layout: ComputedLayout): boolean {
   const { x, y, width, height } = layout

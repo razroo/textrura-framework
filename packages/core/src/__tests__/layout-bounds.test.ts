@@ -236,6 +236,19 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite(root)).toBe(true)
   })
 
+  it('accepts finite bounds inherited from a prototype (destructuring semantics; not own-field-only)', () => {
+    const proto = {
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+      children: [],
+    } as unknown as ComputedLayout
+    const layout = Object.create(proto) as unknown as ComputedLayout
+    expect(Object.hasOwn(layout, 'x')).toBe(false)
+    expect(layoutBoundsAreFinite(layout)).toBe(true)
+  })
+
   it('rejects null-prototype layout objects (no own x/y/width/height) without throwing', () => {
     const bare = Object.create(null) as unknown as ComputedLayout
     expect(() => layoutBoundsAreFinite(bare)).not.toThrow()
