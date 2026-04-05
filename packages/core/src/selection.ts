@@ -225,6 +225,10 @@ function textNodeBoundsAreFinite(node: TextNodeInfo): boolean {
  *
  * Returns `null` when `textNodes` is empty or no node’s bounds contain the point.
  *
+ * `charOffset` matches **JavaScript string indices** (UTF-16 code units) when each line’s `charOffsets` /
+ * `charWidths` entry corresponds to one code unit — the usual shape from canvas `measureText` and Pretext.
+ * Supplementary characters then occupy two adjacent indices, aligned with `String` slicing and text-input caret math.
+ *
  * Vertical line bands are half-open between stacked lines so a y exactly on an interior boundary belongs to the
  * lower line; the **last** line’s bottom edge is inclusive so it matches {@link import('./hit-test.js').dispatchHit}
  * inclusive rect edges on the text node box.

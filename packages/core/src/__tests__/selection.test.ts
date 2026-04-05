@@ -730,6 +730,32 @@ describe('hitTestText', () => {
     expect(hitTestText([], 10, 20)).toBeNull()
   })
 
+  it('uses UTF-16 code-unit indices for charOffset when metrics use one slot per code unit (surrogate pairs)', () => {
+    const pair = '\uD83D\uDE00'
+    expect(pair.length).toBe(2)
+    const lineText = `a${pair}`
+    expect(lineText.length).toBe(3)
+    const textNodes: TextNodeInfo[] = [
+      {
+        element: {
+          kind: 'text' as const,
+          props: { text: lineText, font: '14px sans-serif', lineHeight: 18 },
+        },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 18,
+        index: 0,
+        lines: [{ text: lineText, x: 0, y: 0, charOffsets: [0, 8, 16], charWidths: [8, 8, 8] }],
+      },
+    ]
+    expect(hitTestText(textNodes, 2, 5)).toEqual({ nodeIndex: 0, charOffset: 0 })
+    expect(hitTestText(textNodes, 10, 5)).toEqual({ nodeIndex: 0, charOffset: 1 })
+    expect(hitTestText(textNodes, 18, 5)).toEqual({ nodeIndex: 0, charOffset: 2 })
+    expect(hitTestText(textNodes, 100, 5)).toEqual({ nodeIndex: 0, charOffset: 3 })
+  })
+
   it('returns null for non-finite pointer coordinates', () => {
     const textNodes: TextNodeInfo[] = [
       {
