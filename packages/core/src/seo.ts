@@ -247,13 +247,14 @@ function sanitizeHtmlTagName(tag: string | undefined, fallback: string): string 
   return t
 }
 
-/** Escape HTML special characters. */
+/** Escape HTML special characters (including `'` for single-quoted attribute contexts). */
 function escapeHTML(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
 /**

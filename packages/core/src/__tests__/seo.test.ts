@@ -215,6 +215,15 @@ describe('toSemanticHTML', () => {
     expect(html).toContain('rel="canonical" href="https://example.com"')
   })
 
+  it('escapes apostrophes in title and body text (single-quote safe)', () => {
+    const el = box({ width: 100, height: 100 }, [
+      text({ text: "It's safe", font: '14px sans-serif', lineHeight: 18 }),
+    ])
+    const html = toSemanticHTML(el, { title: "Bob's Page" })
+    expect(html).toContain('<title>Bob&#39;s Page</title>')
+    expect(html).toContain('It&#39;s safe')
+  })
+
   it('escapes HTML special characters in title, description, canonical, and OG meta values', () => {
     const el = box({ width: 100, height: 100 })
     const html = toSemanticHTML(el, {
