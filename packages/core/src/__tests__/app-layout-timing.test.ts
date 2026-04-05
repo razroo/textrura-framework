@@ -1685,4 +1685,16 @@ describe('performance now helpers', () => {
     expect(readPerformanceNow()).toBe(0)
     spy.mockRestore()
   })
+
+  it('safePerformanceNowMs coerces ±Infinity now to 0; readPerformanceNow preserves non-finite values for callers', () => {
+    const pos = vi.spyOn(performance, 'now').mockReturnValue(Number.POSITIVE_INFINITY)
+    expect(safePerformanceNowMs()).toBe(0)
+    expect(readPerformanceNow()).toBe(Number.POSITIVE_INFINITY)
+    pos.mockRestore()
+
+    const neg = vi.spyOn(performance, 'now').mockReturnValue(Number.NEGATIVE_INFINITY)
+    expect(safePerformanceNowMs()).toBe(0)
+    expect(readPerformanceNow()).toBe(Number.NEGATIVE_INFINITY)
+    neg.mockRestore()
+  })
 })
