@@ -332,6 +332,35 @@ describe('box layout', () => {
     expect(inner.children[1]!.x).toBe(0)
   })
 
+  it('row with flexWrap wrap and dir rtl mirrors main-axis start on each wrapped line (ltr document owner)', () => {
+    const rtlTree: BoxNode = {
+      width: 150,
+      height: 100,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+      dir: 'rtl',
+      children: [
+        { width: 80, height: 30 },
+        { width: 80, height: 30 },
+      ],
+    }
+    const ltrTree: BoxNode = { ...rtlTree, dir: 'ltr' }
+    const opts = { width: 150, height: 100, direction: 'ltr' as const }
+    const rtl = computeLayout(rtlTree, opts)
+    const ltr = computeLayout(ltrTree, opts)
+    // 80 + gap + 80 does not fit in 150 — two flex lines
+    expect(ltr.children[0]!.y).not.toBe(ltr.children[1]!.y)
+    expect(rtl.children[0]!.y).toBe(ltr.children[0]!.y)
+    expect(rtl.children[1]!.y).toBe(ltr.children[1]!.y)
+    // LTR main-start is physical left; RTL main-start is physical right on every line
+    expect(ltr.children[0]!.x).toBe(0)
+    expect(ltr.children[1]!.x).toBe(0)
+    expect(rtl.children[0]!.x).toBeGreaterThan(ltr.children[0]!.x)
+    expect(rtl.children[0]!.x + rtl.children[0]!.width).toBe(150)
+    expect(rtl.children[1]!.x).toBe(rtl.children[0]!.x)
+  })
+
   it('row layout with gap', () => {
     const tree: BoxNode = {
       width: 300,
