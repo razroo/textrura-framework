@@ -261,10 +261,10 @@ export class TerminalCompositor {
     const x = Math.round((offsetX + layout.x) * scaleX)
     const y = baseY + Math.round((offsetY + layout.y) * scaleY)
     const w = Math.max(1, Math.round(layout.width * scaleX))
-    const h = Math.max(1, Math.round(layout.height * scaleY))
+    const h = Math.round(layout.height * scaleY) // allow 0 — skip tiny elements
 
     if (element.kind === 'box') {
-      this.paintBox(element, x, y, w, h)
+      if (h > 0) this.paintBox(element, x, y, w, h)
       const childOffsetX = offsetX + layout.x - ((element.props.scrollX as number) ?? 0)
       const childOffsetY = offsetY + layout.y - ((element.props.scrollY as number) ?? 0)
       for (let i = 0; i < element.children.length; i++) {
@@ -276,7 +276,7 @@ export class TerminalCompositor {
     } else if (element.kind === 'scene3d') {
       // skip
     } else if (element.kind !== 'image') {
-      this.paintText(element, x, y, w, h)
+      if (h > 0 || w > 0) this.paintText(element, x, y, w, Math.max(h, 1))
     }
   }
 
