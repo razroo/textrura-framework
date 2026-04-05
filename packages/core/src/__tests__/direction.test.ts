@@ -233,6 +233,13 @@ describe('resolveComputeLayoutDirection', () => {
     expect(resolveComputeLayoutDirection(Object('ltr') as never, ltrRoot)).toBe('ltr')
   })
 
+  it('does not coerce boxed-string host overrides: direction comes from root, not Object("rtl"|"ltr")', () => {
+    const ltrRoot = box({ width: 1, height: 1, dir: 'ltr' })
+    expect(resolveComputeLayoutDirection(Object('rtl') as never, ltrRoot)).toBe('ltr')
+    const rtlRoot = box({ width: 1, height: 1, dir: 'rtl' })
+    expect(resolveComputeLayoutDirection(Object('ltr') as never, rtlRoot)).toBe('rtl')
+  })
+
   it('ignores Symbol host values (only primitive ltr/rtl strings win), deriving from the root', () => {
     const rtlRoot = box({ width: 1, height: 1, dir: 'rtl' })
     expect(resolveComputeLayoutDirection(Symbol('rtl') as never, rtlRoot)).toBe('rtl')
