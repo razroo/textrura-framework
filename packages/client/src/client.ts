@@ -248,6 +248,9 @@ function applyPatches(layout: ComputedLayout, patches: ServerPatch['patches']): 
  * patches, and calls {@link Renderer.render} when a frame is applied or a patch runs against current
  * state. Patches received before the first frame are ignored (no state change, no render).
  *
+ * A well-formed `patch` with an empty `patches` array still calls {@link Renderer.render} (no geometry
+ * mutation, but a repaint hook for hosts that rely on render side effects).
+ *
  * For `patch` messages, each entry walks `path` into `layout.children`; if an index is missing, the
  * walk stops and any `x` / `y` / `width` / `height` fields apply to that last resolved node (often the
  * root). This is intentional lenient behavior and does not call `onError`.
@@ -369,11 +372,21 @@ export function applyServerMessage(
  * Connect to a Geometra server and render received geometry.
  *
  * The client is a thin paint layer — all layout computation happens server-side.
- * Pointer events on the canvas are forwarded to the server for hit-testing.
- * Automatically reconnects on disconnect with exponential backoff.
+ * With a `canvas`, pointer hits are forwarded as `event` messages for server-side hit-testing; keyboard,
+ * IME composition, and `resize` forwarding default on and target the canvas (or {@link TexturaClientOptions.keyboardTarget} /
+ * {@link TexturaClientOptions.resizeTarget} when set). Without a canvas, those forwarders stay off unless
+ * you opt in explicitly on {@link TexturaClientOptions}.
  *
- * {@link TexturaClient.close} is idempotent: additional calls after the first are no-ops so hosts do not
- * double-remove listeners or invoke {@link Renderer.destroy} twice.
+ * Server messages may arrive as JSON text WebSocket frames or GEOM v1 binary envelopes (same JSON
+ * payload); see {@link TexturaClientOptions.binaryFraming} and {@link decodeBinaryFrameJson}. Use
+ * {@link createHeadlessClient} when you only need wire state (`onData`, {@link TexturaClient.layout}) without
+ * painting. For custom transports or tests, decode JSON yourself and call {@link applyServerMessage} with the
+ * same {@link TexturaClientOptions.renderer} you would pass here.
+ *
+ * Reconnects after disconnect with exponential backoff unless {@link TexturaClientOptions.reconnect} is false.
+ *
+ * {@link TexturaClient.close} is idempotent: it stops reconnects, removes forwarded DOM listeners, closes the
+ * socket, and invokes {@link Renderer.destroy} once — further calls are no-ops.
  */
 export function createClient(options: TexturaClientOptions): TexturaClient {
   const url = options.url ?? 'ws://localhost:3100'
