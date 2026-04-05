@@ -434,6 +434,27 @@ describe('animation timeline', () => {
     expect(timeline.value.peek()).toBe(15)
   })
 
+  it('resume only wakes paused timelines (idle, finished, and cancelled stay unchanged)', () => {
+    const idle = createTweenTimeline(0)
+    expect(idle.state()).toBe('idle')
+    idle.resume()
+    expect(idle.state()).toBe('idle')
+
+    const finished = createTweenTimeline(0)
+    finished.to(1, 10, easing.linear)
+    expect(finished.step(10)).toBe(1)
+    expect(finished.state()).toBe('finished')
+    finished.resume()
+    expect(finished.state()).toBe('finished')
+
+    const cancelled = createTweenTimeline(0)
+    cancelled.to(10, 100, easing.linear)
+    cancelled.cancel()
+    expect(cancelled.state()).toBe('cancelled')
+    cancelled.resume()
+    expect(cancelled.state()).toBe('cancelled')
+  })
+
   it('lazily adds properties at 0 when first targeted in to()', () => {
     const props = createPropertyTimeline({ x: 0 })
     props.to({ x: 100, z: 50 }, 200, easing.linear)
