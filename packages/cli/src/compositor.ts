@@ -151,11 +151,12 @@ export class TerminalCompositor {
   }
 
   private computeRowAllocation(): void {
-    const scale = 0.15
     // Compute natural row height for each view based on layout
     const naturalHeights = this.views.map(v => {
       if (!v.layout) return 4 // minimum for unloaded views
-      return Math.max(2, Math.round(v.layout.height * scale * 0.5))
+      const scaleX = this.width / v.layout.width
+      const scaleY = scaleX * 0.5
+      return Math.max(2, Math.round(v.layout.height * scaleY))
     })
     const totalNatural = naturalHeights.reduce((a, b) => a + b, 0)
 
@@ -207,8 +208,11 @@ export class TerminalCompositor {
   }
 
   private paintView(layout: ComputedLayout, tree: UIElement, yOffset: number, maxRows: number): void {
-    const scale = 0.15
-    this.paintNode(tree, layout, 0, 0, scale, yOffset, yOffset + maxRows)
+    // Scale to fit the layout width into the terminal columns
+    const scaleX = this.width / layout.width
+    // For rows, terminal chars are ~2x taller than wide, so halve the y scale
+    const scaleY = scaleX * 0.5
+    this.paintNode(tree, layout, 0, 0, scaleX, scaleY, yOffset, yOffset + maxRows)
   }
 
   private paintNode(
@@ -216,14 +220,15 @@ export class TerminalCompositor {
     layout: ComputedLayout,
     offsetX: number,
     offsetY: number,
-    scale: number,
+    scaleX: number,
+    scaleY: number,
     minRow: number,
     maxRow: number,
   ): void {
-    const x = Math.round((offsetX + layout.x) * scale)
-    const y = minRow + Math.round((offsetY + layout.y) * scale * 0.5)
-    const w = Math.max(1, Math.round(layout.width * scale))
-    const h = Math.max(1, Math.round(layout.height * scale * 0.5))
+    const x = Math.round((offsetX + layout.x) * scaleX)
+    const y = minRow + Math.round((offsetY + layout.y) * scaleY)
+    const w = Math.max(1, Math.round(layout.width * scaleX))
+    const h = Math.max(1, Math.round(layout.height * scaleY))
 
     if (element.kind === 'box') {
       this.paintBox(element, x, y, w, h, minRow, maxRow)
@@ -234,7 +239,7 @@ export class TerminalCompositor {
       for (let i = 0; i < element.children.length; i++) {
         const childLayout = layout.children[i]
         if (childLayout) {
-          this.paintNode(element.children[i]!, childLayout, childOffsetX, childOffsetY, scale, minRow, maxRow)
+          this.paintNode(element.children[i]!, childLayout, childOffsetX, childOffsetY, scaleX, scaleY, minRow, maxRow)
         }
       }
     } else if (element.kind === 'scene3d') {
