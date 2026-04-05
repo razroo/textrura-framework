@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import type { ComputedLayout } from 'textura'
-import { diffLayout, isProtocolCompatible, coalescePatches } from '../protocol.js'
+import {
+  diffLayout,
+  isProtocolCompatible,
+  coalescePatches,
+  type LayoutPatch,
+} from '../protocol.js'
 
 type TestLayout = ComputedLayout
 
@@ -412,5 +417,14 @@ describe('coalescePatches', () => {
         { path: [0], y: 2 },
       ]),
     ).toEqual([{ path: [0], x: 1, y: 2 }])
+  })
+
+  it('ignores unknown patch keys; merged results only carry path and finite geometry fields', () => {
+    const merged = coalescePatches([
+      { path: [0], x: 1, rotation: 45, meta: { id: 'a' } } as unknown as LayoutPatch,
+      { path: [0], y: 2, extra: 'noise' } as unknown as LayoutPatch,
+    ])
+    expect(merged).toEqual([{ path: [0], x: 1, y: 2 }])
+    expect(Object.keys(merged[0]!).sort()).toEqual(['path', 'x', 'y'])
   })
 })
