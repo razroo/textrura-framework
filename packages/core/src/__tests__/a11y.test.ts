@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import type { ComputedLayout } from 'textura'
 import { box, image, scene3d, text } from '../elements.js'
 import { toAccessibilityTree } from '../a11y.js'
 
@@ -241,6 +242,20 @@ describe('toAccessibilityTree', () => {
     expect(a11y.bounds).toEqual({ x: 0, y: 0, width: 0, height: 0 })
     expect(a11y.children).toEqual([])
     expect(a11y.focusable).toBe(false)
+  })
+
+  it('emits a zero-bounds stub when layout.children is missing or not an array (same guard as layoutBoundsAreFinite)', () => {
+    const tree = box({ width: 100, height: 100, semantic: { tag: 'main' } }, [])
+    const base = { x: 0, y: 0, width: 100, height: 100 } as Record<string, unknown>
+    for (const badChildren of [undefined, null, {}, '[]', new Uint32Array()] as const) {
+      const layout = { ...base, children: badChildren } as unknown as ComputedLayout
+      expect(() => toAccessibilityTree(tree, layout)).not.toThrow()
+      const a11y = toAccessibilityTree(tree, layout)
+      expect(a11y.role).toBe('main')
+      expect(a11y.bounds).toEqual({ x: 0, y: 0, width: 0, height: 0 })
+      expect(a11y.children).toEqual([])
+      expect(a11y.focusable).toBe(false)
+    }
   })
 
   it('maps common semantic tags for nav/list/form patterns', () => {
