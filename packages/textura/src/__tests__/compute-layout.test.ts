@@ -912,6 +912,56 @@ describe('box layout', () => {
     expect(inner.children[1]!.x).toBe(0)
   })
 
+  it('nested column with explicit dir ltr under rtl owner keeps flex-start on the left (overrides document direction)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 100,
+      flexDirection: 'column',
+      children: [
+        {
+          width: 200,
+          height: 100,
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          dir: 'ltr',
+          children: [
+            { width: 50, height: 30 },
+            { width: 50, height: 30 },
+          ],
+        },
+      ],
+    }
+    const result = computeLayout(tree, { width: 200, height: 100, direction: 'rtl' })
+    const inner = result.children[0]!
+    expect(inner.children[0]!.x).toBe(0)
+    expect(inner.children[1]!.x).toBe(0)
+  })
+
+  it('nested column with explicit dir rtl under ltr owner aligns flex-start to the right (overrides document direction)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 100,
+      flexDirection: 'column',
+      children: [
+        {
+          width: 200,
+          height: 100,
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          dir: 'rtl',
+          children: [
+            { width: 50, height: 30 },
+            { width: 50, height: 30 },
+          ],
+        },
+      ],
+    }
+    const result = computeLayout(tree, { width: 200, height: 100, direction: 'ltr' })
+    const inner = result.children[0]!
+    expect(inner.children[0]!.x).toBe(150)
+    expect(inner.children[1]!.x).toBe(150)
+  })
+
   it('row with flexWrap wrap and dir rtl mirrors main-axis start on each wrapped line (ltr document owner)', () => {
     const rtlTree: BoxNode = {
       width: 150,
