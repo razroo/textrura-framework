@@ -121,7 +121,14 @@ export function resolveFocusedTarget(tree: UIElement, layout: ComputedLayout): F
   return resolved
 }
 
-/** Move focus to the next focusable element. */
+/**
+ * Move focus to the next focusable box in {@link collectFocusOrder} (tree order, depth-first).
+ *
+ * When nothing is focused, selects the first focusable. When the current {@link focusedElement}
+ * cannot be matched in the latest order (neither element identity nor layout bounds), navigation
+ * behaves as if the current index were `0` — so `focusNext` advances to the **second** focusable.
+ * Call {@link resolveFocusedTarget} after rerenders if you need to reconcile focus before Tab routing.
+ */
 export function focusNext(tree: UIElement, layout: ComputedLayout): void {
   const targets: FocusTarget[] = []
   collectFocusable(tree, layout, targets)
@@ -140,7 +147,13 @@ export function focusNext(tree: UIElement, layout: ComputedLayout): void {
   focusedElement.set({ ...next, focusIndex: nextIndex })
 }
 
-/** Move focus to the previous focusable element. */
+/**
+ * Move focus to the previous focusable box in {@link collectFocusOrder} (tree order, depth-first).
+ *
+ * When nothing is focused, selects the **last** focusable. Orphan/stale focus (not found in the
+ * current order) uses the same index-`0` fallback as {@link focusNext}, so `focusPrev` jumps to the
+ * **last** focusable in the list.
+ */
 export function focusPrev(tree: UIElement, layout: ComputedLayout): void {
   const targets: FocusTarget[] = []
   collectFocusable(tree, layout, targets)

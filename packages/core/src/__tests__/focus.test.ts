@@ -345,6 +345,22 @@ describe('focusNext', () => {
     focusNext(root, layout)
     expect(focusedElement.peek()!.focusIndex).toBe(1)
   })
+
+  it('when focus is not in the current order, advances as if from index 0 (second focusable)', () => {
+    const a = box({ width: 10, height: 10, onClick: () => {} })
+    const b = box({ width: 10, height: 10, onClick: () => {} })
+    const orphan = box({ width: 10, height: 10, onClick: () => {} })
+    const root = box({ width: 100, height: 100 }, [a, b])
+    const layout = {
+      ...makeLayout(),
+      children: [makeLayout({ width: 10, height: 10 }), makeLayout({ x: 20, width: 10, height: 10 })],
+    }
+
+    setFocus(orphan, makeLayout({ x: 99, y: 99, width: 10, height: 10 }))
+    focusNext(root, layout)
+    expect(focusedElement.peek()!.element).toBe(b)
+    expect(focusedElement.peek()!.focusIndex).toBe(1)
+  })
 })
 
 describe('focusPrev', () => {
@@ -424,6 +440,22 @@ describe('focusPrev', () => {
     expect(focusedElement.peek()!.focusIndex).toBe(1)
     focusPrev(root, layout)
     expect(focusedElement.peek()!.focusIndex).toBe(0)
+  })
+
+  it('when focus is not in the current order, moves as if from index 0 (last focusable)', () => {
+    const a = box({ width: 10, height: 10, onClick: () => {} })
+    const b = box({ width: 10, height: 10, onClick: () => {} })
+    const orphan = box({ width: 10, height: 10, onClick: () => {} })
+    const root = box({ width: 100, height: 100 }, [a, b])
+    const layout = {
+      ...makeLayout(),
+      children: [makeLayout({ width: 10, height: 10 }), makeLayout({ x: 20, width: 10, height: 10 })],
+    }
+
+    setFocus(orphan, makeLayout({ x: 99, y: 99, width: 10, height: 10 }))
+    focusPrev(root, layout)
+    expect(focusedElement.peek()!.element).toBe(b)
+    expect(focusedElement.peek()!.focusIndex).toBe(1)
   })
 })
 
