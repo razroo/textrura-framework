@@ -258,6 +258,19 @@ describe('toAccessibilityTree', () => {
     }
   })
 
+  it('emits a zero-bounds stub when layout.children inherits Array.prototype but fails Array.isArray', () => {
+    const tree = box({ width: 100, height: 100, semantic: { tag: 'main' } }, [])
+    const children = Object.create(Array.prototype) as unknown as ComputedLayout['children']
+    expect(Array.isArray(children)).toBe(false)
+    const layout = { x: 0, y: 0, width: 100, height: 100, children } as ComputedLayout
+    expect(() => toAccessibilityTree(tree, layout)).not.toThrow()
+    const a11y = toAccessibilityTree(tree, layout)
+    expect(a11y.role).toBe('main')
+    expect(a11y.bounds).toEqual({ x: 0, y: 0, width: 0, height: 0 })
+    expect(a11y.children).toEqual([])
+    expect(a11y.focusable).toBe(false)
+  })
+
   it('maps common semantic tags for nav/list/form patterns', () => {
     const tree = box({ semantic: { tag: 'main' } }, [
       box({ semantic: { tag: 'nav' } }, [
