@@ -249,6 +249,22 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite(layout)).toBe(true)
   })
 
+  it('accepts finite bounds on non-enumerable prototype data properties ([[Get]] ignores enumerability)', () => {
+    const proto = Object.create(null) as Record<string, unknown>
+    for (const [key, value] of [
+      ['x', 1],
+      ['y', 2],
+      ['width', 30],
+      ['height', 40],
+      ['children', []],
+    ] as const) {
+      Object.defineProperty(proto, key, { value, enumerable: false, writable: true, configurable: true })
+    }
+    const layout = Object.create(proto) as unknown as ComputedLayout
+    expect(Object.getPrototypeOf(layout)).toBe(proto)
+    expect(layoutBoundsAreFinite(layout)).toBe(true)
+  })
+
   it('accepts bounds on non-enumerable own data properties (object destructuring uses Get, not enumerability)', () => {
     const children: [] = []
     const layout = { children } as Record<string, unknown>
