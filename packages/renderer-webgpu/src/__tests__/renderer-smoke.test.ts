@@ -68,6 +68,24 @@ describe('webgpu renderer smoke', () => {
     expect(ctx.calls.pop()).toEqual({ x: 0, y: 0, w: 1, h: 1, color: '#aabbcc' })
   })
 
+  it('pre-init 2d fallback clears 1×1 when root layout x or y is non-finite (layoutBoundsAreFinite parity)', () => {
+    const ctx = new Fake2DContext()
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: (kind: string) => (kind === '2d' ? ctx : null),
+    } as unknown as HTMLCanvasElement
+
+    const renderer = new WebGPURenderer({ canvas, background: '#ccddee' })
+    const tree = box({ width: 100, height: 40 }, [])
+
+    renderer.render({ x: Number.POSITIVE_INFINITY, y: 0, width: 100, height: 40, children: [] }, tree)
+    expect(ctx.calls.pop()).toEqual({ x: 0, y: 0, w: 1, h: 1, color: '#ccddee' })
+
+    renderer.render({ x: 0, y: Number.NEGATIVE_INFINITY, width: 100, height: 40, children: [] }, tree)
+    expect(ctx.calls.pop()).toEqual({ x: 0, y: 0, w: 1, h: 1, color: '#ccddee' })
+  })
+
   it('reports unsupported when navigator has no gpu', () => {
     vi.stubGlobal('navigator', {} as Navigator)
     expect(WebGPURenderer.isSupported()).toBe(false)
