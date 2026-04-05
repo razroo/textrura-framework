@@ -359,6 +359,34 @@ describe('box layout', () => {
     expect(result.height).toBe(90)
   })
 
+  it('overflow scroll, hidden, visible: fixed-height column keeps parent height; flexShrink 0 child keeps full height', () => {
+    for (const overflow of ['scroll', 'hidden', 'visible'] as const) {
+      const tree: BoxNode = {
+        width: 100,
+        height: 80,
+        flexDirection: 'column',
+        overflow,
+        children: [{ width: 100, height: 200, flexShrink: 0 }],
+      }
+      const result = computeLayout(tree, { width: 100, height: 80 })
+      expect(result.height).toBe(80)
+      expect(result.children[0]!.height).toBe(200)
+      expect(result.children[0]!.y).toBe(0)
+    }
+  })
+
+  it('unknown overflow string is ignored (layout matches omitting overflow; corrupt props do not throw)', () => {
+    const child = { width: 50, height: 20 }
+    const baseline: BoxNode = { width: 100, height: 50, children: [child] }
+    const weird = {
+      width: 100,
+      height: 50,
+      overflow: 'not-a-mode',
+      children: [child],
+    } as unknown as BoxNode
+    expect(computeLayout(weird)).toEqual(computeLayout(baseline))
+  })
+
   it('flexGrow distributes space', () => {
     const tree: BoxNode = {
       width: 300,
