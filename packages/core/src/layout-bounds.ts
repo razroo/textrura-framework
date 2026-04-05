@@ -27,7 +27,9 @@ export function finiteNumberOrZero(value: unknown): number {
  * `isFinite` would coerce operands and throws on `BigInt`, which would otherwise take down pointer dispatch.
  *
  * @param layout — Bounds from Textura/Yoga {@link ComputedLayout} output.
- * @returns `true` when `x`, `y`, `width`, and `height` are finite and both dimensions are `>= 0`.
+ * @returns `true` when `x`, `y`, `width`, and `height` are finite, both dimensions are `>= 0`, and
+ *   `children` is a real array (empty is fine). Missing or non-array `children` is rejected so parallel
+ *   tree walks (hit-test, focus, a11y) never throw on `layout.children[i]` from bad snapshots or transport bugs.
  *
  * `x` / `y` / `width` / `height` are read with normal property access (destructuring uses `[[Get]]`), so
  * inherited values on the prototype chain are observed the same as own fields — including
@@ -37,7 +39,8 @@ export function finiteNumberOrZero(value: unknown): number {
  * each visited layout when needed.
  */
 export function layoutBoundsAreFinite(layout: ComputedLayout): boolean {
-  const { x, y, width, height } = layout
+  const { x, y, width, height, children } = layout
+  if (!Array.isArray(children)) return false
   return (
     isFiniteLayoutNumber(x) &&
     isFiniteLayoutNumber(y) &&

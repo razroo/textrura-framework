@@ -531,6 +531,35 @@ describe('dispatchHit', () => {
     }
   })
 
+  it('layout missing or non-array children is a safe miss without throwing (layoutBoundsAreFinite before child walk)', () => {
+    let fired = false
+    const el = box({
+      width: 100,
+      height: 50,
+      onClick: () => {
+        fired = true
+      },
+      cursor: 'pointer',
+    })
+    const finite = { x: 0, y: 0, width: 100, height: 50 }
+    const missingChildren = { ...finite } as unknown as ComputedLayout
+    const nullChildren = { ...finite, children: null } as unknown as ComputedLayout
+    const objectChildren = { ...finite, children: {} } as unknown as ComputedLayout
+
+    for (const bad of [missingChildren, nullChildren, objectChildren]) {
+      fired = false
+      expect(() => dispatchHit(el, bad, 'onClick', 50, 25)).not.toThrow()
+      expect(dispatchHit(el, bad, 'onClick', 50, 25).handled).toBe(false)
+      expect(fired).toBe(false)
+      expect(() => hitPathAtPoint(el, bad, 50, 25)).not.toThrow()
+      expect(hitPathAtPoint(el, bad, 50, 25)).toBeNull()
+      expect(() => hasInteractiveHitAtPoint(el, bad, 50, 25)).not.toThrow()
+      expect(hasInteractiveHitAtPoint(el, bad, 50, 25)).toBe(false)
+      expect(() => getCursorAtPoint(el, bad, 50, 25)).not.toThrow()
+      expect(getCursorAtPoint(el, bad, 50, 25)).toBeNull()
+    }
+  })
+
   it('negative width or height layout is a miss for dispatch and hit queries (layoutBoundsAreFinite)', () => {
     let fired: boolean
     const el = box({

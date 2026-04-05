@@ -27,6 +27,17 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite(withExtra)).toBe(true)
   })
 
+  it('rejects missing, null, or non-array children (corrupt geometry / bad deserialization)', () => {
+    const base = { x: 0, y: 0, width: 10, height: 10 } as Record<string, unknown>
+    expect(layoutBoundsAreFinite({ ...base } as unknown as ComputedLayout)).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, children: null } as unknown as ComputedLayout)).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, children: {} } as unknown as ComputedLayout)).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, children: '[]' } as unknown as ComputedLayout)).toBe(false)
+    expect(
+      layoutBoundsAreFinite({ ...base, children: new Uint32Array() } as unknown as ComputedLayout),
+    ).toBe(false)
+  })
+
   it('accepts extreme finite coordinates and subnormal positive width/height (still Number.isFinite)', () => {
     const children = [] as const
     expect(
