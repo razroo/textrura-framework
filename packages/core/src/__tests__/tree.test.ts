@@ -275,6 +275,28 @@ describe('toLayoutTree', () => {
     expect(layout.children[0]).toHaveProperty('width', 100)
   })
 
+  it('strips selectable from nested text (not only the layout root)', () => {
+    const el = box({ width: 200, height: 200 }, [
+      text({
+        text: 'Hi',
+        font: '14px sans-serif',
+        lineHeight: 18,
+        width: 50,
+        height: 18,
+        selectable: false,
+      }),
+    ])
+    const layout = toLayoutTree(el) as BoxLayoutNode
+    expect(layout.children[0]).toMatchObject({
+      text: 'Hi',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      width: 50,
+      height: 18,
+    })
+    expect(layout.children[0]).not.toHaveProperty('selectable')
+  })
+
   it('strips cursor, pointerEvents, zIndex, overflow, scrollX, scrollY, boxShadow, gradient', () => {
     const el = box({
       width: 100,
