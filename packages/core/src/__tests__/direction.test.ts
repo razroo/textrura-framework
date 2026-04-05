@@ -256,4 +256,60 @@ describe('resolveComputeLayoutDirection', () => {
     expect(resolveComputeLayoutDirection('rtl', bogusRoot)).toBe('rtl')
     expect(resolveComputeLayoutDirection('ltr', bogusRoot)).toBe('ltr')
   })
+
+  it('derives direction from non-box roots (text, image, scene3d) when the host override is invalid', () => {
+    const rtlText = text({
+      text: 'x',
+      font: '16px sans-serif',
+      lineHeight: 20,
+      width: 10,
+      height: 20,
+      dir: 'rtl',
+    })
+    expect(resolveComputeLayoutDirection(undefined, rtlText)).toBe('rtl')
+    expect(resolveComputeLayoutDirection('auto' as never, rtlText)).toBe('rtl')
+
+    const autoText = text({
+      text: 'x',
+      font: '16px sans-serif',
+      lineHeight: 20,
+      width: 10,
+      height: 20,
+      dir: 'auto',
+    })
+    expect(resolveComputeLayoutDirection(undefined, autoText)).toBe('ltr')
+
+    const rtlImage = image({ src: 'a.png', width: 8, height: 8, dir: 'rtl' })
+    expect(resolveComputeLayoutDirection(undefined, rtlImage)).toBe('rtl')
+
+    const rtlScene = scene3d({
+      width: 16,
+      height: 16,
+      objects: [],
+      dir: 'rtl',
+    })
+    expect(resolveComputeLayoutDirection(undefined, rtlScene)).toBe('rtl')
+  })
+
+  it('host primitive ltr/rtl overrides non-box root dir', () => {
+    const rtlText = text({
+      text: 'x',
+      font: '16px sans-serif',
+      lineHeight: 20,
+      width: 10,
+      height: 20,
+      dir: 'rtl',
+    })
+    expect(resolveComputeLayoutDirection('ltr', rtlText)).toBe('ltr')
+
+    const ltrText = text({
+      text: 'x',
+      font: '16px sans-serif',
+      lineHeight: 20,
+      width: 10,
+      height: 20,
+      dir: 'ltr',
+    })
+    expect(resolveComputeLayoutDirection('rtl', ltrText)).toBe('rtl')
+  })
 })

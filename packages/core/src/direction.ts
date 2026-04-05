@@ -47,7 +47,8 @@ export function resolveElementDirection(
  * server-driven layout aligned with local canvas apps.
  *
  * @param layoutDirection — Host override (`createServer` / `createApp` option), or any runtime garbage; only `'ltr'` / `'rtl'` count.
- * @param root — Live view root used when the override is absent or invalid.
+ * @param root — Live view root used when the override is absent or invalid. Any {@link UIElement} kind
+ *   (`box`, `text`, `image`, `scene3d`) may be the root; `dir` is read from {@link UIElement.props} the same way.
  */
 export function resolveComputeLayoutDirection(
   layoutDirection: unknown,
