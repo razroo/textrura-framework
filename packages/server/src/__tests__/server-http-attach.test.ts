@@ -95,6 +95,44 @@ describe('createServer http attach', () => {
     await new Promise<void>((resolve) => httpServer.close(() => resolve()))
   })
 
+  it('matches WebSocket upgrades when wsPath and request path differ only by trailing slash', async () => {
+    const port = pickPort()
+    const httpServer = http.createServer()
+
+    await new Promise<void>((resolve, reject) => {
+      httpServer.listen(port, () => resolve())
+      httpServer.on('error', reject)
+    })
+
+    const geometra = await createServer(() => box({ width: 10, height: 10 }, []), {
+      httpServer,
+      wsPath: '/my-ws/',
+      width: 100,
+      height: 100,
+    })
+
+    const connect = (path: string) =>
+      new Promise<{ type: string }>((resolve, reject) => {
+        const ws = new WebSocket(`ws://127.0.0.1:${port}${path}`)
+        const t = setTimeout(() => reject(new Error('ws timeout')), 5000)
+        ws.on('message', (raw) => {
+          clearTimeout(t)
+          resolve(JSON.parse(String(raw)) as { type: string })
+          ws.close()
+        })
+        ws.on('error', (e) => {
+          clearTimeout(t)
+          reject(e)
+        })
+      })
+
+    await expect(connect('/my-ws')).resolves.toMatchObject({ type: 'frame' })
+    await expect(connect('/my-ws/')).resolves.toMatchObject({ type: 'frame' })
+
+    geometra.close()
+    await new Promise<void>((resolve) => httpServer.close(() => resolve()))
+  })
+
   it('throws when both httpServer and port are passed', async () => {
     const httpServer = http.createServer()
     await expect(
