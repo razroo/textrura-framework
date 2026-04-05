@@ -19,7 +19,10 @@ export interface StreamText {
    * Non-string values are ignored so corrupt host data cannot stringify as `[object Object]`.
    */
   append(chunk: string): void
-  /** Replace the entire text content. */
+  /**
+   * Replace the entire text content synchronously.
+   * Non-string values are ignored (same guard as `append`) so the buffer and signal stay strings.
+   */
   set(text: string): void
   /** Reset to empty string. */
   clear(): void
@@ -36,12 +39,13 @@ export interface StreamText {
  * coalesced within a microtask so downstream signal subscribers (layout,
  * render) see at most one update per event-loop tick.
  *
- * @param initial — Optional initial text content (default `''`).
+ * @param initial — Optional initial text content (default `''`). Non-string values are treated as empty so corrupt host data cannot poison the buffer.
  */
 export function streamText(initial = ''): StreamText {
-  const s = signal(initial)
+  const seed = typeof initial === 'string' ? initial : ''
+  const s = signal(seed)
   const streamingState = signal(true)
-  let buffer = initial
+  let buffer = seed
   let flushScheduled = false
 
   function scheduleFlush(): void {
@@ -66,6 +70,7 @@ export function streamText(initial = ''): StreamText {
       scheduleFlush()
     },
     set(text: string): void {
+      if (typeof text !== 'string') return
       buffer = text
       s.set(text)
     },

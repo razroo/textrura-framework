@@ -13,6 +13,13 @@ describe('streamText', () => {
     expect(s.value).toBe('')
   })
 
+  it('treats non-string initial as empty (mistyped / hostile host data)', () => {
+    expect(streamText(null as unknown as string).value).toBe('')
+    expect(streamText(undefined as unknown as string).value).toBe('')
+    expect(streamText(0 as unknown as string).value).toBe('')
+    expect(streamText({} as unknown as string).value).toBe('')
+  })
+
   it('append accumulates text after microtask flush', async () => {
     const s = streamText()
     s.append('Hello ')
@@ -97,6 +104,16 @@ describe('streamText', () => {
     s.append({} as unknown as string)
     await Promise.resolve()
     expect(s.value).toBe('x')
+  })
+
+  it('ignores non-string set without mutating value or signal (parity with append guard)', () => {
+    const s = streamText('keep')
+    s.set(null as unknown as string)
+    s.set(undefined as unknown as string)
+    s.set(99 as unknown as string)
+    s.set({} as unknown as string)
+    expect(s.value).toBe('keep')
+    expect(s.signal.peek()).toBe('keep')
   })
 
   it('clear before pending microtask flush leaves empty value (buffer and signal stay aligned)', async () => {
