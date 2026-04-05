@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import type { ComputedLayout } from 'textura'
-import { box, text } from '../elements.js'
+import { box, image, scene3d, sphere, text } from '../elements.js'
 import { clearFocus, focusedElement, setFocus } from '../focus.js'
 import { trapFocusStep } from '../focus-trap.js'
 
@@ -164,6 +164,24 @@ describe('trapFocusStep', () => {
       children: [{ x: 0, y: 0, width: 50, height: 20, children: [] }],
     }
     expect(trapFocusStep(tree, layout, [0], 'next')).toBe(false)
+  })
+
+  it('returns false when scope resolves to image or scene3d leaf (non-box trap root)', () => {
+    const img = image({ src: '/x.png', width: 10, height: 10 })
+    const s3 = scene3d({ width: 16, height: 16, objects: [sphere({ radius: 1 })] })
+    const tree = box({}, [img, s3])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 10, height: 10, children: [] },
+        { x: 0, y: 0, width: 16, height: 16, children: [] },
+      ],
+    }
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(false)
+    expect(trapFocusStep(tree, layout, [1], 'prev')).toBe(false)
   })
 
   it('returns false when subtree has no focusable boxes', () => {
