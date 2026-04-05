@@ -197,6 +197,56 @@ describe('box layout', () => {
     expect(result.children[1]!.x).toBe(0)
   })
 
+  it('nested column with dir auto inherits rtl owner direction for cross-axis flex-start (matches explicit dir rtl)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 100,
+      flexDirection: 'column',
+      children: [
+        {
+          width: 200,
+          height: 100,
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          dir: 'auto',
+          children: [
+            { width: 50, height: 30 },
+            { width: 50, height: 30 },
+          ],
+        },
+      ],
+    }
+    const result = computeLayout(tree, { width: 200, height: 100, direction: 'rtl' })
+    const inner = result.children[0]!
+    expect(inner.children[0]!.x).toBe(150)
+    expect(inner.children[1]!.x).toBe(150)
+  })
+
+  it('nested column with dir auto under ltr owner keeps flex-start on the left (matches explicit dir ltr)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 100,
+      flexDirection: 'column',
+      children: [
+        {
+          width: 200,
+          height: 100,
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          dir: 'auto',
+          children: [
+            { width: 50, height: 30 },
+            { width: 50, height: 30 },
+          ],
+        },
+      ],
+    }
+    const result = computeLayout(tree, { width: 200, height: 100, direction: 'ltr' })
+    const inner = result.children[0]!
+    expect(inner.children[0]!.x).toBe(0)
+    expect(inner.children[1]!.x).toBe(0)
+  })
+
   it('row layout with gap', () => {
     const tree: BoxNode = {
       width: 300,
