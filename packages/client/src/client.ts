@@ -142,19 +142,31 @@ function isWellFormedGeomV1Message(msg: Record<string, unknown>): boolean {
   return false
 }
 
+/** Decode-phase timings and byte counts passed into {@link applyServerMessage} from the WebSocket layer. */
 export interface ServerMessageDecodeMeta {
+  /** Milliseconds spent parsing the wire payload (`JSON.parse` or binary GEOM v1 header + UTF-8 decode). */
   decodeMs: number
+  /** Whether this message was received as a JSON string frame or a GEOM v1 binary envelope. */
   encoding?: 'json' | 'binary'
+  /** Byte length of the raw `MessageEvent.data` when measured (text UTF-8 or binary buffer length). */
   bytesReceived?: number
 }
 
+/** Per-message frame budget: decode, state apply, and renderer work (see {@link TexturaClientOptions.onFrameMetrics}). */
 export interface ClientFrameMetrics {
+  /** Server message discriminant (`frame`, `patch`, `error`, or `data`). */
   messageType: ServerMessage['type']
+  /** Same as {@link ServerMessageDecodeMeta.decodeMs} for this message. */
   decodeMs: number
+  /** Milliseconds to merge the message into client state (patch walk, tree/layout assignment). */
   applyMs: number
+  /** Milliseconds inside {@link Renderer.render} when a frame or patch triggered a paint; `0` for `error` / `data`. */
   renderMs: number
+  /** Length of `patches` when `messageType` is `patch`; omitted otherwise. */
   patchCount?: number
+  /** Same as {@link ServerMessageDecodeMeta.encoding} when provided by the transport. */
   encoding?: 'json' | 'binary'
+  /** Same as {@link ServerMessageDecodeMeta.bytesReceived} when provided by the transport. */
   bytesReceived?: number
 }
 
