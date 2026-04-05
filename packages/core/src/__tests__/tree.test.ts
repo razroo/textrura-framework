@@ -326,6 +326,19 @@ describe('toLayoutTree', () => {
     })
     expect(toLayoutTree(t, true)).not.toHaveProperty('dir')
     expect(toLayoutTree(t, false)).toHaveProperty('dir', 'rtl')
+
+    const img = image({ src: '/a.png', width: 8, height: 8, dir: 'ltr' })
+    expect(toLayoutTree(img, true)).not.toHaveProperty('dir')
+    expect(toLayoutTree(img, false)).toHaveProperty('dir', 'ltr')
+
+    const s3 = scene3d({
+      width: 80,
+      height: 80,
+      dir: 'rtl',
+      objects: [sphere({ radius: 1 })],
+    })
+    expect(toLayoutTree(s3, true)).not.toHaveProperty('dir')
+    expect(toLayoutTree(s3, false)).toHaveProperty('dir', 'rtl')
   })
 
   it('omits dir on root text, image, and scene3d layout snapshots', () => {
