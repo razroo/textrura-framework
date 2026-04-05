@@ -1711,4 +1711,53 @@ describe('performance now helpers', () => {
     expect(readPerformanceNow()).toBe(0)
     obj.mockRestore()
   })
+
+  it('return 0 when globalThis.performance is undefined or null', () => {
+    for (const perf of [undefined, null] as const) {
+      vi.stubGlobal('performance', perf as unknown as Performance)
+      try {
+        expect(safePerformanceNowMs()).toBe(0)
+        expect(readPerformanceNow()).toBe(0)
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    }
+  })
+
+  it('return 0 when performance.now is missing or not a function', () => {
+    for (const perf of [
+      {},
+      { now: 'bad' as unknown as () => number },
+      { now: null as unknown as () => number },
+    ] as const) {
+      vi.stubGlobal('performance', perf as unknown as Performance)
+      try {
+        expect(safePerformanceNowMs()).toBe(0)
+        expect(readPerformanceNow()).toBe(0)
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    }
+  })
+
+  it('return 0 when globalThis.performance getter throws on access', () => {
+    const desc = Object.getOwnPropertyDescriptor(globalThis, 'performance')
+    try {
+      Object.defineProperty(globalThis, 'performance', {
+        configurable: true,
+        enumerable: desc?.enumerable ?? true,
+        get() {
+          throw new Error('performance access denied')
+        },
+      })
+      expect(safePerformanceNowMs()).toBe(0)
+      expect(readPerformanceNow()).toBe(0)
+    } finally {
+      if (desc) {
+        Object.defineProperty(globalThis, 'performance', desc)
+      } else {
+        Reflect.deleteProperty(globalThis, 'performance')
+      }
+    }
+  })
 })
