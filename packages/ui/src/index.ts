@@ -810,7 +810,7 @@ export function card(options: CardOptions = {}): UIElement {
     )
   }
   if (options.children && options.children.length > 0) {
-    sections.push(box({ padding: 14, gap: options.gap ?? 10, minWidth: 0 }, options.children))
+    sections.push(box({ flexDirection: 'column', padding: 14, gap: options.gap ?? 10, minWidth: 0 }, options.children))
   }
   if (options.footer) {
     sections.push(
