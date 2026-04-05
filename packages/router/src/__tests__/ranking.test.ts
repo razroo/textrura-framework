@@ -54,6 +54,12 @@ describe('route ranking', () => {
     expect(scorePathPattern('/users/:id')).toBeGreaterThan(scorePathPattern('/*'))
   })
 
+  it('scores named splat segments the same as anonymous * (parity with matchPath segment rules)', () => {
+    expect(scorePathPattern('/files/*')).toBe(scorePathPattern('/files/*rest'))
+    expect(comparePatternSpecificity('/files/*', '/files/*rest')).toBe(0)
+    expect(scorePathPattern('/a/*catchAll')).toBe(scorePathPattern('/a/*'))
+  })
+
   it('returns 0 from comparePatternSpecificity when score and depth tie (e.g. two static peers)', () => {
     expect(comparePatternSpecificity('/a', '/b')).toBe(0)
     expect(comparePatternSpecificity('/x/:id', '/y/:slug')).toBe(0)

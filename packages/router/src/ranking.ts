@@ -40,7 +40,8 @@ function scoreSegment(segment: RankedSegment): number {
 /**
  * Sum specificity scores for each path segment in `pattern` (after the same leading/trailing slash trim
  * as {@link matchPath} / {@link buildPath}). Static segments weigh highest, then params, optional
- * segments, then splats. Empty segments produced by doubled slashes (e.g. `/a//b`) count as extra
+ * segments, then splats (any segment whose first character is `*`, including named splats like `*rest`).
+ * Empty segments produced by doubled slashes (e.g. `/a//b`) count as extra
  * static segments so ranking depth stays aligned with {@link matchPath} segment lists.
  */
 export function scorePathPattern(pattern: string): number {
