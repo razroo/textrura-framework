@@ -38,6 +38,12 @@ describe('layoutBoundsAreFinite', () => {
     ).toBe(false)
   })
 
+  it('rejects children that inherit Array.prototype but are not Arrays (Array.isArray guard)', () => {
+    const children = Object.create(Array.prototype) as unknown as ComputedLayout['children']
+    expect(Array.isArray(children)).toBe(false)
+    expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 10, height: 10, children })).toBe(false)
+  })
+
   it('accepts extreme finite coordinates and subnormal positive width/height (still Number.isFinite)', () => {
     const children = [] as const
     expect(
