@@ -3059,4 +3059,85 @@ describe('createHeadlessClient', () => {
 
     client.close()
   })
+
+  it('delivers well-formed data messages to onData without updating layout until a frame (headless)', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+    const errors: unknown[] = []
+    const dataCalls: Array<{ channel: string; payload: unknown }> = []
+    const metrics: ClientFrameMetrics[] = []
+
+    const client = createHeadlessClient({
+      url: 'ws://mock.test',
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+      onFrameMetrics: m => metrics.push(m),
+      onData: (ch, pl) => dataCalls.push({ channel: ch, payload: pl }),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    const payload = { n: 7, side: true }
+    sockets[0]!.emit('message', {
+      data: JSON.stringify({
+        type: 'data',
+        channel: 'geom.headless',
+        payload,
+        protocolVersion: 1,
+      }),
+    })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    expect(errors).toHaveLength(0)
+    expect(dataCalls).toEqual([{ channel: 'geom.headless', payload }])
+    expect(client.layout).toBeNull()
+    expect(metrics).toHaveLength(1)
+    expect(metrics[0]?.messageType).toBe('data')
+    expect(metrics[0]?.renderMs).toBe(0)
+
+    client.close()
+  })
+
+  it('invokes onError for invalid JSON text then applies a valid frame to layout (headless)', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+    const errors: unknown[] = []
+
+    const client = createHeadlessClient({
+      url: 'ws://mock.test',
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    sockets[0]!.emit('message', { data: '{ not json' })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(SyntaxError)
+    expect(client.layout).toBeNull()
+
+    sockets[0]!.emit('message', {
+      data: JSON.stringify({
+        type: 'frame',
+        layout: { x: 0, y: 0, width: 88, height: 89, children: [] },
+        tree: { kind: 'box', props: {}, children: [] } satisfies UIElement,
+        protocolVersion: 1,
+      }),
+    })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
+    expect(client.layout?.width).toBe(88)
+    expect(client.layout?.height).toBe(89)
+
+    client.close()
+  })
 })
