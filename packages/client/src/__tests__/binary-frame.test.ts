@@ -43,6 +43,34 @@ describe('isBinaryFrameArrayBuffer', () => {
     expect(isBinaryFrameArrayBuffer(headerOnly.buffer)).toBe(true)
   })
 
+  it('returns false when a root SharedArrayBuffer is shorter than the v1 header', () => {
+    if (typeof SharedArrayBuffer === 'undefined') return
+    expect(isBinaryFrameArrayBuffer(new SharedArrayBuffer(8))).toBe(false)
+  })
+
+  it('returns false when magic or version on a root SharedArrayBuffer does not match v1', () => {
+    if (typeof SharedArrayBuffer === 'undefined') return
+    const sab = new SharedArrayBuffer(9)
+    new Uint8Array(sab).fill(0)
+    expect(isBinaryFrameArrayBuffer(sab)).toBe(false)
+
+    const wrongVersion = new SharedArrayBuffer(9)
+    const u8 = new Uint8Array(wrongVersion)
+    u8.set([0x47, 0x45, 0x4f, 0x4d, 2], 0)
+    new DataView(wrongVersion).setUint32(5, 0, true)
+    expect(isBinaryFrameArrayBuffer(wrongVersion)).toBe(false)
+  })
+
+  it('returns true for a minimal valid v1 header on a root SharedArrayBuffer', () => {
+    if (typeof SharedArrayBuffer === 'undefined') return
+    const headerOnly = new Uint8Array(9)
+    headerOnly.set([0x47, 0x45, 0x4f, 0x4d, 1], 0)
+    new DataView(headerOnly.buffer).setUint32(5, 0, true)
+    const sab = new SharedArrayBuffer(9)
+    new Uint8Array(sab).set(headerOnly)
+    expect(isBinaryFrameArrayBuffer(sab)).toBe(true)
+  })
+
   it('returns false when the view byteLength is below the 9-byte v1 header (embedded / sliced buffers)', () => {
     const headerOnly = new Uint8Array(9)
     headerOnly.set([0x47, 0x45, 0x4f, 0x4d, 1], 0)
