@@ -4284,4 +4284,32 @@ describe('Yoga-computed row layout and hit routing (document direction)', () => 
     expect(hasInteractiveHitAtPoint(root, layout, ax, ay)).toBe(true)
     expect(hasInteractiveHitAtPoint(root, layout, bx, by)).toBe(true)
   })
+
+  it('nested flex row: malformed dir string matches Yoga Inherit (same child x as dir auto)', () => {
+    const mkRow = (dir: unknown) =>
+      box(
+        { width: 200, height: 50, flexDirection: 'row', dir: dir as never },
+        [box({ width: 50, height: 50 }), box({ width: 50, height: 50 })],
+      )
+
+    const autoRtl = box({ width: 200, height: 100, flexDirection: 'column' }, [mkRow('auto')])
+    const badRtl = box({ width: 200, height: 100, flexDirection: 'column' }, [mkRow('typo-from-wire')])
+    const layAutoRtl = computeLayout(toLayoutTree(autoRtl), { width: 200, height: 100, direction: 'rtl' })
+    const layBadRtl = computeLayout(toLayoutTree(badRtl), { width: 200, height: 100, direction: 'rtl' })
+    const rowAutoRtl = layAutoRtl.children[0]!
+    const rowBadRtl = layBadRtl.children[0]!
+    expect(rowBadRtl.children[0]!.x).toBe(rowAutoRtl.children[0]!.x)
+    expect(rowBadRtl.children[1]!.x).toBe(rowAutoRtl.children[1]!.x)
+    expect(rowAutoRtl.children[0]!.x).toBeGreaterThan(rowAutoRtl.children[1]!.x)
+
+    const autoLtr = box({ width: 200, height: 100, flexDirection: 'column' }, [mkRow('auto')])
+    const badLtr = box({ width: 200, height: 100, flexDirection: 'column' }, [mkRow('typo-from-wire')])
+    const layAutoLtr = computeLayout(toLayoutTree(autoLtr), { width: 200, height: 100, direction: 'ltr' })
+    const layBadLtr = computeLayout(toLayoutTree(badLtr), { width: 200, height: 100, direction: 'ltr' })
+    const rowAutoLtr = layAutoLtr.children[0]!
+    const rowBadLtr = layBadLtr.children[0]!
+    expect(rowBadLtr.children[0]!.x).toBe(rowAutoLtr.children[0]!.x)
+    expect(rowBadLtr.children[1]!.x).toBe(rowAutoLtr.children[1]!.x)
+    expect(rowAutoLtr.children[0]!.x).toBeLessThan(rowAutoLtr.children[1]!.x)
+  })
 })
