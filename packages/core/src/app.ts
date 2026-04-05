@@ -31,7 +31,9 @@ export interface AppOptions {
   waitForFonts?: boolean
   /**
    * Max time to wait for fonts when `waitForFonts` is true. Default `10_000`.
-   * Non-finite or negative values fall back to the default (same rules as `waitForFonts` in `fonts.js`).
+   * Sanitized with {@link import('./fonts.js').resolveFontLoadTimeoutMs}: `NaN`, `±Infinity`, negatives,
+   * and non-numbers fall back to the default. **`0` is valid** (immediate timeout in the font race);
+   * see `waitForFonts` tests in `fonts.test.ts`.
    */
   fontLoadTimeoutMs?: number
   /**

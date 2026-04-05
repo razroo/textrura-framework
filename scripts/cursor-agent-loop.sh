@@ -26,6 +26,9 @@ fi
 # `virtual-scroll.test.ts`, `perf-smoke.test.ts`, server `protocol-perf-smoke.test.ts`) — `npm run test`
 # omits those even when `release:gate` runs them explicitly. Do not treat a green fast test run as a
 # substitute for `release:gate` when editing fonts, virtual scroll, or perf-smoke surfaces.
+# `vitest -t` on a lone test in files that combine `createApp` (awaits `textura.init()` / WASM) with
+# `vi.useFakeTimers()` can hang: fake clocks block timer-driven init. Run the whole file or `release:gate`
+# instead of assuming an isolated filtered test proves the case.
 # Root `npm run release:gate` allowlists specific vitest entry files (see package.json), not every
 # `packages/*/src/__tests__/**/*.test.ts` that `npm run test` / vitest.fast.config.ts includes — a file
 # passing `vitest.fast` does not imply it runs in CI gate; check package.json before assuming coverage ships.
