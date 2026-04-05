@@ -267,4 +267,24 @@ describe('coalescePatches', () => {
       { path: [1, 23], y: 2 },
     ])
   })
+
+  it('does not alias a dense path to a sparse path (join emits empty segments for holes)', () => {
+    // Malformed / hand-built patches only: diffLayout always builds dense paths.
+    const dense = [1, 2, 3]
+    const sparse = [1, , 3] as number[]
+    expect(sparse.length).toBe(3)
+    expect(1 in sparse).toBe(false)
+    expect(dense.join('.')).toBe('1.2.3')
+    expect(sparse.join('.')).toBe('1..3')
+
+    const merged = coalescePatches([
+      { path: dense, x: 1 },
+      { path: sparse, y: 2 },
+    ])
+    // First insert clones with [...path]; iterator turns the hole into an explicit `undefined` slot.
+    expect(merged).toEqual([
+      { path: [1, 2, 3], x: 1 },
+      { path: [1, undefined, 3], y: 2 },
+    ])
+  })
 })
