@@ -85,6 +85,18 @@ describe('isTextNode', () => {
     })
     expect(isTextNode(node)).toBe(true)
   })
+
+  it('is false for boxed String primitives (typeof is object; must not match string text leaves)', () => {
+    expect(
+      isTextNode({
+        text: Object('hi') as unknown as string,
+        font: '16px sans-serif',
+        lineHeight: 20,
+        width: 40,
+        height: 20,
+      } as unknown as LayoutNode),
+    ).toBe(false)
+  })
 })
 
 describe('box layout', () => {
