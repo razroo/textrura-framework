@@ -346,6 +346,46 @@ export function hasInteractiveHitAtPoint(
 }
 
 /**
+ * Root-anchored containment for {@link hitPathAtPoint} and {@link getCursorAtPoint}: finite pointer coords,
+ * finite layout bounds, optional overflow clip on boxes, then the same inclusive rect test as {@link collectHits}.
+ * Returns the node’s absolute origin `(absX, absY)` when the point hits the layout rect.
+ */
+function rootedLayoutPointContainment(
+  element: UIElement,
+  layout: ComputedLayout,
+  x: number,
+  y: number,
+  offsetX: unknown,
+  offsetY: unknown,
+): { absX: number; absY: number } | null {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+  if (!layoutBoundsAreFinite(layout)) return null
+
+  const ox = finiteNumberOrZero(offsetX)
+  const oy = finiteNumberOrZero(offsetY)
+  const absX = ox + layout.x
+  const absY = oy + layout.y
+
+  if (element.kind === 'box') {
+    const { overflow } = element.props
+    if (overflow === 'hidden' || overflow === 'scroll') {
+      if (x < absX || x > absX + layout.width || y < absY || y > absY + layout.height) {
+        return null
+      }
+    }
+  }
+
+  const inside =
+    x >= absX &&
+    x <= absX + layout.width &&
+    y >= absY &&
+    y <= absY + layout.height
+
+  if (!inside) return null
+  return { absX, absY }
+}
+
+/**
  * Child indices from root to the deepest box under (x, y). Among overlapping siblings, prefers higher z-index (topmost);
  * non-finite or non-number `zIndex` values match `dispatchHit` / paint order (treated as `0`).
  * Boxes with `pointerEvents: 'none'` are skipped for path segments; if the deepest matching geometry is only such a box
@@ -372,30 +412,9 @@ export function hitPathAtPoint(
   offsetX = 0,
   offsetY = 0,
 ): number[] | null {
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return null
-  if (!layoutBoundsAreFinite(layout)) return null
-
-  const ox = finiteNumberOrZero(offsetX)
-  const oy = finiteNumberOrZero(offsetY)
-  const absX = ox + layout.x
-  const absY = oy + layout.y
-
-  if (element.kind === 'box') {
-    const { overflow } = element.props
-    if (overflow === 'hidden' || overflow === 'scroll') {
-      if (x < absX || x > absX + layout.width || y < absY || y > absY + layout.height) {
-        return null
-      }
-    }
-  }
-
-  const inside =
-    x >= absX &&
-    x <= absX + layout.width &&
-    y >= absY &&
-    y <= absY + layout.height
-
-  if (!inside) return null
+  const hit = rootedLayoutPointContainment(element, layout, x, y, offsetX, offsetY)
+  if (!hit) return null
+  const { absX, absY } = hit
 
   if (element.kind !== 'box') return null
 
@@ -450,28 +469,9 @@ export function getCursorAtPoint(
   offsetX = 0,
   offsetY = 0,
 ): string | null {
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return null
-  if (!layoutBoundsAreFinite(layout)) return null
-
-  const ox = finiteNumberOrZero(offsetX)
-  const oy = finiteNumberOrZero(offsetY)
-  const absX = ox + layout.x
-  const absY = oy + layout.y
-
-  if (element.kind === 'box') {
-    const { overflow } = element.props
-    if (overflow === 'hidden' || overflow === 'scroll') {
-      if (x < absX || x > absX + layout.width || y < absY || y > absY + layout.height) {
-        return null
-      }
-    }
-  }
-
-  const inside =
-    x >= absX && x <= absX + layout.width &&
-    y >= absY && y <= absY + layout.height
-
-  if (!inside) return null
+  const hit = rootedLayoutPointContainment(element, layout, x, y, offsetX, offsetY)
+  if (!hit) return null
+  const { absX, absY } = hit
 
   // Check children (deepest first via recursion)
   if (element.kind === 'box') {
