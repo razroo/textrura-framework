@@ -54,6 +54,11 @@ describe('client binary frame decode', () => {
     expect(decodeBinaryFrameJson(encodeBinaryFrameJsonV1(json))).toBe(json)
   })
 
+  it('roundtrips JSON with astral-plane Unicode (UTF-8 outside the BMP)', () => {
+    const json = JSON.stringify({ glyph: '🙂', mixed: 'a\uD83D\uDE42b', rtl: 'مرحبا' })
+    expect(decodeBinaryFrameJson(encodeBinaryFrameJsonV1(json))).toBe(json)
+  })
+
   it('throws when the buffer is not a GEOM binary frame', () => {
     expect(() => decodeBinaryFrameJson(new ArrayBuffer(0))).toThrow('Not a GEOM binary frame')
     const plain = new TextEncoder().encode('not binary').buffer

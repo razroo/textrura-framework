@@ -60,6 +60,12 @@ describe('binary frame envelope', () => {
     expect(decodeBinaryFrameJson(buf)).toBe(json)
   })
 
+  it('roundtrips JSON with astral-plane Unicode (UTF-8 outside the BMP)', () => {
+    const json = JSON.stringify({ glyph: '🙂', mixed: 'a\uD83D\uDE42b', rtl: 'مرحبا' })
+    const buf = encodeBinaryFrameJson(json)
+    expect(decodeBinaryFrameJson(buf)).toBe(json)
+  })
+
   it('encode empty UTF-8 payload is header-only (9 bytes, length field zero) and roundtrips', () => {
     const buf = encodeBinaryFrameJson('')
     expect(buf.length).toBe(9)
