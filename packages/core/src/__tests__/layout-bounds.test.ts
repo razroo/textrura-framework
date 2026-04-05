@@ -249,6 +249,58 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite(layout)).toBe(true)
   })
 
+  it('accepts bounds on non-enumerable own data properties (object destructuring uses Get, not enumerability)', () => {
+    const children: [] = []
+    const layout = { children } as Record<string, unknown>
+    for (const [key, value] of [
+      ['x', 0],
+      ['y', 2],
+      ['width', 40],
+      ['height', 50],
+    ] as const) {
+      Object.defineProperty(layout, key, { value, enumerable: false, writable: true, configurable: true })
+    }
+    expect(layoutBoundsAreFinite(layout as unknown as ComputedLayout)).toBe(true)
+  })
+
+  it('accepts bounds supplied via accessor descriptors (destructuring invokes getters)', () => {
+    const layout = {
+      children: [] as [],
+      get x() {
+        return 0
+      },
+      get y() {
+        return 1
+      },
+      get width() {
+        return 20
+      },
+      get height() {
+        return 30
+      },
+    } as unknown as ComputedLayout
+    expect(layoutBoundsAreFinite(layout)).toBe(true)
+  })
+
+  it('rejects when an accessor returns a non-finite dimension', () => {
+    const layout = {
+      children: [] as [],
+      get x() {
+        return 0
+      },
+      get y() {
+        return 0
+      },
+      get width() {
+        return Number.NaN
+      },
+      get height() {
+        return 10
+      },
+    } as unknown as ComputedLayout
+    expect(layoutBoundsAreFinite(layout)).toBe(false)
+  })
+
   it('rejects when own properties shadow valid prototype bounds with corrupt values', () => {
     const proto = {
       x: 0,
