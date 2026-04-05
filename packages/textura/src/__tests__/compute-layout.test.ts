@@ -15,8 +15,8 @@ if (typeof globalThis.OffscreenCanvas === 'undefined') {
   }
 }
 
-import { init, destroy, computeLayout } from '../index.js'
-import type { BoxNode, TextNode } from '../index.js'
+import { init, destroy, computeLayout, isTextNode } from '../index.js'
+import type { BoxNode, LayoutNode, TextNode } from '../index.js'
 
 beforeAll(async () => {
   await init()
@@ -24,6 +24,67 @@ beforeAll(async () => {
 
 afterAll(() => {
   destroy()
+})
+
+describe('isTextNode', () => {
+  it('is true only when `text` is present and a string', () => {
+    const leaf: TextNode = {
+      text: 'hi',
+      font: '16px sans-serif',
+      lineHeight: 20,
+      width: 40,
+      height: 20,
+    }
+    expect(isTextNode(leaf)).toBe(true)
+    expect(isTextNode({ ...leaf, text: '' })).toBe(true)
+  })
+
+  it('is false for box nodes and nodes without string text', () => {
+    const boxNode: BoxNode = { width: 10, height: 10, children: [] }
+    expect(isTextNode(boxNode as LayoutNode)).toBe(false)
+
+    expect(
+      isTextNode({
+        text: 1,
+        font: '16px sans-serif',
+        lineHeight: 20,
+        width: 40,
+        height: 20,
+      } as unknown as LayoutNode),
+    ).toBe(false)
+
+    expect(
+      isTextNode({
+        text: null,
+        font: '16px sans-serif',
+        lineHeight: 20,
+        width: 40,
+        height: 20,
+      } as unknown as LayoutNode),
+    ).toBe(false)
+
+    expect(
+      isTextNode({
+        text: undefined,
+        font: '16px sans-serif',
+        lineHeight: 20,
+        width: 40,
+        height: 20,
+      } as unknown as LayoutNode),
+    ).toBe(false)
+  })
+
+  it('uses `in` semantics so inherited `text` counts (documents engine guard behavior)', () => {
+    const proto = { text: 'from-proto' }
+    const node = Object.create(proto) as LayoutNode
+    Object.assign(node, {
+      font: '16px sans-serif',
+      lineHeight: 20,
+      width: 40,
+      height: 20,
+    })
+    expect(isTextNode(node)).toBe(true)
+  })
 })
 
 describe('box layout', () => {
