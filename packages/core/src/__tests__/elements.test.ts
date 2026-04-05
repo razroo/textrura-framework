@@ -153,6 +153,36 @@ describe('text', () => {
     expect((el.props as { cursor?: string }).cursor).toBe('text')
     expect((el.props as { selectable?: boolean }).selectable).toBe(true)
   })
+
+  it('preserves whiteSpace on props for Textura wrapping policy', () => {
+    const nowrap = text({
+      text: 'x',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      whiteSpace: 'nowrap',
+    })
+    expect((nowrap.props as { whiteSpace?: string }).whiteSpace).toBe('nowrap')
+    const preWrap = text({
+      text: 'x',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      whiteSpace: 'pre-wrap',
+    })
+    expect((preWrap.props as { whiteSpace?: string }).whiteSpace).toBe('pre-wrap')
+  })
+
+  it('preserves pointerEvents and zIndex on props (StyleProps parity with box for cursor and paint order)', () => {
+    const el = text({
+      text: 'x',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      pointerEvents: 'none',
+      zIndex: 5,
+    })
+    const p = el.props as Record<string, unknown>
+    expect(p.pointerEvents).toBe('none')
+    expect(p.zIndex).toBe(5)
+  })
 })
 
 describe('image', () => {
