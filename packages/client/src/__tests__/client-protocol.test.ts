@@ -1042,6 +1042,70 @@ describe('applyServerMessage', () => {
     expect(metrics).toHaveLength(0)
     expect(renders).toHaveLength(0)
   })
+
+  it('rejects data messages with cyclic object or array payloads (no stack overflow; no onData)', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const errors: string[] = []
+    const dataCalls: unknown[] = []
+    const metrics: ClientFrameMetrics[] = []
+    type Msg = Parameters<typeof applyServerMessage>[2]
+
+    const cyclicObject = { n: 1 } as Record<string, unknown>
+    cyclicObject.self = cyclicObject
+
+    const cyclicArray: unknown[] = []
+    cyclicArray.push(cyclicArray)
+
+    const cyclicMixed: Record<string, unknown> = { arr: [] as unknown[] }
+    ;(cyclicMixed.arr as unknown[]).push(cyclicMixed)
+
+    for (const payload of [cyclicObject, cyclicArray, cyclicMixed]) {
+      applyServerMessage(
+        state,
+        renderer,
+        { type: 'data', channel: 'geom.cycle', payload, protocolVersion: 1 } as unknown as Msg,
+        e => errors.push(String(e)),
+        m => metrics.push(m),
+        { decodeMs: 0 },
+        () => dataCalls.push(payload),
+      )
+    }
+
+    expect(errors).toHaveLength(3)
+    for (const err of errors) {
+      expect(err).toContain('Invalid server message')
+    }
+    expect(dataCalls).toHaveLength(0)
+    expect(metrics).toHaveLength(0)
+    expect(renders).toHaveLength(0)
+  })
+
+  it('accepts data messages that reuse the same plain object under multiple keys (acyclic DAG)', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const dataCalls: Array<{ channel: string; payload: unknown }> = []
+    const metrics: ClientFrameMetrics[] = []
+    type Msg = Parameters<typeof applyServerMessage>[2]
+
+    const shared = { x: 1 }
+    const payload = { left: shared, right: shared }
+
+    applyServerMessage(
+      state,
+      renderer,
+      { type: 'data', channel: 'geom.shared', payload, protocolVersion: 1 } as unknown as Msg,
+      undefined,
+      m => metrics.push(m),
+      { decodeMs: 0 },
+      (ch, pl) => dataCalls.push({ channel: ch, payload: pl }),
+    )
+
+    expect(dataCalls).toEqual([{ channel: 'geom.shared', payload }])
+    expect(metrics).toHaveLength(1)
+    expect(metrics[0]!.messageType).toBe('data')
+    expect(renders).toHaveLength(0)
+  })
 })
 
 describe('GEOM data channel ids', () => {

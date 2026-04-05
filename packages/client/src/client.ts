@@ -54,19 +54,37 @@ interface ServerData {
 
 type ServerMessage = ServerFrame | ServerPatch | ServerError | ServerData
 
-/** JSON-serializable plain data (no Date, Map, undefined in objects, etc.). */
-function isJsonSerializableValue(v: unknown): boolean {
+/**
+ * JSON-serializable plain data (no Date, Map, undefined in objects, etc.).
+ * Rejects cyclic object graphs (including `a.push(a)` on arrays) so corrupt server payloads cannot blow the stack;
+ * shared acyclic subgraphs referenced from multiple paths remain valid, matching `JSON.stringify` behavior.
+ */
+function isJsonSerializableValue(v: unknown, visiting: Set<object> = new Set()): boolean {
   if (v === null) return true
   const t = typeof v
   if (t === 'string' || t === 'number' || t === 'boolean') return true
   if (t === 'bigint' || t === 'undefined' || t === 'function' || t === 'symbol') return false
-  if (Array.isArray(v)) return v.every(isJsonSerializableValue)
+  if (Array.isArray(v)) {
+    if (visiting.has(v)) return false
+    visiting.add(v)
+    try {
+      return v.every(item => isJsonSerializableValue(item, visiting))
+    } finally {
+      visiting.delete(v)
+    }
+  }
   if (t === 'object') {
     if (Object.getPrototypeOf(v) !== Object.prototype) return false
-    for (const key of Object.keys(v as object)) {
-      if (!isJsonSerializableValue((v as Record<string, unknown>)[key])) return false
+    if (visiting.has(v as object)) return false
+    visiting.add(v as object)
+    try {
+      for (const key of Object.keys(v as object)) {
+        if (!isJsonSerializableValue((v as Record<string, unknown>)[key], visiting)) return false
+      }
+      return true
+    } finally {
+      visiting.delete(v as object)
     }
-    return true
   }
   return false
 }
