@@ -307,6 +307,93 @@ describe('collectTextNodes', () => {
     expect(results[0]).toMatchObject({ x: 35, y: 70 })
   })
 
+  it('treats non-finite or bigint scrollX/scrollY as zero when descending (finiteNumberOrZero parity with hit-test)', () => {
+    const mkText = () =>
+      text({ text: 'InScroll', font: '14px sans-serif', lineHeight: 18, width: 80, height: 18 })
+
+    const childLayout = {
+      x: 10,
+      y: 20,
+      width: 100,
+      height: 100,
+      children: [{ x: 5, y: 30, width: 80, height: 18, children: [] }],
+    } satisfies ComputedLayout
+
+    const rootLayout = (inner: ComputedLayout): ComputedLayout => ({
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 120,
+      children: [inner],
+    })
+
+    const r1: TextNodeInfo[] = []
+    collectTextNodes(
+      box({ width: 200, height: 120 }, [
+        box(
+          {
+            width: 100,
+            height: 100,
+            overflow: 'scroll',
+            scrollX: Number.NaN,
+            scrollY: 40,
+          },
+          [mkText()],
+        ),
+      ]),
+      rootLayout(childLayout),
+      0,
+      0,
+      r1,
+    )
+    // scrollX → 0: x = 10 + 5 = 15; scrollY 40: y = (20 − 40) + 30 = 10
+    expect(r1[0]).toMatchObject({ x: 15, y: 10 })
+
+    const r2: TextNodeInfo[] = []
+    collectTextNodes(
+      box({ width: 200, height: 120 }, [
+        box(
+          {
+            width: 100,
+            height: 100,
+            overflow: 'scroll',
+            scrollX: 12,
+            scrollY: Number.POSITIVE_INFINITY,
+          },
+          [mkText()],
+        ),
+      ]),
+      rootLayout(childLayout),
+      0,
+      0,
+      r2,
+    )
+    // scrollY → 0: y = 20 + 30 = 50; scrollX 12: x = (10 − 12) + 5 = 3
+    expect(r2[0]).toMatchObject({ x: 3, y: 50 })
+
+    const r3: TextNodeInfo[] = []
+    collectTextNodes(
+      box({ width: 200, height: 120 }, [
+        box(
+          {
+            width: 100,
+            height: 100,
+            overflow: 'scroll',
+            scrollX: 9n as unknown as number,
+            scrollY: 7,
+          },
+          [mkText()],
+        ),
+      ]),
+      rootLayout(childLayout),
+      0,
+      0,
+      r3,
+    )
+    // BigInt scrollX → 0: x = 10 + 5 = 15; scrollY 7: y = (20 − 7) + 30 = 43
+    expect(r3[0]).toMatchObject({ x: 15, y: 43 })
+  })
+
   it('skips the whole walk when root layout bounds are corrupt (aligned with hit-test / focus)', () => {
     const el = box({ width: 200, height: 100 }, [
       text({ text: 'Hi', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
