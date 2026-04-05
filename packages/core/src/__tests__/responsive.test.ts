@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createViewport, breakpoint, responsive, defaultBreakpoints } from '../responsive.js'
-import { signal } from '../signals.js'
+import { computed, signal } from '../signals.js'
 
 describe('createViewport', () => {
   it('exposes reactive width and height', () => {
@@ -51,6 +51,17 @@ describe('breakpoint', () => {
     w.set(1024)
     expect(bp.value).toBe('lg')
   })
+
+  it('accepts a computed width source (same dependency tracking as a raw signal)', () => {
+    const w = signal(1600)
+    const half = computed(() => w.value / 2)
+    const bp = breakpoint(half, bps)
+    expect(bp.value).toBe('md')
+    w.set(400)
+    expect(bp.value).toBe('sm')
+    w.set(2048)
+    expect(bp.value).toBe('lg')
+  })
 })
 
 describe('responsive', () => {
@@ -68,6 +79,15 @@ describe('responsive', () => {
     expect(cols.value).toBe(1)
     w.set(1200)
     expect(cols.value).toBe(3)
+  })
+
+  it('accepts a computed width source', () => {
+    const w = signal(1600)
+    const half = computed(() => w.value / 2)
+    const cols = responsive(half, { sm: 1, md: 2, lg: 3 }, bps)
+    expect(cols.value).toBe(2)
+    w.set(400)
+    expect(cols.value).toBe(1)
   })
 })
 
@@ -182,5 +202,14 @@ describe('createViewport edge cases', () => {
     vp.resize(400, 300)
     expect(vp.width.value).toBe(400)
     expect(vp.height.value).toBe(300)
+  })
+
+  it('preserves IEEE negative zero on init and resize (finiteNumberOrZero parity with layout math)', () => {
+    const vp = createViewport(-0, 10)
+    expect(Object.is(vp.width.peek(), -0)).toBe(true)
+    expect(vp.height.value).toBe(10)
+    vp.resize(5, -0)
+    expect(vp.width.value).toBe(5)
+    expect(Object.is(vp.height.peek(), -0)).toBe(true)
   })
 })
