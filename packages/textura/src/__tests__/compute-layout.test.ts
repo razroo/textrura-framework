@@ -787,6 +787,49 @@ describe('box layout', () => {
     expect(result.height).toBe(90)
   })
 
+  it('uniform border offsets child position and expands auto height (Yoga inner content box)', () => {
+    const tree: BoxNode = {
+      width: 300,
+      border: 12,
+      children: [{ width: 100, height: 50 }],
+    }
+    const result = computeLayout(tree)
+    expect(result.children[0]!.x).toBe(12)
+    expect(result.children[0]!.y).toBe(12)
+    expect(result.height).toBe(74)
+  })
+
+  it('per-edge borders offset child from the inner corner and expand auto height', () => {
+    const tree: BoxNode = {
+      width: 300,
+      borderLeft: 7,
+      borderTop: 9,
+      borderRight: 3,
+      borderBottom: 5,
+      children: [{ width: 100, height: 50 }],
+    }
+    const result = computeLayout(tree)
+    expect(result.children[0]!.x).toBe(7)
+    expect(result.children[0]!.y).toBe(9)
+    expect(result.height).toBe(64)
+  })
+
+  it('row gap is measured from border-inset main-start (uniform border)', () => {
+    const tree: BoxNode = {
+      width: 300,
+      flexDirection: 'row',
+      gap: 10,
+      border: 10,
+      children: [
+        { width: 50, height: 30 },
+        { width: 50, height: 30 },
+      ],
+    }
+    const result = computeLayout(tree)
+    expect(result.children[0]!.x).toBe(10)
+    expect(result.children[1]!.x).toBe(70)
+  })
+
   it('overflow scroll, hidden, visible: fixed-height column keeps parent height; flexShrink 0 child keeps full height', () => {
     for (const overflow of ['scroll', 'hidden', 'visible'] as const) {
       const tree: BoxNode = {
