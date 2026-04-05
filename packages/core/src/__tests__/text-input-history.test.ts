@@ -124,17 +124,18 @@ describe('text input history', () => {
     expect(undoTextInputHistory(h)).toBe(h)
   })
 
-  it('with maxPast +Infinity, past is not trimmed', () => {
+  it('with maxPast +Infinity, past exceeds the default cap (100) and is not trimmed', () => {
     let h = createTextInputHistory({ nodes: ['0'], selection: sel(0, 1) })
-    for (let i = 1; i <= 120; i++) {
+    const steps = 201
+    for (let i = 1; i <= steps; i++) {
       h = pushTextInputHistory(
         h,
         { nodes: [String(i)], selection: sel(0, 1) },
         Number.POSITIVE_INFINITY,
       )
     }
-    expect(h.past).toHaveLength(120)
-    expect(h.present.nodes).toEqual(['120'])
+    expect(h.past).toHaveLength(steps)
+    expect(h.present.nodes).toEqual([String(steps)])
   })
 
   it('treats non-finite maxPast as default 100', () => {

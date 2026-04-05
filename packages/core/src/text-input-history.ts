@@ -35,7 +35,8 @@ export function createTextInputHistory(initial: TextInputState): TextInputHistor
  *
  * @param maxPast — Maximum prior states kept in `past` after this push; older entries are dropped from the front.
  *   Use `0` to disable undo (each push yields an empty `past`). `NaN` falls back to `100`; `+Infinity`
- *   keeps history unbounded; other non-finite values fall back to `100`. Negative finite values clamp to `0`.
+ *   uses {@link Number.MAX_SAFE_INTEGER} as the cap (unbounded in practice; still finite so trimming stays
+ *   safe if the stack ever grew that large). Other non-finite values fall back to `100`. Negative finite values clamp to `0`.
  */
 export function pushTextInputHistory(
   history: TextInputHistoryState,
