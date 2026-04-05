@@ -14,7 +14,7 @@ export type LinkProps = FlexProps &
   }
 
 function isActivationKey(key: string): boolean {
-  return key === 'Enter' || key === ' ' || key === 'Spacebar'
+  return key === 'Enter' || key === 'NumpadEnter' || key === ' ' || key === 'Spacebar'
 }
 
 /**
@@ -22,7 +22,7 @@ function isActivationKey(key: string): boolean {
  * `cursor: pointer` unless overridden.
  *
  * - **Pointer**: `onClick` calls your handler first, then `router.navigate(to, { replace })`.
- * - **Keyboard**: `onKeyDown` runs first; **Enter**, **Space** (`' '`), and legacy **Spacebar**
+ * - **Keyboard**: `onKeyDown` runs first; **Enter**, **NumpadEnter**, **Space** (`' '`), and legacy **Spacebar**
  *   then navigate the same way.
  *
  * Layout and style props are forwarded to {@link import('@geometra/core').box} like any other box element.
