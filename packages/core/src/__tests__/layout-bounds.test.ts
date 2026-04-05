@@ -368,11 +368,16 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(3.001, 3, 3, 3, 0, 0)).toBe(false)
   })
 
-  it('returns false when abs origin + size overflows to Infinity (naive sum would accept all finite x)', () => {
+  it('returns false when abs origin + size overflows to Infinity (naive edge sum would accept all finite coords)', () => {
     const max = Number.MAX_VALUE
     expect(max + max).toBe(Infinity)
-    expect(pointInInclusiveLayoutRect(0, 0, max, 0, max, 10)).toBe(false)
+    // Point lies on the min edges but right = absX + width overflows.
+    expect(pointInInclusiveLayoutRect(max, 0, max, 0, max, 10)).toBe(false)
+    // Symmetric: bottom = absY + height overflows.
+    expect(pointInInclusiveLayoutRect(0, max, 0, max, 10, max)).toBe(false)
+    // Control: same large width/height with origin 0 keeps finite right/bottom.
     expect(pointInInclusiveLayoutRect(max, 0, 0, 0, max, 10)).toBe(true)
+    expect(pointInInclusiveLayoutRect(0, max, 0, 0, 10, max)).toBe(true)
   })
 
   it('returns false for non-finite pointer coords or negative width/height', () => {
