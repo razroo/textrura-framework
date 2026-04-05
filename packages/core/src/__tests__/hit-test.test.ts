@@ -4609,6 +4609,34 @@ describe('z-index sort cache invalidation', () => {
     expect(log).toEqual(['mid'])
   })
 
+  it('recomputes sibling order when growing from two children to three after two-child cache warm', () => {
+    const log: string[] = []
+    const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } })
+    const front = box({ width: 50, height: 50, zIndex: 10, onClick: () => { log.push('front') } })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] as const },
+        { x: 0, y: 0, width: 50, height: 50, children: [] as const },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['front'])
+    log.length = 0
+
+    const top = box({ width: 50, height: 50, zIndex: 20, onClick: () => { log.push('top') } })
+    root.children.push(top)
+    layout.children.push({ x: 0, y: 0, width: 50, height: 50, children: [] as const })
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['top'])
+  })
+
   it('hitPathAtPoint and getCursorAtPoint follow recomputed z-order after top sibling removal', () => {
     const back = box({ width: 50, height: 50, zIndex: 0, cursor: 'pointer' })
     const front = box({ width: 50, height: 50, zIndex: 10, cursor: 'text' })
