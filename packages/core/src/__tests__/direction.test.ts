@@ -228,4 +228,19 @@ describe('resolveComputeLayoutDirection', () => {
     const ltrRoot = box({ width: 1, height: 1, dir: 'ltr' })
     expect(resolveComputeLayoutDirection(Symbol('ltr') as never, ltrRoot)).toBe('ltr')
   })
+
+  it('ignores BigInt host layoutDirection (derive from root), without throwing', () => {
+    const rtlRoot = box({ width: 1, height: 1, dir: 'rtl' })
+    expect(resolveComputeLayoutDirection(0n as never, rtlRoot)).toBe('rtl')
+    expect(resolveComputeLayoutDirection(1n as never, rtlRoot)).toBe('rtl')
+    const ltrRoot = box({ width: 1, height: 1, dir: 'ltr' })
+    expect(resolveComputeLayoutDirection(0n as never, ltrRoot)).toBe('ltr')
+  })
+
+  it('uses document-default ltr parent when root dir is auto and host override is invalid', () => {
+    const autoRoot = box({ width: 1, height: 1, dir: 'auto' })
+    expect(resolveComputeLayoutDirection(undefined, autoRoot)).toBe('ltr')
+    expect(resolveComputeLayoutDirection('auto' as never, autoRoot)).toBe('ltr')
+    expect(resolveComputeLayoutDirection(0 as never, autoRoot)).toBe('ltr')
+  })
 })
