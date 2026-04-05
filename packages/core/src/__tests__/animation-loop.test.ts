@@ -160,4 +160,67 @@ describe('animationLoop', () => {
     stop()
     expect(cancel).not.toHaveBeenCalled()
   })
+
+  it('falls back to setTimeout when requestAnimationFrame is missing (SSR / headless)', async () => {
+    vi.stubGlobal('requestAnimationFrame', undefined as unknown as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', undefined as unknown as typeof cancelAnimationFrame)
+    vi.useFakeTimers()
+
+    let mockNow = 10_000
+    vi.spyOn(Date, 'now').mockImplementation(() => mockNow)
+
+    vi.resetModules()
+    const { animationLoop } = await import('../animation.js')
+
+    const dts: number[] = []
+    let frames = 0
+    animationLoop(dt => {
+      dts.push(dt)
+      frames++
+      mockNow += 50
+      return frames < 4
+    })
+
+    try {
+      await vi.runAllTimersAsync()
+      expect(frames).toBe(4)
+      expect(dts[0]).toBe(0)
+      expect(dts[1]).toBeCloseTo(0.05, 6)
+      expect(dts[2]).toBeCloseTo(0.05, 6)
+      expect(dts[3]).toBeCloseTo(0.05, 6)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stop() clears a pending setTimeout frame when RAF APIs are missing', async () => {
+    vi.stubGlobal('requestAnimationFrame', undefined as unknown as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', undefined as unknown as typeof cancelAnimationFrame)
+    vi.useFakeTimers()
+    const clearSpy = vi.spyOn(globalThis, 'clearTimeout')
+
+    let mockNow = 0
+    vi.spyOn(Date, 'now').mockImplementation(() => mockNow)
+
+    vi.resetModules()
+    const { animationLoop } = await import('../animation.js')
+
+    let ticks = 0
+    const stop = animationLoop(() => {
+      ticks++
+      mockNow += 16
+      return true
+    })
+
+    try {
+      await vi.runOnlyPendingTimersAsync()
+      expect(ticks).toBe(1)
+
+      stop()
+      expect(clearSpy).toHaveBeenCalled()
+    } finally {
+      clearSpy.mockRestore()
+      vi.useRealTimers()
+    }
+  })
 })
