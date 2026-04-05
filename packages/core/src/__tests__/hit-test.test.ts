@@ -1295,6 +1295,34 @@ describe('dispatchHit', () => {
     expect(log).toEqual(['front'])
   })
 
+  it('overlapping siblings: three children hit order updates when z-index values change (sort-path cache)', () => {
+    const log: string[] = []
+    const low = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('low') } })
+    const mid = box({ width: 50, height: 50, zIndex: 5, onClick: () => { log.push('mid') } })
+    const high = box({ width: 50, height: 50, zIndex: 10, onClick: () => { log.push('high') } })
+    const root = box({ width: 100, height: 100 }, [low, mid, high])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['high'])
+
+    log.length = 0
+    high.props.zIndex = 0
+    low.props.zIndex = 20
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['low'])
+  })
+
   it('overlapping siblings: appended child wins after prior dispatch warmed z-order cache', () => {
     const log: string[] = []
     const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } })
