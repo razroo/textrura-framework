@@ -11,7 +11,7 @@ class FakeCtx {
   globalAlpha = 1
   scale(): void {}
   setTransform(): void {}
-  fillRect(): void {}
+  fillRect(_x: number, _y: number, _w: number, _h: number): void {}
   beginPath(): void {}
   rect(): void {}
   clip(): void {}
