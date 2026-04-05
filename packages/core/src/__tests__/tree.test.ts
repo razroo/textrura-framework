@@ -311,6 +311,23 @@ describe('toLayoutTree', () => {
     expect(layout).not.toHaveProperty('dir')
   })
 
+  it('isLayoutRoot false preserves dir on subtree heads (advanced embedding; default true strips like app root)', () => {
+    const row = box({ width: 100, height: 40, flexDirection: 'row', dir: 'rtl' })
+    expect(toLayoutTree(row, true)).not.toHaveProperty('dir')
+    expect(toLayoutTree(row, false)).toHaveProperty('dir', 'rtl')
+
+    const t = text({
+      text: 'x',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      width: 10,
+      height: 18,
+      dir: 'rtl',
+    })
+    expect(toLayoutTree(t, true)).not.toHaveProperty('dir')
+    expect(toLayoutTree(t, false)).toHaveProperty('dir', 'rtl')
+  })
+
   it('omits dir on root text, image, and scene3d layout snapshots', () => {
     const t = text({
       text: 'x',

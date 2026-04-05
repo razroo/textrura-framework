@@ -68,6 +68,12 @@ function stripStyleProps(props: Record<string, unknown>): Record<string, unknown
  *
  * Does not mutate the source element or its `props` (strip list is applied to a shallow copy).
  *
+ * @param isLayoutRoot — When `true` (default), this node's `dir` is omitted so
+ * {@link import('./app.js').AppOptions.layoutDirection} (or Yoga owner direction from the host) stays the single
+ * source of truth for the **geometric** layout root. Pass `false` only when treating this element as the root of a
+ * subtree you embed yourself (e.g. custom `computeLayout` on a fragment): `dir` is then forwarded on that head like
+ * any non-root node.
+ *
  * Runtime fields on boxes (`handlers`, `semantic`, `key`) are not part of `element.props` and
  * are unchanged on the live tree — they are not copied into the layout snapshot.
  */
