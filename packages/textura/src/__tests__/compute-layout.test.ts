@@ -128,6 +128,34 @@ describe('box layout', () => {
     expect(result.children[1]!.height).toBe(70)
   })
 
+  it('applies aspectRatio as width/height when width is definite (Yoga setAspectRatio)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 200,
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      children: [{ width: 100, aspectRatio: 2 }],
+    }
+    const result = computeLayout(tree)
+    const child = result.children[0]!
+    expect(child.width).toBe(100)
+    expect(child.height).toBe(50)
+  })
+
+  it('applies aspectRatio as width/height when height is definite', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 200,
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      children: [{ height: 50, aspectRatio: 2 }],
+    }
+    const result = computeLayout(tree)
+    const child = result.children[0]!
+    expect(child.width).toBe(100)
+    expect(child.height).toBe(50)
+  })
+
   it('nested row with dir rtl mirrors flex child order under ltr owner direction', () => {
     const tree: BoxNode = {
       width: 200,
