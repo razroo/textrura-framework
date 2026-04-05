@@ -98,6 +98,13 @@ describe('isRedirectResult', () => {
     expect(isRedirectResult(0)).toBe(false)
     expect(isRedirectResult(Object(0))).toBe(false)
   })
+
+  it('accepts kind read from the prototype chain ([[Get]] semantics; matches JSDoc)', () => {
+    const proto = { kind: 'redirect' as const }
+    const r = Object.create(proto) as { to: string }
+    r.to = '/x'
+    expect(isRedirectResult(r)).toBe(true)
+  })
 })
 
 describe('isResponseResult', () => {
@@ -121,5 +128,12 @@ describe('isResponseResult', () => {
     expect(isResponseResult(() => {})).toBe(false)
     expect(isResponseResult(0)).toBe(false)
     expect(isResponseResult(Object(0))).toBe(false)
+  })
+
+  it('accepts kind read from the prototype chain ([[Get]] semantics; matches JSDoc)', () => {
+    const proto = { kind: 'response' as const }
+    const r = Object.create(proto) as { data: unknown }
+    r.data = { ok: true }
+    expect(isResponseResult(r)).toBe(true)
   })
 })
