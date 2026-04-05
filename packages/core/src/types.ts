@@ -250,7 +250,14 @@ export interface Scene3dElement {
 /** Union of all element types. */
 export type UIElement = TextElement | BoxElement | ImageElement | Scene3dElement
 
-/** Supported event handlers on box elements. */
+/**
+ * Supported event handlers on box elements.
+ *
+ * Pointer slots (`onPointer*`, `onWheel`) and `onClick` are hit-tested; keyboard and composition slots
+ * route to the focused element. Tab order, focus traps, and click-to-focus use
+ * {@link import('./focus-candidates.js').hasFocusCandidateHandlers} — pointer-only boxes are omitted there
+ * until they also define click, key, or composition handlers.
+ */
 export interface EventHandlers {
   onClick?: (e: HitEvent) => void
   onPointerDown?: (e: HitEvent) => void
