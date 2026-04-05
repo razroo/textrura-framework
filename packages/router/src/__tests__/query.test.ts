@@ -13,6 +13,16 @@ describe('query helpers', () => {
     expect(parseQuery(sym)).toEqual({})
   })
 
+  it('rejects boxed primitives for parseQuery (typeof object; same guard as null/number callers)', () => {
+    const boxedStr = Object('a=1') as never
+    const boxedNum = Object(42) as never
+    expect(typeof boxedStr).toBe('object')
+    expect(typeof boxedNum).toBe('object')
+    expect(parseQuery(boxedStr)).toEqual({})
+    expect(parseQuery(boxedNum)).toEqual({})
+    expect(Object.getPrototypeOf(parseQuery(boxedStr))).toBeNull()
+  })
+
   it('parses empty search string', () => {
     const q = parseQuery('')
     expect(q).toEqual({})
