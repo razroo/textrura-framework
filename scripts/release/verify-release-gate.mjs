@@ -41,6 +41,12 @@ async function main() {
       'release:gate: test:terminal-input must be the final && segment (nothing may run after the demo-terminal input suite)',
     )
   }
+  // CI and local docs require Bun for `@geometra/demo-terminal` input wiring; `npm run` here would hide missing Bun.
+  if (!/\bbun\s+run\s+test:terminal-input\b/.test(lastSegment)) {
+    throw new Error(
+      'release:gate: final && segment must be `bun run test:terminal-input` (Bun on PATH is required for the demo-terminal input suite)',
+    )
+  }
 
   const tokens = gate.split(/\s+/).filter(Boolean)
   const paths = tokens.filter(t => t.startsWith('packages/') && t.endsWith('.test.ts'))
