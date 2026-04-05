@@ -11,6 +11,9 @@ function isFiniteLayoutNumber(value: unknown): value is number {
  *
  * Shared by hit-testing, text selection walks, accessibility bounds, text-input caret math, and animation timelines
  * so corrupt serialized values cannot poison coordinates or timing.
+ *
+ * @param value — Any runtime value (including corrupt deserialized props).
+ * @returns A primitive finite `number`, or `0` when the input is not a finite number. Primitive IEEE **−0** is preserved.
  */
 export function finiteNumberOrZero(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0
@@ -58,6 +61,14 @@ export function layoutBoundsAreFinite(layout: ComputedLayout): boolean {
  * Returns `false` when the summed right or bottom edge overflows to non-finite values — with IEEE doubles,
  * two large finite operands can still produce `±Infinity`, and naive `x <= absX + width` would then accept
  * every finite `x`. Shared by hit-testing and overflow clipping so behavior stays consistent.
+ *
+ * @param x — Pointer X (must be a finite primitive `number`; non-numbers yield `false` via `Number.isFinite`).
+ * @param y — Pointer Y (same rules as `x`).
+ * @param absX — Rectangle minimum X in the same coordinate space as `x`.
+ * @param absY — Rectangle minimum Y in the same coordinate space as `y`.
+ * @param width — Non-negative width; negative values yield `false`.
+ * @param height — Non-negative height; negative values yield `false`.
+ * @returns `true` when the point lies inside the inclusive rect and all arguments are finite with non-negative size.
  */
 export function pointInInclusiveLayoutRect(
   x: number,

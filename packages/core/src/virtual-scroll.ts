@@ -29,6 +29,9 @@ function intRowMetric(n: number, fallback: number): number {
  * @param currentStart — Current window start index; floored to a whole row, then clamped into valid range before
  * adjusting for selection.
  * Non-finite arguments use the same defaults as empty/reset UI state (`0` rows, window `1`, selection/start `0`).
+ *
+ * @returns Indices with `start <= end`, selection clamped to `[0, totalRows - 1]` (or `0` when empty), and
+ *   `selected` always inside `[start, end]` whenever `totalRows > 0`.
  */
 export function syncVirtualWindow(
   totalRows: number,
