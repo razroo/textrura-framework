@@ -43,6 +43,11 @@ async function main() {
 
   const seen = new Map()
   for (const rel of paths) {
+    if (!rel.includes('/src/__tests__/')) {
+      throw new Error(
+        `release:gate: vitest allowlist paths must live under packages/<pkg>/src/__tests__/ (got: ${rel})`,
+      )
+    }
     const canonical = canonicalPackagesTestPath(rel)
     if (seen.has(canonical)) {
       throw new Error(
