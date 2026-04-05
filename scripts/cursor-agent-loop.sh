@@ -11,6 +11,8 @@ fi
 #
 # Task selection (humans/agents): grep the entire ROADMAP.md for `- [ ]` (Phase A–C, post-1.0 plans,
 # release polish, and next frontier all use the same checkbox pattern) and grep ROUTING_COMPETITIVENESS_CHECKLIST.md.
+# Zero matching lines from those greps is normal when everything is checked — not a broken search; continue to
+# deferred themes / north-star buckets (step 2b) instead of retrying or assuming the repo has "no roadmap".
 # Both trackers may already be all `[x]` — that only means unchecked checkbox backlog is exhausted there,
 # not that the repo is "done". ROADMAP "Deferred / research" uses plain bullets (no `- [ ]`), so an empty
 # roadmap grep does not mean no roadmap-backed themes — read that subsection when casting next work (RTL through
@@ -142,7 +144,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
 1. Explore the codebase. Read ROADMAP.md, CLAUDE.md, and browse the source in packages/. Understand the architecture and what already exists. If the task touches demo sites, \`create:app\` templates, or starter examples, read AGENTS.md (full-viewport canvas; no extra DOM chrome around Geometra).
 
 2. Decide what to work on. Use this priority order:
-   a) Unchecked items in ROADMAP.md (if any remain). Grep the whole file for \`[ ]\` — not only Phase A–C; post-1.0, release polish, and next-frontier blocks use the same pattern. When ROADMAP is all \`[x]\`, still grep ROUTING_COMPETITIVENESS_CHECKLIST.md for any remaining \`[ ]\` lines; when both greps are empty, use ROADMAP "Deferred / research" or the routing doc's sections only as thematic hints (fonts/metrics, hit-test and input, protocol, renderers, demos). The ROADMAP "Deferred / research" subsection has no checkboxes — read it explicitly when everything else is \`[x]\` and you want roadmap-aligned themes. Ignore \`[ ]\` in RELEASE_CHECKLIST.md and v1-release-checklist.md — those are maintainer release steps, not framework backlog.
+   a) Unchecked items in ROADMAP.md (if any remain). Grep the whole file for \`[ ]\` — not only Phase A–C; post-1.0, release polish, and next-frontier blocks use the same pattern. When ROADMAP is all \`[x]\`, still grep ROUTING_COMPETITIVENESS_CHECKLIST.md for any remaining \`[ ]\` lines. When both greps return no lines, that means all checkboxes are done (expected), not a failed search — proceed to ROADMAP "Deferred / research" or routing sections as thematic hints (fonts/metrics, hit-test and input, protocol, renderers, demos), or to 2b. The ROADMAP "Deferred / research" subsection has no checkboxes — read it explicitly when everything else is \`[x]\` and you want roadmap-aligned themes. Ignore \`[ ]\` in RELEASE_CHECKLIST.md and v1-release-checklist.md — those are maintainer release steps, not framework backlog.
    b) If nothing is unchecked there either, improve the framework on your own initiative. Examples of valuable work:
       - Add or expand test coverage (unit tests, edge cases, integration tests)
       - Improve performance in hot paths (hit-testing, text measurement, layout, repaint)
