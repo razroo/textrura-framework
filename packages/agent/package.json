@@ -1,0 +1,40 @@
+{
+  "name": "@geometra/agent",
+  "version": "1.16.0",
+  "description": "AI agent UI runtime — wire up LLM agents with server-streamed Geometra UIs",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/razroo/geometra",
+    "directory": "packages/agent"
+  },
+  "homepage": "https://razroo.github.io/geometra",
+  "keywords": [
+    "geometra",
+    "agent",
+    "ai",
+    "llm",
+    "server-driven-ui"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@geometra/core": "^1.6.0",
+    "@geometra/server": "^1.6.0",
+    "@geometra/ui": "^1.6.0"
+  }
+}

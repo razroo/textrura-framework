@@ -83,6 +83,19 @@ export type {
   MotionPreference,
 } from './animation.js'
 
+// Streaming text
+export { streamText } from './stream-text.js'
+export type { StreamText } from './stream-text.js'
+
+// Responsive helpers
+export {
+  createViewport,
+  breakpoint,
+  responsive,
+  defaultBreakpoints,
+} from './responsive.js'
+export type { Viewport, BreakpointMap } from './responsive.js'
+
 // Virtual scroll helpers
 export { syncVirtualWindow } from './virtual-scroll.js'
 export type { VirtualWindowState } from './virtual-scroll.js'

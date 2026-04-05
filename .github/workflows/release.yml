@@ -21,6 +21,7 @@ jobs:
         packages/ui
         packages/router
         packages/tw
+        packages/agent
       PUBLISH_PACKAGES: >-
         textura
         @geometra/core
@@ -33,6 +34,7 @@ jobs:
         @geometra/ui
         @geometra/router
         @geometra/tw
+        @geometra/agent
         @geometra/cli
     steps:
       - uses: actions/checkout@v6
@@ -72,6 +74,12 @@ jobs:
           # tw also depends on textura
           cd packages/tw
           npm pkg set "dependencies.textura=^$VERSION"
+          cd "$GITHUB_WORKSPACE"
+          # agent depends on core, server, and ui
+          cd packages/agent
+          npm pkg set "dependencies.@geometra/core=^$VERSION"
+          npm pkg set "dependencies.@geometra/server=^$VERSION"
+          npm pkg set "dependencies.@geometra/ui=^$VERSION"
           cd "$GITHUB_WORKSPACE"
           # cli depends on renderer-terminal and textura
           cd packages/cli
