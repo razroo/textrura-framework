@@ -218,6 +218,16 @@ describe('breakpoint non-finite min-width', () => {
 })
 
 describe('createViewport edge cases', () => {
+  it('coerces boxed or non-number initial dimensions to zero (typeof guard; same as resize payloads)', () => {
+    const boxed = createViewport(Object(800) as unknown as number, Object(600) as unknown as number)
+    expect(boxed.width.value).toBe(0)
+    expect(boxed.height.value).toBe(0)
+
+    const hostile = createViewport('1024' as unknown as number, null as unknown as number)
+    expect(hostile.width.value).toBe(0)
+    expect(hostile.height.value).toBe(0)
+  })
+
   it('coerces non-finite initial dimensions to zero (parity with layout / hit-test guards)', () => {
     const vp = createViewport(Number.NaN, Number.POSITIVE_INFINITY)
     expect(vp.width.value).toBe(0)
