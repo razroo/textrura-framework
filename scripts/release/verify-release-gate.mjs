@@ -48,6 +48,20 @@ async function main() {
     )
   }
 
+  const terminalMatches = gate.match(/\bbun\s+run\s+test:terminal-input\b/g)
+  if (!terminalMatches || terminalMatches.length !== 1) {
+    throw new Error(
+      'release:gate: scripts.release:gate must include exactly one `bun run test:terminal-input` (duplicate or missing breaks ordering and wastes CI time)',
+    )
+  }
+
+  const firstSegment = segments[0] ?? ''
+  if (!firstSegment.includes('verify-release-gate.mjs')) {
+    throw new Error(
+      'release:gate: first && segment must run scripts/release/verify-release-gate.mjs so duplicate/missing vitest paths fail before the long vitest run',
+    )
+  }
+
   const tokens = gate.split(/\s+/).filter(Boolean)
   const paths = tokens.filter(t => t.startsWith('packages/') && t.endsWith('.test.ts'))
 

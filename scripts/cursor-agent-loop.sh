@@ -36,6 +36,8 @@ fi
 # keyboard.test.ts); inserting it again after keyboard duplicates the entry and fails verify-release-gate.mjs.
 # `verify-release-gate.mjs` also resolves paths canonically, so `packages/a/../b/x.test.ts` counts as the same
 # file as `packages/b/x.test.ts` for duplicate detection. Gate paths must use forward slashes only (backslashes rejected).
+# The verifier also requires exactly one `bun run test:terminal-input` in the gate string and that the first
+# `&&` segment runs `verify-release-gate.mjs` (fail-fast before vitest; no duplicate terminal suites).
 # `npm run release:gate` runs `scripts/release/verify-release-gate.mjs`
 # first to fail fast on duplicates/missing paths and to ensure `test:terminal-input` is the final `&&` segment
 # in package.json (nothing may run after the demo-terminal input suite), then the vitest allowlist, then
