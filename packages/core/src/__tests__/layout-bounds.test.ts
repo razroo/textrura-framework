@@ -249,6 +249,27 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite(layout)).toBe(true)
   })
 
+  it('rejects when own properties shadow valid prototype bounds with corrupt values', () => {
+    const proto = {
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+      children: [],
+    } as unknown as ComputedLayout
+    const nanWidth = Object.assign(Object.create(proto), { width: Number.NaN }) as unknown as ComputedLayout
+    expect(Object.getPrototypeOf(nanWidth)).toBe(proto)
+    expect(layoutBoundsAreFinite(nanWidth)).toBe(false)
+
+    const undefinedY = Object.assign(Object.create(proto), {
+      y: undefined as unknown as number,
+    }) as unknown as ComputedLayout
+    expect(layoutBoundsAreFinite(undefinedY)).toBe(false)
+
+    const negHeight = Object.assign(Object.create(proto), { height: -1 }) as unknown as ComputedLayout
+    expect(layoutBoundsAreFinite(negHeight)).toBe(false)
+  })
+
   it('rejects null-prototype layout objects (no own x/y/width/height) without throwing', () => {
     const bare = Object.create(null) as unknown as ComputedLayout
     expect(() => layoutBoundsAreFinite(bare)).not.toThrow()
