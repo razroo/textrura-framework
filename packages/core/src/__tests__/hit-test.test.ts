@@ -128,6 +128,73 @@ describe('dispatchHit', () => {
     }
   })
 
+  describe('corrupt child layout (subtree skipped; parent still hit-testable)', () => {
+    it('dispatchHit does not invoke child handlers and falls through to parent onClick', () => {
+      let childFired = false
+      let parentFired = false
+      const child = box({
+        width: 50,
+        height: 50,
+        onClick: () => {
+          childFired = true
+        },
+      })
+      const parent = box({
+        width: 100,
+        height: 100,
+        onClick: () => {
+          parentFired = true
+        },
+        children: [child],
+      })
+      const childLayout = { x: 0, y: 0, width: Number.NaN, height: 50, children: [] as const }
+      const layout = { x: 0, y: 0, width: 100, height: 100, children: [childLayout] as const }
+
+      expect(() => dispatchHit(parent, layout, 'onClick', 10, 10)).not.toThrow()
+      const r = dispatchHit(parent, layout, 'onClick', 10, 10)
+      expect(r.handled).toBe(true)
+      expect(childFired).toBe(false)
+      expect(parentFired).toBe(true)
+    })
+
+    it('hitPathAtPoint returns [] (leaf parent) when only the child layout is corrupt', () => {
+      const child = box({ width: 50, height: 50 })
+      const parent = box({ width: 100, height: 100, children: [child] })
+      const childLayout = { x: 0, y: 0, width: 10, height: -1, children: [] as const }
+      const layout = { x: 0, y: 0, width: 100, height: 100, children: [childLayout] as const }
+
+      expect(() => hitPathAtPoint(parent, layout, 50, 50)).not.toThrow()
+      expect(hitPathAtPoint(parent, layout, 50, 50)).toEqual([])
+    })
+
+    it('hasInteractiveHitAtPoint is false when corrupt child had the only pointer handlers', () => {
+      const child = box({ width: 50, height: 50, onClick: () => {} })
+      const parent = box({ width: 100, height: 100, children: [child] })
+      const childLayout = { x: 0, y: 0, width: Number.POSITIVE_INFINITY, height: 50, children: [] as const }
+      const layout = { x: 0, y: 0, width: 100, height: 100, children: [childLayout] as const }
+
+      expect(() => hasInteractiveHitAtPoint(parent, layout, 25, 25)).not.toThrow()
+      expect(hasInteractiveHitAtPoint(parent, layout, 25, 25)).toBe(false)
+    })
+
+    it('getCursorAtPoint falls through to parent when child leaf layout is corrupt', () => {
+      const leaf = text({
+        text: 'x',
+        font: '16px sans-serif',
+        lineHeight: 20,
+        width: 40,
+        height: 40,
+        cursor: 'text',
+      })
+      const parent = box({ width: 100, height: 100, cursor: 'pointer', children: [leaf] })
+      const badLeafLayout = { x: 0, y: 0, width: 40, height: Number.NaN, children: [] as const }
+      const layout = { x: 0, y: 0, width: 100, height: 100, children: [badLeafLayout] as const }
+
+      expect(() => getCursorAtPoint(parent, layout, 20, 20)).not.toThrow()
+      expect(getCursorAtPoint(parent, layout, 20, 20)).toBe('pointer')
+    })
+  })
+
   describe('non-box roots: path and interactive-hit vs cursor resolution', () => {
     const layout = { x: 0, y: 0, width: 100, height: 50, children: [] as const }
 
