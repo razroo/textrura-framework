@@ -52,6 +52,136 @@ effect(() => {
   }
 })
 
+// ── Terminal renderer for UIElements ────────────────────────────────────────
+
+const BORDER_H = '─'
+const BORDER_TL = '┌'
+const BORDER_TR = '┐'
+const BORDER_BL = '└'
+const BORDER_BR = '┘'
+const BORDER_V = '│'
+
+function renderElement(el: UIElement, indent = 4): void {
+  const pad = ' '.repeat(indent)
+
+  if (el.kind === 'text') {
+    const color = el.props.color as string | undefined
+    const t = el.props.text as string
+    if (color === '#94a3b8' || color === '#64748b') {
+      process.stdout.write(dim(`${pad}${t}\n`))
+    } else if (color === '#fbbf24') {
+      process.stdout.write(yellow(`${pad}${t}\n`))
+    } else if (color === '#f8fafc' || color === '#e2e8f0') {
+      process.stdout.write(`${pad}${t}\n`)
+    } else {
+      process.stdout.write(`${pad}${t}\n`)
+    }
+    return
+  }
+
+  if (el.kind === 'scene3d') {
+    const objects = (el.props as { objects?: Array<{ type: string; position?: number[]; radius?: number; color?: number }> }).objects ?? []
+    const w = 52
+    process.stdout.write(cyan(`${pad}${BORDER_TL}${BORDER_H.repeat(w)}${BORDER_TR}\n`))
+    process.stdout.write(cyan(`${pad}${BORDER_V}`) + bold(`  3D Scene`) + dim(`  (${objects.length} objects, orbit controls)`) + ' '.repeat(Math.max(0, w - 40)) + cyan(`${BORDER_V}\n`))
+    process.stdout.write(cyan(`${pad}${BORDER_V}${' '.repeat(w)}${BORDER_V}\n`))
+    for (const obj of objects) {
+      const label = formatSceneObject(obj)
+      if (label) {
+        const content = `  ${label}`
+        process.stdout.write(cyan(`${pad}${BORDER_V}`) + content + ' '.repeat(Math.max(0, w - content.length)) + cyan(`${BORDER_V}\n`))
+      }
+    }
+    process.stdout.write(cyan(`${pad}${BORDER_V}${' '.repeat(w)}${BORDER_V}\n`))
+    process.stdout.write(cyan(`${pad}${BORDER_BL}${BORDER_H.repeat(w)}${BORDER_BR}\n`))
+    return
+  }
+
+  if (el.kind === 'box') {
+    // Check if this is a table-like row (flexDirection: 'row' with text children)
+    const isRow = el.props.flexDirection === 'row' && el.children.length > 0
+    if (isRow && el.children.every(c => c.kind === 'box' && c.children.length === 1 && c.children[0]!.kind === 'text')) {
+      // Render as table row
+      const cells = el.children.map(c => {
+        const txt = (c as { children: Array<{ props: { text: string } }> }).children[0]!.props.text
+        return txt
+      })
+      const colWidth = 18
+      const colors = el.children.map(c => {
+        return ((c as { children: Array<{ props: { color?: string } }> }).children[0]!.props.color) as string | undefined
+      })
+      let line = pad
+      cells.forEach((cell, i) => {
+        const padded = cell.padEnd(colWidth)
+        if (colors[i] === '#94a3b8') {
+          line += dim(padded)
+        } else if (colors[i] === '#fbbf24') {
+          line += yellow(padded)
+        } else {
+          line += padded
+        }
+      })
+      process.stdout.write(line + '\n')
+      return
+    }
+
+    // Separator line
+    if (el.props.height === 1 && el.props.backgroundColor) {
+      process.stdout.write(dim(`${pad}${'─'.repeat(54)}\n`))
+      return
+    }
+
+    // Spacer
+    if (el.props.height === 8 && el.children.length === 0) {
+      return
+    }
+
+    // Container with background — draw a box
+    const bg = el.props.backgroundColor as string | undefined
+    if (bg && el.children.length > 0) {
+      const w = 56
+      process.stdout.write(`${pad}${BORDER_TL}${BORDER_H.repeat(w)}${BORDER_TR}\n`)
+      for (const child of el.children) {
+        renderElement(child, indent + 2)
+      }
+      process.stdout.write(`${pad}${BORDER_BL}${BORDER_H.repeat(w)}${BORDER_BR}\n`)
+      return
+    }
+
+    // Generic container — just render children
+    for (const child of el.children) {
+      renderElement(child, indent)
+    }
+  }
+}
+
+function formatSceneObject(obj: { type: string; position?: number[] | number[][]; radius?: number; color?: number; points?: number[][] }): string {
+  const hexColor = (c?: number) => c !== undefined ? `#${c.toString(16).padStart(6, '0')}` : ''
+  switch (obj.type) {
+    case 'sphere': {
+      const s = obj as { type: string; position?: number[]; radius?: number; color?: number }
+      const pos = s.position ? `(${s.position.map(n => n.toFixed(0)).join(', ')})` : ''
+      const col = hexColor(s.color)
+      const r = s.radius ?? 1
+      return `● Sphere  r=${r}  ${pos}  ${col}`
+    }
+    case 'line': {
+      const l = obj as { type: string; points?: number[][]; color?: number }
+      const pts = l.points?.length ?? 0
+      return `━ Line    ${pts} points  ${hexColor(l.color)}`
+    }
+    case 'ambientLight':
+      return dim('☀ Ambient light')
+    case 'directionalLight': {
+      const d = obj as { type: string; position?: number[] }
+      const pos = d.position ? `(${d.position.map(n => n.toFixed(0)).join(', ')})` : ''
+      return dim(`☀ Directional light  ${pos}`)
+    }
+    default:
+      return ''
+  }
+}
+
 // ── Build callbacks (mirrors what createAgentApp provides) ──────────────────
 function createCallbacks(): AgentCallbacks {
   return {
@@ -87,10 +217,11 @@ function createCallbacks(): AgentCallbacks {
       const next = new Map(panels.peek())
       next.set(key, element)
       panels.set(next)
-      // Print panel info to terminal
-      const kind = element.kind
-      const panelLabel = key === 'main' ? 'content panel' : `panel "${key}"`
-      process.stdout.write(magenta(`\n  📊 [showUI] Pushed ${kind} element to ${panelLabel}\n`))
+      // Render the element to terminal
+      const panelLabel = key === 'main' ? 'Content Panel' : `Panel: ${key}`
+      process.stdout.write(magenta(`\n  ┄┄┄ ${panelLabel} ┄┄┄\n`))
+      renderElement(element)
+      process.stdout.write(magenta(`  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n`))
     },
     clearUI(key = 'main'): void {
       const current = panels.peek()
