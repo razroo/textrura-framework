@@ -5,6 +5,7 @@ import {
   finiteRootExtent,
   layoutBoundsAreFinite,
   pointInInclusiveLayoutRect,
+  scrollSafeChildOffsets,
 } from '../layout-bounds.js'
 
 const emptyChildren = [] as const
@@ -582,6 +583,24 @@ describe('finiteRootExtent', () => {
     expect(finiteRootExtent(negOverflow)).toBeUndefined()
     expect(Number.MAX_VALUE * 2).toBe(Infinity)
     expect(finiteRootExtent(Number.MAX_VALUE * 2)).toBeUndefined()
+  })
+})
+
+describe('scrollSafeChildOffsets', () => {
+  it('returns abs minus finite scroll offsets', () => {
+    expect(scrollSafeChildOffsets(10, 20, 3, 4)).toEqual({ ox: 7, oy: 16 })
+    expect(scrollSafeChildOffsets(0, 0, 0, 0)).toEqual({ ox: 0, oy: 0 })
+  })
+
+  it('coerces non-finite scroll props via finiteNumberOrZero', () => {
+    expect(scrollSafeChildOffsets(10, 20, Number.NaN, Number.POSITIVE_INFINITY)).toEqual({ ox: 10, oy: 20 })
+  })
+
+  it('returns null when abs minus scroll overflows to non-finite (hit-test / selection parity)', () => {
+    const max = Number.MAX_VALUE
+    expect(max - -max).toBe(Infinity)
+    expect(scrollSafeChildOffsets(max, 0, -max, 0)).toBeNull()
+    expect(scrollSafeChildOffsets(0, max, 0, -max)).toBeNull()
   })
 })
 

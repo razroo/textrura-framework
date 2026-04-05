@@ -5,6 +5,7 @@ import {
   finiteNumberOrZero,
   layoutBoundsAreFinite,
   pointInInclusiveLayoutRect,
+  scrollSafeChildOffsets,
 } from './layout-bounds.js'
 
 interface HitTarget {
@@ -126,24 +127,6 @@ export interface HitDispatchResult {
    * other event types.
    */
   focusTarget?: { element: BoxElement; layout: ComputedLayout }
-}
-
-/**
- * Scroll-adjusted origin for child layout coordinates (`abs - scroll`).
- * When the difference overflows to a non-finite value, returns `null` so descendants are not
- * walked with offsets that would become `0` inside {@link rootedLayoutPointContainment}
- * (`finiteNumberOrZero` maps `±Infinity` to `0`, which misplaces children).
- */
-function scrollSafeChildOffsets(
-  absX: number,
-  absY: number,
-  scrollX: unknown,
-  scrollY: unknown,
-): { ox: number; oy: number } | null {
-  const ox = absX - finiteNumberOrZero(scrollX)
-  const oy = absY - finiteNumberOrZero(scrollY)
-  if (!Number.isFinite(ox) || !Number.isFinite(oy)) return null
-  return { ox, oy }
 }
 
 /** Walk the element tree + computed layout in parallel to find hit targets at (x, y). */

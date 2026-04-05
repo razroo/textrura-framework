@@ -42,6 +42,7 @@ export {
   finiteRootExtent,
   layoutBoundsAreFinite,
   pointInInclusiveLayoutRect,
+  scrollSafeChildOffsets,
 } from './layout-bounds.js'
 export { safePerformanceNowMs, readPerformanceNow } from './performance-now.js'
 

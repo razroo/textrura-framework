@@ -20,6 +20,25 @@ export function finiteNumberOrZero(value: unknown): number {
 }
 
 /**
+ * Scroll-adjusted origin for child layout coordinates (`abs - scroll`), shared by hit-testing and
+ * {@link collectTextNodes} so text selection stays in the same coordinate space as pointer dispatch.
+ * When the difference overflows to a non-finite value, returns `null` so descendants are not walked with
+ * offsets that would become `0` inside downstream math using {@link finiteNumberOrZero} (which would
+ * misplace children).
+ */
+export function scrollSafeChildOffsets(
+  absX: number,
+  absY: number,
+  scrollX: unknown,
+  scrollY: unknown,
+): { ox: number; oy: number } | null {
+  const ox = absX - finiteNumberOrZero(scrollX)
+  const oy = absY - finiteNumberOrZero(scrollY)
+  if (!Number.isFinite(ox) || !Number.isFinite(oy)) return null
+  return { ox, oy }
+}
+
+/**
  * Optional Textura root width/height from host options: only finite, non-negative numbers become
  * constraints; otherwise the key is omitted (unconstrained layout).
  *

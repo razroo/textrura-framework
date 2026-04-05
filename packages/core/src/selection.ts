@@ -5,6 +5,7 @@ import {
   finiteNumberOrZero,
   layoutBoundsAreFinite,
   pointInInclusiveLayoutRect,
+  scrollSafeChildOffsets,
 } from './layout-bounds.js'
 
 /** Info about a rendered text node's position and content. */
@@ -59,6 +60,9 @@ export interface SelectionRange {
  * For each box, child origins subtract {@link import('./types.js').StyleProps.scrollX} /
  * `scrollY` (non-finite values → `0`), matching {@link import('./hit-test.js').dispatchHit} and
  * canvas paint so text metrics and pointer hit-testing share one coordinate space inside scroll containers.
+ * When `abs - scroll` overflows to non-finite values, child subtrees are skipped (same
+ * {@link import('./layout-bounds.js').scrollSafeChildOffsets} rule as hit-testing) so corrupt extremes
+ * cannot emit text nodes with non-finite coordinates.
  *
  * Sibling order is **element child index** (tree source order), not {@link import('./types.js').StyleProps.zIndex}
  * paint order — pointer routing uses z-index for topmost hits; selection indexing stays stable for a11y and ranges.
@@ -113,13 +117,20 @@ function collectTextNodesWalk(
 
   if (element.kind !== 'box') return
 
-  const childOffsetX = x - finiteNumberOrZero(element.props.scrollX)
-  const childOffsetY = y - finiteNumberOrZero(element.props.scrollY)
+  const childOrigin = scrollSafeChildOffsets(x, y, element.props.scrollX, element.props.scrollY)
+  if (!childOrigin) return
 
   for (let i = 0; i < element.children.length; i++) {
     const childLayout = layout.children[i]
     if (childLayout) {
-      collectTextNodesWalk(element.children[i]!, childLayout, childOffsetX, childOffsetY, results, direction)
+      collectTextNodesWalk(
+        element.children[i]!,
+        childLayout,
+        childOrigin.ox,
+        childOrigin.oy,
+        results,
+        direction,
+      )
     }
   }
 }
