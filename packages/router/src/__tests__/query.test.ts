@@ -234,6 +234,13 @@ describe('query helpers', () => {
     expect(stringifyQuery(inArray)).toBe('?tag=x')
   })
 
+  it('omits symbol entries inside arrays without throwing (typeof guard; parity with skipped object values)', () => {
+    const sym = Symbol('bad')
+    const input = { mix: ['a', sym as unknown as string, 'b'] } as unknown as QueryInput
+    expect(() => stringifyQuery(input)).not.toThrow()
+    expect(stringifyQuery(input)).toBe('?mix=a&mix=b')
+  })
+
   it('omits non-primitive runtime values (objects, boxed primitives, Date) without throwing', () => {
     const solo = { x: { nested: 1 } } as unknown as QueryInput
     expect(stringifyQuery(solo)).toBe('')
