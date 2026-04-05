@@ -35,7 +35,10 @@ fi
 # (@geometra/demo-terminal). The gate fails if `bun` is missing from PATH even when Node/npm work — install Bun or run
 # only the vitest segment locally when debugging. The allowlist evolves; read package.json instead of copying examples
 # from older prompts or transcripts.
-# CI runs the same gate: `.github/workflows/quality.yml` invokes `bun run release:gate` (match locally when validating).
+# CI runs the same gate: `.github/workflows/quality.yml` invokes `bun run release:gate` after lint, fast tests
+# (`bun run test` / vitest.fast.config.ts), `bun run build`, `bun run examples:smoke`, and `bun run e2e:demo`.
+# A green `release:gate` alone does not imply those steps passed — re-run the relevant ones when touching demos,
+# create:app templates, examples tooling, or Playwright-covered demo flows.
 # Extend an allowlisted file when adding release-critical tests unless you intentionally widen the gate.
 # Layout/Yoga geometry regression: use `packages/core/src/__tests__/geometry-snapshot-ci.test.ts` (gate-listed)
 # and `GEOMETRY_SNAPSHOT_TESTING.md`; avoid unrelated snapshot churn unless widening the gate on purpose.
@@ -160,6 +163,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
 4. Run the repo release gate from the repo root:
    npm run release:gate
    The gate ends with \`bun run test:terminal-input\` (see root package.json) — \`bun\` must be on PATH. If that fails, fix issues and re-run until it passes (or stop with a clear explanation if blocked by environment).
+   CI (\`.github/workflows/quality.yml\`) also runs lint, fast tests, build, examples:smoke, and e2e:demo before this gate; when your change touches demos, \`create:app\`, examples scripts, or demo E2E surfaces, run the matching subset locally (not only the gate).
 
 5. If you made real changes: git add only what belongs to this task, then git commit with a conventional message (feat:/fix:/chore:/docs:/test:/perf:/refactor: as appropriate).
    ${PUSH_TEXT}
