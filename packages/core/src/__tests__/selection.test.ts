@@ -268,6 +268,45 @@ describe('collectTextNodes', () => {
     expect(results[0]).toMatchObject({ x: 3, y: 10 })
   })
 
+  it('composes nested scrollX/scrollY when descending (same stack as hit-test / canvas paint)', () => {
+    const t = text({
+      text: 'Nested',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      width: 40,
+      height: 18,
+    })
+    const inner = box(
+      { width: 100, height: 100, overflow: 'scroll', scrollX: 25, scrollY: 35 },
+      [t],
+    )
+    const outer = box(
+      { width: 100, height: 100, overflow: 'scroll', scrollX: 20, scrollY: 15 },
+      [inner],
+    )
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        {
+          x: 30,
+          y: 40,
+          width: 100,
+          height: 100,
+          children: [{ x: 50, y: 80, width: 40, height: 18, children: [] }],
+        },
+      ],
+    }
+    const results: TextNodeInfo[] = []
+    collectTextNodes(outer, layout, 0, 0, results)
+    expect(results).toHaveLength(1)
+    // inner abs = (0 - 20 + 30, 0 - 15 + 40) = (10, 25)
+    // text abs = (10 - 25 + 50, 25 - 35 + 80) = (35, 70) — mirrors nested scroll hit-test layout
+    expect(results[0]).toMatchObject({ x: 35, y: 70 })
+  })
+
   it('skips the whole walk when root layout bounds are corrupt (aligned with hit-test / focus)', () => {
     const el = box({ width: 200, height: 100 }, [
       text({ text: 'Hi', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
