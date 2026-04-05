@@ -460,6 +460,21 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(() => pointInInclusiveLayoutRect(0, 0, 0, 0, 10, b)).not.toThrow()
     expect(pointInInclusiveLayoutRect(0, 0, 0, 0, 10, b)).toBe(false)
   })
+
+  it('returns false for string, null, undefined, or boxed rect args without coercion (JSON / host bug guard)', () => {
+    const str = '10' as unknown as number
+    const boxed = Object(10) as unknown as number
+    for (const bad of [str, null as unknown as number, undefined as unknown as number, boxed] as const) {
+      expect(() => pointInInclusiveLayoutRect(5, 5, bad, 0, 10, 10)).not.toThrow()
+      expect(pointInInclusiveLayoutRect(5, 5, bad, 0, 10, 10)).toBe(false)
+      expect(() => pointInInclusiveLayoutRect(5, 5, 0, bad, 10, 10)).not.toThrow()
+      expect(pointInInclusiveLayoutRect(5, 5, 0, bad, 10, 10)).toBe(false)
+      expect(() => pointInInclusiveLayoutRect(5, 5, 0, 0, bad, 10)).not.toThrow()
+      expect(pointInInclusiveLayoutRect(5, 5, 0, 0, bad, 10)).toBe(false)
+      expect(() => pointInInclusiveLayoutRect(5, 5, 0, 0, 10, bad)).not.toThrow()
+      expect(pointInInclusiveLayoutRect(5, 5, 0, 0, 10, bad)).toBe(false)
+    }
+  })
 })
 
 describe('finiteNumberOrZero', () => {
