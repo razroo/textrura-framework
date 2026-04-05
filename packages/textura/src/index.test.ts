@@ -75,6 +75,54 @@ describe('box layout', () => {
     expect(result.children[0]!.x).toBeGreaterThan(result.children[1]!.x)
   })
 
+  test('nested row with dir auto inherits rtl owner direction and mirrors flex children', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'column',
+      children: [
+        {
+          width: 200,
+          height: 40,
+          flexDirection: 'row',
+          gap: 10,
+          dir: 'auto',
+          children: [
+            { width: 50, height: 30 },
+            { width: 50, height: 30 },
+          ],
+        },
+      ],
+    }
+    const result = computeLayout(tree, { width: 200, height: 80, direction: 'rtl' })
+    const row = result.children[0]!
+    expect(row.children[0]!.x).toBeGreaterThan(row.children[1]!.x)
+  })
+
+  test('nested row with dir auto under ltr owner keeps ltr flex child order', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'column',
+      children: [
+        {
+          width: 200,
+          height: 40,
+          flexDirection: 'row',
+          gap: 10,
+          dir: 'auto',
+          children: [
+            { width: 50, height: 30 },
+            { width: 50, height: 30 },
+          ],
+        },
+      ],
+    }
+    const result = computeLayout(tree, { width: 200, height: 80, direction: 'ltr' })
+    const row = result.children[0]!
+    expect(row.children[0]!.x).toBeLessThan(row.children[1]!.x)
+  })
+
   test('row layout with gap', () => {
     const tree: BoxNode = {
       width: 300,
