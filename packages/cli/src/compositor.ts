@@ -151,30 +151,23 @@ export class TerminalCompositor {
   }
 
   private computeRowAllocation(): void {
-    // Compute natural row height for each view based on layout
-    const naturalHeights = this.views.map(v => {
-      if (!v.layout) return 4 // minimum for unloaded views
-      const scaleX = this.width / v.layout.width
-      const scaleY = scaleX * 0.5
-      return Math.max(2, Math.round(v.layout.height * scaleY))
+    // Give header-like views (short) minimal rows, rest to content views
+    const isShort = this.views.map(v => {
+      if (!v.layout) return true
+      return v.layout.height < 200 // header views are typically < 100px
     })
-    const totalNatural = naturalHeights.reduce((a, b) => a + b, 0)
 
-    if (totalNatural <= this.height) {
-      // All views fit — use natural heights, give remaining to last view
-      let used = 0
-      for (let i = 0; i < this.views.length; i++) {
-        this.views[i]!.rows = naturalHeights[i]!
-        used += naturalHeights[i]!
-      }
-      // Give remaining rows to the last view (below-fold, most content)
-      if (this.views.length > 0) {
-        this.views[this.views.length - 1]!.rows += this.height - used
-      }
-    } else {
-      // Views don't fit — scale proportionally
-      for (let i = 0; i < this.views.length; i++) {
-        this.views[i]!.rows = Math.max(2, Math.round(naturalHeights[i]! / totalNatural * this.height))
+    const shortCount = isShort.filter(Boolean).length
+    const tallCount = this.views.length - shortCount
+
+    for (let i = 0; i < this.views.length; i++) {
+      if (isShort[i]) {
+        // Short views (headers): give 2-3 rows
+        this.views[i]!.rows = Math.min(3, Math.max(2, Math.floor(this.height * 0.05)))
+      } else {
+        // Tall views (content): split remaining rows equally
+        const remaining = this.height - shortCount * 3
+        this.views[i]!.rows = Math.max(4, Math.floor(remaining / Math.max(1, tallCount)))
       }
     }
   }
@@ -208,11 +201,16 @@ export class TerminalCompositor {
   }
 
   private paintView(layout: ComputedLayout, tree: UIElement, yOffset: number, maxRows: number): void {
-    // Scale to fit the layout width into the terminal columns
+    // Scale to fit within allocated terminal space (both width and height)
     const scaleX = this.width / layout.width
-    // For rows, terminal chars are ~2x taller than wide, so halve the y scale
-    const scaleY = scaleX * 0.5
-    this.paintNode(tree, layout, 0, 0, scaleX, scaleY, yOffset, yOffset + maxRows)
+    // Terminal chars are ~2x taller than wide, so y needs 0.5 factor
+    const scaleYFromWidth = scaleX * 0.5
+    // Also constrain by available rows
+    const scaleYFromHeight = maxRows / (layout.height * 0.5)
+    // Use the smaller scale so content fits both dimensions
+    const scaleY = Math.min(scaleYFromWidth, scaleYFromHeight)
+    const finalScaleX = Math.min(scaleX, scaleY * 2) // keep aspect ratio
+    this.paintNode(tree, layout, 0, 0, finalScaleX, scaleY, yOffset, yOffset + maxRows)
   }
 
   private paintNode(
