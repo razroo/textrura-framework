@@ -2012,6 +2012,20 @@ describe('dispatchHit', () => {
     expect(result.focusTarget?.element).toBe(el)
   })
 
+  it('hasInteractiveHitAtPoint ignores keyboard/composition-only handlers (hover uses pointer slots; click-to-focus stays separate)', () => {
+    const keyOnly = box({ width: 50, height: 50, onKeyDown: () => undefined })
+    const compOnly = box({ width: 50, height: 50, onCompositionUpdate: () => undefined })
+    const clickBox = box({ width: 50, height: 50, onClick: () => undefined })
+    const leafLayout = { x: 0, y: 0, width: 50, height: 50, children: [] as const }
+
+    expect(hasInteractiveHitAtPoint(keyOnly, leafLayout, 25, 25)).toBe(false)
+    expect(hasInteractiveHitAtPoint(compOnly, leafLayout, 25, 25)).toBe(false)
+    expect(hasInteractiveHitAtPoint(clickBox, leafLayout, 25, 25)).toBe(true)
+
+    expect(dispatchHit(keyOnly, leafLayout, 'onClick', 25, 25).focusTarget?.element).toBe(keyOnly)
+    expect(dispatchHit(compOnly, leafLayout, 'onClick', 25, 25).focusTarget?.element).toBe(compOnly)
+  })
+
   it('onClick: parent without handlers still routes click-to-focus to key-only child', () => {
     const child = box({ width: 40, height: 40, onKeyDown: () => undefined })
     const parent = box({ width: 100, height: 100 }, [child])
