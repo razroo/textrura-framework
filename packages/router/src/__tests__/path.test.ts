@@ -152,6 +152,36 @@ describe('path generation', () => {
     ).toThrow('Missing required splat param: s')
   })
 
+  it('omits optional path params when the value is Symbol or Promise (typeof guard; parity with query skips)', () => {
+    const sym = Symbol('seg') as unknown as string
+    expect(buildPath('/users/:id?', { id: sym })).toBe('/users')
+    expect(buildPath('/a/:seg?/c', { seg: sym })).toBe('/a/c')
+    const pending = Promise.resolve('x') as unknown as string
+    expect(buildPath('/users/:id?', { id: pending })).toBe('/users')
+  })
+
+  it('throws for required path params when the value is Symbol or Promise', () => {
+    const sym = Symbol('id') as unknown as string
+    expect(() =>
+      buildPath('/users/:id', { id: sym } as PathParams<'/users/:id'>),
+    ).toThrow('Missing required path param: id')
+    const pending = Promise.resolve(1) as unknown as number
+    expect(() => buildPath('/n/:x', { x: pending } as PathParams<'/n/:x'>)).toThrow(
+      'Missing required path param: x',
+    )
+  })
+
+  it('throws for splat params when the value is Symbol or Promise', () => {
+    const sym = Symbol('rest') as unknown as string
+    expect(() =>
+      buildPath('/docs/*rest', { rest: sym } as PathParams<'/docs/*rest'>),
+    ).toThrow('Missing required splat param: rest')
+    const pending = Promise.resolve('y') as unknown as string
+    expect(() => buildPath('/*', { '*': pending } as PathParams<'/*'>)).toThrow(
+      'Missing required splat param: *',
+    )
+  })
+
   it('builds path with multiple dynamic segments', () => {
     expect(buildPath('/users/:userId/posts/:postId', { userId: 'a', postId: 2 })).toBe(
       '/users/a/posts/2',
