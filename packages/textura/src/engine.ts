@@ -87,18 +87,42 @@ const WRAP_MAP = {
   'wrap-reverse': Wrap.WrapReverse,
 } as const
 
+const OVERFLOW_MAP = {
+  visible: Overflow.Visible,
+  hidden: Overflow.Hidden,
+  scroll: Overflow.Scroll,
+} as const
+
+/** True when `key` is an own property of `map` (not `Object.prototype` keys like `toString`). */
+function isOwnEnumKey<T extends Record<string, unknown>>(map: T, key: unknown): key is keyof T {
+  return typeof key === 'string' && Object.hasOwn(map, key)
+}
+
 function applyFlexProps(node: Node, props: FlexProps): void {
-  if (props.flexDirection !== undefined)
-    node.setFlexDirection(FLEX_DIRECTION_MAP[props.flexDirection])
-  if (props.flexWrap !== undefined) node.setFlexWrap(WRAP_MAP[props.flexWrap])
-  if (props.justifyContent !== undefined)
-    node.setJustifyContent(JUSTIFY_MAP[props.justifyContent])
-  if (props.alignItems !== undefined)
-    node.setAlignItems(ALIGN_MAP[props.alignItems])
-  if (props.alignSelf !== undefined)
-    node.setAlignSelf(ALIGN_MAP[props.alignSelf])
-  if (props.alignContent !== undefined)
-    node.setAlignContent(ALIGN_MAP[props.alignContent])
+  const flexDirection = props.flexDirection
+  if (flexDirection !== undefined && isOwnEnumKey(FLEX_DIRECTION_MAP, flexDirection)) {
+    node.setFlexDirection(FLEX_DIRECTION_MAP[flexDirection])
+  }
+  const flexWrap = props.flexWrap
+  if (flexWrap !== undefined && isOwnEnumKey(WRAP_MAP, flexWrap)) {
+    node.setFlexWrap(WRAP_MAP[flexWrap])
+  }
+  const justifyContent = props.justifyContent
+  if (justifyContent !== undefined && isOwnEnumKey(JUSTIFY_MAP, justifyContent)) {
+    node.setJustifyContent(JUSTIFY_MAP[justifyContent])
+  }
+  const alignItems = props.alignItems
+  if (alignItems !== undefined && isOwnEnumKey(ALIGN_MAP, alignItems)) {
+    node.setAlignItems(ALIGN_MAP[alignItems])
+  }
+  const alignSelf = props.alignSelf
+  if (alignSelf !== undefined && isOwnEnumKey(ALIGN_MAP, alignSelf)) {
+    node.setAlignSelf(ALIGN_MAP[alignSelf])
+  }
+  const alignContent = props.alignContent
+  if (alignContent !== undefined && isOwnEnumKey(ALIGN_MAP, alignContent)) {
+    node.setAlignContent(ALIGN_MAP[alignContent])
+  }
 
   if (props.flexGrow !== undefined) node.setFlexGrow(props.flexGrow)
   if (props.flexShrink !== undefined) node.setFlexShrink(props.flexShrink)
@@ -165,9 +189,9 @@ function applyFlexProps(node: Node, props: FlexProps): void {
 
   // Other
   if (props.aspectRatio !== undefined) node.setAspectRatio(props.aspectRatio)
-  if (props.overflow !== undefined) {
-    const map = { visible: Overflow.Visible, hidden: Overflow.Hidden, scroll: Overflow.Scroll }
-    node.setOverflow(map[props.overflow])
+  const overflow = props.overflow
+  if (overflow !== undefined && isOwnEnumKey(OVERFLOW_MAP, overflow)) {
+    node.setOverflow(OVERFLOW_MAP[overflow])
   }
   if (props.display !== undefined)
     node.setDisplay(props.display === 'none' ? Display.None : Display.Flex)

@@ -266,6 +266,111 @@ describe('box layout', () => {
     expect(nullOwner.children[1]!.x).toBe(ltr.children[1]!.x)
   })
 
+  it('malformed flex enum strings skip Yoga setters (own-key guard; no prototype keys like toString)', () => {
+    const base: BoxNode = {
+      width: 200,
+      height: 40,
+      flexDirection: 'row',
+      gap: 10,
+      children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+    }
+    const good = computeLayout(base, { width: 200, height: 80 })
+    const trimmedRow = computeLayout(
+      { ...base, flexDirection: 'row ' as never },
+      { width: 200, height: 80 },
+    )
+    expect(trimmedRow.children[0]!.x).toBe(good.children[0]!.x)
+    expect(trimmedRow.children[1]!.x).toBe(good.children[1]!.x)
+    const bogusWrap = computeLayout(
+      { ...base, flexWrap: 'wrap ' as never },
+      { width: 200, height: 80 },
+    )
+    expect(bogusWrap.children[0]!.x).toBe(good.children[0]!.x)
+    const bogusJustify = computeLayout(
+      { ...base, justifyContent: 'center ' as never },
+      { width: 200, height: 80 },
+    )
+    expect(bogusJustify.children[0]!.x).toBe(good.children[0]!.x)
+    const bogusAlign = computeLayout(
+      { ...base, alignItems: 'flex-end ' as never },
+      { width: 200, height: 80 },
+    )
+    expect(bogusAlign.children[0]!.y).toBe(good.children[0]!.y)
+    const bogusAlignContent = computeLayout(
+      {
+        width: 200,
+        height: 80,
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignContent: 'space-between ' as never,
+        children: [
+          { width: 80, height: 20 },
+          { width: 80, height: 20 },
+        ],
+      },
+      { width: 200, height: 80 },
+    )
+    const alignContentRef = computeLayout(
+      {
+        width: 200,
+        height: 80,
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        children: [
+          { width: 80, height: 20 },
+          { width: 80, height: 20 },
+        ],
+      },
+      { width: 200, height: 80 },
+    )
+    expect(bogusAlignContent.children[0]!.y).toBe(alignContentRef.children[0]!.y)
+    const protoKey = computeLayout(
+      { ...base, flexDirection: 'toString' as never },
+      { width: 200, height: 80 },
+    )
+    expect(protoKey.children[0]!.x).toBe(good.children[0]!.x)
+    const bogusOverflow = computeLayout(
+      {
+        width: 100,
+        height: 50,
+        overflow: 'hidden ' as never,
+        children: [{ width: 200, height: 20 }],
+      },
+      { width: 100, height: 80 },
+    )
+    const overflowRef = computeLayout(
+      {
+        width: 100,
+        height: 50,
+        children: [{ width: 200, height: 20 }],
+      },
+      { width: 100, height: 80 },
+    )
+    expect(bogusOverflow.height).toBe(overflowRef.height)
+    const bogusAlignSelf = computeLayout(
+      {
+        width: 200,
+        height: 40,
+        flexDirection: 'row',
+        children: [
+          { width: 50, height: 30, alignSelf: 'flex-start ' as never },
+          { width: 50, height: 30 },
+        ],
+      },
+      { width: 200, height: 80 },
+    )
+    const alignSelfRef = computeLayout(
+      {
+        width: 200,
+        height: 40,
+        flexDirection: 'row',
+        children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+      },
+      { width: 200, height: 80 },
+    )
+    expect(bogusAlignSelf.children[0]!.y).toBe(alignSelfRef.children[0]!.y)
+  })
+
   it('explicit undefined owner direction in options matches omitted direction (LTR flex row)', () => {
     const tree: BoxNode = {
       width: 200,
