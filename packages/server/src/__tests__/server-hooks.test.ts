@@ -391,4 +391,48 @@ describe('server message hooks', () => {
       server.close()
     })
   })
+
+  it('ignores invalid layoutDirection (Symbol) and derives Yoga direction from the root like createApp', async () => {
+    const port = pickPort()
+    const server = await createServer(
+      () =>
+        box({ width: 100, height: 40, flexDirection: 'row', dir: 'rtl' }, [
+          box({ width: 30, height: 20 }),
+          box({ width: 30, height: 20 }),
+        ]),
+      {
+        port,
+        width: 200,
+        height: 100,
+        layoutDirection: Symbol('bad') as never,
+      },
+    )
+
+    const layout = await new Promise<{ children: Array<{ x: number }> }>((resolve, reject) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}`)
+      const timeout = setTimeout(() => reject(new Error('timed out')), 5000)
+
+      ws.on('message', (raw) => {
+        const msg = JSON.parse(String(raw)) as {
+          type: string
+          layout?: { children: Array<{ x: number }> }
+        }
+        if (msg.type === 'frame' && msg.layout?.children?.length === 2) {
+          clearTimeout(timeout)
+          ws.close()
+          resolve(msg.layout)
+        }
+      })
+
+      ws.on('error', (err) => {
+        clearTimeout(timeout)
+        reject(err)
+      })
+    }).finally(() => {
+      server.close()
+    })
+
+    const [a, b] = layout.children
+    expect(a!.x).toBeGreaterThan(b!.x)
+  })
 })
