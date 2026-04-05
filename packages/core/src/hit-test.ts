@@ -139,7 +139,7 @@ function collectHits(
 
   if (element.kind !== 'box') return
 
-  const boxEl = element as BoxElement
+  const boxEl = element
   const childOffsetX = absX - finiteNumberOrZero(boxEl.props.scrollX)
   const childOffsetY = absY - finiteNumberOrZero(boxEl.props.scrollY)
 
@@ -402,7 +402,7 @@ export function hitPathAtPoint(
 
   if (element.kind !== 'box') return null
 
-  const boxEl = element as BoxElement
+  const boxEl = element
   let childOffsetX = absX
   let childOffsetY = absY
   childOffsetX -= finiteNumberOrZero(boxEl.props.scrollX)
