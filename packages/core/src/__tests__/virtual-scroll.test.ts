@@ -131,6 +131,14 @@ describe('syncVirtualWindow', () => {
     expect(syncVirtualWindow(8, 3, 2, z)).toEqual({ start: 0, end: 2, selected: 2 })
   })
 
+  it('treats boxed Number objects like non-numbers on every axis (typeof guard; no ToNumber coercion)', () => {
+    const five = Object(5) as unknown as number
+    expect(syncVirtualWindow(five, 3, 2, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+    expect(syncVirtualWindow(8, five, 2, 0)).toEqual({ start: 2, end: 2, selected: 2 })
+    expect(syncVirtualWindow(8, 3, five, 0)).toEqual({ start: 0, end: 2, selected: 0 })
+    expect(syncVirtualWindow(8, 3, 2, five)).toEqual({ start: 0, end: 2, selected: 2 })
+  })
+
   it(
     'keeps selection inside the visible window and bounds visible span for a grid of small inputs',
     () => {
