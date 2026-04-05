@@ -19,6 +19,14 @@ describe('redirect', () => {
       replace: true,
     })
   })
+
+  it('includes replace: false when callers pass it explicitly (distinct from omitting replace)', () => {
+    expect(redirect('/c', { replace: false })).toEqual({
+      kind: 'redirect',
+      to: '/c',
+      replace: false,
+    })
+  })
 })
 
 describe('response', () => {
@@ -75,6 +83,14 @@ describe('isRedirectResult', () => {
     expect(isRedirectResult({ kind: 'response', data: 1 })).toBe(false)
     expect(isRedirectResult({ kind: 'redirect' })).toBe(true)
   })
+
+  it('returns false when kind is missing or wrong (arrays, functions, primitives, boxed numbers)', () => {
+    expect(isRedirectResult([])).toBe(false)
+    expect(isRedirectResult(['redirect'])).toBe(false)
+    expect(isRedirectResult(() => {})).toBe(false)
+    expect(isRedirectResult(0)).toBe(false)
+    expect(isRedirectResult(Object(0))).toBe(false)
+  })
 })
 
 describe('isResponseResult', () => {
@@ -83,5 +99,13 @@ describe('isResponseResult', () => {
     expect(isResponseResult(null)).toBe(false)
     expect(isResponseResult({ kind: 'redirect', to: '/' })).toBe(false)
     expect(isResponseResult({ kind: 'response' })).toBe(true)
+  })
+
+  it('returns false when kind is missing or wrong (arrays, functions, primitives, boxed numbers)', () => {
+    expect(isResponseResult([])).toBe(false)
+    expect(isResponseResult(['response'])).toBe(false)
+    expect(isResponseResult(() => {})).toBe(false)
+    expect(isResponseResult(0)).toBe(false)
+    expect(isResponseResult(Object(0))).toBe(false)
   })
 })
