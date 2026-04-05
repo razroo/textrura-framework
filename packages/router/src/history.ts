@@ -99,7 +99,10 @@ export function createMemoryHistory(options: MemoryHistoryOptions = {}): History
       notify('replace')
     },
     go(delta: number) {
-      const nextIndex = Math.max(0, Math.min(index + delta, entries.length - 1))
+      if (Number.isNaN(delta)) return
+      const sum = index + delta
+      if (Number.isNaN(sum)) return
+      const nextIndex = Math.max(0, Math.min(sum, entries.length - 1))
       if (nextIndex === index) return
       index = nextIndex
       notify('pop')

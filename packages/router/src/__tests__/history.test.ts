@@ -35,6 +35,15 @@ describe('history adapters', () => {
     expect(updates).toEqual([])
   })
 
+  it('memory history treats NaN delta as a no-op (does not corrupt stack index)', () => {
+    const history = createMemoryHistory({ initialEntries: ['/a', '/b'] })
+    expect(history.location.pathname).toBe('/b')
+    history.go(Number.NaN)
+    expect(history.location.pathname).toBe('/b')
+    history.go(-1)
+    expect(history.location.pathname).toBe('/a')
+  })
+
   it('memory history notifies listeners with correct action for push, replace, and go', () => {
     const history = createMemoryHistory({ initialEntries: ['/a'] })
     const updates: HistoryUpdate[] = []
