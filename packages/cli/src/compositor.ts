@@ -190,12 +190,9 @@ export class TerminalCompositor {
     }
     const scaleX = this.termWidth / maxLayoutWidth
 
-    // Target max ~3 screenfuls so user only scrolls 2-3 times
-    const maxVRows = this.termHeight * 3
-    const scaleYFromWidth = scaleX * 0.5
-    const scaleYFromTarget = maxVRows / Math.max(1, totalLayoutHeight)
-    // Use whichever is more compact
-    const scaleY = Math.max(scaleYFromTarget, scaleYFromWidth * 0.3)
+    // Target: entire page fits in ~1.5 screenfuls (one screen + one scroll)
+    const targetVRows = Math.round(this.termHeight * 1.5)
+    const scaleY = targetVRows / Math.max(1, totalLayoutHeight)
 
     let totalVRows = 0
     for (const v of this.views) {
