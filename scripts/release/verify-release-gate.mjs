@@ -30,7 +30,15 @@ async function main() {
   }
   if (!gate.includes('test:terminal-input')) {
     throw new Error(
-      'release:gate: package.json scripts.release:gate must end with test:terminal-input (@geometra/demo-terminal input suite)',
+      'release:gate: package.json scripts.release:gate must invoke test:terminal-input (@geometra/demo-terminal input suite)',
+    )
+  }
+
+  const segments = gate.split(/\s+&&\s+/).map(s => s.trim())
+  const lastSegment = segments[segments.length - 1] ?? ''
+  if (!lastSegment.includes('test:terminal-input')) {
+    throw new Error(
+      'release:gate: test:terminal-input must be the final && segment (nothing may run after the demo-terminal input suite)',
     )
   }
 

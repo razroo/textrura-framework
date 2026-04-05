@@ -31,7 +31,9 @@ fi
 # `verify-release-gate.mjs` also resolves paths canonically, so `packages/a/../b/x.test.ts` counts as the same
 # file as `packages/b/x.test.ts` for duplicate detection.
 # `npm run release:gate` runs `scripts/release/verify-release-gate.mjs`
-# first to fail fast on duplicates or missing paths, then the vitest allowlist, then `bun run test:terminal-input`
+# first to fail fast on duplicates/missing paths and to ensure `test:terminal-input` is the final `&&` segment
+# in package.json (nothing may run after the demo-terminal input suite), then the vitest allowlist, then
+# `bun run test:terminal-input`
 # (@geometra/demo-terminal). The gate fails if `bun` is missing from PATH even when Node/npm work — install Bun or run
 # only the vitest segment locally when debugging. The allowlist evolves; read package.json instead of copying examples
 # from older prompts or transcripts.
