@@ -250,6 +250,17 @@ describe('coalescePatches', () => {
     ])
   })
 
+  it('does not merge [0,1] with [0.1] (join(".") would alias corrupt single-segment paths)', () => {
+    const merged = coalescePatches([
+      { path: [0, 1], x: 10 },
+      { path: [0.1], y: 20 },
+    ])
+    expect(merged).toEqual([
+      { path: [0, 1], x: 10 },
+      { path: [0.1], y: 20 },
+    ])
+  })
+
   it('preserves first-seen order for unrelated paths', () => {
     const merged = coalescePatches([
       { path: [2], x: 1 },

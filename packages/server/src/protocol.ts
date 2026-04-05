@@ -105,7 +105,8 @@ function isFinitePatchNumber(value: unknown): value is number {
 
 /**
  * Coalesce multiple patches on the same path (last write wins per field).
- * Paths are keyed by joining indices with `.` (e.g. `[1,23]` → `"1.23"`, `[12,3]` → `"12.3"`) so distinct nodes never alias.
+ * Paths are keyed with `JSON.stringify` so distinct index sequences never alias (e.g. `[0, 1]` vs `[0.1]` would
+ * both stringify to `"0.1"` under a naive `join('.')` key).
  * Entries with a missing or non-array `path` (including `null` list slots) are skipped so corrupt hand-built batches cannot throw.
  * Geometry fields apply only when the incoming value is a finite primitive `number` — JSON `null`, `NaN`, `±Infinity`,
  * boxed numbers, and other garbage cannot overwrite a prior good coordinate (last finite write still wins).
@@ -115,7 +116,7 @@ export function coalescePatches(patches: LayoutPatch[]): LayoutPatch[] {
   const order: string[] = []
   for (const patch of patches) {
     if (patch == null || !Array.isArray(patch.path)) continue
-    const key = patch.path.join('.')
+    const key = JSON.stringify(patch.path)
     if (!byPath.has(key)) {
       byPath.set(key, { path: [...patch.path] })
       order.push(key)
