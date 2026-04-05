@@ -16,7 +16,12 @@ function stepDeltaMs(deltaMs: number): number {
   return typeof deltaMs === 'number' && Number.isFinite(deltaMs) ? Math.max(0, deltaMs) : 0
 }
 
-/** Common easing functions. */
+/**
+ * Named easing curves for {@link transition}, {@link createTweenTimeline}, and {@link createPropertyTimeline}.
+ *
+ * Each function expects normalized time `t` in `[0, 1]` (inclusive) and returns eased progress in `[0, 1]`
+ * at the endpoints; behavior outside that interval is not part of the contract.
+ */
 export const easing = {
   linear: (t: number) => t,
   easeIn: (t: number) => t * t * t,
@@ -24,6 +29,7 @@ export const easing = {
   easeInOut: (t: number) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
 }
 
+/** Easing callback: `t` is normalized time in `[0, 1]`; return eased progress (typically in `[0, 1]`). */
 export type EasingFn = (t: number) => number
 export type TweenPlaybackState = 'idle' | 'running' | 'paused' | 'finished' | 'cancelled'
 
