@@ -279,3 +279,109 @@ describe('client reconnect integration', () => {
     client.close()
   })
 })
+
+describe('createClient WebSocket binary decode failures', () => {
+  afterEach(() => {
+    globalThis.WebSocket = origWebSocket
+  })
+
+  function installMockWebSocket(sockets: Array<{ emit(type: string, event?: unknown): void }>) {
+    class MockWebSocket {
+      static CONNECTING = 0
+      static OPEN = 1
+      static CLOSING = 2
+      static CLOSED = 3
+      readyState = MockWebSocket.OPEN
+      private listeners = new Map<string, Array<(event?: unknown) => void>>()
+
+      constructor(_url: string) {
+        sockets.push(this)
+        queueMicrotask(() => this.emit('open'))
+      }
+
+      addEventListener(type: string, cb: (event?: unknown) => void) {
+        const current = this.listeners.get(type) ?? []
+        current.push(cb)
+        this.listeners.set(type, current)
+      }
+
+      send(_data: string) {}
+
+      close() {
+        this.readyState = MockWebSocket.CLOSED
+      }
+
+      emit(type: string, event: unknown = {}) {
+        for (const cb of this.listeners.get(type) ?? []) cb(event)
+      }
+    }
+
+    globalThis.WebSocket = MockWebSocket as unknown as typeof WebSocket
+  }
+
+  it('invokes onError when a binary message is not a GEOM v1 envelope', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+    const renderer: Renderer = {
+      render: () => {},
+      destroy: () => {},
+    }
+
+    createClient({
+      url: 'ws://mock.test',
+      renderer,
+      binaryFraming: true,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    sockets[0]!.emit('message', { data: new Uint8Array([0x01, 0x02, 0x03]).buffer })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(Error)
+    expect((errors[0] as Error).message).toContain('Not a GEOM binary frame')
+  })
+
+  it('invokes onError when a GEOM v1 binary frame declares a payload longer than the buffer', async () => {
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+    const renderer: Renderer = {
+      render: () => {},
+      destroy: () => {},
+    }
+
+    createClient({
+      url: 'ws://mock.test',
+      renderer,
+      binaryFraming: true,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    const headerOnly = new Uint8Array(9)
+    headerOnly.set([0x47, 0x45, 0x4f, 0x4d, 1], 0)
+    new DataView(headerOnly.buffer).setUint32(5, 64, true)
+    sockets[0]!.emit('message', { data: headerOnly.buffer })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(Error)
+    expect((errors[0] as Error).message).toContain('Truncated binary frame payload')
+  })
+})
