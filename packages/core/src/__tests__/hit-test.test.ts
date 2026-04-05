@@ -3484,6 +3484,24 @@ describe('overflow hidden clipping', () => {
 })
 
 describe('overflow visible', () => {
+  it('omitted overflow matches explicit visible: parent inside gate still blocks protruding child hits', () => {
+    let childFired = false
+    const child = box({ width: 80, height: 40, onClick: () => { childFired = true } })
+    const parent = box({ width: 100, height: 100 }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 50, y: 30, width: 80, height: 40, children: [] }],
+    }
+    dispatchHit(parent, layout, 'onClick', 110, 50)
+    expect(childFired).toBe(false)
+    expect(hitPathAtPoint(parent, layout, 110, 50)).toBeNull()
+    expect(hasInteractiveHitAtPoint(parent, layout, 110, 50)).toBe(false)
+    expect(getCursorAtPoint(parent, layout, 110, 50)).toBeNull()
+  })
+
   it('pointer over child geometry outside parent bounds does not hit child (parent inside gate)', () => {
     let childFired = false
     const child = box({ width: 80, height: 40, onClick: () => { childFired = true } })
