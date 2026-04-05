@@ -6,7 +6,7 @@ import { init, computeLayout } from 'textura'
 import type { ComputedLayout } from 'textura'
 import {
   toLayoutTree,
-  resolveElementDirection,
+  resolveComputeLayoutDirection,
   dispatchHit,
   dispatchKeyboardEvent,
   dispatchCompositionEvent,
@@ -66,6 +66,10 @@ export interface TexturaServerOptions {
   /**
    * Yoga / Textura root layout direction. When omitted, derived from the view root’s resolved `dir`
    * (parent context defaults to `ltr`).
+   *
+   * Values other than the strings `ltr` and `rtl` are ignored at runtime (e.g. malformed config) so
+   * `computeLayout` still receives a direction consistent with the root element, matching
+   * `createApp`'s `layoutDirection` option in `@geometra/core`.
    */
   layoutDirection?: 'ltr' | 'rtl'
 }
@@ -171,8 +175,7 @@ export async function createServer(
       currentTree = view()
       const serializedTree = JSON.stringify(currentTree)
       const layoutTree = toLayoutTree(currentTree)
-      const direction =
-        layoutDirectionOption ?? resolveElementDirection(currentTree, 'ltr')
+      const direction = resolveComputeLayoutDirection(layoutDirectionOption, currentTree)
       const layout = computeLayout(layoutTree, { width, height, direction })
 
       let msg: ServerMessage

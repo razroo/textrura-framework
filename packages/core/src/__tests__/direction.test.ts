@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { box, image, scene3d, sphere, text } from '../elements.js'
-import { resolveDirectionValue, resolveElementDirection, type ResolvedDirection } from '../direction.js'
+import {
+  resolveDirectionValue,
+  resolveElementDirection,
+  resolveComputeLayoutDirection,
+  type ResolvedDirection,
+} from '../direction.js'
 import { toLayoutTree } from '../tree.js'
 
 describe('direction model', () => {
@@ -177,5 +182,33 @@ describe('direction model', () => {
     expect(d).toBe('rtl')
     d = resolveElementDirection(leaf, d)
     expect(d).toBe('ltr')
+  })
+})
+
+describe('resolveComputeLayoutDirection', () => {
+  it('uses explicit ltr/rtl when the host option is a primitive string', () => {
+    const rtlRoot = box({ width: 1, height: 1, flexDirection: 'row', dir: 'rtl' }, [])
+    expect(resolveComputeLayoutDirection('ltr', rtlRoot)).toBe('ltr')
+    expect(resolveComputeLayoutDirection('rtl', box({ width: 1, height: 1 }, []))).toBe('rtl')
+  })
+
+  it('derives from the root element when the option is omitted', () => {
+    const rtlRoot = box({ width: 1, height: 1, dir: 'rtl' })
+    expect(resolveComputeLayoutDirection(undefined, rtlRoot)).toBe('rtl')
+  })
+
+  it('ignores auto and other non-ltr/rtl host values like createApp (root dir wins)', () => {
+    const rtlRoot = box({ width: 1, height: 1, flexDirection: 'row', dir: 'rtl' }, [])
+    expect(resolveComputeLayoutDirection('auto' as never, rtlRoot)).toBe('rtl')
+    expect(resolveComputeLayoutDirection('sideways-lr' as never, rtlRoot)).toBe('rtl')
+    expect(resolveComputeLayoutDirection(0 as never, rtlRoot)).toBe('rtl')
+    expect(resolveComputeLayoutDirection(null as never, rtlRoot)).toBe('rtl')
+  })
+
+  it('ignores boxed-string ltr/rtl (strict equality only), deriving from the root', () => {
+    const rtlRoot = box({ width: 1, height: 1, dir: 'rtl' })
+    expect(resolveComputeLayoutDirection(Object('rtl') as never, rtlRoot)).toBe('rtl')
+    const ltrRoot = box({ width: 1, height: 1, dir: 'ltr' })
+    expect(resolveComputeLayoutDirection(Object('ltr') as never, ltrRoot)).toBe('ltr')
   })
 })

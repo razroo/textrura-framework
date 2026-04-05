@@ -37,3 +37,24 @@ export function resolveElementDirection(
   const dir = element.props.dir
   return resolveDirectionValue(dir, parentDirection)
 }
+
+/**
+ * Yoga / Textura **owner** direction for the layout-tree root: optional host override plus the live UI root.
+ *
+ * Only exact primitive `'ltr'` and `'rtl'` on `layoutDirection` win; any other value (omitted,
+ * `'auto'`, malformed config, boxed strings, etc.) falls back to {@link resolveElementDirection} on
+ * `root` with document default `'ltr'`, matching {@link import('./app.js').createApp} and keeping
+ * server-driven layout aligned with local canvas apps.
+ *
+ * @param layoutDirection — Host override (`createServer` / `createApp` option), or any runtime garbage; only `'ltr'` / `'rtl'` count.
+ * @param root — Live view root used when the override is absent or invalid.
+ */
+export function resolveComputeLayoutDirection(
+  layoutDirection: unknown,
+  root: UIElement,
+): ResolvedDirection {
+  if (layoutDirection === 'ltr' || layoutDirection === 'rtl') {
+    return layoutDirection
+  }
+  return resolveElementDirection(root, 'ltr')
+}

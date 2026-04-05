@@ -2,22 +2,12 @@ import { init, computeLayout } from 'textura'
 import type { ComputedLayout, ComputeOptions } from 'textura'
 import type { UIElement, Renderer, EventHandlers, KeyboardHitEvent } from './types.js'
 import { toLayoutTree } from './tree.js'
-import { resolveElementDirection } from './direction.js'
+import { resolveComputeLayoutDirection } from './direction.js'
 import { dispatchHit } from './hit-test.js'
 import { effect } from './signals.js'
 import { focusedElement, setFocus } from './focus.js'
 import { collectFontFamiliesFromTree, resolveFontLoadTimeoutMs, waitForFonts } from './fonts.js'
 import { dispatchKeyboardEvent, dispatchCompositionEvent } from './keyboard.js'
-
-function resolveComputeLayoutDirection(
-  layoutDirection: AppOptions['layoutDirection'],
-  root: UIElement,
-): 'ltr' | 'rtl' {
-  if (layoutDirection === 'ltr' || layoutDirection === 'rtl') {
-    return layoutDirection
-  }
-  return resolveElementDirection(root, 'ltr')
-}
 
 /** Only finite, non-negative numbers become Textura root constraints; otherwise the key is omitted (unconstrained). */
 function finiteRootExtent(value: number | undefined): number | undefined {
