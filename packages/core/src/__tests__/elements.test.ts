@@ -80,7 +80,7 @@ describe('box', () => {
     expect((el.props as { dir?: string }).dir).toBe('auto')
   })
 
-  it('preserves pointer/hit and scroll style props on props (layout snapshot strips them for Yoga)', () => {
+  it('preserves pointer/hit and scroll style props on props (layout snapshot omits them; hit-test and renderers read live props)', () => {
     const el = box({
       width: 1,
       height: 1,
