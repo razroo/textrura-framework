@@ -1701,6 +1701,14 @@ describe('performance now helpers', () => {
     spy.mockRestore()
   })
 
+  it('preserves IEEE negative zero from performance.now (finite; must not collapse to +0)', () => {
+    const spy = vi.spyOn(performance, 'now').mockReturnValue(-0)
+    expect(Number.isFinite(-0)).toBe(true)
+    expect(Object.is(safePerformanceNowMs(), -0)).toBe(true)
+    expect(Object.is(readPerformanceNow(), -0)).toBe(true)
+    spy.mockRestore()
+  })
+
   it('safePerformanceNowMs and readPerformanceNow return 0 when performance.now throws', () => {
     const spy = vi.spyOn(performance, 'now').mockImplementation(() => {
       throw new Error('clock')
