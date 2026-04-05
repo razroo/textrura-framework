@@ -271,7 +271,9 @@ describe('coalescePatches', () => {
   it('does not alias a dense path to a sparse path (join emits empty segments for holes)', () => {
     // Malformed / hand-built patches only: diffLayout always builds dense paths.
     const dense = [1, 2, 3]
-    const sparse = [1, , 3] as number[]
+    const sparse: number[] = []
+    sparse[0] = 1
+    sparse[2] = 3
     expect(sparse.length).toBe(3)
     expect(1 in sparse).toBe(false)
     expect(dense.join('.')).toBe('1.2.3')
