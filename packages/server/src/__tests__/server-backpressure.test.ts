@@ -12,4 +12,19 @@ describe('server backpressure helper', () => {
     expect(shouldDeferClientSend(0, 0)).toBe(false)
     expect(shouldDeferClientSend(1, 0)).toBe(true)
   })
+
+  it('never defers when either operand is NaN (comparison is false)', () => {
+    expect(shouldDeferClientSend(Number.NaN, 1024)).toBe(false)
+    expect(shouldDeferClientSend(2048, Number.NaN)).toBe(false)
+  })
+
+  it('defers when buffered amount is finite and above threshold, including very large totals', () => {
+    expect(shouldDeferClientSend(Number.MAX_SAFE_INTEGER, 0)).toBe(true)
+    expect(shouldDeferClientSend(Number.POSITIVE_INFINITY, 1024)).toBe(true)
+  })
+
+  it('treats negative buffered amount like zero (never above a non-negative threshold)', () => {
+    expect(shouldDeferClientSend(-1, 0)).toBe(false)
+    expect(shouldDeferClientSend(-100, 1024)).toBe(false)
+  })
 })
