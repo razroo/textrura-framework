@@ -806,15 +806,15 @@ export function card(options: CardOptions = {}): UIElement {
   const sections: UIElement[] = []
   if (options.header) {
     sections.push(
-      box({ paddingLeft: 14, paddingRight: 14, paddingTop: 12, paddingBottom: 12, borderBottom: 1, borderColor: options.borderColor ?? '#334155', minWidth: 0 }, [options.header]),
+      box({ paddingLeft: 16, paddingRight: 16, paddingTop: 14, paddingBottom: 14, borderBottom: 1, borderColor: options.borderColor ?? '#334155', minWidth: 0 }, [options.header]),
     )
   }
   if (options.children && options.children.length > 0) {
-    sections.push(box({ flexDirection: 'column', padding: 14, gap: options.gap ?? 10, minWidth: 0 }, options.children))
+    sections.push(box({ flexDirection: 'column', padding: 16, gap: options.gap ?? 14, minWidth: 0 }, options.children))
   }
   if (options.footer) {
     sections.push(
-      box({ paddingLeft: 14, paddingRight: 14, paddingTop: 12, paddingBottom: 12, borderTop: 1, borderColor: options.borderColor ?? '#334155', minWidth: 0 }, [options.footer]),
+      box({ paddingLeft: 16, paddingRight: 16, paddingTop: 14, paddingBottom: 14, borderTop: 1, borderColor: options.borderColor ?? '#334155', minWidth: 0 }, [options.footer]),
     )
   }
   return box(
