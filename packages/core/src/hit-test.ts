@@ -128,6 +128,24 @@ export interface HitDispatchResult {
   focusTarget?: { element: BoxElement; layout: ComputedLayout }
 }
 
+/**
+ * Scroll-adjusted origin for child layout coordinates (`abs - scroll`).
+ * When the difference overflows to a non-finite value, returns `null` so descendants are not
+ * walked with offsets that would become `0` inside {@link rootedLayoutPointContainment}
+ * (`finiteNumberOrZero` maps `±Infinity` to `0`, which misplaces children).
+ */
+function scrollSafeChildOffsets(
+  absX: number,
+  absY: number,
+  scrollX: unknown,
+  scrollY: unknown,
+): { ox: number; oy: number } | null {
+  const ox = absX - finiteNumberOrZero(scrollX)
+  const oy = absY - finiteNumberOrZero(scrollY)
+  if (!Number.isFinite(ox) || !Number.isFinite(oy)) return null
+  return { ox, oy }
+}
+
 /** Walk the element tree + computed layout in parallel to find hit targets at (x, y). */
 function collectHits(
   element: UIElement,
@@ -149,18 +167,19 @@ function collectHits(
   if (element.kind !== 'box') return
 
   const boxEl = element
-  const childOffsetX = absX - finiteNumberOrZero(boxEl.props.scrollX)
-  const childOffsetY = absY - finiteNumberOrZero(boxEl.props.scrollY)
+  const childOrigin = scrollSafeChildOffsets(absX, absY, boxEl.props.scrollX, boxEl.props.scrollY)
 
   const passThrough = boxEl.props.pointerEvents === 'none'
   if (boxEl.handlers && !passThrough) {
     results.push({ layout, handlers: boxEl.handlers, element: boxEl, absX, absY })
   }
 
-  for (const i of getChildrenByZAsc(boxEl)) {
-    const childLayout = layout.children[i]
-    if (childLayout) {
-      collectHits(boxEl.children[i]!, childLayout, x, y, childOffsetX, childOffsetY, results)
+  if (childOrigin) {
+    for (const i of getChildrenByZAsc(boxEl)) {
+      const childLayout = layout.children[i]
+      if (childLayout) {
+        collectHits(boxEl.children[i]!, childLayout, x, y, childOrigin.ox, childOrigin.oy, results)
+      }
     }
   }
 }
@@ -189,27 +208,28 @@ function dispatchHitRecursive(
   }
 
   let focusTarget: HitDispatchResult['focusTarget']
-  const childOffsetX = absX - finiteNumberOrZero(scrollX)
-  const childOffsetY = absY - finiteNumberOrZero(scrollY)
+  const childOrigin = scrollSafeChildOffsets(absX, absY, scrollX, scrollY)
   const asc = getChildrenByZAsc(boxEl)
 
-  for (let k = asc.length - 1; k >= 0; k--) {
-    const i = asc[k]!
-    const childLayout = layout.children[i]
-    if (!childLayout) continue
-    const childResult = dispatchHitRecursive(
-      boxEl.children[i]!,
-      childLayout,
-      eventType,
-      x,
-      y,
-      childOffsetX,
-      childOffsetY,
-      extra,
-    )
-    if (childResult.handled) return childResult
-    if (eventType === 'onClick' && !focusTarget && childResult.focusTarget) {
-      focusTarget = childResult.focusTarget
+  if (childOrigin) {
+    for (let k = asc.length - 1; k >= 0; k--) {
+      const i = asc[k]!
+      const childLayout = layout.children[i]
+      if (!childLayout) continue
+      const childResult = dispatchHitRecursive(
+        boxEl.children[i]!,
+        childLayout,
+        eventType,
+        x,
+        y,
+        childOrigin.ox,
+        childOrigin.oy,
+        extra,
+      )
+      if (childResult.handled) return childResult
+      if (eventType === 'onClick' && !focusTarget && childResult.focusTarget) {
+        focusTarget = childResult.focusTarget
+      }
     }
   }
 
@@ -412,18 +432,17 @@ export function hitPathAtPoint(
   if (element.kind !== 'box') return null
 
   const boxEl = element
-  let childOffsetX = absX
-  let childOffsetY = absY
-  childOffsetX -= finiteNumberOrZero(boxEl.props.scrollX)
-  childOffsetY -= finiteNumberOrZero(boxEl.props.scrollY)
+  const childOrigin = scrollSafeChildOffsets(absX, absY, boxEl.props.scrollX, boxEl.props.scrollY)
 
   const asc = getChildrenByZAsc(boxEl)
-  for (let k = asc.length - 1; k >= 0; k--) {
-    const i = asc[k]!
-    const childLayout = layout.children[i]
-    if (!childLayout) continue
-    const sub = hitPathAtPoint(boxEl.children[i]!, childLayout, x, y, childOffsetX, childOffsetY)
-    if (sub !== null) return [i, ...sub]
+  if (childOrigin) {
+    for (let k = asc.length - 1; k >= 0; k--) {
+      const i = asc[k]!
+      const childLayout = layout.children[i]
+      if (!childLayout) continue
+      const sub = hitPathAtPoint(boxEl.children[i]!, childLayout, x, y, childOrigin.ox, childOrigin.oy)
+      if (sub !== null) return [i, ...sub]
+    }
   }
   if (boxEl.props.pointerEvents === 'none') return null
   return []
@@ -468,18 +487,24 @@ export function getCursorAtPoint(
 
   // Check children (deepest first via recursion)
   if (element.kind === 'box') {
-    let childOffX = absX
-    let childOffY = absY
-    childOffX -= finiteNumberOrZero(element.props.scrollX)
-    childOffY -= finiteNumberOrZero(element.props.scrollY)
+    const childOrigin = scrollSafeChildOffsets(absX, absY, element.props.scrollX, element.props.scrollY)
 
     const asc = getChildrenByZAsc(element)
-    for (let k = asc.length - 1; k >= 0; k--) {
-      const i = asc[k]!
-      const childLayout = layout.children[i]
-      if (childLayout) {
-        const childCursor = getCursorAtPoint(element.children[i]!, childLayout, x, y, childOffX, childOffY)
-        if (childCursor) return childCursor
+    if (childOrigin) {
+      for (let k = asc.length - 1; k >= 0; k--) {
+        const i = asc[k]!
+        const childLayout = layout.children[i]
+        if (childLayout) {
+          const childCursor = getCursorAtPoint(
+            element.children[i]!,
+            childLayout,
+            x,
+            y,
+            childOrigin.ox,
+            childOrigin.oy,
+          )
+          if (childCursor) return childCursor
+        }
       }
     }
   }
