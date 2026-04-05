@@ -609,6 +609,32 @@ describe('getSelectedText', () => {
     expect(() => getSelectedText({ anchorNode: a, anchorOffset: 0, focusNode: b, focusOffset: 2 }, nodes)).not.toThrow()
     expect(getSelectedText({ anchorNode: a, anchorOffset: 0, focusNode: b, focusOffset: 2 }, nodes)).toBe('')
   })
+
+  it('treats boxed number character offsets as 0 (typeof is not number; clampCharIndex parity)', () => {
+    const nodes: TextNodeInfo[] = [
+      {
+        element: { kind: 'text' as const, props: { text: 'hello', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 18,
+        lines: [],
+        index: 0,
+      },
+    ]
+    expect(
+      getSelectedText(
+        {
+          anchorNode: 0,
+          anchorOffset: Object(2) as unknown as number,
+          focusNode: 0,
+          focusOffset: 3,
+        },
+        nodes,
+      ),
+    ).toBe('hel')
+  })
 })
 
 describe('hitTestText', () => {
