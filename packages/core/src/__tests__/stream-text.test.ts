@@ -18,6 +18,8 @@ describe('streamText', () => {
     expect(streamText(undefined as unknown as string).value).toBe('')
     expect(streamText(0 as unknown as string).value).toBe('')
     expect(streamText({} as unknown as string).value).toBe('')
+    expect(streamText(1n as unknown as string).value).toBe('')
+    expect(streamText(Symbol('seed') as unknown as string).value).toBe('')
   })
 
   it('treats boxed String initial as empty (typeof is object, not string)', () => {
