@@ -243,6 +243,51 @@ describe('dispatchHit', () => {
     expect(hitPathAtPoint(root, layout, 70, 20)).toEqual([1])
   })
 
+  it('corrupt child layout (own property shadows prototype with NaN width) skips that subtree; lower sibling still receives hit', () => {
+    let firedTop = false
+    let firedBottom = false
+    const bottom = box({ width: 50, height: 50, onClick: () => { firedBottom = true } })
+    const top = box({ width: 50, height: 50, onClick: () => { firedTop = true } })
+    const root = box({ width: 100, height: 50, flexDirection: 'row' }, [bottom, top])
+
+    const bottomLayout = { x: 0, y: 0, width: 50, height: 50, children: [] as const }
+    const topProto = {
+      x: 50,
+      y: 0,
+      width: 50,
+      height: 50,
+      children: [] as const,
+    }
+    const topLayoutCorrupt = Object.assign(Object.create(topProto), {
+      width: Number.NaN,
+      children: [] as const,
+    }) as unknown as (typeof bottomLayout)
+
+    const rootLayout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 50,
+      children: [bottomLayout, topLayoutCorrupt] as const,
+    }
+
+    expect(dispatchHit(root, rootLayout, 'onClick', 25, 25).handled).toBe(true)
+    expect(firedBottom).toBe(true)
+    expect(firedTop).toBe(false)
+
+    firedBottom = false
+    firedTop = false
+    expect(dispatchHit(root, rootLayout, 'onClick', 75, 25).handled).toBe(false)
+    expect(firedBottom).toBe(false)
+    expect(firedTop).toBe(false)
+
+    expect(hitPathAtPoint(root, rootLayout, 25, 25)).toEqual([0])
+    expect(hitPathAtPoint(root, rootLayout, 75, 25)).toEqual([])
+    expect(hasInteractiveHitAtPoint(root, rootLayout, 25, 25)).toBe(true)
+    expect(hasInteractiveHitAtPoint(root, rootLayout, 75, 25)).toBe(false)
+    expect(getCursorAtPoint(root, rootLayout, 25, 25)).toBeNull()
+  })
+
   it('non-finite pointer coordinates miss dispatch and hit queries', () => {
     let fired = false
     const el = box({ width: 100, height: 50, onClick: () => { fired = true }, cursor: 'pointer' })
