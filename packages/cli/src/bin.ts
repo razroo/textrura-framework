@@ -1,37 +1,55 @@
 #!/usr/bin/env node
 import { viewInTerminal } from './viewer.js'
 import { TerminalCompositor } from './compositor.js'
+import { dumpPage } from './text-dump.js'
 
-const url = process.argv[2]
+const args = process.argv.slice(2)
+const flags = new Set(args.filter(a => a.startsWith('--')))
+const positional = args.filter(a => !a.startsWith('--'))
+const url = positional[0]
+
+const textMode = flags.has('--text')
+const jsonMode = flags.has('--json')
 
 if (!url) {
-  console.error('Usage: geometra <url>')
+  console.error('Usage: geometra <url> [--text] [--json]')
   console.error('')
   console.error('  View any Geometra-powered site in the terminal.')
   console.error('')
+  console.error('Options:')
+  console.error('  --text   Output page content as plain text (pipeable to Claude Code)')
+  console.error('  --json   Output raw UI tree + layout as JSON')
+  console.error('')
   console.error('Examples:')
   console.error('  geometra https://artemis-two.razroo.com/')
-  console.error('  geometra http://localhost:5173/')
+  console.error('  geometra https://artemis-two.razroo.com/ --text')
+  console.error('  geometra https://artemis-two.razroo.com/ --json')
+  console.error('  geometra https://artemis-two.razroo.com/ --text | claude')
   console.error('  geometra ws://localhost:8080/geometra-ws')
   process.exit(1)
 }
 
 // Direct WebSocket URL — single view
 if (url.startsWith('ws://') || url.startsWith('wss://')) {
-  console.error(`Connecting to ${url}...`)
-  const viewer = viewInTerminal({ url })
-  process.on('SIGINT', () => { viewer.close(); process.exit(0) })
-  process.on('SIGTERM', () => { viewer.close(); process.exit(0) })
+  if (textMode || jsonMode) {
+    dumpPage([url], textMode ? 'text' : 'json').then(() => process.exit(0))
+  } else {
+    const viewer = viewInTerminal({ url })
+    process.on('SIGINT', () => { viewer.close(); process.exit(0) })
+    process.on('SIGTERM', () => { viewer.close(); process.exit(0) })
+  }
 } else {
-  // HTTP(S) URL — discover all Geometra WebSocket endpoints and composite
   ;(async () => {
     const parsed = new URL(url)
     const wsProto = parsed.protocol === 'https:' ? 'wss:' : 'ws:'
     const baseWs = `${wsProto}//${parsed.host}`
     const baseHttp = `${parsed.protocol}//${parsed.host}`
 
-    console.error(`Discovering Geometra views at ${parsed.host}...`)
+    if (!textMode && !jsonMode) {
+      process.stderr.write(`Discovering Geometra views at ${parsed.host}...\n`)
+    }
 
+    // Discover WebSocket paths
     const paths = new Set<string>()
     let m: RegExpExecArray | null
 
@@ -39,11 +57,9 @@ if (url.startsWith('ws://') || url.startsWith('wss://')) {
       const res = await fetch(url)
       const html = await res.text()
 
-      // Scan HTML for WS paths
       const wsPathRe = /(\/geometra-ws(?:-[a-z]+)*)/g
       while ((m = wsPathRe.exec(html)) !== null) paths.add(m[1]!)
 
-      // Fetch and scan JS bundles
       const scriptRe = /src=["']([^"']+\.js)["']/g
       const scriptUrls: string[] = []
       while ((m = scriptRe.exec(html)) !== null) {
@@ -60,31 +76,40 @@ if (url.startsWith('ws://') || url.startsWith('wss://')) {
         } catch { /* skip */ }
       }
     } catch {
-      console.error('Could not fetch page HTML.')
+      process.stderr.write('Could not fetch page HTML.\n')
     }
 
     if (paths.size === 0) paths.add('/geometra-ws')
 
-    // For terminal rendering, only use full-width views.
-    // Skip HUD (transparent overlay for 3D) and the narrow console panel.
-    const terminalViews = [...paths].filter(p =>
-      p.includes('header') || p.includes('below')
-    )
-
-    // Fallback: if no header/below views found, use main view
-    if (terminalViews.length === 0) {
-      terminalViews.push([...paths][0] ?? '/geometra-ws')
+    // For --text/--json, use ALL views to get complete content
+    // For terminal rendering, skip HUD and console panel
+    let viewPaths: string[]
+    if (textMode || jsonMode) {
+      viewPaths = [...paths].sort((a, b) => {
+        const order = (p: string) =>
+          p.includes('header') ? 0 :
+          p === '/geometra-ws' ? 1 :
+          p.includes('hud') ? 2 :
+          p.includes('below') ? 3 : 4
+        return order(a) - order(b)
+      })
+    } else {
+      const terminal = [...paths].filter(p => p.includes('header') || p.includes('below'))
+      viewPaths = terminal.length > 0 ? terminal : [[...paths][0] ?? '/geometra-ws']
+      viewPaths.sort((a, b) => {
+        const order = (p: string) => p.includes('header') ? 0 : p.includes('below') ? 1 : 2
+        return order(a) - order(b)
+      })
     }
 
-    const sorted = terminalViews.sort((a, b) => {
-      const order = (p: string) =>
-        p.includes('header') ? 0 : p.includes('below') ? 1 : 2
-      return order(a) - order(b)
-    })
+    const wsUrls = viewPaths.map(p => `${baseWs}${p}`)
 
-    const wsUrls = sorted.map(p => `${baseWs}${p}`)
-    console.error(`Found ${sorted.length} view(s): ${sorted.join(', ')}`)
+    if (textMode || jsonMode) {
+      await dumpPage(wsUrls, textMode ? 'text' : 'json')
+      process.exit(0)
+    }
 
+    process.stderr.write(`Found ${viewPaths.length} view(s): ${viewPaths.join(', ')}\n`)
     const compositor = new TerminalCompositor(wsUrls)
     compositor.start()
 
