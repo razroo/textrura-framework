@@ -389,6 +389,14 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(-0, -0, -0, -0, 10, 10)).toBe(true)
   })
 
+  it('distinguishes negative subnormal pointer coords from the inclusive min edge at abs origin 0', () => {
+    const negSub = -Number.MIN_VALUE
+    expect(negSub).toBeLessThan(0)
+    expect(pointInInclusiveLayoutRect(negSub, 0, 0, 0, 10, 10)).toBe(false)
+    expect(pointInInclusiveLayoutRect(0, negSub, 0, 0, 10, 10)).toBe(false)
+    expect(pointInInclusiveLayoutRect(Number.MIN_VALUE, Number.MIN_VALUE, 0, 0, 10, 10)).toBe(true)
+  })
+
   it('supports negative absolute origins (Yoga can emit negative x/y for positioned subtrees)', () => {
     // Rect [-10, -5] x [-20, -15] inclusive
     expect(pointInInclusiveLayoutRect(-10, -20, -10, -20, 5, 5)).toBe(true)
@@ -522,6 +530,12 @@ describe('finiteNumberOrZero', () => {
     const sub = 1e-320
     expect(Number.isFinite(sub)).toBe(true)
     expect(finiteNumberOrZero(sub)).toBe(sub)
+  })
+
+  it('preserves negative subnormal magnitudes (paired with positive MIN_VALUE; still finite scroll deltas)', () => {
+    const negSub = -Number.MIN_VALUE
+    expect(negSub).toBeLessThan(0)
+    expect(finiteNumberOrZero(negSub)).toBe(negSub)
   })
 
   it('preserves IEEE negative zero (finite; scroll/sign math must not collapse -0 to +0)', () => {
