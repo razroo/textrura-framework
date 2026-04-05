@@ -6,6 +6,8 @@
  * - Call {@link init} once before layout; use {@link destroy} in tests or teardown.
  * - {@link computeLayout} walks a declarative {@link LayoutNode} and returns {@link ComputedLayout} geometry.
  * - Root constraints and document direction: {@link ComputeOptions} (`width`, `height`, `direction`).
+ * - Per-node writing mode: optional {@link FlexProps.dir} on {@link BoxNode} and leaf {@link TextNode} snapshots
+ *   (`ltr` / `rtl` / `auto`); hosts often omit `dir` on the **layout root** and rely on `ComputeOptions.direction` alone.
  * - {@link clearCache} clears Pretext measurement caches when fonts or measurement inputs change.
  *
  * Host frameworks (including Geometra’s `@geometra/core`) convert UI props into {@link LayoutNode} trees before
