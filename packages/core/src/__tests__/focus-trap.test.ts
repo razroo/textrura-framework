@@ -341,6 +341,43 @@ describe('trapFocusStep', () => {
     expect(focusedElement.peek()?.element).toBe(modalB)
   })
 
+  it('when focus is on a pointer-only box inside the trap, next/prev match cleared-focus entry (not in trap list)', () => {
+    const modalA = box({ onKeyDown: () => undefined }, [])
+    const modalB = box({ onKeyDown: () => undefined }, [])
+    const pointerOnly = box(
+      { onPointerDown: () => undefined, onPointerUp: () => undefined },
+      [],
+    )
+    const tree = box({}, [box({}, [modalA, pointerOnly, modalB])])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 100,
+      children: [
+        {
+          x: 0,
+          y: 0,
+          width: 200,
+          height: 100,
+          children: [
+            { x: 0, y: 0, width: 100, height: 40, children: [] },
+            { x: 0, y: 45, width: 100, height: 10, children: [] },
+            { x: 0, y: 55, width: 100, height: 40, children: [] },
+          ],
+        },
+      ],
+    }
+
+    setFocus(pointerOnly, layout.children[0]!.children[1]!)
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(modalA)
+
+    setFocus(pointerOnly, layout.children[0]!.children[1]!)
+    expect(trapFocusStep(tree, layout, [0], 'prev')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(modalB)
+  })
+
   it('when focus is cleared, next targets first focusable and prev targets last (same idx -1 path as outside trap)', () => {
     const modalA = box({ onKeyDown: () => undefined }, [])
     const modalB = box({ onKeyDown: () => undefined }, [])
