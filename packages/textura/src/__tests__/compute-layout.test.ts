@@ -72,6 +72,16 @@ describe('isTextNode', () => {
         height: 20,
       } as unknown as LayoutNode),
     ).toBe(false)
+
+    expect(
+      isTextNode({
+        text: Object('hi') as unknown as string,
+        font: '16px sans-serif',
+        lineHeight: 20,
+        width: 40,
+        height: 20,
+      } as unknown as LayoutNode),
+    ).toBe(false)
   })
 
   it('uses `in` semantics so inherited `text` counts (documents engine guard behavior)', () => {
