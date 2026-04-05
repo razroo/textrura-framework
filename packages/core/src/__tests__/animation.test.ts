@@ -133,6 +133,11 @@ describe('transition()', () => {
     expect(transition(0, 200, Number.NaN, easing.linear).peek()).toBe(200)
     expect(transition(0, 40, Number.POSITIVE_INFINITY, easing.linear).peek()).toBe(40)
     expect(pending).toHaveLength(0)
+
+    // BigInt is not a finite number for Number.isFinite → same instant jump as NaN/±Infinity (no RAF).
+    expect(() => transition(0, 55, 400n as never, easing.linear)).not.toThrow()
+    expect(transition(0, 55, 400n as never, easing.linear).peek()).toBe(55)
+    expect(pending).toHaveLength(0)
   })
 
   it('clamps non-positive finite duration to 1 ms scale like createTweenTimeline', async () => {
@@ -314,6 +319,16 @@ describe('animation timeline', () => {
     props.to({ x: 7 }, Number.NaN)
     expect(props.values.x.peek()).toBe(7)
     expect(props.state()).toBe('finished')
+
+    const bigintDur = createTweenTimeline(3)
+    bigintDur.to(50, 400n as never, easing.linear)
+    expect(bigintDur.value.peek()).toBe(50)
+    expect(bigintDur.state()).toBe('finished')
+
+    const propsBig = createPropertyTimeline({ x: 0 })
+    propsBig.to({ x: 8 }, 2n as never)
+    expect(propsBig.values.x.peek()).toBe(8)
+    expect(propsBig.state()).toBe('finished')
   })
 
   it('normalizes non-finite initial values to 0 so interpolation stays finite', () => {
