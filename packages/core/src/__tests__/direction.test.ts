@@ -203,6 +203,7 @@ describe('resolveComputeLayoutDirection', () => {
     expect(resolveComputeLayoutDirection('sideways-lr' as never, rtlRoot)).toBe('rtl')
     expect(resolveComputeLayoutDirection(0 as never, rtlRoot)).toBe('rtl')
     expect(resolveComputeLayoutDirection(null as never, rtlRoot)).toBe('rtl')
+    expect(resolveComputeLayoutDirection('' as never, rtlRoot)).toBe('rtl')
   })
 
   it('ignores boxed-string ltr/rtl (strict equality only), deriving from the root', () => {
