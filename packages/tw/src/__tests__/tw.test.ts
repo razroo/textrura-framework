@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { tw } from '../index.js'
+import { MAX_TW_CLASS_TOKENS, tw } from '../index.js'
 import { parseClasses } from '../parser.js'
 
 describe('tw()', () => {
@@ -57,6 +57,18 @@ describe('tw()', () => {
       expect(parseClasses('')).toEqual({})
       expect(parseClasses('   \n\t\u00A0  ')).toEqual({})
       expect(tw('  ', '\t', ' \u00A0 ')).toEqual({})
+    })
+
+    it('exports a bounded token budget aligned with the parser cap', () => {
+      expect(MAX_TW_CLASS_TOKENS).toBe(4096)
+    })
+
+    it('ignores classes past the token budget (left-to-right)', () => {
+      const ignored = `${'x '.repeat(MAX_TW_CLASS_TOKENS)}p-4`
+      expect(parseClasses(ignored)).toEqual({})
+
+      const appliedFirst = `p-4 ${'x '.repeat(MAX_TW_CLASS_TOKENS)}`
+      expect(parseClasses(appliedFirst)).toEqual({ padding: 16 })
     })
   })
 
