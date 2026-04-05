@@ -111,11 +111,20 @@ describe('box layout', () => {
       height: 80,
       direction: 'RTL' as never,
     })
+    // Per-node `dir: 'auto'` is valid; owner `ComputeOptions.direction` is only ltr|rtl — stray `'auto'`
+    // at the document level (bad cast / confused API) must fall back like other malformed strings.
+    const autoOwner = computeLayout(tree, {
+      width: 200,
+      height: 80,
+      direction: 'auto' as never,
+    })
     expect(rtl.children[0]!.x).toBeGreaterThan(rtl.children[1]!.x)
     expect(trimmed.children[0]!.x).toBe(ltr.children[0]!.x)
     expect(trimmed.children[1]!.x).toBe(ltr.children[1]!.x)
     expect(upper.children[0]!.x).toBe(ltr.children[0]!.x)
     expect(upper.children[1]!.x).toBe(ltr.children[1]!.x)
+    expect(autoOwner.children[0]!.x).toBe(ltr.children[0]!.x)
+    expect(autoOwner.children[1]!.x).toBe(ltr.children[1]!.x)
   })
 
   it('explicit undefined owner direction in options matches omitted direction (LTR flex row)', () => {
