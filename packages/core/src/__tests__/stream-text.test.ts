@@ -182,3 +182,37 @@ describe('streamText', () => {
     expect(s.streaming).toBe(false)
   })
 })
+
+describe('streamText.streamingSignal', () => {
+  it('starts true and mirrors streaming until done()', () => {
+    const s = streamText()
+    expect(s.streamingSignal.peek()).toBe(true)
+    s.done()
+    expect(s.streamingSignal.peek()).toBe(false)
+    expect(s.streaming).toBe(false)
+  })
+
+  it('returns to true after clear() even when done() was called first', () => {
+    const s = streamText()
+    s.done()
+    expect(s.streamingSignal.peek()).toBe(false)
+    s.clear()
+    expect(s.streamingSignal.peek()).toBe(true)
+    expect(s.streaming).toBe(true)
+  })
+
+  it('notifies subscribers when streaming flips (done then clear)', () => {
+    const s = streamText()
+    const flags: boolean[] = []
+    effect(() => {
+      flags.push(s.streamingSignal.value)
+    })
+    expect(flags).toEqual([true])
+    flags.length = 0
+    s.done()
+    expect(flags).toEqual([false])
+    flags.length = 0
+    s.clear()
+    expect(flags).toEqual([true])
+  })
+})
