@@ -125,4 +125,28 @@ describe('demo input scenario smoke', () => {
     el.handlers?.onKeyDown?.({ ...base, ctrlKey: false, metaKey: false })
     expect(order).toEqual(['keyDown'])
   })
+
+  it('disabled uiInput omits pointer and keyboard handlers (no accidental input when non-interactive)', () => {
+    let calls = 0
+    const el = uiInput('hi', 'field', {
+      disabled: true,
+      focused: true,
+      onClick: () => {
+        calls++
+      },
+      onKeyDown: () => {
+        calls++
+      },
+      onSelectAll: () => {
+        calls++
+      },
+    })
+    expect(el.kind).toBe('box')
+    expect(el.props.pointerEvents).toBe('none')
+    expect(el.handlers?.onClick).toBeUndefined()
+    expect(el.handlers?.onKeyDown).toBeUndefined()
+    expect(el.handlers?.onCompositionStart).toBeUndefined()
+    expect(el.semantic).toEqual({ tag: 'input', ariaDisabled: true })
+    expect(calls).toBe(0)
+  })
 })
