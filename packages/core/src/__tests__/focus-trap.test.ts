@@ -43,6 +43,38 @@ describe('trapFocusStep', () => {
     expect(wrapped?.element).not.toBe(outside)
   })
 
+  it('cycles in source child order inside the trap, not z-index paint order (matches collectFocusOrder)', () => {
+    const backVisually = box({ width: 50, height: 50, zIndex: 0, onKeyDown: () => undefined }, [])
+    const frontVisually = box({ width: 50, height: 50, zIndex: 10, onKeyDown: () => undefined }, [])
+    const modal = box({ width: 100, height: 100 }, [backVisually, frontVisually])
+    const tree = box({}, [modal])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: [
+        {
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          children: [
+            { x: 0, y: 0, width: 50, height: 50, children: [] },
+            { x: 0, y: 0, width: 50, height: 50, children: [] },
+          ],
+        },
+      ],
+    }
+
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(backVisually)
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(frontVisually)
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(backVisually)
+  })
+
   it('returns false when scope path is out of range', () => {
     const tree = box({}, [box({ onKeyDown: () => undefined }, [])])
     const layout: ComputedLayout = {
