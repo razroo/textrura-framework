@@ -97,6 +97,7 @@ describe('tw()', () => {
     it('overflow-scroll', () => expect(tw('overflow-scroll')).toEqual({ overflow: 'scroll' }))
     it('ltr', () => expect(tw('ltr')).toEqual({ dir: 'ltr' }))
     it('rtl', () => expect(tw('rtl')).toEqual({ dir: 'rtl' }))
+    it('dir-auto', () => expect(tw('dir-auto')).toEqual({ dir: 'auto' }))
   })
 
   describe('flex alignment', () => {
@@ -242,6 +243,10 @@ describe('tw()', () => {
 
     it('last flex direction wins', () => {
       expect(tw('flex-row flex-col')).toEqual({ flexDirection: 'column' })
+    })
+
+    it('last dir utility wins (rtl then dir-auto)', () => {
+      expect(tw('rtl dir-auto')).toEqual({ dir: 'auto' })
     })
 
     it('inset then override single side', () => {

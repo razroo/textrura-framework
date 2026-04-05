@@ -23,4 +23,5 @@ export const layoutMap: Record<string, Partial<TwResult>> = {
 
   'ltr': { dir: 'ltr' },
   'rtl': { dir: 'rtl' },
+  'dir-auto': { dir: 'auto' },
 }
