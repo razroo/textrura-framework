@@ -52,6 +52,12 @@ describe('tw()', () => {
       expect(parseClasses(1 as unknown as string)).toEqual({})
       expect(parseClasses(Symbol('x') as unknown as string)).toEqual({})
     })
+
+    it('treats whitespace-only input as no tokens (NBSP and newlines included)', () => {
+      expect(parseClasses('')).toEqual({})
+      expect(parseClasses('   \n\t\u00A0  ')).toEqual({})
+      expect(tw('  ', '\t', ' \u00A0 ')).toEqual({})
+    })
   })
 
   describe('layout', () => {
