@@ -543,6 +543,26 @@ describe('getSelectedText', () => {
     ).toBe('Hello World\nSec')
   })
 
+  it('normalizes anchorNode +Infinity the same as focus +Infinity (range swap before clipping)', () => {
+    const nodes = makeNodes()
+    expect(
+      getSelectedText(
+        { anchorNode: Number.POSITIVE_INFINITY, anchorOffset: 3, focusNode: 0, focusOffset: 0 },
+        nodes,
+      ),
+    ).toBe('Hello World\nSec')
+  })
+
+  it('normalizes focusNode -Infinity to the first node after swap (finite indices truncate; -Infinity stays non-finite)', () => {
+    const nodes = makeNodes()
+    expect(
+      getSelectedText(
+        { anchorNode: 0, anchorOffset: 5, focusNode: Number.NEGATIVE_INFINITY, focusOffset: 0 },
+        nodes,
+      ),
+    ).toBe('Hello')
+  })
+
   it('returns empty string for BigInt node indices without throwing', () => {
     const nodes = makeNodes()
     const a = 0n as unknown as number
