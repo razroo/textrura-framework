@@ -893,6 +893,39 @@ describe('text layout (Pretext + canvas measureText)', () => {
     expect(result.lineCount).toBe(1)
   })
 
+  it('text leaf accepts per-node dir (ltr, rtl, auto, unknown) without throwing; ASCII geometry matches omitting dir under uniform mock measureText', () => {
+    const base: TextNode = {
+      text: 'Hello',
+      font: '16px sans-serif',
+      lineHeight: 20,
+      width: 200,
+    }
+    const omitted = computeLayout(base)
+    const pick = (r: {
+      x: number
+      y: number
+      width: number
+      height: number
+      children: unknown[]
+      lineCount?: number
+      text?: string
+    }) => ({
+      x: r.x,
+      y: r.y,
+      width: r.width,
+      height: r.height,
+      lineCount: r.lineCount,
+      text: r.text,
+      childrenLen: r.children.length,
+    })
+    const expected = pick(omitted)
+    expect(pick(computeLayout({ ...base, dir: 'ltr' }))).toEqual(expected)
+    expect(pick(computeLayout({ ...base, dir: 'rtl' }))).toEqual(expected)
+    expect(pick(computeLayout({ ...base, dir: 'auto' }))).toEqual(expected)
+    // Malformed serialized dir maps to Yoga Inherit (same as auto on a root text leaf under default LTR owner).
+    expect(pick(computeLayout({ ...base, dir: 'bogus' as never }))).toEqual(expected)
+  })
+
   it('text wraps to multiple lines in narrow container', () => {
     const longText =
       'This is a fairly long paragraph of text that should definitely wrap to multiple lines when constrained to a narrow width.'
