@@ -253,6 +253,25 @@ describe('box layout', () => {
     ).toEqual(omitBoth)
   })
 
+  it('negative ComputeOptions width/height are ignored per-axis like undefined (parity with Geometra root extents)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 40,
+      flexDirection: 'row',
+      gap: 10,
+      children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+    }
+    const omitWidth = computeLayout(tree, { height: 80 })
+    expect(computeLayout(tree, { width: -1, height: 80 })).toEqual(omitWidth)
+    expect(computeLayout(tree, { width: Number.MIN_VALUE * -1, height: 80 })).toEqual(omitWidth)
+
+    const omitHeight = computeLayout(tree, { width: 200 })
+    expect(computeLayout(tree, { width: 200, height: -50 })).toEqual(omitHeight)
+
+    const widthZero = computeLayout(tree, { width: 0, height: 80 })
+    expect(computeLayout(tree, { width: -0, height: 80 })).toEqual(widthZero)
+  })
+
   it('root dir rtl on the tree node mirrors a top-level row even when ComputeOptions.direction is ltr', () => {
     const tree: BoxNode = {
       width: 200,

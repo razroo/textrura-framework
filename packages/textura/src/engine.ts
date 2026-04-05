@@ -304,14 +304,14 @@ export interface ComputeOptions {
   /**
    * Available width for the root container. Default: unconstrained.
    *
-   * Runtime: only finite primitive numbers are forwarded to Yoga; `NaN`, `±Infinity`, and non-numbers
-   * (e.g. corrupted JSON) are ignored per-axis, same as omitting `width`.
+   * Runtime: only finite primitive numbers are forwarded to Yoga; `NaN`, `±Infinity`, negatives, and non-numbers
+   * (e.g. corrupted JSON) are ignored per-axis, same as omitting `width`. IEEE `-0` is normalized to `+0`.
    */
   width?: number
   /**
    * Available height for the root container. Default: unconstrained.
    *
-   * Same finite-number guard as {@link ComputeOptions.width}.
+   * Same constraint guard as {@link ComputeOptions.width}.
    */
   height?: number
   /**
@@ -331,7 +331,9 @@ export interface ComputeOptions {
 }
 
 function sanitizeOwnerConstraint(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined
+  const v = Object.is(value, -0) ? 0 : value
+  return v >= 0 ? v : undefined
 }
 
 /**
@@ -342,6 +344,8 @@ function sanitizeOwnerConstraint(value: unknown): number | undefined {
  *
  * Combine {@link ComputeOptions.direction} with optional per-node {@link FlexProps.dir} on each
  * {@link LayoutNode} for mixed-direction flex subtrees.
+ *
+ * @throws {Error} If {@link init} has not completed (`textura: call init() first`).
  */
 export function computeLayout(
   tree: LayoutNode,
