@@ -9,8 +9,10 @@ fi
 # session that explores the codebase, picks the next best improvement, implements
 # it, runs the release gate, commits, and pushes.
 #
-# Task selection (humans/agents): grep the entire ROADMAP.md for `- [ ]` (Phase A–C, post-1.0 plans,
-# release polish, and next frontier all use the same checkbox pattern) and grep ROUTING_COMPETITIVENESS_CHECKLIST.md.
+# Task selection (humans/agents): find unchecked Markdown boxes in ROADMAP.md (Phase A–C, post-1.0 plans,
+# release polish, next frontier) and in ROUTING_COMPETITIVENESS_CHECKLIST.md. Use a **literal** bracket pattern
+# (e.g. `rg '\[ \]' ROADMAP.md` or stricter `rg '^- \[ \]' ROADMAP.md`) — a bare `[ ]` regex is a one-space
+# character class and matches almost every line; that is not the checkbox search.
 # Zero matching lines from those greps is normal when everything is checked — not a broken search; continue to
 # deferred themes / north-star buckets (step 2b) instead of retrying or assuming the repo has "no roadmap".
 # Both trackers may already be all `[x]` — that only means unchecked checkbox backlog is exhausted there,
