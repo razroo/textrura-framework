@@ -243,4 +243,17 @@ describe('resolveComputeLayoutDirection', () => {
     expect(resolveComputeLayoutDirection('auto' as never, autoRoot)).toBe('ltr')
     expect(resolveComputeLayoutDirection(0 as never, autoRoot)).toBe('ltr')
   })
+
+  it('derives ltr from corrupt root dir when host override is invalid (parity with nested bogus dir in Textura)', () => {
+    const bogusRoot = box({ width: 1, height: 1, dir: 'bogus' as never })
+    expect(resolveComputeLayoutDirection(undefined, bogusRoot)).toBe('ltr')
+    expect(resolveComputeLayoutDirection('auto' as never, bogusRoot)).toBe('ltr')
+    expect(resolveComputeLayoutDirection(null as never, bogusRoot)).toBe('ltr')
+  })
+
+  it('host primitive ltr/rtl overrides corrupt root dir (invalid root does not block layoutDirection)', () => {
+    const bogusRoot = box({ width: 1, height: 1, dir: 'bogus' as never })
+    expect(resolveComputeLayoutDirection('rtl', bogusRoot)).toBe('rtl')
+    expect(resolveComputeLayoutDirection('ltr', bogusRoot)).toBe('ltr')
+  })
 })
