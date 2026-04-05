@@ -41,6 +41,8 @@ fi
 # and `GEOMETRY_SNAPSHOT_TESTING.md`; avoid unrelated snapshot churn unless widening the gate on purpose.
 # Demos and starter output: read `AGENTS.md` — Geometra should own the full viewport; no marketing DOM shells
 # or extra chrome around the canvas; diagnostics belong in-tree, not adjacent HTML panels.
+# Edits to scripts/create-geometra-app.mjs or templates it emits: run `npm run create:app:smoke` from repo root
+# before commit (scaffold file checks; not part of release:gate).
 # Interaction / protocol / renderer changes: skim `FRAMEWORK_NORTH_STAR.md` merge checklist (DOM-free invariants,
 # input tests, perf hot paths, docs accuracy) before shipping.
 # Ignore `[ ]` in RELEASE_CHECKLIST.md / v1-release-checklist.md
@@ -153,7 +155,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
 
    c) Self-improve this loop: when scripts/cursor-agent-loop.sh — the prompt you are reading or the script's header comments — is stale, misleading, too vague, or omits heuristics that would help later runs pick better tasks and scope work smarter, prefer a minimal, accurate edit to that script if that is higher leverage right now than the next item in (a)/(b). Goal: successive iterations should get better at deciding what to work on and how.
 
-3. Implement with minimal scope: only files and changes required for this one task. Match existing naming, imports (.js extensions), and patterns.
+3. Implement with minimal scope: only files and changes required for this one task. Match existing naming, imports (.js extensions), and patterns. If you changed \`scripts/create-geometra-app.mjs\` or starter templates it generates, run \`npm run create:app:smoke\` from the repo root before commit (not in release:gate).
 
 4. Run the repo release gate from the repo root:
    npm run release:gate
