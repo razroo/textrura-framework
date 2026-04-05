@@ -1,4 +1,20 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+
+// Pretext measures via OffscreenCanvas in Node (see @chenglou/pretext getMeasureContext).
+if (typeof globalThis.OffscreenCanvas === 'undefined') {
+  ;(globalThis as unknown as { OffscreenCanvas: unknown }).OffscreenCanvas = class {
+    getContext(type: string) {
+      if (type !== '2d') return null
+      return {
+        font: '',
+        measureText(value: string) {
+          return { width: value.length * 8 }
+        },
+      }
+    }
+  }
+}
+
 import { init, destroy, computeLayout } from '../index.js'
 import type { BoxNode, TextNode } from '../index.js'
 
@@ -282,9 +298,9 @@ describe('box layout', () => {
   })
 })
 
-// Text measurement tests require a canvas context (browser environment).
-describe('text layout (requires browser)', () => {
-  it.skip('text node measures height from content', () => {
+// Text measurement uses OffscreenCanvas (polyfilled above in Node; real canvas in browsers).
+describe('text layout (Pretext + canvas measureText)', () => {
+  it('text node measures height from content', () => {
     const tree: TextNode = {
       text: 'Hello world',
       font: '16px sans-serif',
@@ -298,13 +314,14 @@ describe('text layout (requires browser)', () => {
     expect(result.lineCount).toBe(1)
   })
 
-  it.skip('text wraps to multiple lines in narrow container', () => {
+  it('text wraps to multiple lines in narrow container', () => {
     const longText =
       'This is a fairly long paragraph of text that should definitely wrap to multiple lines when constrained to a narrow width.'
     const tree: TextNode = {
       text: longText,
       font: '16px sans-serif',
       lineHeight: 20,
+      whiteSpace: 'normal',
       width: 100,
     }
     const result = computeLayout(tree)
@@ -312,7 +329,7 @@ describe('text layout (requires browser)', () => {
     expect(result.height).toBe(result.lineCount! * 20)
   })
 
-  it.skip('text inside a flex container', () => {
+  it('text inside a flex container', () => {
     const tree: BoxNode = {
       width: 400,
       padding: 10,
@@ -331,7 +348,7 @@ describe('text layout (requires browser)', () => {
     expect(result.height).toBe(78)
   })
 
-  it.skip('text in row layout gets intrinsic width, not container width', () => {
+  it('text in row layout gets intrinsic width, not container width', () => {
     const tree: BoxNode = {
       width: 600,
       flexDirection: 'row',
