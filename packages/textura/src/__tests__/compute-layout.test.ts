@@ -494,4 +494,52 @@ describe('text layout (Pretext + canvas measureText)', () => {
     expect(textChild.width).toBeLessThan(100)
     expect(caretChild.x).toBeLessThan(120)
   })
+
+  it('text leaves accept explicit dir on the node (rtl) without breaking layout', () => {
+    const tree: TextNode = {
+      text: 'Hi',
+      font: '16px sans-serif',
+      lineHeight: 20,
+      width: 80,
+      dir: 'rtl',
+    }
+    const result = computeLayout(tree)
+    expect(result.width).toBe(80)
+    expect(result.height).toBe(20)
+    expect(Number.isFinite(result.x)).toBe(true)
+    expect(Number.isFinite(result.y)).toBe(true)
+  })
+
+  it('row with dir rtl mirrors text siblings like box children (RTL through Textura props)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 40,
+      flexDirection: 'row',
+      gap: 10,
+      dir: 'rtl',
+      children: [
+        { text: 'AA', font: '16px sans-serif', lineHeight: 20, width: 40 } satisfies TextNode,
+        { text: 'BB', font: '16px sans-serif', lineHeight: 20, width: 40 } satisfies TextNode,
+      ],
+    }
+    const result = computeLayout(tree, { width: 200, height: 40, direction: 'ltr' })
+    const first = result.children[0]!
+    const second = result.children[1]!
+    expect(first.x).toBeGreaterThan(second.x)
+  })
+
+  it('text leaf with unknown dir at runtime inherits like auto (parity with nested row bogus-dir test)', () => {
+    const tree = {
+      text: 'x',
+      font: '16px sans-serif',
+      lineHeight: 20,
+      width: 50,
+      dir: 'bogus' as never,
+    } satisfies TextNode
+    const rtl = computeLayout(tree, { width: 200, height: 40, direction: 'rtl' })
+    const ltr = computeLayout(tree, { width: 200, height: 40, direction: 'ltr' })
+    expect(rtl.width).toBe(50)
+    expect(ltr.width).toBe(50)
+    expect(rtl.height).toBe(ltr.height)
+  })
 })
