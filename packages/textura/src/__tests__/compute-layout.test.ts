@@ -464,6 +464,34 @@ describe('box layout', () => {
     }
   })
 
+  it('nested row with explicit undefined dir matches omitting dir (engine skips setDirection when props.dir is undefined)', () => {
+    const baseRow = {
+      width: 200,
+      height: 40,
+      flexDirection: 'row' as const,
+      gap: 10,
+      children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+    }
+    const omitted: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'column',
+      children: [baseRow],
+    }
+    const explicitUndefined: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'column',
+      children: [{ ...baseRow, dir: undefined }],
+    }
+    for (const dir of ['ltr', 'rtl'] as const) {
+      const a = computeLayout(omitted, { width: 200, height: 80, direction: dir }).children[0]!
+      const b = computeLayout(explicitUndefined, { width: 200, height: 80, direction: dir }).children[0]!
+      expect(b.children[0]!.x).toBe(a.children[0]!.x)
+      expect(b.children[1]!.x).toBe(a.children[1]!.x)
+    }
+  })
+
   it('nested row with trimmed or cased dir strings inherits owner direction (only exact ltr/rtl are explicit)', () => {
     const makeTree = (dir: string): BoxNode => ({
       width: 200,
