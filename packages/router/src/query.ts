@@ -65,7 +65,8 @@ export function parseQuery(search: string): ParsedQuery {
 /**
  * Serialize a shallow query object to `?a=1&b=2`. Keys are sorted lexicographically for stable output.
  * Skips `null` and `undefined`; array values become repeated keys. Booleans become `"true"` / `"false"`.
- * Skips non-finite numbers (`NaN`, `±Infinity`) so accidental numeric garbage does not produce query pairs.
+ * Skips non-finite numbers (`NaN`, `±Infinity`) and `bigint` values so accidental numeric garbage does not produce query pairs
+ * (parity with {@link import('./path.js').buildPath} optional param omission).
  * Keys and string values are normalized with `String.prototype.toWellFormed` before percent-encoding so
  * ill-formed lone UTF-16 surrogates cannot throw from `encodeURIComponent`.
  * Returns `""` when there are no pairs to emit.
@@ -81,6 +82,7 @@ export function stringifyQuery(query: QueryInput): string {
     const values = Array.isArray(raw) ? raw : [raw]
     for (const value of values) {
       if (value == null) continue
+      if (typeof value === 'bigint') continue
       if (typeof value === 'number' && !Number.isFinite(value)) continue
       pairs.push(`${encode(key)}=${encode(String(value))}`)
     }

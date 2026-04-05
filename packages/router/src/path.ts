@@ -46,7 +46,7 @@ function wellFormedSplatRemainder(value: string | number): string {
   return trimSlashes(raw)
 }
 
-/** True when a param value should participate in the path (non-finite numbers omitted; mirrors `stringifyQuery` in `query.ts`). */
+/** True when a param value should participate in the path (non-finite numbers and `bigint` omitted; mirrors `stringifyQuery` in `query.ts`). */
 function paramValuePresent(value: string | number | null | undefined): boolean {
   if (value == null || value === '') return false
   if (typeof value === 'bigint') return false

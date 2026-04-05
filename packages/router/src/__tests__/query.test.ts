@@ -219,13 +219,13 @@ describe('query helpers', () => {
     expect(stringifyQuery({ huge: Number.MAX_VALUE * 2 })).toBe('')
   })
 
-  it('stringifies bigint values without throwing (runtime input; not part of QueryValue typing)', () => {
+  it('omits bigint values without throwing (runtime input; parity with buildPath optional params)', () => {
     const solo = { n: BigInt(42) } as unknown as QueryInput
-    expect(stringifyQuery(solo)).toBe('?n=42')
+    expect(stringifyQuery(solo)).toBe('')
     const mixed = { a: 1, b: BigInt(2) } as unknown as QueryInput
-    expect(stringifyQuery(mixed)).toBe('?a=1&b=2')
+    expect(stringifyQuery(mixed)).toBe('?a=1')
     const inArray = { tag: [BigInt(0), 'x'] } as unknown as QueryInput
-    expect(stringifyQuery(inArray)).toBe('?tag=0&tag=x')
+    expect(stringifyQuery(inArray)).toBe('?tag=x')
   })
 
   it('omits non-finite entries inside arrays while preserving finite values', () => {
