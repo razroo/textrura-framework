@@ -17,6 +17,9 @@ export interface StreamText {
   /**
    * Append text. Coalesces rapid calls into a single signal update per microtask.
    * Non-string values are ignored so corrupt host data cannot stringify as `[object Object]`.
+   *
+   * After {@link StreamText.done}, `append` still mutates the buffer and can schedule a flush, but
+   * {@link StreamText.streaming} stays `false` until {@link StreamText.clear} starts a new session.
    */
   append(chunk: string): void
   /**
@@ -24,9 +27,16 @@ export interface StreamText {
    * Non-string values are ignored (same guard as `append`) so the buffer and signal stay strings.
    */
   set(text: string): void
-  /** Reset to empty string. */
+  /**
+   * Reset to empty string and set {@link StreamText.streaming} back to `true`.
+   * Use this after {@link StreamText.done} when starting another streaming session on the same handle.
+   */
   clear(): void
-  /** Mark the stream as finished. Sets `streaming` to `false`. */
+  /**
+   * Mark the stream as finished: sets {@link StreamText.streaming} to `false` and flushes any buffered text
+   * synchronously so the signal matches the buffer. Idempotent. Does not block later {@link StreamText.append}
+   * or {@link StreamText.set} (see {@link StreamText.append}).
+   */
   done(): void
   /** Whether the stream is still receiving chunks. */
   readonly streaming: boolean

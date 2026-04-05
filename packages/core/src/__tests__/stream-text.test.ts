@@ -254,10 +254,25 @@ describe('streamText', () => {
     const s = streamText()
     s.done()
     expect(s.streaming).toBe(false)
+    expect(s.streamingSignal.peek()).toBe(false)
     s.append('late')
     await Promise.resolve()
     expect(s.value).toBe('late')
     expect(s.streaming).toBe(false)
+    expect(s.streamingSignal.peek()).toBe(false)
+  })
+
+  it('multiple appends after done() coalesce into one microtask (streaming stays false)', async () => {
+    const s = streamText()
+    s.done()
+    s.append('a')
+    s.append('b')
+    s.append('c')
+    expect(s.signal.peek()).toBe('')
+    await Promise.resolve()
+    expect(s.value).toBe('abc')
+    expect(s.streaming).toBe(false)
+    expect(s.streamingSignal.peek()).toBe(false)
   })
 
   it('set() after done() replaces text synchronously while streaming stays false', () => {
