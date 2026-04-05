@@ -34,6 +34,7 @@ The framework replaces the entire browser rendering pipeline. Layout is computed
 | `@geometra/client` | Thin client that receives pre-computed geometry and paints it (versioned protocol checks) |
 | `@geometra/ui` | Starter UI primitives built on `@geometra/core`: form controls, overlays, lists, tables, trees, and command surfaces |
 | `@geometra/router` | Renderer-agnostic data router: nested routes, loaders/actions, redirects, blockers, lazy/prefetch, protocol-aware navigation |
+| `@geometra/tw` | Tailwind-style utility classes — converts class strings like `"flex-row p-4 bg-blue-500"` into Geometra props |
 
 Package docs:
 
@@ -47,6 +48,7 @@ Package docs:
 - `@geometra/client`: `packages/client/README.md`
 - `@geometra/ui`: `packages/ui/README.md`
 - `@geometra/router`: `packages/router/README.md`
+- `@geometra/tw`: `packages/tw` — Tailwind-style utility classes
 
 ## Start Here
 
@@ -105,6 +107,18 @@ function view() {
 }
 
 await createApp(view, renderer, { width: 400, height: 300 })
+```
+
+#### With `@geometra/tw` (Tailwind-style shorthand)
+
+```ts
+import { tw } from '@geometra/tw'
+
+// Before:
+box({ flexDirection: 'column', padding: 24, gap: 16, backgroundColor: '#1e293b', borderRadius: 8 }, children)
+
+// After:
+box(tw("flex-col p-6 gap-4 bg-slate-800 rounded-lg"), children)
 ```
 
 ### Phase 2: Server-Computed Layout
