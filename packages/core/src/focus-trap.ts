@@ -58,10 +58,14 @@ function resolveSubtree(
  * outside without clearing focus first.
  *
  * @param tree — UI root that contains the trap subtree (same tree passed to layout and hit-testing).
+ *   When `scopePath` is an empty array, this node **is** the trap root: it must be a
+ *   {@link import('./types.js').BoxElement} or `trapFocusStep` returns `false` (text/image/scene3d roots cannot host a trap).
  * @param layout — Computed layout parallel to `tree` from Textura/Yoga.
- * @param scopePath — Indices from the tree root to the trap root box (inclusive). Invalid
+ * @param scopePath — Indices from the tree root to the trap root box (inclusive). Pass `[]` to use
+ *   `tree` / `layout` as the trap scope (cycle every focusable under that subtree). Invalid
  *   paths (out-of-range index, non-box node, non-array `children` on a box along the path, or empty
- *   focusable list under the subtree) yield `false`.
+ *   focusable list under the subtree) yield `false`. The resolved scope root’s layout must satisfy
+ *   {@link import('./layout-bounds.js').layoutBoundsAreFinite}; otherwise no focusables are collected.
  * @param direction — `'next'` for forward cycling (Tab-like), `'prev'` for backward (Shift+Tab-like); default `'next'`.
  * @returns `true` if focus was moved, `false` if the scope is invalid or contains no focusables.
  */
