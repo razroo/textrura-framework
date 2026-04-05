@@ -1081,6 +1081,21 @@ describe('dispatchHit', () => {
     expect(hitPathAtPoint(parent, layout, 70, 30, 50n as unknown as number, 0)).toEqual([])
     expect(hasInteractiveHitAtPoint(parent, layout, 20, 30, 0n as unknown as number, 0)).toBe(true)
     expect(hasInteractiveHitAtPoint(parent, layout, 70, 30, 0n as unknown as number, 0)).toBe(false)
+
+    // BigInt offsetY → 0 (same finiteNumberOrZero rule as offsetX); finite offsetX still applies.
+    expect(dispatchHit(parent, layout, 'onClick', 20, 30, undefined, 50, 50n as unknown as number).handled).toBe(
+      false,
+    )
+    expect(dispatchHit(parent, layout, 'onClick', 70, 30, undefined, 50, 50n as unknown as number).handled).toBe(
+      true,
+    )
+    expect(hitPathAtPoint(parent, layout, 20, 30, 50, 50n as unknown as number)).toBeNull()
+    expect(hitPathAtPoint(parent, layout, 70, 30, 50, 50n as unknown as number)).toEqual([0])
+    expect(hasInteractiveHitAtPoint(parent, layout, 20, 30, 50, 50n as unknown as number)).toBe(false)
+    expect(hasInteractiveHitAtPoint(parent, layout, 70, 30, 50, 50n as unknown as number)).toBe(true)
+    expect(() => getCursorAtPoint(parent, layout, 70, 30, 50, 50n as unknown as number)).not.toThrow()
+    expect(getCursorAtPoint(parent, layout, 20, 30, 50, 50n as unknown as number)).toBeNull()
+    expect(getCursorAtPoint(parent, layout, 70, 30, 50, 50n as unknown as number)).toBe('pointer')
   })
 
   it('root offset + layout origin that sums to Infinity is a safe miss (pointInInclusiveLayoutRect non-finite abs guard)', () => {
