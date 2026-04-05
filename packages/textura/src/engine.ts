@@ -250,11 +250,12 @@ function buildNode(desc: LayoutNode): BuildResult {
         meta.lineCount = lineCount
         const height = lineCount * lineHeight
 
-        // Add a small buffer (ceil + 1px) to account for cross-platform
-        // font rendering differences between server (node-canvas) and
-        // browser canvas.  Without this, text can render wider than
-        // measured and get clipped by parent overflow:hidden.
-        const bufferedWidth = Math.ceil(contentWidth) + 1
+        // Buffer text width to account for font rendering differences
+        // between server (node-canvas) and browser canvas.  Server may
+        // lack the requested font (e.g. Inter) and fall back to a
+        // narrower system font, causing measured width to be too small.
+        // Without this, text gets clipped by parent overflow:hidden.
+        const bufferedWidth = Math.ceil(contentWidth * 1.15) + 2
 
         const reportedWidth =
           !shouldWrap

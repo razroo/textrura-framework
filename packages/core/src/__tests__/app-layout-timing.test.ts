@@ -1807,4 +1807,35 @@ describe('performance now helpers', () => {
       }
     }
   })
+
+  it('treats falsy globalThis.performance like missing (corrupt host / mistaken assignment)', () => {
+    for (const perf of [0, false, ''] as const) {
+      vi.stubGlobal('performance', perf as unknown as Performance)
+      try {
+        expect(safePerformanceNowMs()).toBe(0)
+        expect(readPerformanceNow()).toBe(0)
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    }
+  })
+
+  it('return 0 when performance.now is an accessor that throws (typeof invokes the getter)', () => {
+    vi.stubGlobal(
+      'performance',
+      Object.defineProperty({}, 'now', {
+        configurable: true,
+        enumerable: true,
+        get() {
+          throw new Error('now access denied')
+        },
+      }) as unknown as Performance,
+    )
+    try {
+      expect(safePerformanceNowMs()).toBe(0)
+      expect(readPerformanceNow()).toBe(0)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
 })
