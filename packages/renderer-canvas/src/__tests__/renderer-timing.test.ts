@@ -313,6 +313,62 @@ describe('CanvasRenderer.render wall time', () => {
     expect(renderer.lastRenderWallMs).toBeCloseTo(6, 5)
     spy.mockRestore()
   })
+
+  it('with layoutInspector, clamps HUD pre-paint ms to 0 when the middle performance.now is non-finite; final delta still uses the last sample', () => {
+    Object.defineProperty(globalThis, 'window', {
+      value: { devicePixelRatio: 1 },
+      configurable: true,
+      writable: true,
+    })
+    const ctx = new FakeCtx()
+    const fillText = vi.spyOn(ctx, 'fillText')
+    const canvas = {
+      style: {} as Record<string, string>,
+      getContext: () => ctx,
+    } as unknown as HTMLCanvasElement
+
+    const stamps = [100, Number.NaN, 107.25]
+    let i = 0
+    const spy = vi.spyOn(performance, 'now').mockImplementation(() => stamps[i++] ?? stamps[stamps.length - 1]!)
+
+    const renderer = new CanvasRenderer({ canvas, layoutInspector: true })
+    const tree = box({ width: 10, height: 10 })
+    const layout = { x: 0, y: 0, width: 10, height: 10, children: [] }
+
+    renderer.render(layout, tree)
+
+    expect(renderer.lastRenderWallMs).toBeCloseTo(7.25, 5)
+    const renderHudLine = fillText.mock.calls.find(args => String(args[0]).startsWith('render '))
+    expect(renderHudLine).toBeDefined()
+    expect(String(renderHudLine![0])).toBe('render 0.00ms')
+    spy.mockRestore()
+  })
+
+  it('with layoutInspector, records 0 lastRenderWallMs when the final performance.now is non-finite', () => {
+    Object.defineProperty(globalThis, 'window', {
+      value: { devicePixelRatio: 1 },
+      configurable: true,
+      writable: true,
+    })
+    const ctx = new FakeCtx()
+    const canvas = {
+      style: {} as Record<string, string>,
+      getContext: () => ctx,
+    } as unknown as HTMLCanvasElement
+
+    const stamps = [100, 102, Number.NaN]
+    let i = 0
+    const spy = vi.spyOn(performance, 'now').mockImplementation(() => stamps[i++] ?? stamps[stamps.length - 1]!)
+
+    const renderer = new CanvasRenderer({ canvas, layoutInspector: true })
+    const tree = box({ width: 10, height: 10 })
+    const layout = { x: 0, y: 0, width: 10, height: 10, children: [] }
+
+    renderer.render(layout, tree)
+
+    expect(renderer.lastRenderWallMs).toBe(0)
+    spy.mockRestore()
+  })
 })
 
 describe('CanvasRenderer layoutInspector inspectorProbe', () => {
