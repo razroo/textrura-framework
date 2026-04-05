@@ -35,6 +35,7 @@ fi
 # (@geometra/demo-terminal). The gate fails if `bun` is missing from PATH even when Node/npm work — install Bun or run
 # only the vitest segment locally when debugging. The allowlist evolves; read package.json instead of copying examples
 # from older prompts or transcripts.
+# CI runs the same gate: `.github/workflows/quality.yml` invokes `bun run release:gate` (match locally when validating).
 # Extend an allowlisted file when adding release-critical tests unless you intentionally widen the gate.
 # Layout/Yoga geometry regression: use `packages/core/src/__tests__/geometry-snapshot-ci.test.ts` (gate-listed)
 # and `GEOMETRY_SNAPSHOT_TESTING.md`; avoid unrelated snapshot churn unless widening the gate on purpose.

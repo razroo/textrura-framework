@@ -82,7 +82,13 @@ export interface FlexProps {
   display?: 'flex' | 'none'
 
   /**
-   * Per-node layout direction for Yoga (`setDirection`). `auto` maps to Yoga inherit (parent / root owner direction).
+   * Per-node layout direction for Yoga (`setDirection`).
+   *
+   * - `'ltr'` / `'rtl'` set an explicit direction on this node.
+   * - `'auto'` maps to Yoga **Inherit** (parent, then the root owner direction from `computeLayout` options).
+   * - Any other string still reaches the engine at runtime; values other than `'ltr'` / `'rtl'` are treated like
+   *   **Inherit** (same as `'auto'`). Geometra may forward unknown serialized `dir` strings on nested nodes for
+   *   this path while resolving interaction direction separately in core.
    */
   dir?: 'ltr' | 'rtl' | 'auto'
 }
