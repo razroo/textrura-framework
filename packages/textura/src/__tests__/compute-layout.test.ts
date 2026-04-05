@@ -607,6 +607,47 @@ describe('box layout', () => {
     }
   })
 
+  it('nested row with boxed-string dir inherits owner direction (strict equality; no String object coercion)', () => {
+    const bogus: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'column',
+      children: [
+        {
+          width: 200,
+          height: 40,
+          flexDirection: 'row',
+          gap: 10,
+          dir: 'bogus' as never,
+          children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+        },
+      ],
+    }
+    for (const boxed of [Object('rtl'), Object('ltr')] as const) {
+      const tree: BoxNode = {
+        width: 200,
+        height: 80,
+        flexDirection: 'column',
+        children: [
+          {
+            width: 200,
+            height: 40,
+            flexDirection: 'row',
+            gap: 10,
+            dir: boxed as never,
+            children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+          },
+        ],
+      }
+      for (const dir of ['ltr', 'rtl'] as const) {
+        const boxedRow = computeLayout(tree, { width: 200, height: 80, direction: dir }).children[0]!
+        const bogusRow = computeLayout(bogus, { width: 200, height: 80, direction: dir }).children[0]!
+        expect(boxedRow.children[0]!.x).toBe(bogusRow.children[0]!.x)
+        expect(boxedRow.children[1]!.x).toBe(bogusRow.children[1]!.x)
+      }
+    }
+  })
+
   it('nested row with explicit undefined dir matches omitting dir (engine skips setDirection when props.dir is undefined)', () => {
     const baseRow = {
       width: 200,
