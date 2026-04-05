@@ -222,7 +222,7 @@ export interface TexturaClient {
   layout: ComputedLayout | null
   /** Current tree (if received). */
   tree: UIElement | null
-  /** Disconnect from server (no reconnect). */
+  /** Disconnect from server (no reconnect). Idempotent — repeated calls are ignored. */
   close(): void
 }
 
@@ -371,6 +371,9 @@ export function applyServerMessage(
  * The client is a thin paint layer — all layout computation happens server-side.
  * Pointer events on the canvas are forwarded to the server for hit-testing.
  * Automatically reconnects on disconnect with exponential backoff.
+ *
+ * {@link TexturaClient.close} is idempotent: additional calls after the first are no-ops so hosts do not
+ * double-remove listeners or invoke {@link Renderer.destroy} twice.
  */
 export function createClient(options: TexturaClientOptions): TexturaClient {
   const url = options.url ?? 'ws://localhost:3100'
@@ -388,8 +391,12 @@ export function createClient(options: TexturaClientOptions): TexturaClient {
     layout: null,
     tree: null,
     close() {
+      if (closed) return
       closed = true
-      if (retryTimer) clearTimeout(retryTimer)
+      if (retryTimer) {
+        clearTimeout(retryTimer)
+        retryTimer = null
+      }
       ws.close()
       cleanup()
     },

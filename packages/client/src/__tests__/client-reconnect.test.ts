@@ -118,6 +118,72 @@ describe('client reconnect integration', () => {
     client.close()
   })
 
+  it('close() is idempotent (renderer.destroy runs once; no double cleanup)', async () => {
+    class MockWebSocket {
+      static CONNECTING = 0
+      static OPEN = 1
+      static CLOSING = 2
+      static CLOSED = 3
+      readyState = MockWebSocket.OPEN
+      private listeners = new Map<string, Array<(event?: unknown) => void>>()
+
+      constructor(_url: string) {
+        sockets.push(this)
+        setTimeout(() => this.emit('open'), 0)
+      }
+
+      addEventListener(type: string, cb: (event?: unknown) => void) {
+        const current = this.listeners.get(type) ?? []
+        current.push(cb)
+        this.listeners.set(type, current)
+      }
+
+      removeEventListener(type: string, cb: (event?: unknown) => void) {
+        const current = this.listeners.get(type) ?? []
+        this.listeners.set(type, current.filter(fn => fn !== cb))
+      }
+
+      send(_data: string) {}
+
+      close() {
+        this.readyState = MockWebSocket.CLOSED
+        this.emit('close', { code: 1000 })
+      }
+
+      emit(type: string, event: unknown = {}) {
+        for (const cb of this.listeners.get(type) ?? []) cb(event)
+      }
+    }
+
+    const sockets: MockWebSocket[] = []
+    globalThis.WebSocket = MockWebSocket as unknown as typeof WebSocket
+
+    const destroy = vi.fn()
+    const renderer: Renderer = {
+      render: () => {},
+      destroy,
+    }
+
+    const client = createClient({
+      url: 'ws://mock.test',
+      renderer,
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+    })
+
+    await vi.runAllTimersAsync()
+    expect(sockets).toHaveLength(1)
+
+    client.close()
+    client.close()
+    client.close()
+
+    expect(destroy).toHaveBeenCalledTimes(1)
+  })
+
   it('reconnect decodes GEOM v1 binary frames on the new socket when binaryFraming is enabled', async () => {
     class MockWebSocket {
       static CONNECTING = 0
