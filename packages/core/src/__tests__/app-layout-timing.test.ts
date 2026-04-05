@@ -1744,6 +1744,13 @@ describe('performance now helpers', () => {
     obj.mockRestore()
   })
 
+  it('safePerformanceNowMs and readPerformanceNow return 0 when now returns a symbol (typeof guard)', () => {
+    const spy = vi.spyOn(performance, 'now').mockReturnValue(Symbol('t') as unknown as number)
+    expect(safePerformanceNowMs()).toBe(0)
+    expect(readPerformanceNow()).toBe(0)
+    spy.mockRestore()
+  })
+
   it('safePerformanceNowMs and readPerformanceNow return 0 when now returns a boxed number (typeof is object; no ToNumber)', () => {
     const spy = vi.spyOn(performance, 'now').mockImplementation(() => Object(12.5) as unknown as number)
     expect(Number.isFinite(Object(12.5) as unknown as number)).toBe(false)
