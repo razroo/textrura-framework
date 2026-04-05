@@ -52,24 +52,34 @@ function getChildrenByZAsc(boxEl: BoxElement): number[] {
     return asc
   }
 
-  // Three children with identical z-index: stable paint order matches source order; avoid map/sort allocations.
-  if (n === 3) {
+  // Three+ children sharing one z-index: stable paint order matches source order; avoid map/sort allocations.
+  if (n >= 3) {
     const z0 = zIndexOf(boxEl.children[0]!)
-    const z1 = zIndexOf(boxEl.children[1]!)
-    const z2 = zIndexOf(boxEl.children[2]!)
-    if (z0 === z1 && z1 === z2) {
-      const cached = zIndexOrderCache.get(boxEl)
-      if (
-        cached &&
-        cached.zValues.length === 3 &&
-        cached.zValues[0] === z0 &&
-        cached.zValues[1] === z1 &&
-        cached.zValues[2] === z2
-      ) {
-        return cached.asc
+    let allEqual = true
+    for (let i = 1; i < n; i++) {
+      if (zIndexOf(boxEl.children[i]!) !== z0) {
+        allEqual = false
+        break
       }
-      const zValues = [z0, z1, z2]
-      const asc = [0, 1, 2]
+    }
+    if (allEqual) {
+      const cached = zIndexOrderCache.get(boxEl)
+      if (cached && cached.zValues.length === n) {
+        let match = true
+        for (let j = 0; j < n; j++) {
+          if (cached.zValues[j] !== z0) {
+            match = false
+            break
+          }
+        }
+        if (match) return cached.asc
+      }
+      const zValues = new Array<number>(n)
+      const asc = new Array<number>(n)
+      for (let i = 0; i < n; i++) {
+        zValues[i] = z0
+        asc[i] = i
+      }
       zIndexOrderCache.set(boxEl, { zValues, asc })
       return asc
     }

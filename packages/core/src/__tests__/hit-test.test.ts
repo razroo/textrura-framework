@@ -1487,7 +1487,7 @@ describe('dispatchHit', () => {
     expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(true)
   })
 
-  it('overlapping siblings: equal z-index on four children prefers last source order (map/sort path, not n≤3 fast paths)', () => {
+  it('overlapping siblings: equal z-index on four children prefers last source order (identical-z fast path, stable source order)', () => {
     const log: string[] = []
     const a = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('a') } })
     const b = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('b') } })
@@ -1513,7 +1513,7 @@ describe('dispatchHit', () => {
     expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(true)
   })
 
-  it('overlapping siblings: three children with partial z-index ties still prefer highest z (general sort path, not triple-equal fast path)', () => {
+  it('overlapping siblings: three children with partial z-index ties still prefer highest z (general sort path, not identical-z fast path)', () => {
     const log: string[] = []
     const lowA = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('lowA') } })
     const lowB = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('lowB') } })
