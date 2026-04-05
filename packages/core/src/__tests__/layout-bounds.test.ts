@@ -547,6 +547,17 @@ describe('finiteRootExtent', () => {
     expect(finiteRootExtent(Number.MIN_VALUE)).toBe(Number.MIN_VALUE)
     expect(finiteRootExtent(Number.MAX_VALUE)).toBe(Number.MAX_VALUE)
   })
+
+  it('returns undefined when the value overflows double range (JSON exponent edge cases)', () => {
+    const posOverflow = Number.parseFloat('1e400')
+    const negOverflow = Number.parseFloat('-1e400')
+    expect(posOverflow).toBe(Infinity)
+    expect(negOverflow).toBe(-Infinity)
+    expect(finiteRootExtent(posOverflow)).toBeUndefined()
+    expect(finiteRootExtent(negOverflow)).toBeUndefined()
+    expect(Number.MAX_VALUE * 2).toBe(Infinity)
+    expect(finiteRootExtent(Number.MAX_VALUE * 2)).toBeUndefined()
+  })
 })
 
 describe('finiteNumberOrZero', () => {
