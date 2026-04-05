@@ -57,6 +57,11 @@ async function main() {
 
   const seen = new Map()
   for (const rel of paths) {
+    if (rel.includes('\\')) {
+      throw new Error(
+        `release:gate: vitest allowlist paths must use forward slashes (POSIX); backslashes break duplicate resolution and cross-platform CI: ${rel}`,
+      )
+    }
     if (!rel.includes('/src/__tests__/')) {
       throw new Error(
         `release:gate: vitest allowlist paths must live under packages/<pkg>/src/__tests__/ (got: ${rel})`,
