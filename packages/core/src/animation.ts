@@ -372,6 +372,9 @@ export function spring(
  * Run a raw animation loop. The callback receives delta time in seconds.
  * Return `false` from the callback to stop. Returns a stop function that is safe
  * to call multiple times (only the first call cancels a pending frame).
+ *
+ * When `Date.now()` moves backward (clock skew, sleep/wake, manual adjustment), `dt` is clamped to `0`
+ * so callbacks never see a negative delta.
  */
 export function animationLoop(callback: (dt: number) => boolean): () => void {
   let lastTime = Date.now()
@@ -381,7 +384,7 @@ export function animationLoop(callback: (dt: number) => boolean): () => void {
   function tick() {
     if (!running) return
     const now = Date.now()
-    const dt = (now - lastTime) / 1000
+    const dt = Math.max(0, (now - lastTime) / 1000)
     lastTime = now
     if (callback(dt) !== false) {
       id = raf(tick) as unknown as number

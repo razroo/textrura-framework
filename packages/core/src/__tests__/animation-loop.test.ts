@@ -47,6 +47,46 @@ describe('animationLoop', () => {
     expect(dts[3]).toBeCloseTo(0.05, 6)
   })
 
+  it('clamps negative elapsed time to zero when the clock moves backward between ticks', async () => {
+    const pending: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      pending.push(cb)
+      return pending.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    let mockNow = 10_000
+    vi.spyOn(Date, 'now').mockImplementation(() => mockNow)
+
+    const animationLoop = await loadAnimationLoop()
+    const dts: number[] = []
+    let frames = 0
+
+    animationLoop(dt => {
+      dts.push(dt)
+      frames++
+      if (frames === 1) {
+        mockNow += 100
+      } else if (frames === 2) {
+        mockNow -= 500
+      } else {
+        mockNow += 50
+      }
+      return frames < 4
+    })
+
+    while (pending.length) {
+      const batch = pending.splice(0, pending.length)
+      for (const cb of batch) cb(0)
+    }
+
+    expect(frames).toBe(4)
+    expect(dts[0]).toBe(0)
+    expect(dts[1]).toBeCloseTo(0.1, 6)
+    expect(dts[2]).toBe(0)
+    expect(dts[3]).toBeCloseTo(0.05, 6)
+  })
+
   it('returning false on the first tick does not schedule another frame', async () => {
     const pending: FrameRequestCallback[] = []
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
