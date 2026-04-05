@@ -135,6 +135,17 @@ describe('streamText', () => {
     expect(s.signal.peek()).toBe('keep')
   })
 
+  it('ignores non-string set after append without clearing the pending buffer (microtask flush still runs)', async () => {
+    const s = streamText()
+    s.append('queued')
+    s.set(null as unknown as string)
+    s.set(0n as unknown as string)
+    expect(s.signal.peek()).toBe('')
+    await Promise.resolve()
+    expect(s.value).toBe('queued')
+    expect(s.signal.peek()).toBe('queued')
+  })
+
   it('clear before pending microtask flush leaves empty value (buffer and signal stay aligned)', async () => {
     const s = streamText()
     s.append('gone')
