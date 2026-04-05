@@ -730,6 +730,14 @@ describe('hasFocusCandidateHandlers', () => {
     expect(hasFocusCandidateHandlers({ onClick: undefined, onKeyDown: noop })).toBe(true)
   })
 
+  it('treats falsy non-function handler values as absent (corrupt or loosely typed runtime maps)', () => {
+    expect(hasFocusCandidateHandlers({ onClick: 0 as never })).toBe(false)
+    expect(hasFocusCandidateHandlers({ onClick: false as never })).toBe(false)
+    expect(hasFocusCandidateHandlers({ onClick: '' as never })).toBe(false)
+    expect(hasFocusCandidateHandlers({ onKeyDown: null as never })).toBe(false)
+    expect(hasFocusCandidateHandlers({ onKeyUp: 0n as never })).toBe(false)
+  })
+
   it('reads focus handlers from a null-prototype object (e.g. Object.assign onto Object.create(null))', () => {
     const handlers = Object.assign(Object.create(null), { onKeyDown: noop }) as EventHandlers
     expect(Object.getPrototypeOf(handlers)).toBeNull()
