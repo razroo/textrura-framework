@@ -325,6 +325,13 @@ describe('toLayoutTree', () => {
     expect(childLayout).toMatchObject({ width: 50, height: 50, dir: 'rtl' })
   })
 
+  it('forwards unknown dir strings on nested boxes verbatim (Textura treats non-ltr/rtl as Inherit)', () => {
+    const inner = box({ width: 50, height: 50, dir: 'sideways-lr' as never })
+    const root = box({ width: 100, height: 100 }, [inner])
+    const layout = toLayoutTree(root) as BoxLayoutNode
+    expect(layout.children[0]).toMatchObject({ width: 50, height: 50, dir: 'sideways-lr' })
+  })
+
   it('omits root dir:auto and forwards dir:auto on descendants for Yoga inherit semantics', () => {
     const inner = box({ width: 50, height: 50, dir: 'auto' })
     const root = box({ width: 100, height: 100, dir: 'auto' }, [inner])

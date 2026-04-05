@@ -53,8 +53,9 @@ function stripStyleProps(props: Record<string, unknown>): Record<string, unknown
  * The layout **root** omits `dir` so {@link import('./app.js').createApp}'s
  * {@link import('./app.js').AppOptions.layoutDirection} (or the root element’s resolved `dir` when that
  * option is omitted) stays the single source of truth for the Yoga owner direction passed to Textura.
- * Descendant nodes forward `dir` (`ltr` | `rtl` | `auto`) into Textura for per-subtree flex direction;
- * interaction helpers still resolve direction with {@link import('./direction.js').resolveElementDirection}.
+ * Descendant nodes forward `dir` (`ltr` | `rtl` | `auto`, or malformed strings from bad serialization) into Textura
+ * for per-subtree flex direction; Textura maps non-`ltr` / non-`rtl` values to Yoga **Inherit** (same as `auto`).
+ * Interaction helpers still resolve direction with {@link import('./direction.js').resolveElementDirection}.
  *
  * Does not mutate the source element or its `props` (strip list is applied to a shallow copy).
  *
