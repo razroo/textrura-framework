@@ -117,6 +117,37 @@ describe('diffLayout', () => {
     }
     expect(diffLayout(prev, next)).toEqual([])
   })
+
+  it('diffs root-only layouts (empty children) in one patch at path []', () => {
+    const prev: TestLayout = { x: 0, y: 0, width: 100, height: 50, children: [] }
+    const next: TestLayout = { x: 1, y: 2, width: 100, height: 60, children: [] }
+    expect(diffLayout(prev, next)).toEqual([{ path: [], x: 1, y: 2, height: 60 }])
+  })
+
+  it('returns no patches for identical root-only layouts', () => {
+    const leaf: TestLayout = { x: 10, y: 20, width: 200, height: 40, children: [] }
+    expect(diffLayout(leaf, { ...leaf })).toEqual([])
+  })
+
+  it('diffs a single-child subtree whose leaves have empty children', () => {
+    const prev: TestLayout = {
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 200,
+      children: [{ x: 5, y: 5, width: 90, height: 30, children: [] }],
+    }
+    const next: TestLayout = {
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 200,
+      children: [{ x: 5, y: 8, width: 91, height: 30, children: [] }],
+    }
+    expect(diffLayout(prev, next)).toEqual([
+      { path: [0], y: 8, width: 91 },
+    ])
+  })
 })
 
 describe('isProtocolCompatible', () => {
