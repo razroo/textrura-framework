@@ -264,6 +264,19 @@ describe('streamText', () => {
     expect(s.streaming).toBe(false)
   })
 
+  it('second consecutive done() does not notify streamingSignal subscribers again', () => {
+    const s = streamText()
+    const streamingRuns: boolean[] = []
+    effect(() => {
+      streamingRuns.push(s.streamingSignal.value)
+    })
+    expect(streamingRuns).toEqual([true])
+    s.done()
+    expect(streamingRuns).toEqual([true, false])
+    s.done()
+    expect(streamingRuns).toEqual([true, false])
+  })
+
   it('set() then append() coalesces the combined buffer in one microtask update', async () => {
     const s = streamText()
     s.set('hello ')
