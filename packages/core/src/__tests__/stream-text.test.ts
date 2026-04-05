@@ -88,4 +88,50 @@ describe('streamText', () => {
     await Promise.resolve()
     expect(s.value).toBe('x')
   })
+
+  it('done() on an empty stream sets streaming false without changing value', () => {
+    const s = streamText()
+    s.done()
+    expect(s.value).toBe('')
+    expect(s.streaming).toBe(false)
+  })
+
+  it('idempotent done() leaves value and streaming false', () => {
+    const s = streamText()
+    s.append('x')
+    s.done()
+    expect(s.value).toBe('x')
+    expect(s.streaming).toBe(false)
+    s.done()
+    expect(s.value).toBe('x')
+    expect(s.streaming).toBe(false)
+  })
+
+  it('set() then append() coalesces the combined buffer in one microtask update', async () => {
+    const s = streamText()
+    s.set('hello ')
+    s.append('world')
+    expect(s.signal.peek()).toBe('hello ')
+    await Promise.resolve()
+    expect(s.value).toBe('hello world')
+  })
+
+  it('append() then set() before microtask replaces buffer and drops pending chunks from the signal', async () => {
+    const s = streamText()
+    s.append('gone')
+    s.set('replaced')
+    expect(s.signal.peek()).toBe('replaced')
+    await Promise.resolve()
+    expect(s.value).toBe('replaced')
+  })
+
+  it('append after done() still updates text (callers may clear() to start a new stream)', async () => {
+    const s = streamText()
+    s.done()
+    expect(s.streaming).toBe(false)
+    s.append('late')
+    await Promise.resolve()
+    expect(s.value).toBe('late')
+    expect(s.streaming).toBe(false)
+  })
 })
