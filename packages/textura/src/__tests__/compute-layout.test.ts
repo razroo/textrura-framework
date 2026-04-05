@@ -282,6 +282,44 @@ describe('box layout', () => {
     expect(result.children[1]!.x).toBe(0)
   })
 
+  it('column-reverse stacks children from the bottom (main axis reversed) while dir rtl keeps cross-axis start on the right', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 100,
+      flexDirection: 'column-reverse',
+      alignItems: 'flex-start',
+      dir: 'rtl',
+      children: [
+        { width: 50, height: 30 },
+        { width: 50, height: 30 },
+      ],
+    }
+    const result = computeLayout(tree, { width: 200, height: 100, direction: 'ltr' })
+    expect(result.children[0]!.x).toBe(150)
+    expect(result.children[0]!.y).toBe(70)
+    expect(result.children[1]!.x).toBe(150)
+    expect(result.children[1]!.y).toBe(40)
+  })
+
+  it('column-reverse with dir ltr aligns flex-start children on the left and reverses main-axis order', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 100,
+      flexDirection: 'column-reverse',
+      alignItems: 'flex-start',
+      dir: 'ltr',
+      children: [
+        { width: 50, height: 30 },
+        { width: 50, height: 30 },
+      ],
+    }
+    const result = computeLayout(tree, { width: 200, height: 100, direction: 'ltr' })
+    expect(result.children[0]!.x).toBe(0)
+    expect(result.children[0]!.y).toBe(70)
+    expect(result.children[1]!.x).toBe(0)
+    expect(result.children[1]!.y).toBe(40)
+  })
+
   it('nested column with dir auto inherits rtl owner direction for cross-axis flex-start (matches explicit dir rtl)', () => {
     const tree: BoxNode = {
       width: 200,
