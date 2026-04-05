@@ -547,6 +547,59 @@ describe('createApp layout timing', () => {
     expect(render).toHaveBeenCalled()
   })
 
+  it('invokes onError when setFrameTimings throws before render; render is skipped on the first frame', async () => {
+    const onError = vi.fn()
+    const err = new Error('setFrameTimings failed')
+    const renderer: Renderer = {
+      setFrameTimings() {
+        throw err
+      },
+      render: vi.fn(),
+      destroy: vi.fn(),
+    }
+
+    await createApp(() => box({ width: 10, height: 10 }, []), renderer, {
+      width: 100,
+      height: 50,
+      onError,
+    })
+
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(onError).toHaveBeenCalledWith(err)
+    expect(renderer.render).not.toHaveBeenCalled()
+  })
+
+  it('keeps the last committed tree and layout when setFrameTimings throws during a reactive update', async () => {
+    const onError = vi.fn()
+    const width = signal(40)
+    let timingsCalls = 0
+    const renderer: Renderer = {
+      setFrameTimings() {
+        timingsCalls++
+        if (timingsCalls > 1) throw new Error('second timings failed')
+      },
+      render: vi.fn(),
+      destroy: vi.fn(),
+    }
+
+    const app = await createApp(() => box({ width: width.value, height: 20 }, []), renderer, {
+      width: 100,
+      height: 50,
+      onError,
+    })
+
+    expect(timingsCalls).toBe(1)
+    expect(renderer.render).toHaveBeenCalledTimes(1)
+    expect((app.tree!.props as { width: number }).width).toBe(40)
+
+    width.set(44)
+    expect(timingsCalls).toBe(2)
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(renderer.render).toHaveBeenCalledTimes(1)
+    expect((app.tree!.props as { width: number }).width).toBe(40)
+    expect(app.layout).not.toBeNull()
+  })
+
   it('passes layoutMs 0 for setFrameTimings when global performance is undefined', async () => {
     vi.stubGlobal('performance', undefined)
     try {
