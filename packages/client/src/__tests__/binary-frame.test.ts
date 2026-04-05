@@ -220,7 +220,7 @@ describe('client binary frame decode', () => {
     expect(decodeBinaryFrameJson(u32)).toBe(json)
   })
 
-  it('decodes a v1 frame when the same bytes are exposed as Int16Array, Int32Array, or BigUint64Array', () => {
+  it('decodes a v1 frame when the same bytes are exposed as Int16Array, Int32Array, BigInt64Array, or BigUint64Array', () => {
     const json = '{"type":"patch","patches":[]}'
     const frame = new Uint8Array(encodeBinaryFrameJsonV1(json))
 
@@ -241,6 +241,9 @@ describe('client binary frame decode', () => {
     const len64 = Math.ceil(frame.byteLength / 8) * 8
     const buf64 = new ArrayBuffer(len64)
     new Uint8Array(buf64).set(frame)
+    const i64 = new BigInt64Array(buf64)
+    expect(isBinaryFrameArrayBuffer(i64)).toBe(true)
+    expect(decodeBinaryFrameJson(i64)).toBe(json)
     const u64 = new BigUint64Array(buf64)
     expect(isBinaryFrameArrayBuffer(u64)).toBe(true)
     expect(decodeBinaryFrameJson(u64)).toBe(json)
