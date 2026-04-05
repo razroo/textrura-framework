@@ -123,6 +123,40 @@ describe('box layout', () => {
     expect(row.children[0]!.x).toBeLessThan(row.children[1]!.x)
   })
 
+  it('column with dir rtl aligns flex-start children to the cross-axis start (physical right under ltr owner)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 100,
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      dir: 'rtl',
+      children: [
+        { width: 50, height: 30 },
+        { width: 50, height: 30 },
+      ],
+    }
+    const result = computeLayout(tree, { width: 200, height: 100, direction: 'ltr' })
+    expect(result.children[0]!.x).toBe(150)
+    expect(result.children[1]!.x).toBe(150)
+  })
+
+  it('column with dir ltr keeps flex-start children on the left cross-axis start', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 100,
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      dir: 'ltr',
+      children: [
+        { width: 50, height: 30 },
+        { width: 50, height: 30 },
+      ],
+    }
+    const result = computeLayout(tree, { width: 200, height: 100, direction: 'ltr' })
+    expect(result.children[0]!.x).toBe(0)
+    expect(result.children[1]!.x).toBe(0)
+  })
+
   it('row layout with gap', () => {
     const tree: BoxNode = {
       width: 300,
