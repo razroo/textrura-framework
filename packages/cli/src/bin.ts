@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { viewInTerminal } from './viewer.js'
+import { TerminalCompositor } from './compositor.js'
 
 const url = process.argv[2]
 
@@ -22,7 +23,7 @@ if (url.startsWith('ws://') || url.startsWith('wss://')) {
   process.on('SIGINT', () => { viewer.close(); process.exit(0) })
   process.on('SIGTERM', () => { viewer.close(); process.exit(0) })
 } else {
-  // HTTP(S) URL — discover Geometra WebSocket endpoints
+  // HTTP(S) URL — discover all Geometra WebSocket endpoints and composite
   ;(async () => {
     const parsed = new URL(url)
     const wsProto = parsed.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -32,18 +33,17 @@ if (url.startsWith('ws://') || url.startsWith('wss://')) {
     console.error(`Discovering Geometra views at ${parsed.host}...`)
 
     const paths = new Set<string>()
+    let m: RegExpExecArray | null
 
     try {
-      // Fetch HTML and scan for WS paths + JS bundle URLs
       const res = await fetch(url)
       const html = await res.text()
 
       // Scan HTML for WS paths
-      const wsPathRe = /["'`](\/geometra-ws[^"'`]*?)["'`]/g
-      let m: RegExpExecArray | null
+      const wsPathRe = /(\/geometra-ws(?:-[a-z]+)*)/g
       while ((m = wsPathRe.exec(html)) !== null) paths.add(m[1]!)
 
-      // Fetch and scan JS bundles referenced in the HTML
+      // Fetch and scan JS bundles
       const scriptRe = /src=["']([^"']+\.js)["']/g
       const scriptUrls: string[] = []
       while ((m = scriptRe.exec(html)) !== null) {
@@ -55,20 +55,15 @@ if (url.startsWith('ws://') || url.startsWith('wss://')) {
         try {
           const jsRes = await fetch(jsUrl)
           const js = await jsRes.text()
-          // Match /geometra-ws paths anywhere — they may appear inside
-          // template literals like `${var}/geometra-ws-header`
           const jsWsRe = /(\/geometra-ws(?:-[a-z]+)*)/g
           while ((m = jsWsRe.exec(js)) !== null) paths.add(m[1]!)
-        } catch { /* skip failed JS fetches */ }
+        } catch { /* skip */ }
       }
     } catch {
       console.error('Could not fetch page HTML.')
     }
 
-    // Fallback: try well-known Geometra paths
-    if (paths.size === 0) {
-      paths.add('/geometra-ws')
-    }
+    if (paths.size === 0) paths.add('/geometra-ws')
 
     // Sort: header → main → hud → below
     const sorted = [...paths].sort((a, b) => {
@@ -80,14 +75,13 @@ if (url.startsWith('ws://') || url.startsWith('wss://')) {
       return order(a) - order(b)
     })
 
+    const wsUrls = sorted.map(p => `${baseWs}${p}`)
     console.error(`Found ${sorted.length} view(s): ${sorted.join(', ')}`)
 
-    const viewers = sorted.map(path => viewInTerminal({
-      url: `${baseWs}${path}`,
-      height: Math.max(8, Math.floor((process.stdout.rows || 40) / sorted.length)),
-    }))
+    const compositor = new TerminalCompositor(wsUrls)
+    compositor.start()
 
-    process.on('SIGINT', () => { viewers.forEach(v => v.close()); process.exit(0) })
-    process.on('SIGTERM', () => { viewers.forEach(v => v.close()); process.exit(0) })
+    process.on('SIGINT', () => { compositor.close(); process.exit(0) })
+    process.on('SIGTERM', () => { compositor.close(); process.exit(0) })
   })()
 }
