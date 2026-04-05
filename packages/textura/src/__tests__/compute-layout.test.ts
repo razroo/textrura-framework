@@ -853,3 +853,11 @@ describe('text layout (Pretext + canvas measureText)', () => {
     expect(result.children[1]!.x).toBe(40)
   })
 })
+
+describe('engine init contract', () => {
+  it('computeLayout throws a clear error when Yoga config is missing (caller must init after destroy)', async () => {
+    destroy()
+    expect(() => computeLayout({ width: 1, height: 1 })).toThrow(/textura: call init\(\) first/)
+    await init()
+  })
+})
