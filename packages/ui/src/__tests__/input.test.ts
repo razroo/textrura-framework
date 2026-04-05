@@ -505,6 +505,43 @@ describe('@geometra/ui input', () => {
     expect(selectAllCalled).toBe(true)
   })
 
+  it('does not throw when key is nullish or non-string under Ctrl/Meta; skips select-all and forwards to onKeyDown', () => {
+    const order: string[] = []
+    const el = input('x', 'f', {
+      focused: true,
+      onSelectAll: () => order.push('selectAll'),
+      onKeyDown: () => order.push('keyDown'),
+    })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+
+    const base = {
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: true,
+      metaKey: false,
+      altKey: false,
+      target: {} as KeyboardHitEvent['target'],
+    }
+
+    expect(() =>
+      el.handlers?.onKeyDown?.({ ...base, key: undefined as never }),
+    ).not.toThrow()
+    expect(order).toEqual(['keyDown'])
+    order.length = 0
+
+    expect(() =>
+      el.handlers?.onKeyDown?.({ ...base, key: null as never }),
+    ).not.toThrow()
+    expect(order).toEqual(['keyDown'])
+    order.length = 0
+
+    expect(() =>
+      el.handlers?.onKeyDown?.({ ...base, key: 65 as never }),
+    ).not.toThrow()
+    expect(order).toEqual(['keyDown'])
+  })
+
   it('calls onSelectAll when key is uppercase A under Ctrl/Meta (normalizes with toLowerCase)', () => {
     const order: string[] = []
     const el = input('x', 'f', {
