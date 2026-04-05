@@ -57,12 +57,16 @@ export function streamText(initial = ''): StreamText {
   const streamingState = signal(true)
   let buffer = seed
   let flushScheduled = false
+  /** Bumped by `clear()` / `done()` so an in-queue coalesce microtask cannot run after a synchronous buffer flush. */
+  let flushGeneration = 0
 
   function scheduleFlush(): void {
     if (flushScheduled) return
     flushScheduled = true
+    const generation = flushGeneration
     queueMicrotask(() => {
       flushScheduled = false
+      if (generation !== flushGeneration) return
       batch(() => {
         s.set(buffer)
       })
@@ -85,11 +89,15 @@ export function streamText(initial = ''): StreamText {
       s.set(text)
     },
     clear(): void {
+      flushGeneration++
+      flushScheduled = false
       buffer = ''
       s.set('')
       streamingState.set(true)
     },
     done(): void {
+      flushGeneration++
+      flushScheduled = false
       // Flush any remaining buffered text synchronously
       if (buffer !== s.peek()) {
         s.set(buffer)

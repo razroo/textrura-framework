@@ -175,6 +175,25 @@ describe('streamText', () => {
     expect(s.value).toBe('')
   })
 
+  it('clear() drops a pending coalesce microtask so a later append can schedule a fresh flush', async () => {
+    const s = streamText()
+    s.append('gone')
+    s.clear()
+    s.append('kept')
+    await Promise.resolve()
+    expect(s.value).toBe('kept')
+  })
+
+  it('done() then synchronous append still flushes; pre-done coalesce microtask must not block scheduling', async () => {
+    const s = streamText()
+    s.append('a')
+    s.done()
+    expect(s.value).toBe('a')
+    s.append('b')
+    await Promise.resolve()
+    expect(s.value).toBe('ab')
+  })
+
   it('done() on an empty stream sets streaming false without changing value', () => {
     const s = streamText()
     s.done()
