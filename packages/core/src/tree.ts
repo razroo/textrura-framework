@@ -9,8 +9,9 @@ import type { UIElement } from './types.js'
  *
  * `overflow`, `scrollX`, and `scrollY` stay on the **live** {@link UIElement} tree for
  * {@link import('./hit-test.js').dispatchHit}, canvas/terminal paint, and {@link import('./selection.js').collectTextNodes},
- * but are omitted here so the Textura snapshot stays a pure flex/measure input. Geometra applies clipping and scroll
- * offsets in interaction and renderer code instead of threading these props through Yoga/WASM for layout.
+ * but are omitted here so the Textura snapshot stays a pure flex/measure input. Scroll offsets and parent-bounds
+ * containment come from the live tree in hit-testing/selection; renderers apply `overflow` clip modes when painting
+ * instead of threading these props through Yoga/WASM for layout.
  */
 function stripStyleProps(props: Record<string, unknown>): Record<string, unknown> {
   const layoutProps = { ...props }
@@ -56,8 +57,8 @@ function stripStyleProps(props: Record<string, unknown>): Record<string, unknown
  * Remaining props are flex and sizing fields that belong in the layout pipeline.
  *
  * Although Textura’s flex props include `overflow`, Geometra does **not** forward it (or scroll offsets) into the
- * layout snapshot: clipping and scroll translation are handled in hit-testing and backends using the live tree,
- * keeping Yoga output aligned with the same geometry those paths consume.
+ * layout snapshot: scroll translation and parent rect gates use the live tree for interaction; backends clip paint from
+ * `overflow`; Yoga output stays aligned with the layout geometry those paths consume.
  *
  * The layout **root** omits `dir` so {@link import('./app.js').createApp}'s
  * {@link import('./app.js').AppOptions.layoutDirection} (or the root element’s resolved `dir` when that

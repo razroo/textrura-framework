@@ -355,8 +355,8 @@ export function hasInteractiveHitAtPoint(
 
 /**
  * Root-anchored containment for {@link hitPathAtPoint} and {@link getCursorAtPoint}: finite pointer coords,
- * finite layout bounds, then the same inclusive rect test as {@link collectHits} (scroll clipping uses the
- * parent’s layout rect; child coordinates apply scroll in the recursive walk).
+ * finite layout bounds, then the same inclusive rect test as {@link collectHits} (parent layout rect per
+ * level; child coordinates subtract this box’s `scrollX`/`scrollY` in the recursive walk).
  * Returns the node’s absolute origin `(absX, absY)` when the point hits the layout rect.
  */
 function rootedLayoutPointContainment(
@@ -432,7 +432,7 @@ export function hitPathAtPoint(
 /**
  * Resolve the deepest `cursor` style at `(x, y)`.
  *
- * Walk follows the same scroll and overflow clipping rules as {@link dispatchHit}. {@link hitPathAtPoint} only
+ * Walk follows the same parent-bounds and scroll-offset rules as {@link dispatchHit}. {@link hitPathAtPoint} only
  * returns box index paths, but cursor resolution also considers `text`, `image`, and `scene3d` nodes: when the point is inside
  * such a leaf’s layout and it is not `pointerEvents: 'none'`, its {@link import('./types.js').StyleProps.cursor}
  * is used (including a lone `text` / `image` / `scene3d` tree root). Boxes and leaves with `pointerEvents: 'none'` are skipped so hits

@@ -56,14 +56,16 @@ export interface StyleProps {
    */
   pointerEvents?: 'auto' | 'none'
   /**
-   * Overflow behavior for children. `hidden` and `scroll` clip hit-testing to the parent rect before
-   * descending; `visible` (or omitted) still requires the pointer to lie inside the parent’s layout bounds
-   * to reach descendants — geometry that paints outside the parent is not hit-tested from this ancestor.
+   * Renderer clip mode: `hidden` and `scroll` clip descendant paint to this box in canvas/terminal backends;
+   * `visible` (or omitted) does not clip paint.
+   *
+   * Hit-testing gates on the parent layout rect for every mode and does not branch on `overflow`; `scrollX` /
+   * `scrollY` shift child geometry under this box.
    */
   overflow?: 'visible' | 'hidden' | 'scroll'
-  /** Horizontal scroll offset (used with overflow: 'scroll'). */
+  /** Horizontal content scroll offset (hit-testing, selection walks, and paint). */
   scrollX?: number
-  /** Vertical scroll offset (used with overflow: 'scroll'). */
+  /** Vertical content scroll offset (hit-testing, selection walks, and paint). */
   scrollY?: number
   /** Box shadow. */
   boxShadow?: { offsetX: number; offsetY: number; blur: number; color: string }
