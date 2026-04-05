@@ -2,6 +2,8 @@
 
 **The Singularity Frontend Framework**
 
+> **AI Agents:** See [`llms.txt`](llms.txt) for a structured overview of the entire framework — architecture, props, components, protocols, and APIs.
+
 **[Live Demo](https://razroo.github.io/geometra)** | **[npm](https://www.npmjs.com/org/geometra)** | **[GitHub](https://github.com/razroo/geometra)** | **[Auth](https://github.com/razroo/geometra-auth)** | **[Token Registry](https://github.com/razroo/geometra-token-registry)**
 
 https://github.com/user-attachments/assets/1610d856-3c7d-4fce-be42-1c43306e6520
