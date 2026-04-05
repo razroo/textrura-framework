@@ -36,6 +36,28 @@ describe('toSemanticHTML', () => {
     expect(toSemanticHTML(el, { lang: Object('fr-CA') as never })).toContain('<html lang="en">')
   })
 
+  it('emits document dir on the root html element when options.dir is ltr, rtl, or auto', () => {
+    const el = box({ width: 100, height: 100 })
+    expect(toSemanticHTML(el, { dir: 'rtl' })).toContain('<html lang="en" dir="rtl">')
+    expect(toSemanticHTML(el, { dir: 'ltr' })).toContain('<html lang="en" dir="ltr">')
+    expect(toSemanticHTML(el, { dir: 'auto' })).toContain('<html lang="en" dir="auto">')
+  })
+
+  it('combines custom lang with document dir on the root html element', () => {
+    const el = box({ width: 100, height: 100 })
+    expect(toSemanticHTML(el, { lang: 'ar', dir: 'rtl' })).toContain('<html lang="ar" dir="rtl">')
+  })
+
+  it('omits document dir when options.dir is not an exact primitive (parity with element dir)', () => {
+    const el = box({ width: 100, height: 100 })
+    expect(toSemanticHTML(el, { dir: ' rtl ' as never })).toContain('<html lang="en">\n')
+    expect(toSemanticHTML(el, { dir: Object('rtl') as never })).toContain('<html lang="en">\n')
+    expect(toSemanticHTML(el, { dir: undefined })).toContain('<html lang="en">\n')
+    expect(toSemanticHTML(el, { dir: 'sideways-lr' as never })).toContain('<html lang="en">\n')
+    expect(toSemanticHTML(el, { dir: null as never })).toContain('<html lang="en">\n')
+    expect(toSemanticHTML(el, { dir: 0 as never })).toContain('<html lang="en">\n')
+  })
+
   it('ignores non-string head/meta option values at runtime (no throw; matches lang guard)', () => {
     const el = box({ width: 100, height: 100 })
     expect(() =>

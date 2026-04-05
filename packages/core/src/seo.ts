@@ -9,6 +9,14 @@ export interface SemanticHTMLOptions {
    * `null`, and other shapes fall back to `en` so corrupt options never reach the internal `escapeHTML` path.
    */
   lang?: string
+  /**
+   * Document text direction for the root `<html dir="...">` attribute (optional).
+   * Only exact primitive `ltr`, `rtl`, or `auto` are emitted (same strict rules as per-node `dir` on
+   * boxes/text/images); padded strings, boxed values, and other shapes are ignored so crawlers never
+   * see ambiguous or spoofed `dir` on the root. Use when the layout root omits `dir` in the tree but
+   * the host still runs in RTL/LTR (e.g. `createApp` `layoutDirection` without a root `dir` prop).
+   */
+  dir?: 'ltr' | 'rtl' | 'auto'
   /** Page title for the <title> tag. */
   title?: string
   /** Meta description. */
@@ -351,7 +359,9 @@ function elementToHTML(element: UIElement, indent: number): string {
  * version for real users.
  *
  * When `props.dir` is `ltr`, `rtl`, or `auto` on a box, text, or image node, the HTML `dir`
- * attribute is emitted on that element’s tag. Images also honor `semantic.role` and
+ * attribute is emitted on that element’s tag. Optional `options.dir` adds the same attribute on the
+ * root `<html>` element when the document direction should be explicit for crawlers (strict primitive
+ * `ltr` / `rtl` / `auto` only). Images also honor `semantic.role` and
  * `semantic.ariaLabel` (escaped), alongside `alt` from props or `semantic.alt`.
  *
  * `semantic.tag` is validated as a safe HTML local name (letter, then letters/digits/hyphen, ≤128
@@ -431,8 +441,12 @@ export function toSemanticHTML(
   const rawLang = typeof options.lang === 'string' ? options.lang.trim() : ''
   const lang = escapeHTML(rawLang || 'en')
 
+  const docDir = options.dir
+  const htmlDirAttr =
+    docDir === 'ltr' || docDir === 'rtl' || docDir === 'auto' ? ` dir="${escapeHTML(docDir)}"` : ''
+
   return `<!DOCTYPE html>
-<html lang="${lang}">
+<html lang="${lang}"${htmlDirAttr}>
 <head>
   ${meta.join('\n  ')}
 </head>
