@@ -201,16 +201,10 @@ export class TerminalCompositor {
   }
 
   private paintView(layout: ComputedLayout, tree: UIElement, yOffset: number, maxRows: number): void {
-    // Scale to fit within allocated terminal space (both width and height)
+    // Scale independently to fill terminal width and fit allocated rows
     const scaleX = this.width / layout.width
-    // Terminal chars are ~2x taller than wide, so y needs 0.5 factor
-    const scaleYFromWidth = scaleX * 0.5
-    // Also constrain by available rows
-    const scaleYFromHeight = maxRows / (layout.height * 0.5)
-    // Use the smaller scale so content fits both dimensions
-    const scaleY = Math.min(scaleYFromWidth, scaleYFromHeight)
-    const finalScaleX = Math.min(scaleX, scaleY * 2) // keep aspect ratio
-    this.paintNode(tree, layout, 0, 0, finalScaleX, scaleY, yOffset, yOffset + maxRows)
+    const scaleY = maxRows / layout.height
+    this.paintNode(tree, layout, 0, 0, scaleX, scaleY, yOffset, yOffset + maxRows)
   }
 
   private paintNode(
