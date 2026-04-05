@@ -463,6 +463,29 @@ describe('batch', () => {
     expect(sums).toEqual([3, 30, 31])
   })
 
+  it('nested batch: inner completes then outer throws; deferred subscribers flush on outer unwind', () => {
+    const a = signal(0)
+    let runs = 0
+    effect(() => {
+      void a.value
+      runs++
+    })
+    expect(runs).toBe(1)
+
+    expect(() =>
+      batch(() => {
+        batch(() => {
+          a.set(1)
+          expect(runs).toBe(1)
+        })
+        throw new Error('outer-fail')
+      }),
+    ).toThrow('outer-fail')
+
+    expect(a.peek()).toBe(1)
+    expect(runs).toBe(2)
+  })
+
   it('dedupes the same subscriber when multiple deps update in one batch', () => {
     const a = signal(1)
     const b = signal(2)
