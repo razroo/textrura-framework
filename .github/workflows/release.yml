@@ -33,6 +33,7 @@ jobs:
         @geometra/ui
         @geometra/router
         @geometra/tw
+        @geometra/cli
     steps:
       - uses: actions/checkout@v6
 
@@ -70,6 +71,12 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           # tw also depends on textura
           cd packages/tw
+          npm pkg set "dependencies.textura=^$VERSION"
+          cd "$GITHUB_WORKSPACE"
+          # cli depends on renderer-terminal and textura
+          cd packages/cli
+          npm pkg set "dependencies.@geometra/core=^$VERSION"
+          npm pkg set "dependencies.@geometra/renderer-terminal=^$VERSION"
           npm pkg set "dependencies.textura=^$VERSION"
           cd "$GITHUB_WORKSPACE"
 
