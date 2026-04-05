@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { ComputedLayout } from 'textura'
 import type { Renderer, UIElement } from '@geometra/core'
 import { applyServerMessage, type ClientFrameMetrics } from '../client.js'
+import { GEOM_DATA_CHANNEL_TRACKER_SNAPSHOT } from '../data-channels.js'
 
 function layout(x = 0, y = 0, width = 100, height = 50): ComputedLayout {
   return { x, y, width, height, children: [] } as ComputedLayout
@@ -948,5 +949,11 @@ describe('applyServerMessage', () => {
     expect(dataCalls).toHaveLength(0)
     expect(metrics).toHaveLength(0)
     expect(renders).toHaveLength(0)
+  })
+})
+
+describe('GEOM data channel ids', () => {
+  it('keeps tracker snapshot channel stable for server/client and renderer-three re-exports', () => {
+    expect(GEOM_DATA_CHANNEL_TRACKER_SNAPSHOT).toBe('geom.tracker.snapshot')
   })
 })
