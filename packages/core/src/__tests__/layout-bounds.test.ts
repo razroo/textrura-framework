@@ -516,6 +516,14 @@ describe('finiteNumberOrZero', () => {
     expect(finiteNumberOrZero(Number.MAX_VALUE)).toBe(Number.MAX_VALUE)
   })
 
+  it('preserves subnormal and epsilon magnitudes (scroll offsets must not collapse tiny finite values)', () => {
+    expect(finiteNumberOrZero(Number.MIN_VALUE)).toBe(Number.MIN_VALUE)
+    expect(finiteNumberOrZero(Number.EPSILON)).toBe(Number.EPSILON)
+    const sub = 1e-320
+    expect(Number.isFinite(sub)).toBe(true)
+    expect(finiteNumberOrZero(sub)).toBe(sub)
+  })
+
   it('preserves IEEE negative zero (finite; scroll/sign math must not collapse -0 to +0)', () => {
     expect(1 / finiteNumberOrZero(-0)).toBe(-Infinity)
     expect(Object.is(finiteNumberOrZero(-0), -0)).toBe(true)
