@@ -5,6 +5,7 @@ import { dispatchKeyboardEvent, dispatchCompositionEvent } from '../keyboard.js'
 import { clearFocus, collectFocusOrder, focusedElement, setFocus } from '../focus.js'
 import { insertInputText, moveInputCaret } from '../text-input.js'
 import type { TextInputState } from '../text-input.js'
+import type { CompositionHitEvent, KeyboardHitEvent } from '../types.js'
 
 describe('dispatchKeyboardEvent', () => {
   beforeEach(() => {
@@ -769,6 +770,39 @@ describe('dispatchKeyboardEvent', () => {
     expect(receivedTarget).not.toBe(decoy)
   })
 
+  it('shallow-merges extra fields from partialEvent onto non-Tab keyboard events (host parity)', () => {
+    let received: (KeyboardHitEvent & { repeat?: boolean }) | null = null
+    const inner = box({ onKeyDown: e => { received = e } }, [])
+    const tree = box({}, [inner])
+    const innerLayout = { x: 0, y: 0, width: 100, height: 100, children: [] as const }
+    const layout = { x: 0, y: 0, width: 200, height: 100, children: [innerLayout] }
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+
+    const handled = dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'a',
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+      repeat: true,
+    } as Omit<KeyboardHitEvent, 'target'>)
+
+    expect(handled).toBe(true)
+    expect(received).not.toBeNull()
+    expect(received!.key).toBe('a')
+    expect(received!.target).toBe(innerLayout)
+    expect(received!.repeat).toBe(true)
+  })
+
   it('overwrites a bogus target on composition partialEvent with the focused layout', () => {
     let receivedTarget: ComputedLayout | null = null
     const innerLayout = { x: 10, y: 20, width: 80, height: 40, children: [] as const }
@@ -798,6 +832,35 @@ describe('dispatchKeyboardEvent', () => {
 
     expect(receivedTarget).toBe(innerLayout)
     expect(receivedTarget).not.toBe(decoy)
+  })
+
+  it('shallow-merges extra fields from partialEvent onto composition events (host parity)', () => {
+    let locale: string | undefined
+    const inner = box({
+      onCompositionUpdate: e => {
+        locale = (e as CompositionHitEvent & { locale?: string }).locale
+      },
+    }, [])
+    const tree = box({}, [inner])
+    const innerLayout = { x: 0, y: 0, width: 100, height: 100, children: [] as const }
+    const layout = { x: 0, y: 0, width: 200, height: 100, children: [innerLayout] }
+
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+
+    const handled = dispatchCompositionEvent(tree, layout, 'onCompositionUpdate', {
+      data: 'x',
+      locale: 'ja-JP',
+    } as never)
+
+    expect(handled).toBe(true)
+    expect(locale).toBe('ja-JP')
   })
 
   it('returns false for composition dispatch when nothing is focused', () => {
