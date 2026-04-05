@@ -170,6 +170,10 @@ export class TerminalCompositor {
   }
 
   private scheduleRender(): void {
+    // Wait until all views have sent at least one frame before rendering
+    const allReady = this.views.every(v => v.layout !== null)
+    if (!allReady) return
+
     if (this.renderScheduled) return
     this.renderScheduled = true
     setImmediate(() => {
