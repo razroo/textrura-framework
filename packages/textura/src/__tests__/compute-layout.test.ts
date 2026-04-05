@@ -332,6 +332,32 @@ describe('box layout', () => {
     expect(nullOwner.children[1]!.x).toBe(ltr.children[1]!.x)
   })
 
+  it('text leaf accepts per-node dir for Yoga direction (ltr / rtl / auto / malformed) without throwing', () => {
+    const base: TextNode = {
+      text: 'hello',
+      font: '16px sans-serif',
+      lineHeight: 20,
+      width: 200,
+      height: 40,
+    }
+    const variants: LayoutNode[] = [
+      { ...base },
+      { ...base, dir: 'ltr' },
+      { ...base, dir: 'rtl' },
+      { ...base, dir: 'auto' },
+      { ...base, dir: 'bogus' as never },
+      { ...base, dir: null as never },
+    ]
+    for (const tree of variants) {
+      const r = computeLayout(tree, { width: 220, height: 60 })
+      expect(r.text).toBe('hello')
+      expect(r.children).toEqual([])
+      expect(Number.isFinite(r.width) && r.width >= 0).toBe(true)
+      expect(Number.isFinite(r.height) && r.height >= 0).toBe(true)
+      expect(Number.isFinite(r.x) && Number.isFinite(r.y)).toBe(true)
+    }
+  })
+
   it('malformed flex enum strings skip Yoga setters (own-key guard; no prototype keys like toString)', () => {
     const base: BoxNode = {
       width: 200,
