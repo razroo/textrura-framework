@@ -83,3 +83,50 @@ describe('defaultBreakpoints', () => {
     }
   })
 })
+
+describe('breakpoint edge cases', () => {
+  const bps = { sm: 0, md: 640, lg: 1024 }
+
+  it('treats unsorted breakpoint map keys like a sorted ascending map (internal sort by min-width)', () => {
+    const shuffled = { md: 640, lg: 1024, sm: 0 }
+    const w = signal(800)
+    expect(breakpoint(w, shuffled).value).toBe('md')
+    expect(breakpoint(w, bps).value).toBe('md')
+  })
+
+  it('when width is below every minimum, returns the fallback (smallest min-width name)', () => {
+    const wNeg = signal(-50)
+    expect(breakpoint(wNeg, bps).value).toBe('sm')
+
+    const wNan = signal(Number.NaN)
+    expect(breakpoint(wNan, bps).value).toBe('sm')
+  })
+
+  it('positive infinity width selects the largest breakpoint', () => {
+    const w = signal(Number.POSITIVE_INFINITY)
+    expect(breakpoint(w, bps).value).toBe('lg')
+  })
+
+  it('maps without a zero minimum still yield deterministic fallback for too-small widths', () => {
+    const tight = { a: 100, b: 300 }
+    const w = signal(50)
+    // No min <= 50; fallback is the name tied to the smallest threshold (100 → "a").
+    expect(breakpoint(w, tight).value).toBe('a')
+  })
+})
+
+describe('responsive edge cases', () => {
+  const bps = { sm: 0, md: 640, lg: 1024 }
+
+  it('follows breakpoint fallback for NaN width', () => {
+    const w = signal(Number.NaN)
+    const cols = responsive(w, { sm: 1, md: 2, lg: 3 }, bps)
+    expect(cols.value).toBe(1)
+  })
+
+  it('resolves to the largest tier when width is positive infinity', () => {
+    const w = signal(Number.POSITIVE_INFINITY)
+    const cols = responsive(w, { sm: 1, md: 2, lg: 3 }, bps)
+    expect(cols.value).toBe(3)
+  })
+})
