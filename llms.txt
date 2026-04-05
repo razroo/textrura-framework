@@ -1,0 +1,261 @@
+# Geometra
+
+> DOM-free UI framework. Replaces the browser rendering pipeline with:
+> Declarative Tree → Yoga WASM → Computed Geometry → Render Target
+
+## What is Geometra?
+
+Geometra is a frontend framework that eliminates the DOM entirely. Instead of HTML/CSS, you build UIs with `box()` and `text()` function calls that produce a declarative tree. The Yoga flexbox engine (compiled to WASM) computes layout, producing `{ x, y, width, height }` geometry that pluggable renderers paint to Canvas2D, Terminal, WebGPU, or Three.js.
+
+The same geometry protocol works on both client and server over WebSocket. The server computes layout and streams pre-computed coordinates; the thin client (~2KB) just paints. AI agents interact with the server directly via the same JSON protocol — no browser, no scraping.
+
+## Core Concepts
+
+### Element Constructors
+
+All UI is built from four element types:
+
+```ts
+import { box, text, image, scene3d } from '@geometra/core'
+
+// Container with flexbox props + style props + event handlers
+box({ flexDirection: 'row', padding: 16, backgroundColor: '#1a1a2e', onClick: handler }, children)
+
+// Text leaf with font + lineHeight (required)
+text({ text: 'Hello', font: '16px Inter', lineHeight: 22, color: '#fff' })
+
+// Image leaf
+image({ src: 'url', width: 100, height: 100, objectFit: 'cover' })
+
+// 3D scene leaf (Three.js backend)
+scene3d({ objects: [...], fov: 50, cameraPosition: [0, 0, 5] })
+```
+
+### Props System
+
+Elements accept two categories of props:
+
+**FlexProps** (layout — sent to Yoga):
+- `flexDirection`, `flexWrap`, `justifyContent`, `alignItems`, `alignSelf`, `alignContent`
+- `flexGrow`, `flexShrink`, `flexBasis`
+- `width`, `height`, `minWidth`, `maxWidth`, `minHeight`, `maxHeight` (numbers or `'auto'`)
+- `padding`, `paddingTop/Right/Bottom/Left`, `paddingHorizontal/Vertical`
+- `margin` (number or `'auto'`), directional variants
+- `gap`, `rowGap`, `columnGap`
+- `position` (`'relative'` | `'absolute'`), `top`, `right`, `bottom`, `left`
+- `border`, `borderTop/Right/Bottom/Left`
+- `display` (`'flex'` | `'none'`), `overflow`, `aspectRatio`
+- `dir` (`'ltr'` | `'rtl'` | `'auto'`)
+
+**StyleProps** (visual — used by renderers, not layout):
+- `backgroundColor`, `color`, `borderColor`, `borderRadius`, `borderWidth`
+- `opacity`, `cursor`, `zIndex`, `pointerEvents`, `overflow`
+- `boxShadow: { offsetX, offsetY, blur, color }`
+- `gradient: { type: 'linear', angle?, stops: [{ offset, color }] }`
+
+### Reactivity (Signals)
+
+```ts
+import { signal, computed, effect, batch } from '@geometra/core'
+
+const count = signal(0)
+const doubled = computed(() => count.value * 2)
+effect(() => console.log(doubled.value))
+count.set(1) // logs 2
+batch(() => { a.set(1); b.set(2) }) // single flush
+```
+
+### Event Handling
+
+Events are resolved via hit-testing against the computed geometry tree:
+
+```ts
+box({
+  onClick: (e) => { /* e.x, e.y, e.localX, e.localY, e.target */ },
+  onPointerDown: (e) => {},
+  onPointerMove: (e) => {},
+  onWheel: (e) => { /* e.deltaX, e.deltaY */ },
+  onKeyDown: (e) => { /* e.key, e.code, e.shiftKey, etc. */ },
+})
+```
+
+### Application Bootstrap
+
+```ts
+import { createApp } from '@geometra/core'
+import { CanvasRenderer } from '@geometra/renderer-canvas'
+
+const renderer = new CanvasRenderer({
+  canvas: document.getElementById('app') as HTMLCanvasElement,
+  background: '#1a1a2e',
+})
+
+function view() {
+  return box({ padding: 24 }, [
+    text({ text: 'Hello Geometra', font: '24px Inter', lineHeight: 32, color: '#fff' }),
+  ])
+}
+
+await createApp(view, renderer, { width: 800, height: 600 })
+```
+
+## Packages
+
+| Package | npm | Purpose |
+|---|---|---|
+| `textura` | `textura` | Layout engine: Yoga WASM flexbox + Pretext text measurement. `computeLayout(tree)` → `{ x, y, width, height }` |
+| `@geometra/core` | `@geometra/core` | Element constructors, signals, hit-testing, a11y tree, SEO, text-input primitives, `createApp()` |
+| `@geometra/renderer-canvas` | `@geometra/renderer-canvas` | Canvas2D paint backend, text selection, accessibility mirror |
+| `@geometra/renderer-terminal` | `@geometra/renderer-terminal` | ANSI terminal/TUI paint backend |
+| `@geometra/renderer-webgpu` | `@geometra/renderer-webgpu` | WebGPU renderer (capability detection + initialization) |
+| `@geometra/renderer-three` | `@geometra/renderer-three` | Three.js hosts, Scene3dManager for `scene3d()` elements |
+| `@geometra/server` | `@geometra/server` | WebSocket server, server-side layout, geometry diffing |
+| `@geometra/client` | `@geometra/client` | Thin WebSocket client (~2KB), receives pre-computed geometry |
+| `@geometra/ui` | `@geometra/ui` | 31-component UI library (see below) |
+| `@geometra/router` | `@geometra/router` | Renderer-agnostic router: nested routes, loaders/actions, redirects, lazy/prefetch |
+| `@geometra/tw` | `@geometra/tw` | Tailwind-style utility classes: `tw("flex-row p-4 bg-blue-500")` → props object |
+
+## @geometra/ui — Component Library
+
+31 controlled components with dark theme and ARIA semantics. All return `UIElement`.
+
+### Form Controls
+- `button(label, onClick?)` — styled button
+- `input(value, placeholder, options?)` — single-line text input with caret, selection, composition
+- `textarea(value, placeholder, options?)` — multi-line text input with pre-wrap
+- `checkbox(label, options?)` — toggle checkbox (onChange, disabled)
+- `radio(label, options?)` — radio button (onSelect, disabled)
+- `switchControl(options)` — on/off toggle switch (checked, onChange, label, disabled)
+- `slider(options)` — horizontal range input (value, min, max, onChange)
+- `selectControl(options)` — dropdown trigger + menu panel (options, value, onChange, open)
+- `comboboxField(value, placeholder, suggestions, options)` — input + command palette
+
+### Layout & Display
+- `card(options?)` — bordered container with optional header/footer
+- `badge(label, options?)` — colored pill (variant: default/success/warning/error/info)
+- `separator(options?)` — horizontal or vertical divider
+- `avatar(name, options?)` — circle with auto-generated initials
+- `skeleton(options?)` — loading placeholder block
+
+### Feedback
+- `dialog(title, body, actions?)` — modal-style dialog
+- `alert(message, options?)` — dismissible status (variant: info/success/warning/error)
+- `toast(message, options?)` — status notification (variant, title, onDismiss)
+- `progress(value, options?)` — linear progress bar (0-100)
+
+### Navigation
+- `tabs(items, options?)` — tabbed interface (activeIndex, onTabChange)
+- `breadcrumb(items, options?)` — hierarchical path with separators
+- `pagination(options)` — page navigation (page, totalPages, onPageChange)
+- `menu(items, options?)` — vertical menu (disabled, danger states)
+- `commandPalette(commands, options?)` — command list with shortcuts
+
+### Data
+- `list(items)` — simple unordered list
+- `dataTable(columns, rows, options?)` — columnar table with click
+- `treeView(nodes, options)` — expandable tree (expandedIds, onToggle, selectedId)
+
+### Disclosure
+- `accordion(items, options?)` — expand/collapse sections (expandedIds, onToggle)
+- `sheet(options)` — slide-in overlay panel (side, open, onClose, title, children)
+
+## @geometra/tw — Tailwind Utility Classes
+
+Converts Tailwind-style class strings to Geometra prop objects:
+
+```ts
+import { tw } from '@geometra/tw'
+
+box(tw("flex-row items-center p-4 bg-blue-500 rounded-lg shadow-md"), children)
+box(tw("w-[200] h-[100] bg-[#ff00ff]"), children)  // arbitrary values
+```
+
+Supports: layout (`flex-row`, `hidden`, `absolute`), flex alignment (`justify-center`, `items-center`), spacing (`p-4`, `mx-auto`, `-mt-4`), sizing (`w-16`, `h-auto`), borders (`border-2`, `rounded-lg`, `border-red-500`), colors (`bg-blue-500`, `text-white`), visual (`opacity-50`, `cursor-pointer`, `z-10`), shadows (`shadow-md`), and more. Full Tailwind v3 color palette (slate through rose, shades 50-950). Spacing scale: 1 unit = 4px.
+
+## Server-Client Architecture
+
+```
+Server (Node/Bun)                    Client (Browser)
+┌─────────────────┐                  ┌──────────────────┐
+│ box()/text()    │                  │ CanvasRenderer   │
+│ computeLayout() │ ── WebSocket ──→ │ paint({ x,y,w,h })│
+│ diffGeometry()  │ ←── events ──── │ hit-test → event │
+└─────────────────┘                  └──────────────────┘
+```
+
+**Server** computes layout and streams geometry:
+```ts
+import { createServer } from '@geometra/server'
+const server = await createServer(view, { port: 3100, width: 600, height: 400 })
+```
+
+**Client** receives pre-computed geometry and paints:
+```ts
+import { createClient } from '@geometra/client'
+createClient({ url: 'ws://localhost:3100', renderer, canvas })
+```
+
+Protocol messages: `frame` (full layout+tree), `patch` (geometry diffs), `error`, `event`, `key`, `composition`, `resize`.
+
+## Routing
+
+```ts
+import { createRouter, createMemoryHistory } from '@geometra/router'
+
+const router = createRouter({
+  history: createMemoryHistory({ initialEntries: ['/'] }),
+  routes: [
+    { id: 'home', path: '/' },
+    { id: 'users', path: '/users/:id', loader: async ({ params }) => fetchUser(params.id) },
+    { id: 'catchall', path: '/*' },
+  ],
+})
+router.start()
+```
+
+Features: nested routes, loaders/actions, redirects, blockers, lazy loading, prefetch, query string parsing.
+
+## Accessibility & Semantics
+
+```ts
+// Semantic props on any element
+box({ semantic: { tag: 'nav', role: 'navigation', ariaLabel: 'Main menu' } }, children)
+
+// Generate a11y tree from rendered layout
+import { toAccessibilityTree } from '@geometra/core'
+const a11yTree = toAccessibilityTree(tree, layout)
+
+// Generate semantic HTML for SEO
+import { toSemanticHTML } from '@geometra/core'
+const html = toSemanticHTML(tree)
+```
+
+## Project Structure
+
+```
+packages/
+  textura/          — Layout engine (Yoga WASM + Pretext)
+  core/             — Framework core (elements, signals, hit-test, a11y, SEO)
+  renderer-canvas/  — Canvas2D renderer
+  renderer-terminal/— Terminal renderer
+  renderer-webgpu/  — WebGPU renderer
+  renderer-three/   — Three.js renderer
+  server/           — WebSocket server
+  client/           — WebSocket client
+  ui/               — Component library (31 components)
+  router/           — Data router
+  tw/               — Tailwind utility classes
+demo/               — Marketing/demo site (Vite, GitHub Pages)
+demos/              — Example apps (local-canvas, terminal, server-client)
+```
+
+## Build & Dev
+
+```bash
+npm install          # or: bun install
+npm run build        # build all packages (tsc)
+npm run test         # run tests (vitest)
+npm run create:app -- ./my-app  # scaffold a new app
+```
+
+All packages: ESM, strict TypeScript, `.js` extensions in imports.
