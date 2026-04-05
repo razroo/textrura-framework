@@ -3459,6 +3459,28 @@ describe('overflow hidden clipping', () => {
     expect(hitPathAtPoint(parent, layout, 45, 50)).toEqual([0])
     expect(getCursorAtPoint(parent, layout, 45, 50)).toBe('grab')
   })
+
+  it('overflow hidden: clip runs before child descent even when parent uses pointerEvents none (protruding child)', () => {
+    let childFired = false
+    const child = box({ width: 40, height: 40, onClick: () => { childFired = true } })
+    const parent = box(
+      { width: 100, height: 100, overflow: 'hidden', pointerEvents: 'none' },
+      [child],
+    )
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 70, y: 30, width: 40, height: 40, children: [] }],
+    }
+    // Child spans x ≈ 70..110; (105, 50) is inside the child rect but outside the parent's width.
+    dispatchHit(parent, layout, 'onClick', 105, 50)
+    expect(childFired).toBe(false)
+    expect(hitPathAtPoint(parent, layout, 105, 50)).toBeNull()
+    expect(hasInteractiveHitAtPoint(parent, layout, 105, 50)).toBe(false)
+    expect(getCursorAtPoint(parent, layout, 105, 50)).toBeNull()
+  })
 })
 
 describe('overflow visible', () => {
