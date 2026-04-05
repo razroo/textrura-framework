@@ -172,6 +172,64 @@ describe('animationLoop', () => {
     expect(cancel).toHaveBeenCalledTimes(1)
   })
 
+  it('stops the loop and rethrows when the callback throws (no further frames scheduled)', async () => {
+    const pending: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      pending.push(cb)
+      return pending.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    let mockNow = 0
+    vi.spyOn(Date, 'now').mockImplementation(() => mockNow)
+
+    const animationLoop = await loadAnimationLoop()
+    let ticks = 0
+    const stop = animationLoop(() => {
+      ticks++
+      mockNow += 16
+      throw new Error('tick boom')
+    })
+
+    expect(pending).toHaveLength(1)
+    expect(() => pending.shift()!(0)).toThrow('tick boom')
+    expect(ticks).toBe(1)
+    expect(pending).toHaveLength(0)
+
+    const cancel = globalThis.cancelAnimationFrame as ReturnType<typeof vi.fn>
+    stop()
+    expect(cancel).not.toHaveBeenCalled()
+  })
+
+  it('stops after throw on a later tick (first frame scheduled a second, then error)', async () => {
+    const pending: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      pending.push(cb)
+      return pending.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    let mockNow = 0
+    vi.spyOn(Date, 'now').mockImplementation(() => mockNow)
+
+    const animationLoop = await loadAnimationLoop()
+    let ticks = 0
+    animationLoop(() => {
+      ticks++
+      mockNow += 16
+      if (ticks === 2) throw new Error('second tick')
+      return true
+    })
+
+    expect(pending).toHaveLength(1)
+    pending.shift()!(0)
+    expect(ticks).toBe(1)
+    expect(pending).toHaveLength(1)
+    expect(() => pending.shift()!(0)).toThrow('second tick')
+    expect(ticks).toBe(2)
+    expect(pending).toHaveLength(0)
+  })
+
   it('stop() after the callback returned false is a no-op (no extra cancelAnimationFrame)', async () => {
     const pending: FrameRequestCallback[] = []
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {

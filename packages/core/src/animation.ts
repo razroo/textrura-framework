@@ -381,6 +381,9 @@ export function spring(
  *
  * When `Date.now()` moves backward (clock skew, sleep/wake, manual adjustment), `dt` is clamped to `0`
  * so callbacks never see a negative delta.
+ *
+ * If the callback throws, the loop stops (`running` cleared, no further frames scheduled) and the error
+ * is rethrown so hosts retain normal exception visibility.
  */
 export function animationLoop(callback: (dt: number) => boolean): () => void {
   let lastTime = Date.now()
@@ -392,7 +395,14 @@ export function animationLoop(callback: (dt: number) => boolean): () => void {
     const now = Date.now()
     const dt = Math.max(0, (now - lastTime) / 1000)
     lastTime = now
-    if (callback(dt) !== false) {
+    let scheduleNext: boolean
+    try {
+      scheduleNext = callback(dt) !== false
+    } catch (err) {
+      running = false
+      throw err
+    }
+    if (scheduleNext) {
       id = raf(tick) as unknown as number
     } else {
       running = false
