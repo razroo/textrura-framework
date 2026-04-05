@@ -502,6 +502,54 @@ describe('getSelectedText', () => {
       getSelectedText({ anchorNode: 0, anchorOffset: 1.9, focusNode: 0, focusOffset: 3.9 }, nodes),
     ).toBe('el')
   })
+
+  it('truncates fractional node indices toward zero so the walk visits real text nodes', () => {
+    const nodes = makeNodes()
+    const withFractional = getSelectedText(
+      { anchorNode: 0.2, anchorOffset: 0, focusNode: 1.8, focusOffset: 3 },
+      nodes,
+    )
+    const withInteger = getSelectedText(
+      { anchorNode: 0, anchorOffset: 0, focusNode: 1, focusOffset: 3 },
+      nodes,
+    )
+    expect(withFractional).toBe(withInteger)
+    expect(withInteger).toBe('Hello World\nSec')
+  })
+
+  it('returns empty string when node indices are NaN', () => {
+    const nodes = makeNodes()
+    expect(
+      getSelectedText(
+        { anchorNode: Number.NaN, anchorOffset: 0, focusNode: 0, focusOffset: 2 },
+        nodes,
+      ),
+    ).toBe('')
+    expect(
+      getSelectedText(
+        { anchorNode: 0, anchorOffset: 0, focusNode: Number.NaN, focusOffset: 2 },
+        nodes,
+      ),
+    ).toBe('')
+  })
+
+  it('still clamps focusNode +Infinity to the last node like a huge integer index', () => {
+    const nodes = makeNodes()
+    expect(
+      getSelectedText(
+        { anchorNode: 0, anchorOffset: 0, focusNode: Number.POSITIVE_INFINITY, focusOffset: 3 },
+        nodes,
+      ),
+    ).toBe('Hello World\nSec')
+  })
+
+  it('returns empty string for BigInt node indices without throwing', () => {
+    const nodes = makeNodes()
+    const a = 0n as unknown as number
+    const b = 1n as unknown as number
+    expect(() => getSelectedText({ anchorNode: a, anchorOffset: 0, focusNode: b, focusOffset: 2 }, nodes)).not.toThrow()
+    expect(getSelectedText({ anchorNode: a, anchorOffset: 0, focusNode: b, focusOffset: 2 }, nodes)).toBe('')
+  })
 })
 
 describe('hitTestText', () => {

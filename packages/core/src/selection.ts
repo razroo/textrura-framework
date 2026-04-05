@@ -132,8 +132,11 @@ function clampCharIndex(offset: unknown, textLength: number): number {
 /**
  * Get the selected text from a selection range and text node info list.
  *
- * Node indices are clamped to existing `textNodes` so corrupt or deserialized ranges cannot walk
- * millions of empty indices. When `focusNode` lies past the last node, the range end is treated as
+ * Node indices must be numbers; `NaN`, non-numbers, and `BigInt` yield an empty string. Finite indices
+ * are truncated toward zero. `±Infinity` is preserved so an end index past the last node still clamps
+ * like a huge finite past-end index. Indices are then clamped to
+ * existing `textNodes` so corrupt or deserialized
+ * ranges cannot walk millions of empty indices. When `focusNode` lies past the last node, the range end is treated as
  * that last node so `focusOffset` still applies. When the normalized range lies entirely outside
  * `[0, textNodes.length - 1]`, returns an empty string.
  *
@@ -156,6 +159,18 @@ export function getSelectedText(
     ;[startNode, endNode] = [endNode, startNode]
     ;[startOffset, endOffset] = [endOffset, startOffset]
   }
+
+  if (
+    typeof startNode !== 'number' ||
+    typeof endNode !== 'number' ||
+    Number.isNaN(startNode) ||
+    Number.isNaN(endNode)
+  ) {
+    return ''
+  }
+
+  startNode = Number.isFinite(startNode) ? Math.trunc(startNode) : startNode
+  endNode = Number.isFinite(endNode) ? Math.trunc(endNode) : endNode
 
   const maxIdx = textNodes.length - 1
   if (endNode < 0 || startNode > maxIdx) return ''
