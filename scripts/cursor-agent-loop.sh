@@ -18,6 +18,9 @@ fi
 # the checkbox search. Likewise `rg '\[ \]'` without `^-\s*` is still easy to misread — anchor on `- [ ]`.
 # Zero matching lines from those greps is normal when everything is checked — not a broken search; continue to
 # deferred themes / north-star buckets (step 2b) instead of retrying or assuming the repo has "no roadmap".
+# External agent prompts sometimes say to grep raw `[ ]` anywhere in ROADMAP — that is still the same footgun:
+# without a leading `-` anchor, `[ ]` is often parsed as a one-space character class, not a Markdown checkbox.
+# Always interpret "unchecked roadmap items" as line-anchored list checkboxes (`- [ ]` / `^- \[ \]`), never prose.
 # Both trackers may already be all `[x]` — that only means unchecked checkbox backlog is exhausted there,
 # not that the repo is "done". ROADMAP "Deferred / research" uses plain bullets (no `- [ ]`), so an empty
 # roadmap grep does not mean no roadmap-backed themes — read that subsection when casting next work (RTL through

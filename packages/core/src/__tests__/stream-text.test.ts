@@ -240,6 +240,19 @@ describe('streamText', () => {
     expect(s.streaming).toBe(true)
   })
 
+  it('after done() then clear(), coalesced append flushes into the new session with streaming true', async () => {
+    const s = streamText()
+    s.append('first')
+    s.done()
+    expect(s.streaming).toBe(false)
+    s.clear()
+    expect(s.streaming).toBe(true)
+    s.append('second')
+    await Promise.resolve()
+    expect(s.value).toBe('second')
+    expect(s.streaming).toBe(true)
+  })
+
   it('idempotent done() leaves value and streaming false', () => {
     const s = streamText()
     s.append('x')
