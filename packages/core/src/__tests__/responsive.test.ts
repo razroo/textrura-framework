@@ -149,6 +149,21 @@ describe('breakpoint duplicate thresholds', () => {
   })
 })
 
+describe('breakpoint non-finite min-width', () => {
+  it('ignores NaN thresholds for matching so a valid smaller tier still wins', () => {
+    const bps = { sm: 0, md: Number.NaN, lg: 1024 }
+    expect(breakpoint(signal(800), bps).value).toBe('sm')
+  })
+
+  it('does not let Object.entries order flip the result when NaN sits beside a real tier', () => {
+    const w = signal(800)
+    const mdFirst = { md: Number.NaN, lg: 1024 }
+    const lgFirst = { lg: 1024, md: Number.NaN }
+    expect(breakpoint(w, mdFirst).value).toBe('lg')
+    expect(breakpoint(w, lgFirst).value).toBe('lg')
+  })
+})
+
 describe('createViewport edge cases', () => {
   it('coerces non-finite initial dimensions to zero (parity with layout / hit-test guards)', () => {
     const vp = createViewport(Number.NaN, Number.POSITIVE_INFINITY)

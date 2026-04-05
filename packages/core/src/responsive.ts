@@ -59,24 +59,36 @@ export function createViewport(initialWidth: number, initialHeight: number): Vie
  */
 export type BreakpointMap = Record<string, number>
 
+/** Min-width used only for ordering; non-finite thresholds sort last so real breakpoints are tried first. */
+function breakpointSortKey(minWidth: number): number {
+  return typeof minWidth === 'number' && Number.isFinite(minWidth) ? minWidth : Number.POSITIVE_INFINITY
+}
+
 /**
  * Return the active breakpoint name for a given width signal and breakpoint map.
  *
  * The breakpoints are evaluated largest-first; the first whose minimum width
  * is `<=` the current width wins. If no breakpoint matches (shouldn't happen
  * if one starts at 0), returns the smallest breakpoint name.
+ *
+ * Entries whose minimum width is not a finite number are ignored for matching
+ * (`w >= NaN` is always false) but still participate in fallback ordering via a
+ * stable sort key so `Object.entries` order alone cannot flip results.
  */
 export function breakpoint<B extends BreakpointMap>(
   width: Signal<number> | Computed<number>,
   breakpoints: B,
 ): Computed<keyof B & string> {
-  // Pre-sort descending by min-width for fast lookup
-  const sorted = Object.entries(breakpoints).sort((a, b) => b[1] - a[1])
+  // Pre-sort descending by min-width for fast lookup (non-finite → +∞ key so they sort after real thresholds).
+  const sorted = Object.entries(breakpoints).sort(
+    (a, b) => breakpointSortKey(b[1]) - breakpointSortKey(a[1]),
+  )
   const fallback = sorted[sorted.length - 1]![0] as keyof B & string
 
   return computed(() => {
     const w = width.value
     for (const [name, minWidth] of sorted) {
+      if (typeof minWidth !== 'number' || !Number.isFinite(minWidth)) continue
       if (w >= minWidth) return name as keyof B & string
     }
     return fallback
