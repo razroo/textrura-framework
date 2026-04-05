@@ -87,14 +87,12 @@ export class TerminalCompositor {
     this.height = options?.height ?? process.stdout.rows ?? 24
     this.grid = this.createGrid()
 
-    // Allocate rows per view
-    const rowsEach = Math.max(4, Math.floor(this.height / urls.length))
-    this.views = urls.map((url, i) => ({
+    this.views = urls.map((url) => ({
       url,
       ws: null,
       layout: null,
       tree: null,
-      rows: i === urls.length - 1 ? this.height - rowsEach * i : rowsEach,
+      rows: 0, // computed dynamically after first frames arrive
     }))
   }
 
@@ -152,13 +150,41 @@ export class TerminalCompositor {
     })
   }
 
+  private computeRowAllocation(): void {
+    const scale = 0.15
+    // Compute natural row height for each view based on layout
+    const naturalHeights = this.views.map(v => {
+      if (!v.layout) return 4 // minimum for unloaded views
+      return Math.max(2, Math.round(v.layout.height * scale * 0.5))
+    })
+    const totalNatural = naturalHeights.reduce((a, b) => a + b, 0)
+
+    if (totalNatural <= this.height) {
+      // All views fit — use natural heights, give remaining to last view
+      let used = 0
+      for (let i = 0; i < this.views.length; i++) {
+        this.views[i]!.rows = naturalHeights[i]!
+        used += naturalHeights[i]!
+      }
+      // Give remaining rows to the last view (below-fold, most content)
+      if (this.views.length > 0) {
+        this.views[this.views.length - 1]!.rows += this.height - used
+      }
+    } else {
+      // Views don't fit — scale proportionally
+      for (let i = 0; i < this.views.length; i++) {
+        this.views[i]!.rows = Math.max(2, Math.round(naturalHeights[i]! / totalNatural * this.height))
+      }
+    }
+  }
+
   private compositeRender(): void {
+    this.computeRowAllocation()
     this.grid = this.createGrid()
 
     let yOffset = 0
     for (const view of this.views) {
       if (view.layout && view.tree) {
-        // Create a sub-renderer that paints into our grid at the right offset
         this.paintView(view.layout, view.tree, yOffset, view.rows)
       }
       yOffset += view.rows
