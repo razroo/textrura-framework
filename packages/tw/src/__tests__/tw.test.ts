@@ -70,6 +70,18 @@ describe('tw()', () => {
       const appliedFirst = `p-4 ${'x '.repeat(MAX_TW_CLASS_TOKENS)}`
       expect(parseClasses(appliedFirst)).toEqual({ padding: 16 })
     })
+
+    it('applies the last token when it is exactly the final slot in the budget (inclusive 4096 cap)', () => {
+      // 4095 "x" tokens + trailing space, then "p-4" → 4096th token is the utility (must not be cut off).
+      const lastSlot = `${'x '.repeat(MAX_TW_CLASS_TOKENS - 1)}p-4`
+      expect(parseClasses(lastSlot)).toEqual({ padding: 16 })
+    })
+
+    it('drops the first token after the budget when it would be slot 4097 (exclusive tail)', () => {
+      // 4096 "x" tokens then "p-4" → p-4 is never seen.
+      const overByOne = `${'x '.repeat(MAX_TW_CLASS_TOKENS)}p-4`
+      expect(parseClasses(overByOne)).toEqual({})
+    })
   })
 
   describe('layout', () => {
