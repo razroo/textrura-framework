@@ -909,6 +909,40 @@ describe('applyServerMessage', () => {
     expect(renders).toHaveLength(0)
   })
 
+  it('rejects data messages when payload is missing or undefined (no onData, no metrics)', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const errors: string[] = []
+    const dataCalls: unknown[] = []
+    const metrics: ClientFrameMetrics[] = []
+    type Msg = Parameters<typeof applyServerMessage>[2]
+
+    const bad: Msg[] = [
+      { type: 'data', channel: 'geom.missing' } as unknown as Msg,
+      { type: 'data', channel: 'geom.explicit', payload: undefined } as unknown as Msg,
+    ]
+
+    for (const msg of bad) {
+      applyServerMessage(
+        state,
+        renderer,
+        msg,
+        e => errors.push(String(e)),
+        m => metrics.push(m),
+        { decodeMs: 0 },
+        () => dataCalls.push(1),
+      )
+    }
+
+    expect(errors).toHaveLength(bad.length)
+    for (const err of errors) {
+      expect(err).toContain('Invalid server message')
+    }
+    expect(dataCalls).toHaveLength(0)
+    expect(metrics).toHaveLength(0)
+    expect(renders).toHaveLength(0)
+  })
+
   it('accepts data when channel is non-empty after trim and passes the original string to onData', () => {
     const { renderer, renders } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
