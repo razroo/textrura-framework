@@ -318,6 +318,30 @@ describe('resolveComputeLayoutDirection', () => {
     expect(resolveComputeLayoutDirection(undefined, rtlScene)).toBe('rtl')
   })
 
+  it('derives ltr from corrupt dir on non-box roots when host override is invalid (parity with bogus box root)', () => {
+    const bogusText = text({
+      text: 'x',
+      font: '16px sans-serif',
+      lineHeight: 20,
+      width: 10,
+      height: 20,
+      dir: 'bogus' as never,
+    })
+    expect(resolveComputeLayoutDirection(undefined, bogusText)).toBe('ltr')
+    expect(resolveComputeLayoutDirection('auto' as never, bogusText)).toBe('ltr')
+
+    const bogusImage = image({ src: 'a.png', width: 8, height: 8, dir: 'nope' as never })
+    expect(resolveComputeLayoutDirection(undefined, bogusImage)).toBe('ltr')
+
+    const bogusScene = scene3d({
+      width: 16,
+      height: 16,
+      objects: [],
+      dir: '???' as never,
+    })
+    expect(resolveComputeLayoutDirection(undefined, bogusScene)).toBe('ltr')
+  })
+
   it('host primitive ltr/rtl overrides non-box root dir', () => {
     const rtlText = text({
       text: 'x',
