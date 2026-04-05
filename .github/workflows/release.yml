@@ -20,6 +20,7 @@ jobs:
         packages/client
         packages/ui
         packages/router
+        packages/tw
       PUBLISH_PACKAGES: >-
         textura
         @geometra/core
@@ -31,6 +32,7 @@ jobs:
         @geometra/client
         @geometra/ui
         @geometra/router
+        @geometra/tw
     steps:
       - uses: actions/checkout@v6
 
@@ -65,6 +67,10 @@ jobs:
           cd packages/renderer-three
           npm pkg set "dependencies.@geometra/client=^$VERSION"
           npm pkg set "dependencies.@geometra/renderer-canvas=^$VERSION"
+          cd "$GITHUB_WORKSPACE"
+          # tw also depends on textura
+          cd packages/tw
+          npm pkg set "dependencies.textura=^$VERSION"
           cd "$GITHUB_WORKSPACE"
 
       - name: Install dependencies

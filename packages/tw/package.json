@@ -1,0 +1,40 @@
+{
+  "name": "@geometra/tw",
+  "version": "1.8.1",
+  "description": "Tailwind-style utility classes for Geometra",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/razroo/geometra",
+    "directory": "packages/tw"
+  },
+  "homepage": "https://razroo.github.io/geometra",
+  "keywords": [
+    "tailwind",
+    "utility",
+    "geometra",
+    "dom-free",
+    "canvas",
+    "styling"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@geometra/core": "^1.6.0",
+    "textura": "^1.6.0"
+  }
+}
