@@ -20,6 +20,10 @@ describe('streamText', () => {
     expect(streamText({} as unknown as string).value).toBe('')
   })
 
+  it('treats boxed String initial as empty (typeof is object, not string)', () => {
+    expect(streamText(Object('hello') as unknown as string).value).toBe('')
+  })
+
   it('append accumulates text after microtask flush', async () => {
     const s = streamText()
     s.append('Hello ')
@@ -102,6 +106,7 @@ describe('streamText', () => {
     s.append(undefined as unknown as string)
     s.append(42 as unknown as string)
     s.append({} as unknown as string)
+    s.append(Object('y') as unknown as string)
     await Promise.resolve()
     expect(s.value).toBe('x')
   })
@@ -112,6 +117,7 @@ describe('streamText', () => {
     s.set(undefined as unknown as string)
     s.set(99 as unknown as string)
     s.set({} as unknown as string)
+    s.set(Object('new') as unknown as string)
     expect(s.value).toBe('keep')
     expect(s.signal.peek()).toBe('keep')
   })
