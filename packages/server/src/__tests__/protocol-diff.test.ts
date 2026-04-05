@@ -281,6 +281,23 @@ describe('coalescePatches', () => {
     expect(merged).toEqual([{ path: [0], x: 10, y: 20, width: 5 }])
   })
 
+  it('ignores non-finite and non-number geometry fields so corrupt tail patches cannot clobber good coords', () => {
+    expect(
+      coalescePatches([
+        { path: [0], x: 10, y: 1 },
+        { path: [0], x: Number.NaN, y: Number.POSITIVE_INFINITY, width: 3 },
+        { path: [0], x: null as unknown as number, y: null as unknown as number },
+      ]),
+    ).toEqual([{ path: [0], x: 10, y: 1, width: 3 }])
+
+    expect(
+      coalescePatches([
+        { path: [1], x: Number.NaN },
+        { path: [1], x: 7 },
+      ]),
+    ).toEqual([{ path: [1], x: 7 }])
+  })
+
   it('coalesces burst updates to the root path (empty path segment)', () => {
     const merged = coalescePatches([
       { path: [], x: 1 },

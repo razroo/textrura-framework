@@ -98,10 +98,17 @@ export interface LayoutPatch {
   height?: number
 }
 
+/** Only finite primitive numbers merge; `null`, `NaN`, `±Infinity`, and non-numbers are ignored per field. */
+function isFinitePatchNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
 /**
  * Coalesce multiple patches on the same path (last write wins per field).
  * Paths are keyed by joining indices with `.` (e.g. `[1,23]` → `"1.23"`, `[12,3]` → `"12.3"`) so distinct nodes never alias.
  * Entries with a missing or non-array `path` (including `null` list slots) are skipped so corrupt hand-built batches cannot throw.
+ * Geometry fields apply only when the incoming value is a finite primitive `number` — JSON `null`, `NaN`, `±Infinity`,
+ * boxed numbers, and other garbage cannot overwrite a prior good coordinate (last finite write still wins).
  */
 export function coalescePatches(patches: LayoutPatch[]): LayoutPatch[] {
   const byPath = new Map<string, LayoutPatch>()
@@ -114,10 +121,10 @@ export function coalescePatches(patches: LayoutPatch[]): LayoutPatch[] {
       order.push(key)
     }
     const next = byPath.get(key)!
-    if (patch.x !== undefined) next.x = patch.x
-    if (patch.y !== undefined) next.y = patch.y
-    if (patch.width !== undefined) next.width = patch.width
-    if (patch.height !== undefined) next.height = patch.height
+    if (isFinitePatchNumber(patch.x)) next.x = patch.x
+    if (isFinitePatchNumber(patch.y)) next.y = patch.y
+    if (isFinitePatchNumber(patch.width)) next.width = patch.width
+    if (isFinitePatchNumber(patch.height)) next.height = patch.height
   }
   return order.map(k => byPath.get(k)!)
 }
