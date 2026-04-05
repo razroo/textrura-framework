@@ -376,6 +376,12 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(3.001, 3, 3, 3, 0, 0)).toBe(false)
   })
 
+  it('zero-size rect at negative absolute origin hits only that corner (positioned subtrees)', () => {
+    expect(pointInInclusiveLayoutRect(-10, -20, -10, -20, 0, 0)).toBe(true)
+    expect(pointInInclusiveLayoutRect(-11, -20, -10, -20, 0, 0)).toBe(false)
+    expect(pointInInclusiveLayoutRect(-10, -19, -10, -20, 0, 0)).toBe(false)
+  })
+
   it('returns false when abs origin + size overflows to Infinity (naive edge sum would accept all finite coords)', () => {
     const max = Number.MAX_VALUE
     expect(max + max).toBe(Infinity)
