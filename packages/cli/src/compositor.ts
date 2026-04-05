@@ -180,16 +180,23 @@ export class TerminalCompositor {
 
   private compositeRender(): void {
     // Compute scale: fit layout width to terminal columns
-    // Use the widest view's width as reference
     let maxLayoutWidth = 1
+    let totalLayoutHeight = 0
     for (const v of this.views) {
-      if (v.layout && v.layout.width > maxLayoutWidth) maxLayoutWidth = v.layout.width
+      if (v.layout) {
+        if (v.layout.width > maxLayoutWidth) maxLayoutWidth = v.layout.width
+        totalLayoutHeight += v.layout.height
+      }
     }
     const scaleX = this.termWidth / maxLayoutWidth
-    // Terminal chars are ~2x taller than wide
-    const scaleY = scaleX * 0.5
 
-    // Compute total virtual height across all views
+    // Target max ~3 screenfuls so user only scrolls 2-3 times
+    const maxVRows = this.termHeight * 3
+    const scaleYFromWidth = scaleX * 0.5
+    const scaleYFromTarget = maxVRows / Math.max(1, totalLayoutHeight)
+    // Use whichever is more compact
+    const scaleY = Math.max(scaleYFromTarget, scaleYFromWidth * 0.3)
+
     let totalVRows = 0
     for (const v of this.views) {
       if (v.layout) {
