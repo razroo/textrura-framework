@@ -34,10 +34,21 @@ const HIDE_CURSOR = `${ESC}?25l`
 const SHOW_CURSOR = `${ESC}?25h`
 const moveTo = (x: number, y: number) => `${ESC}${y + 1};${x + 1}H`
 
-function hexToAnsi256(hex: string): number {
-  const r = parseInt(hex.slice(1, 3), 16)
-  const g = parseInt(hex.slice(3, 5), 16)
-  const b = parseInt(hex.slice(5, 7), 16)
+function parseColor(color: string): [number, number, number] | null {
+  if (color.startsWith('#')) {
+    return [parseInt(color.slice(1, 3), 16), parseInt(color.slice(3, 5), 16), parseInt(color.slice(5, 7), 16)]
+  }
+  const rgbaMatch = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/)
+  if (rgbaMatch) {
+    return [Number(rgbaMatch[1]), Number(rgbaMatch[2]), Number(rgbaMatch[3])]
+  }
+  return null
+}
+
+function colorToAnsi256(color: string): number | null {
+  const rgb = parseColor(color)
+  if (!rgb) return null
+  const [r, g, b] = rgb
   if (r === g && g === b) {
     if (r < 8) return 16
     if (r > 248) return 231
@@ -46,8 +57,14 @@ function hexToAnsi256(hex: string): number {
   return 16 + 36 * Math.round(r / 255 * 5) + 6 * Math.round(g / 255 * 5) + Math.round(b / 255 * 5)
 }
 
-function bg256(color: string): string { return `${ESC}48;5;${hexToAnsi256(color)}m` }
-function fg256(color: string): string { return `${ESC}38;5;${hexToAnsi256(color)}m` }
+function bg256(color: string): string {
+  const c = colorToAnsi256(color)
+  return c !== null ? `${ESC}48;5;${c}m` : ''
+}
+function fg256(color: string): string {
+  const c = colorToAnsi256(color)
+  return c !== null ? `${ESC}38;5;${c}m` : ''
+}
 
 interface Cell { char: string; fg: string; bg: string }
 

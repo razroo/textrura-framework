@@ -65,13 +65,20 @@ if (url.startsWith('ws://') || url.startsWith('wss://')) {
 
     if (paths.size === 0) paths.add('/geometra-ws')
 
-    // Sort: header → main → hud → below
-    const sorted = [...paths].sort((a, b) => {
+    // For terminal rendering, only use full-width views.
+    // Skip HUD (transparent overlay for 3D) and the narrow console panel.
+    const terminalViews = [...paths].filter(p =>
+      p.includes('header') || p.includes('below')
+    )
+
+    // Fallback: if no header/below views found, use main view
+    if (terminalViews.length === 0) {
+      terminalViews.push([...paths][0] ?? '/geometra-ws')
+    }
+
+    const sorted = terminalViews.sort((a, b) => {
       const order = (p: string) =>
-        p.includes('header') ? 0 :
-        p === '/geometra-ws' ? 1 :
-        p.includes('hud') ? 2 :
-        p.includes('below') ? 3 : 4
+        p.includes('header') ? 0 : p.includes('below') ? 1 : 2
       return order(a) - order(b)
     })
 
