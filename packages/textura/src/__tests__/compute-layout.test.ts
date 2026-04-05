@@ -1066,6 +1066,27 @@ describe('text layout (Pretext + canvas measureText)', () => {
     expect(first.x).toBeGreaterThan(second.x)
   })
 
+  it('column with dir rtl and flex-start align mirrors cross-axis child positions (owner ltr)', () => {
+    const base: BoxNode = {
+      width: 200,
+      height: 120,
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      children: [
+        { width: 80, height: 40 },
+        { width: 80, height: 40 },
+      ],
+    }
+    const ltr = computeLayout({ ...base, dir: 'ltr' }, { width: 200, height: 120, direction: 'ltr' })
+    const rtl = computeLayout({ ...base, dir: 'rtl' }, { width: 200, height: 120, direction: 'ltr' })
+    expect(ltr.children[0]!.x).toBe(0)
+    expect(ltr.children[1]!.x).toBe(0)
+    expect(rtl.children[0]!.x).toBe(120)
+    expect(rtl.children[1]!.x).toBe(120)
+    expect(rtl.children[0]!.y).toBe(ltr.children[0]!.y)
+    expect(rtl.children[1]!.y).toBe(ltr.children[1]!.y)
+  })
+
   it('text leaf with unknown dir at runtime inherits like auto (parity with nested row bogus-dir test)', () => {
     const tree = {
       text: 'x',
