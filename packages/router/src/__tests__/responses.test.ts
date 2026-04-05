@@ -84,6 +84,13 @@ describe('isRedirectResult', () => {
     expect(isRedirectResult({ kind: 'redirect' })).toBe(true)
   })
 
+  it('narrows Object.create(null) redirect results (no Object.prototype)', () => {
+    const bare = Object.create(null) as { kind: string; to: string }
+    bare.kind = 'redirect'
+    bare.to = '/x'
+    expect(isRedirectResult(bare)).toBe(true)
+  })
+
   it('returns false when kind is missing or wrong (arrays, functions, primitives, boxed numbers)', () => {
     expect(isRedirectResult([])).toBe(false)
     expect(isRedirectResult(['redirect'])).toBe(false)
@@ -99,6 +106,13 @@ describe('isResponseResult', () => {
     expect(isResponseResult(null)).toBe(false)
     expect(isResponseResult({ kind: 'redirect', to: '/' })).toBe(false)
     expect(isResponseResult({ kind: 'response' })).toBe(true)
+  })
+
+  it('narrows Object.create(null) response results (no Object.prototype)', () => {
+    const bare = Object.create(null) as { kind: string; data: unknown }
+    bare.kind = 'response'
+    bare.data = { ok: true }
+    expect(isResponseResult(bare)).toBe(true)
   })
 
   it('returns false when kind is missing or wrong (arrays, functions, primitives, boxed numbers)', () => {
