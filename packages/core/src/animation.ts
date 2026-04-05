@@ -2,13 +2,14 @@ import { finiteNumberOrZero } from './layout-bounds.js'
 import { signal } from './signals.js'
 import type { Signal } from './signals.js'
 
-const raf = typeof requestAnimationFrame !== 'undefined'
-  ? requestAnimationFrame
-  : (cb: (t: number) => void) => setTimeout(() => cb(Date.now()), 16) as unknown as number
+// Require a callable: some environments set RAF globals to `null` or a non-function stub.
+const raf =
+  typeof requestAnimationFrame === 'function'
+    ? requestAnimationFrame
+    : (cb: (t: number) => void) => setTimeout(() => cb(Date.now()), 16) as unknown as number
 
-const cancelRaf = typeof cancelAnimationFrame !== 'undefined'
-  ? cancelAnimationFrame
-  : (id: number) => clearTimeout(id)
+const cancelRaf =
+  typeof cancelAnimationFrame === 'function' ? cancelAnimationFrame : (id: number) => clearTimeout(id)
 
 /** Advance amount for timeline stepping: finite `deltaMs` clamped to `>= 0`; otherwise `0` (NaN/±Infinity cannot poison `elapsed`). */
 function stepDeltaMs(deltaMs: number): number {

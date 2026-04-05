@@ -161,6 +161,37 @@ describe('animationLoop', () => {
     expect(cancel).not.toHaveBeenCalled()
   })
 
+  it('falls back to setTimeout when requestAnimationFrame is null (broken polyfill / host)', async () => {
+    vi.stubGlobal('requestAnimationFrame', null as unknown as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', null as unknown as typeof cancelAnimationFrame)
+    vi.useFakeTimers()
+
+    let mockNow = 10_000
+    vi.spyOn(Date, 'now').mockImplementation(() => mockNow)
+
+    vi.resetModules()
+    const { animationLoop } = await import('../animation.js')
+
+    const dts: number[] = []
+    let frames = 0
+    animationLoop(dt => {
+      dts.push(dt)
+      frames++
+      mockNow += 50
+      return frames < 3
+    })
+
+    try {
+      await vi.runAllTimersAsync()
+      expect(frames).toBe(3)
+      expect(dts[0]).toBe(0)
+      expect(dts[1]).toBeCloseTo(0.05, 6)
+      expect(dts[2]).toBeCloseTo(0.05, 6)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('falls back to setTimeout when requestAnimationFrame is missing (SSR / headless)', async () => {
     vi.stubGlobal('requestAnimationFrame', undefined as unknown as typeof requestAnimationFrame)
     vi.stubGlobal('cancelAnimationFrame', undefined as unknown as typeof cancelAnimationFrame)
