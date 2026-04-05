@@ -396,6 +396,14 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(0, max, 0, max, 1, 1e307)).toBe(false)
   })
 
+  it('returns false when both right and bottom overflow (finite corner point; naive <= edge would accept)', () => {
+    const max = Number.MAX_VALUE
+    expect(max + max).toBe(Infinity)
+    // Origin and size each MAX_VALUE so right/bottom are max+max → Infinity; point (max,max) lies on the
+    // would-be min corner, not a finite inclusive far edge.
+    expect(pointInInclusiveLayoutRect(max, max, max, max, max, max)).toBe(false)
+  })
+
   it('returns false for non-finite pointer coords or negative width/height', () => {
     expect(pointInInclusiveLayoutRect(Number.NaN, 0, 0, 0, 1, 1)).toBe(false)
     expect(pointInInclusiveLayoutRect(0, Infinity, 0, 0, 1, 1)).toBe(false)
