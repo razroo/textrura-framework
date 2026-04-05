@@ -530,6 +530,8 @@ describe('finiteRootExtent', () => {
     expect(finiteRootExtent('100' as unknown as number)).toBeUndefined()
     expect(finiteRootExtent(1n as unknown as number)).toBeUndefined()
     expect(finiteRootExtent(Object(50) as unknown as number)).toBeUndefined()
+    // Boxed numbers are typeof object; must not normalize IEEE −0 via primitive path.
+    expect(finiteRootExtent(Object(-0) as unknown as number)).toBeUndefined()
   })
 
   it('returns undefined for negative sizes', () => {
