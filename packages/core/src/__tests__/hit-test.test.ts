@@ -1083,6 +1083,45 @@ describe('dispatchHit', () => {
     expect(hasInteractiveHitAtPoint(parent, layout, 70, 30, 0n as unknown as number, 0)).toBe(false)
   })
 
+  it('root offset + layout origin that sums to Infinity is a safe miss (pointInInclusiveLayoutRect non-finite abs guard)', () => {
+    const max = Number.MAX_VALUE
+    expect(max + max).toBe(Infinity)
+    let fired = false
+    const child = box({
+      width: 40,
+      height: 40,
+      onClick: () => {
+        fired = true
+      },
+    })
+    const parent = box({ width: 100, height: 100 }, [child])
+    const layout = {
+      x: max,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] as const }],
+    }
+    expect(() => dispatchHit(parent, layout, 'onClick', max, 50, undefined, max, 0)).not.toThrow()
+    expect(dispatchHit(parent, layout, 'onClick', max, 50, undefined, max, 0)).toEqual({ handled: false })
+    expect(fired).toBe(false)
+    expect(hitPathAtPoint(parent, layout, max, 50, max, 0)).toBeNull()
+    expect(hasInteractiveHitAtPoint(parent, layout, max, 50, max, 0)).toBe(false)
+    expect(getCursorAtPoint(parent, layout, max, 50, max, 0)).toBeNull()
+
+    const layoutY = {
+      x: 0,
+      y: max,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 40, height: 40, children: [] as const }],
+    }
+    expect(dispatchHit(parent, layoutY, 'onClick', 50, max, undefined, 0, max)).toEqual({ handled: false })
+    expect(hitPathAtPoint(parent, layoutY, 50, max, 0, max)).toBeNull()
+    expect(hasInteractiveHitAtPoint(parent, layoutY, 50, max, 0, max)).toBe(false)
+    expect(getCursorAtPoint(parent, layoutY, 50, max, 0, max)).toBeNull()
+  })
+
   it('merges extra onto the event when offsetX and offsetY are provided', () => {
     let shift = false
     const child = box({
