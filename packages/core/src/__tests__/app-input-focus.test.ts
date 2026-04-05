@@ -125,6 +125,52 @@ describe('app input focus routing', () => {
     app.destroy()
   })
 
+  it('dispatch forwards root offsets through the same finiteNumberOrZero rules as dispatchHit', async () => {
+    let clicks = 0
+    const app = await createApp(
+      () =>
+        box({ width: 100, height: 100 }, [
+          box({
+            width: 40,
+            height: 40,
+            onClick: () => {
+              clicks++
+            },
+          }),
+        ]),
+      new TestRenderer(),
+      { width: 100, height: 100 },
+    )
+
+    const root = app.layout!
+    const child = root.children[0]!
+    const insideX = child.x + child.width / 2
+    const insideY = child.y + child.height / 2
+    const offset = 50
+    const shiftedX = insideX + offset
+
+    expect(app.dispatch('onClick', shiftedX, insideY, undefined, offset, 0)).toBe(true)
+    expect(clicks).toBe(1)
+    clicks = 0
+
+    expect(app.dispatch('onClick', shiftedX, insideY, undefined, Number.NaN, 0)).toBe(false)
+    expect(clicks).toBe(0)
+    expect(app.dispatch('onClick', insideX, insideY, undefined, Number.NaN, 0)).toBe(true)
+    expect(clicks).toBe(1)
+    clicks = 0
+
+    expect(app.dispatch('onClick', shiftedX, insideY, undefined, offset, Number.POSITIVE_INFINITY)).toBe(true)
+    expect(clicks).toBe(1)
+    clicks = 0
+
+    expect(app.dispatch('onClick', insideX, insideY, undefined, offset, 50n as unknown as number)).toBe(false)
+    expect(clicks).toBe(0)
+    expect(app.dispatch('onClick', shiftedX, insideY, undefined, offset, 50n as unknown as number)).toBe(true)
+    expect(clicks).toBe(1)
+
+    app.destroy()
+  })
+
   it('focusNext after createApp re-renders once and returns', async () => {
     const renderer = new TestRenderer()
     const app = await createApp(
