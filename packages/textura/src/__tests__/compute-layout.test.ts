@@ -399,6 +399,84 @@ describe('box layout', () => {
     expect(rtl.children[1]!.x).toBe(rtl.children[0]!.x)
   })
 
+  it('row-reverse swaps main-axis order relative to row under ltr document owner', () => {
+    const rowTree: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'row',
+      gap: 10,
+      children: [
+        { width: 50, height: 30 },
+        { width: 50, height: 30 },
+      ],
+    }
+    const revTree: BoxNode = { ...rowTree, flexDirection: 'row-reverse' }
+    const opts = { width: 200, height: 80, direction: 'ltr' as const }
+    const row = computeLayout(rowTree, opts)
+    const rev = computeLayout(revTree, opts)
+    expect(row.children[0]!.x).toBe(0)
+    expect(row.children[1]!.x).toBe(60)
+    expect(rev.children[0]!.x).toBe(150)
+    expect(rev.children[1]!.x).toBe(90)
+    expect(rev.children[0]!.x).toBeGreaterThan(rev.children[1]!.x)
+  })
+
+  it('row-reverse under rtl document owner matches row under ltr owner (main-start parity)', () => {
+    const rowTree: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'row',
+      gap: 10,
+      children: [
+        { width: 50, height: 30 },
+        { width: 50, height: 30 },
+      ],
+    }
+    const revTree: BoxNode = { ...rowTree, flexDirection: 'row-reverse' }
+    const ltrDocRow = computeLayout(rowTree, { width: 200, height: 80, direction: 'ltr' })
+    const rtlDocRev = computeLayout(revTree, { width: 200, height: 80, direction: 'rtl' })
+    expect(rtlDocRev.children[0]!.x).toBe(ltrDocRow.children[0]!.x)
+    expect(rtlDocRev.children[1]!.x).toBe(ltrDocRow.children[1]!.x)
+  })
+
+  it('row-reverse with dir rtl under ltr owner matches row child positions (inline axis mirrors flex-start)', () => {
+    const rowTree: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'row',
+      gap: 10,
+      children: [
+        { width: 50, height: 30 },
+        { width: 50, height: 30 },
+      ],
+    }
+    const revRtl: BoxNode = { ...rowTree, flexDirection: 'row-reverse', dir: 'rtl' }
+    const opts = { width: 200, height: 80, direction: 'ltr' as const }
+    const row = computeLayout(rowTree, opts)
+    const rev = computeLayout(revRtl, opts)
+    expect(rev.children[0]!.x).toBe(row.children[0]!.x)
+    expect(rev.children[1]!.x).toBe(row.children[1]!.x)
+  })
+
+  it('row-reverse with dir ltr under rtl owner matches row under rtl document owner', () => {
+    const rowTree: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'row',
+      gap: 10,
+      children: [
+        { width: 50, height: 30 },
+        { width: 50, height: 30 },
+      ],
+    }
+    const revLtr: BoxNode = { ...rowTree, flexDirection: 'row-reverse', dir: 'ltr' }
+    const opts = { width: 200, height: 80, direction: 'rtl' as const }
+    const row = computeLayout(rowTree, opts)
+    const rev = computeLayout(revLtr, opts)
+    expect(rev.children[0]!.x).toBe(row.children[0]!.x)
+    expect(rev.children[1]!.x).toBe(row.children[1]!.x)
+  })
+
   it('row layout with gap', () => {
     const tree: BoxNode = {
       width: 300,
