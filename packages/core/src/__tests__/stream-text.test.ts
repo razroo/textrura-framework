@@ -150,6 +150,26 @@ describe('streamText', () => {
     expect(s.streaming).toBe(false)
   })
 
+  it('done() when the buffer already matches the signal skips redundant set (initial string in sync)', () => {
+    const s = streamText('ready')
+    expect(s.signal.peek()).toBe('ready')
+    s.done()
+    expect(s.value).toBe('ready')
+    expect(s.streaming).toBe(false)
+    expect(s.signal.peek()).toBe('ready')
+  })
+
+  it('clear() after done() empties text and turns streaming back on for a new session', () => {
+    const s = streamText()
+    s.append('x')
+    s.done()
+    expect(s.value).toBe('x')
+    expect(s.streaming).toBe(false)
+    s.clear()
+    expect(s.value).toBe('')
+    expect(s.streaming).toBe(true)
+  })
+
   it('idempotent done() leaves value and streaming false', () => {
     const s = streamText()
     s.append('x')
