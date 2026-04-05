@@ -177,6 +177,7 @@ export class CanvasRenderer implements Renderer {
   /**
    * When `layoutInspector` is enabled, optional pointer in layout coordinates
    * to show `hitPathAtPoint` in the HUD. Set each frame from pointer move (or clear).
+   * Non-finite values and non-numbers are ignored so the HUD omits the hit line (aligned with core hit-test guards).
    */
   inspectorProbe: { x: number; y: number } | null = null
 
@@ -928,7 +929,13 @@ export class CanvasRenderer implements Renderer {
       `focus ${focusHint}  (${focusOrdinal})`,
     ]
     const probe = this.inspectorProbe
-    if (probe) {
+    if (
+      probe &&
+      typeof probe.x === 'number' &&
+      typeof probe.y === 'number' &&
+      Number.isFinite(probe.x) &&
+      Number.isFinite(probe.y)
+    ) {
       const path = hitPathAtPoint(tree, layout, probe.x, probe.y)
       lines.push(`hit [${path === null ? 'miss' : path.join(',')}] @ ${Math.round(probe.x)},${Math.round(probe.y)}`)
     }

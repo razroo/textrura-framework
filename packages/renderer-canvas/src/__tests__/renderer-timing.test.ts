@@ -296,3 +296,59 @@ describe('CanvasRenderer.render wall time', () => {
     spy.mockRestore()
   })
 })
+
+describe('CanvasRenderer layoutInspector inspectorProbe', () => {
+  it('omits the HUD hit line when probe coordinates are non-finite or non-numbers (no NaN text; no BigInt Number.isFinite throw)', () => {
+    Object.defineProperty(globalThis, 'window', {
+      value: { devicePixelRatio: 1 },
+      configurable: true,
+      writable: true,
+    })
+    const ctx = new FakeCtx()
+    const fillText = vi.spyOn(ctx, 'fillText')
+    const canvas = {
+      style: {} as Record<string, string>,
+      getContext: () => ctx,
+    } as unknown as HTMLCanvasElement
+
+    const renderer = new CanvasRenderer({ canvas, layoutInspector: true })
+    const tree = box({ width: 10, height: 10 })
+    const layout = { x: 0, y: 0, width: 10, height: 10, children: [] }
+
+    renderer.inspectorProbe = { x: Number.NaN, y: 5 }
+    renderer.render(layout, tree)
+    expect(fillText.mock.calls.some(args => String(args[0]).startsWith('hit ['))).toBe(false)
+
+    renderer.inspectorProbe = { x: 3, y: Number.POSITIVE_INFINITY }
+    renderer.render(layout, tree)
+    expect(fillText.mock.calls.some(args => String(args[0]).startsWith('hit ['))).toBe(false)
+
+    renderer.inspectorProbe = { x: 3, y: 5 } as unknown as { x: number; y: number }
+    Object.assign(renderer.inspectorProbe, { x: 1n as unknown as number, y: 0 })
+    expect(() => renderer.render(layout, tree)).not.toThrow()
+    expect(fillText.mock.calls.some(args => String(args[0]).startsWith('hit ['))).toBe(false)
+  })
+
+  it('draws the HUD hit line when probe coordinates are finite numbers', () => {
+    Object.defineProperty(globalThis, 'window', {
+      value: { devicePixelRatio: 1 },
+      configurable: true,
+      writable: true,
+    })
+    const ctx = new FakeCtx()
+    const fillText = vi.spyOn(ctx, 'fillText')
+    const canvas = {
+      style: {} as Record<string, string>,
+      getContext: () => ctx,
+    } as unknown as HTMLCanvasElement
+
+    const renderer = new CanvasRenderer({ canvas, layoutInspector: true })
+    const tree = box({ width: 10, height: 10 })
+    const layout = { x: 0, y: 0, width: 10, height: 10, children: [] }
+
+    renderer.inspectorProbe = { x: 5, y: 5 }
+    renderer.render(layout, tree)
+
+    expect(fillText.mock.calls.some(args => String(args[0]).startsWith('hit ['))).toBe(true)
+  })
+})
