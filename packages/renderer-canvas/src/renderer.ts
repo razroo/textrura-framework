@@ -675,7 +675,9 @@ export class CanvasRenderer implements Renderer {
     ctx.font = font
     ctx.textBaseline = 'top'
 
-    const lines = whiteSpace === 'nowrap' ? [text] : this.wrapText(text, _width)
+    // Default to nowrap — only wrap when explicitly set to 'normal' or 'pre-wrap'
+    const shouldWrap = whiteSpace === 'normal' || whiteSpace === 'pre-wrap'
+    const lines = shouldWrap ? this.wrapText(text, _width) : [text]
     const textColor = color ?? '#000000'
 
     const isSelectable = selectable !== false

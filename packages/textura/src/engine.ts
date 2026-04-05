@@ -204,7 +204,9 @@ function buildNode(desc: LayoutNode): BuildResult {
 
   if (isTextNode(desc)) {
     const whiteSpace = desc.whiteSpace
-    const nowrap = whiteSpace === 'nowrap'
+    // Default to nowrap — most UI text (labels, values, titles) should not
+    // word-wrap.  Developers opt-in to wrapping via whiteSpace: 'normal'.
+    const shouldWrap = whiteSpace === 'normal' || whiteSpace === 'pre-wrap'
     const font = desc.font
     const text = desc.text
     const lineHeight = desc.lineHeight
@@ -220,12 +222,10 @@ function buildNode(desc: LayoutNode): BuildResult {
         _height: number,
         _heightMode: MeasureMode,
       ) => {
-        // For 'nowrap', pass no whiteSpace option to pretext (uses 'normal')
-        // but force maxWidth to be huge so text never wraps
-        const opts = (whiteSpace && !nowrap) ? { whiteSpace } : undefined
+        const opts = shouldWrap ? { whiteSpace: whiteSpace! } : undefined
 
         let maxWidth: number
-        if (nowrap) {
+        if (!shouldWrap) {
           maxWidth = 1e7
         } else if (widthMode === MeasureMode.Exactly || widthMode === MeasureMode.AtMost) {
           maxWidth = width
@@ -233,7 +233,7 @@ function buildNode(desc: LayoutNode): BuildResult {
           maxWidth = 1e7
         }
 
-        if (widthMode === MeasureMode.Exactly && !nowrap) {
+        if (widthMode === MeasureMode.Exactly && shouldWrap) {
           const prepared = prepare(text, font, opts)
           const result = layout(prepared, maxWidth, lineHeight)
           lastLineCount = result.lineCount
@@ -251,7 +251,7 @@ function buildNode(desc: LayoutNode): BuildResult {
         const height = lineCount * lineHeight
 
         const reportedWidth =
-          nowrap
+          !shouldWrap
             ? contentWidth
             : widthMode === MeasureMode.AtMost
               ? Math.min(contentWidth, width)
