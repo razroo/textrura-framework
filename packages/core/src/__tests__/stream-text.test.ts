@@ -111,6 +111,19 @@ describe('streamText', () => {
     expect(s.value).toBe('x')
   })
 
+  it('ignores bigint and symbol append/set without throwing (typeof string guard; no ToString coercion)', async () => {
+    const s = streamText('keep')
+    expect(() => s.append(0n as unknown as string)).not.toThrow()
+    expect(() => s.append(Symbol('chunk') as unknown as string)).not.toThrow()
+    await Promise.resolve()
+    expect(s.value).toBe('keep')
+    expect(() => s.set(1n as unknown as string)).not.toThrow()
+    expect(s.value).toBe('keep')
+    expect(s.signal.peek()).toBe('keep')
+    expect(() => s.set(Symbol('v') as unknown as string)).not.toThrow()
+    expect(s.value).toBe('keep')
+  })
+
   it('ignores non-string set without mutating value or signal (parity with append guard)', () => {
     const s = streamText('keep')
     s.set(null as unknown as string)
