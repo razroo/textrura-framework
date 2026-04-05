@@ -333,6 +333,25 @@ describe('dispatchHit', () => {
     expect(getCursorAtPoint(el, layout, 10, 21)).toBeNull()
   })
 
+  it('overflow scroll parent with zero height: scroll clip rejects any y past the degenerate row; edge hits still reach children', () => {
+    let childFired = false
+    const child = box({ width: 50, height: 50, onClick: () => { childFired = true } })
+    const parent = box({ width: 100, height: 0, overflow: 'scroll' }, [child])
+    const childLayout = { x: 0, y: 0, width: 50, height: 50, children: [] as const }
+    const layout = { x: 0, y: 0, width: 100, height: 0, children: [childLayout] as const }
+
+    expect(dispatchHit(parent, layout, 'onClick', 25, 1).handled).toBe(false)
+    expect(childFired).toBe(false)
+    expect(hitPathAtPoint(parent, layout, 25, 1)).toBeNull()
+    expect(hasInteractiveHitAtPoint(parent, layout, 25, 1)).toBe(false)
+
+    childFired = false
+    expect(dispatchHit(parent, layout, 'onClick', 25, 0).handled).toBe(true)
+    expect(childFired).toBe(true)
+    expect(hitPathAtPoint(parent, layout, 25, 0)).toEqual([0])
+    expect(hasInteractiveHitAtPoint(parent, layout, 25, 0)).toBe(true)
+  })
+
   it('missing earlier child layout (sparse children array) still hit-tests later siblings', () => {
     let fired = false
     const opaque = box({ width: 40, height: 40 })
