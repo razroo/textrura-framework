@@ -2330,6 +2330,53 @@ describe('hitPathAtPoint', () => {
     expect(hitPathAtPoint(root, layout, 5, 5)).toEqual([1])
   })
 
+  it('overlapping siblings: three distinct z-indices hit the topmost (sort path for n>2, not the two-child fast path)', () => {
+    const low = box({ width: 40, height: 40, zIndex: 0 })
+    const top = box({ width: 40, height: 40, zIndex: 2 })
+    const mid = box({ width: 40, height: 40, zIndex: 1 })
+    const root = box({ width: 100, height: 100 }, [low, top, mid])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+        { x: 0, y: 0, width: 40, height: 40, children: [] },
+      ],
+    }
+    expect(hitPathAtPoint(root, layout, 5, 5)).toEqual([1])
+    let fired: string | undefined
+    const lowH = box({
+      width: 40,
+      height: 40,
+      zIndex: 0,
+      onClick: () => {
+        fired = 'low'
+      },
+    })
+    const topH = box({
+      width: 40,
+      height: 40,
+      zIndex: 2,
+      onClick: () => {
+        fired = 'top'
+      },
+    })
+    const midH = box({
+      width: 40,
+      height: 40,
+      zIndex: 1,
+      onClick: () => {
+        fired = 'mid'
+      },
+    })
+    const rootH = box({ width: 100, height: 100 }, [lowH, topH, midH])
+    dispatchHit(rootH, layout, 'onClick', 5, 5)
+    expect(fired).toBe('top')
+  })
+
   it('overlapping siblings: non-finite z-index is treated as 0 for path order (matches dispatchHit)', () => {
     const invalid = box({ width: 40, height: 40, zIndex: Number.NaN })
     const top = box({ width: 40, height: 40, zIndex: 3 })
