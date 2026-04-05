@@ -237,10 +237,12 @@ describe('box layout', () => {
     expect(computeLayout(tree, { width: Number.NEGATIVE_INFINITY, height: 80 })).toEqual(omitWidth)
     expect(computeLayout(tree, { width: '200' as unknown as number, height: 80 })).toEqual(omitWidth)
     expect(computeLayout(tree, { width: 99n as unknown as number, height: 80 })).toEqual(omitWidth)
+    expect(computeLayout(tree, { width: Object(200) as unknown as number, height: 80 })).toEqual(omitWidth)
 
     const omitHeight = computeLayout(tree, { width: 200 })
     expect(computeLayout(tree, { width: 200, height: Number.NaN })).toEqual(omitHeight)
     expect(computeLayout(tree, { width: 200, height: Number.POSITIVE_INFINITY })).toEqual(omitHeight)
+    expect(computeLayout(tree, { width: 200, height: Object(80) as unknown as number })).toEqual(omitHeight)
 
     const omitBoth = computeLayout(tree, {})
     expect(
