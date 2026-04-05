@@ -22,6 +22,10 @@ fi
 # `vitest.fast.config.ts` (used by `npm run test` / quality.yml "Fast tests") includes only
 # `packages/*/src/__tests__/**/*.test.ts`. Tests colocated as `packages/<pkg>/src/*.test.ts` are skipped by
 # that glob until moved under `src/__tests__/` (or the include pattern is intentionally widened).
+# The same config **excludes** several slow suites via `test.exclude` (e.g. core `fonts.test.ts`,
+# `virtual-scroll.test.ts`, `perf-smoke.test.ts`, server `protocol-perf-smoke.test.ts`) — `npm run test`
+# omits those even when `release:gate` runs them explicitly. Do not treat a green fast test run as a
+# substitute for `release:gate` when editing fonts, virtual scroll, or perf-smoke surfaces.
 # Root `npm run release:gate` allowlists specific vitest entry files (see package.json), not every
 # `packages/*/src/__tests__/**/*.test.ts` that `npm run test` / vitest.fast.config.ts includes — a file
 # passing `vitest.fast` does not imply it runs in CI gate; check package.json before assuming coverage ships.
