@@ -271,6 +271,30 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite(layout)).toBe(true)
   })
 
+  it('accepts children inherited from prototype when x/y/width/height are own ([[Get]] for children)', () => {
+    const proto = { children: [] as const }
+    const layout = Object.assign(Object.create(proto), {
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+    }) as unknown as ComputedLayout
+    expect(Object.hasOwn(layout, 'children')).toBe(false)
+    expect(layoutBoundsAreFinite(layout)).toBe(true)
+  })
+
+  it('rejects non-array children inherited from prototype when own children is absent', () => {
+    const proto = { children: '{}' }
+    const layout = Object.assign(Object.create(proto), {
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+    }) as unknown as ComputedLayout
+    expect(Object.hasOwn(layout, 'children')).toBe(false)
+    expect(layoutBoundsAreFinite(layout)).toBe(false)
+  })
+
   it('accepts finite bounds on non-enumerable prototype data properties ([[Get]] ignores enumerability)', () => {
     const proto = Object.create(null) as Record<string, unknown>
     for (const [key, value] of [
