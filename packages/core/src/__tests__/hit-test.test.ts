@@ -4108,6 +4108,48 @@ describe('Yoga-computed row layout and hit routing (document direction)', () => 
     expect(hasInteractiveHitAtPoint(root, layout, bx, by)).toBe(true)
   })
 
+  it('LTR document: row with dir auto inside an rtl parent mirrors like explicit rtl; hit routing follows geometry', () => {
+    const log: string[] = []
+    const first = box({ width: 50, height: 50, cursor: 'pointer', onClick: () => { log.push('dom-first') } })
+    const second = box({ width: 50, height: 50, cursor: 'pointer', onClick: () => { log.push('dom-second') } })
+    const innerRow = box(
+      { width: 200, height: 50, flexDirection: 'row', gap: 10, dir: 'auto' },
+      [first, second],
+    )
+    const rtlParent = box({ width: 200, height: 50, flexDirection: 'column', dir: 'rtl' }, [innerRow])
+    const root = box({ width: 200, height: 100, flexDirection: 'column' }, [rtlParent])
+    const layout = computeLayout(toLayoutTree(root), { width: 200, height: 100, direction: 'ltr' })
+
+    const parentLayout = layout.children[0]!
+    const rowLayout = parentLayout.children[0]!
+    expect(rowLayout.children.length).toBe(2)
+    const a = rowLayout.children[0]!
+    const b = rowLayout.children[1]!
+    expect(a.x).toBeGreaterThan(b.x)
+
+    const px = layout.x + parentLayout.x
+    const py = layout.y + parentLayout.y
+    const rx = px + rowLayout.x
+    const ry = py + rowLayout.y
+    const ax = rx + a.x + a.width / 2
+    const ay = ry + a.y + a.height / 2
+    const bx = rx + b.x + b.width / 2
+    const by = ry + b.y + b.height / 2
+
+    dispatchHit(root, layout, 'onClick', ax, ay)
+    expect(log).toEqual(['dom-first'])
+    log.length = 0
+    dispatchHit(root, layout, 'onClick', bx, by)
+    expect(log).toEqual(['dom-second'])
+
+    expect(hitPathAtPoint(root, layout, ax, ay)).toEqual([0, 0, 0])
+    expect(hitPathAtPoint(root, layout, bx, by)).toEqual([0, 0, 1])
+    expect(getCursorAtPoint(root, layout, ax, ay)).toBe('pointer')
+    expect(getCursorAtPoint(root, layout, bx, by)).toBe('pointer')
+    expect(hasInteractiveHitAtPoint(root, layout, ax, ay)).toBe(true)
+    expect(hasInteractiveHitAtPoint(root, layout, bx, by)).toBe(true)
+  })
+
   it('RTL document: nested flex row with dir auto inherits owner direction; dispatchHit follows mirrored geometry', () => {
     const log: string[] = []
     const first = box({ width: 50, height: 50, cursor: 'pointer', onClick: () => { log.push('dom-first') } })
