@@ -388,6 +388,14 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(0, max, 0, 0, 10, max)).toBe(true)
   })
 
+  it('returns false when abs origin + width overflows though width is not MAX_VALUE (finite operands, infinite right)', () => {
+    const max = Number.MAX_VALUE
+    // MAX_VALUE + 1 rounds to MAX_VALUE; a large finite addend can still overflow the sum.
+    expect(max + 1e307).toBe(Infinity)
+    expect(pointInInclusiveLayoutRect(max, 0, max, 0, 1e307, 1)).toBe(false)
+    expect(pointInInclusiveLayoutRect(0, max, 0, max, 1, 1e307)).toBe(false)
+  })
+
   it('returns false for non-finite pointer coords or negative width/height', () => {
     expect(pointInInclusiveLayoutRect(Number.NaN, 0, 0, 0, 1, 1)).toBe(false)
     expect(pointInInclusiveLayoutRect(0, Infinity, 0, 0, 1, 1)).toBe(false)
