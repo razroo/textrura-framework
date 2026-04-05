@@ -301,9 +301,18 @@ function readLayout(node: Node, meta: MetaNode): ComputedLayout {
 // --- Public API ---
 
 export interface ComputeOptions {
-  /** Available width for the root container. Default: unconstrained. */
+  /**
+   * Available width for the root container. Default: unconstrained.
+   *
+   * Runtime: only finite primitive numbers are forwarded to Yoga; `NaN`, `±Infinity`, and non-numbers
+   * (e.g. corrupted JSON) are ignored per-axis, same as omitting `width`.
+   */
   width?: number
-  /** Available height for the root container. Default: unconstrained. */
+  /**
+   * Available height for the root container. Default: unconstrained.
+   *
+   * Same finite-number guard as {@link ComputeOptions.width}.
+   */
   height?: number
   /**
    * Yoga **owner** direction passed to `calculateLayout` (document / root context). It seeds inheritance
@@ -319,6 +328,10 @@ export interface ComputeOptions {
    * or corrupted deserialization) falls back to LTR — same as omitting `direction`.
    */
   direction?: 'ltr' | 'rtl'
+}
+
+function sanitizeOwnerConstraint(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
 /**
@@ -338,8 +351,8 @@ export function computeLayout(
 
   const { yogaNode: root, meta } = buildNode(tree)
 
-  const w = options?.width
-  const h = options?.height
+  const w = sanitizeOwnerConstraint(options?.width)
+  const h = sanitizeOwnerConstraint(options?.height)
   const dir =
     options?.direction === 'rtl' ? Direction.RTL : Direction.LTR
 

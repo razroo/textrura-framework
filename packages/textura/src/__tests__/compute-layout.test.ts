@@ -207,6 +207,34 @@ describe('box layout', () => {
     expect(explicitUndefined.children[0]!.x).toBeLessThan(explicitUndefined.children[1]!.x)
   })
 
+  it('non-finite ComputeOptions width/height are ignored per-axis like undefined (host constraint hardening)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 40,
+      flexDirection: 'row',
+      gap: 10,
+      children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+    }
+    const omitWidth = computeLayout(tree, { height: 80 })
+    expect(computeLayout(tree, { width: Number.NaN, height: 80 })).toEqual(omitWidth)
+    expect(computeLayout(tree, { width: Number.POSITIVE_INFINITY, height: 80 })).toEqual(omitWidth)
+    expect(computeLayout(tree, { width: Number.NEGATIVE_INFINITY, height: 80 })).toEqual(omitWidth)
+    expect(computeLayout(tree, { width: '200' as unknown as number, height: 80 })).toEqual(omitWidth)
+    expect(computeLayout(tree, { width: 99n as unknown as number, height: 80 })).toEqual(omitWidth)
+
+    const omitHeight = computeLayout(tree, { width: 200 })
+    expect(computeLayout(tree, { width: 200, height: Number.NaN })).toEqual(omitHeight)
+    expect(computeLayout(tree, { width: 200, height: Number.POSITIVE_INFINITY })).toEqual(omitHeight)
+
+    const omitBoth = computeLayout(tree, {})
+    expect(
+      computeLayout(tree, {
+        width: Number.NaN,
+        height: Number.NaN,
+      }),
+    ).toEqual(omitBoth)
+  })
+
   it('root dir rtl on the tree node mirrors a top-level row even when ComputeOptions.direction is ltr', () => {
     const tree: BoxNode = {
       width: 200,
