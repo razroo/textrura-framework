@@ -108,6 +108,28 @@ describe('webgpu renderer smoke', () => {
     expect(ctx.calls.pop()).toEqual({ x: 0, y: 0, w: 1, h: 1, color: '#334455' })
   })
 
+  it('pre-init 2d fallback clears 1×1 when root layout children is missing, null, or not an array (layoutBoundsAreFinite parity)', () => {
+    const ctx = new Fake2DContext()
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: (kind: string) => (kind === '2d' ? ctx : null),
+    } as unknown as HTMLCanvasElement
+
+    const renderer = new WebGPURenderer({ canvas, background: '#667788' })
+    const tree = box({ width: 100, height: 40 }, [])
+    const base = { x: 0, y: 0, width: 100, height: 40 }
+
+    renderer.render({ ...base, children: null } as unknown as ComputedLayout, tree)
+    expect(ctx.calls.pop()).toEqual({ x: 0, y: 0, w: 1, h: 1, color: '#667788' })
+
+    renderer.render({ ...base, children: {} as unknown as [] } as unknown as ComputedLayout, tree)
+    expect(ctx.calls.pop()).toEqual({ x: 0, y: 0, w: 1, h: 1, color: '#667788' })
+
+    renderer.render(base as unknown as ComputedLayout, tree)
+    expect(ctx.calls.pop()).toEqual({ x: 0, y: 0, w: 1, h: 1, color: '#667788' })
+  })
+
   it('reports unsupported when navigator has no gpu', () => {
     vi.stubGlobal('navigator', {} as Navigator)
     expect(WebGPURenderer.isSupported()).toBe(false)
