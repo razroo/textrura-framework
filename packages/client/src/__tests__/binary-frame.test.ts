@@ -42,6 +42,20 @@ describe('isBinaryFrameArrayBuffer', () => {
     new DataView(headerOnly.buffer).setUint32(5, 0, true)
     expect(isBinaryFrameArrayBuffer(headerOnly.buffer)).toBe(true)
   })
+
+  it('returns false when the view byteLength is below the 9-byte v1 header (embedded / sliced buffers)', () => {
+    const headerOnly = new Uint8Array(9)
+    headerOnly.set([0x47, 0x45, 0x4f, 0x4d, 1], 0)
+    new DataView(headerOnly.buffer).setUint32(5, 0, true)
+    const eight = headerOnly.subarray(0, 8)
+    expect(eight.byteLength).toBe(8)
+    expect(isBinaryFrameArrayBuffer(eight)).toBe(false)
+    expect(() => decodeBinaryFrameJson(eight)).toThrow('Not a GEOM binary frame')
+
+    const emptyView = new Uint8Array(headerOnly.buffer, 0, 0)
+    expect(isBinaryFrameArrayBuffer(emptyView)).toBe(false)
+    expect(() => decodeBinaryFrameJson(emptyView)).toThrow('Not a GEOM binary frame')
+  })
 })
 
 describe('client binary frame decode', () => {
