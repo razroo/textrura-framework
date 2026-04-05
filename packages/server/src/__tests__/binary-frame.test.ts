@@ -60,6 +60,15 @@ describe('binary frame envelope', () => {
     expect(decodeBinaryFrameJson(buf)).toBe(json)
   })
 
+  it('encode empty UTF-8 payload is header-only (9 bytes, length field zero) and roundtrips', () => {
+    const buf = encodeBinaryFrameJson('')
+    expect(buf.length).toBe(9)
+    expect(isBinaryFrameBuffer(buf)).toBe(true)
+    expect([...buf.subarray(0, 5)]).toEqual([0x47, 0x45, 0x4f, 0x4d, 1])
+    expect(buf.readUInt32LE(5)).toBe(0)
+    expect(decodeBinaryFrameJson(buf)).toBe('')
+  })
+
   it('ignores trailing bytes after the declared payload', () => {
     const json = '{"a":1}'
     const buf = encodeBinaryFrameJson(json)
