@@ -88,6 +88,84 @@ describe('@geometra/ui input', () => {
     expect(focused.children.length).toBe(2)
   })
 
+  it('disabled input is non-interactive and overrides focused styling', () => {
+    const enabled = input('x', 'p')
+    const disabled = input('x', 'p', { disabled: true })
+    const disabledButFocused = input('x', 'p', { disabled: true, focused: true })
+
+    for (const el of [enabled, disabled, disabledButFocused]) {
+      expect(el.kind).toBe('box')
+    }
+    if (enabled.kind !== 'box' || disabled.kind !== 'box' || disabledButFocused.kind !== 'box') return
+
+    expect(enabled.props.pointerEvents).toBeUndefined()
+    expect(disabled.props.pointerEvents).toBe('none')
+    expect(disabledButFocused.props.pointerEvents).toBe('none')
+
+    expect(enabled.props.cursor).toBe('text')
+    expect(disabled.props.cursor).toBe('not-allowed')
+    expect(disabledButFocused.props.cursor).toBe('not-allowed')
+
+    expect(enabled.props.borderColor).toBe('#334155')
+    expect(disabled.props.borderColor).toBe('#475569')
+    expect(disabledButFocused.props.borderColor).toBe('#475569')
+
+    expect(disabled.props.backgroundColor).toBe('#0f172a')
+    expect(disabledButFocused.props.backgroundColor).toBe('#0f172a')
+    expect(disabledButFocused.props.borderColor).not.toBe('#38bdf8')
+
+    expect(disabled.semantic).toEqual({ tag: 'input', ariaDisabled: true })
+    expect(disabled.handlers?.onClick).toBeUndefined()
+    expect(disabled.handlers?.onKeyDown).toBeUndefined()
+  })
+
+  it('disabled input does not forward click, keyboard, or composition handlers', () => {
+    let clicks = 0
+    let keys = ''
+    let composition = ''
+
+    const el = input('', 'Name', {
+      disabled: true,
+      onClick: () => {
+        clicks++
+      },
+      onKeyDown: (e) => {
+        if (e.key.length === 1) keys += e.key
+      },
+      onCompositionEnd: (e) => {
+        composition += e.data
+      },
+    })
+
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+
+    el.handlers?.onClick?.({ x: 0, y: 0, target: {} as HitEvent['target'] })
+    el.handlers?.onKeyDown?.({
+      key: 'a',
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+      target: {} as KeyboardHitEvent['target'],
+    })
+    el.handlers?.onCompositionEnd?.({ data: 'に', target: {} as CompositionHitEvent['target'] })
+
+    expect(clicks).toBe(0)
+    expect(keys).toBe('')
+    expect(composition).toBe('')
+  })
+
+  it('disabled empty input shows placeholder without caret even when focused option is true', () => {
+    const el = input('', 'Type here', { disabled: true, focused: true })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.children.length).toBe(1)
+    const only = el.children[0]
+    expect(only?.kind).toBe('text')
+  })
+
   it('supports multiple controlled inputs without cross-field typing', () => {
     const first = signal('')
     const second = signal('')

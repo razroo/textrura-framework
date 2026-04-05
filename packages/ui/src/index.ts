@@ -47,6 +47,8 @@ export function button(label: string, onClick?: EventHandlers['onClick']): UIEle
 }
 
 export interface InputOptions {
+  /** When true, the field is non-interactive: no caret, keyboard, pointer, or composition handlers. */
+  disabled?: boolean
   focused?: boolean
   caretOffset?: number
   selectionStart?: number
@@ -61,7 +63,10 @@ export interface InputOptions {
 }
 
 export function input(value: string, placeholder = '', options: InputOptions = {}): UIElement {
-  const focused = options.focused === true
+  const disabled = options.disabled === true
+  const focused = !disabled && options.focused === true
+  const valueColor = disabled ? '#64748b' : '#e2e8f0'
+  const placeholderColor = disabled ? '#475569' : '#64748b'
   const maxOffset = value.length
   const requestedCaret = options.caretOffset
   const caretBase =
@@ -83,22 +88,22 @@ export function input(value: string, placeholder = '', options: InputOptions = {
     if (focused) {
       children.push(box({ width: 1.5, minHeight: 14, backgroundColor: '#38bdf8' }, []))
     }
-    children.push(text({ text: placeholder, font: '13px Inter', lineHeight: 18, color: '#64748b' }))
+    children.push(text({ text: placeholder, font: '13px Inter', lineHeight: 18, color: placeholderColor }))
   } else if (hasSelection) {
     const beforeSel = value.slice(0, selStart).replace(/ /g, '\u00A0')
     const selectedText = value.slice(selStart, selEnd).replace(/ /g, '\u00A0')
     const afterSel = value.slice(selEnd).replace(/ /g, '\u00A0')
     if (beforeSel.length > 0) {
-      children.push(text({ text: beforeSel, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }))
+      children.push(text({ text: beforeSel, font: '13px Inter', lineHeight: 18, color: valueColor }))
     }
     children.push(
       box(
         { backgroundColor: 'rgba(56, 189, 248, 0.3)', borderRadius: 2 },
-        [text({ text: selectedText, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' })],
+        [text({ text: selectedText, font: '13px Inter', lineHeight: 18, color: valueColor })],
       ),
     )
     if (afterSel.length > 0) {
-      children.push(text({ text: afterSel, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }))
+      children.push(text({ text: afterSel, font: '13px Inter', lineHeight: 18, color: valueColor }))
     }
   } else {
     const leftText = value.slice(0, caretOffset)
@@ -106,13 +111,13 @@ export function input(value: string, placeholder = '', options: InputOptions = {
     const displayLeft = leftText.replace(/ /g, '\u00A0')
     const displayRight = rightText.replace(/ /g, '\u00A0')
     if (displayLeft.length > 0) {
-      children.push(text({ text: displayLeft, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }))
+      children.push(text({ text: displayLeft, font: '13px Inter', lineHeight: 18, color: valueColor }))
     }
     if (focused) {
       children.push(box({ width: 1.5, minHeight: 14, backgroundColor: '#38bdf8' }, []))
     }
     if (displayRight.length > 0) {
-      children.push(text({ text: displayRight, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }))
+      children.push(text({ text: displayRight, font: '13px Inter', lineHeight: 18, color: valueColor }))
     }
   }
 
@@ -149,17 +154,18 @@ export function input(value: string, placeholder = '', options: InputOptions = {
       paddingRight: 10,
       paddingTop: 8,
       paddingBottom: 8,
-      borderColor: focused ? '#38bdf8' : '#334155',
+      borderColor: disabled ? '#475569' : focused ? '#38bdf8' : '#334155',
       borderWidth: 1,
       borderRadius: 8,
-      cursor: 'text',
-      backgroundColor: focused ? '#111827' : undefined,
-      semantic: { tag: 'input' },
-      onClick: handleClick,
-      onKeyDown: wrappedKeyDown,
-      onCompositionStart: options.onCompositionStart,
-      onCompositionUpdate: options.onCompositionUpdate,
-      onCompositionEnd: options.onCompositionEnd,
+      cursor: disabled ? 'not-allowed' : 'text',
+      pointerEvents: disabled ? 'none' : undefined,
+      backgroundColor: disabled ? '#0f172a' : focused ? '#111827' : undefined,
+      semantic: disabled ? { tag: 'input', ariaDisabled: true } : { tag: 'input' },
+      onClick: disabled ? undefined : handleClick,
+      onKeyDown: disabled ? undefined : wrappedKeyDown,
+      onCompositionStart: disabled ? undefined : options.onCompositionStart,
+      onCompositionUpdate: disabled ? undefined : options.onCompositionUpdate,
+      onCompositionEnd: disabled ? undefined : options.onCompositionEnd,
     },
     children,
   )
