@@ -1581,6 +1581,38 @@ describe('dispatchHit', () => {
     expect(hasInteractiveHitAtPoint(root, layout2, 10, 10)).toBe(true)
   })
 
+  it('overlapping siblings: four children use general z-sort path; WeakMap cache refreshes when z-index changes', () => {
+    const log: string[] = []
+    const a = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('a') } })
+    const b = box({ width: 50, height: 50, zIndex: 1, onClick: () => { log.push('b') } })
+    const c = box({ width: 50, height: 50, zIndex: 2, onClick: () => { log.push('c') } })
+    const d = box({ width: 50, height: 50, zIndex: 3, onClick: () => { log.push('d') } })
+    const root = box({ width: 100, height: 100 }, [a, b, c, d])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['d'])
+    expect(hitPathAtPoint(root, layout, 10, 10)).toEqual([3])
+
+    log.length = 0
+    d.props.zIndex = 0
+    a.props.zIndex = 10
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['a'])
+    expect(hitPathAtPoint(root, layout, 10, 10)).toEqual([0])
+  })
+
   it('overlapping siblings: missing layout for top z-index still dispatches to sibling behind', () => {
     const log: string[] = []
     const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } })
