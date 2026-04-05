@@ -129,4 +129,33 @@ describe('responsive edge cases', () => {
     const cols = responsive(w, { sm: 1, md: 2, lg: 3 }, bps)
     expect(cols.value).toBe(3)
   })
+
+  it('returns undefined when the values map omits the active breakpoint key', () => {
+    const w = signal(1200)
+    const cols = responsive(
+      w,
+      { sm: 1, md: 2 } as { sm: number; md: number; lg: number },
+      bps,
+    )
+    expect(cols.value).toBeUndefined()
+  })
+})
+
+describe('breakpoint duplicate thresholds', () => {
+  it('when two names share the same min-width, the earlier name in Object.entries order wins at the boundary', () => {
+    const bps = { sm: 0, md: 640, altMd: 640 }
+    expect(breakpoint(signal(640), bps).value).toBe('md')
+    expect(breakpoint(signal(639), bps).value).toBe('sm')
+  })
+})
+
+describe('createViewport edge cases', () => {
+  it('stores non-finite dimensions as given (hosts may sanitize); breakpoint still falls back safely', () => {
+    const vp = createViewport(Number.NaN, Number.POSITIVE_INFINITY)
+    expect(vp.width.value).toBeNaN()
+    expect(vp.height.value).toBe(Number.POSITIVE_INFINITY)
+    const bps = { sm: 0, md: 640, lg: 1024 }
+    expect(breakpoint(vp.width, bps).value).toBe('sm')
+    expect(breakpoint(signal(Number.NEGATIVE_INFINITY), bps).value).toBe('sm')
+  })
 })
