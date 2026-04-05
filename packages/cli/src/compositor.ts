@@ -23,8 +23,6 @@ interface ViewSlot {
   ws: WebSocket | null
   layout: ComputedLayout | null
   tree: UIElement | null
-  /** Rows allocated to this view in the terminal */
-  rows: number
 }
 
 const ESC = '\x1b['
@@ -38,10 +36,8 @@ function parseColor(color: string): [number, number, number] | null {
   if (color.startsWith('#')) {
     return [parseInt(color.slice(1, 3), 16), parseInt(color.slice(3, 5), 16), parseInt(color.slice(5, 7), 16)]
   }
-  const rgbaMatch = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/)
-  if (rgbaMatch) {
-    return [Number(rgbaMatch[1]), Number(rgbaMatch[2]), Number(rgbaMatch[3])]
-  }
+  const m = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/)
+  if (m) return [Number(m[1]), Number(m[2]), Number(m[3])]
   return null
 }
 
@@ -69,46 +65,81 @@ function fg256(color: string): string {
 interface Cell { char: string; fg: string; bg: string }
 
 /**
- * Composites multiple Geometra WebSocket views into a single terminal output.
- * Each view gets a vertical slice of the terminal, rendered top-to-bottom.
+ * Composites multiple Geometra WebSocket views into a scrollable terminal.
+ *
+ * Renders at readable scale (width-based) into a virtual grid that can be
+ * taller than the terminal. Arrow keys scroll the viewport up/down.
+ * Text truncates with "…" instead of overflowing.
  */
 export class TerminalCompositor {
   private views: ViewSlot[] = []
-  private width: number
-  private height: number
-  private grid: Cell[][] = []
+  private termWidth: number
+  private termHeight: number
+  /** Virtual grid — can be taller than the terminal */
+  private vGrid: Cell[][] = []
+  private vHeight = 0
+  /** Scroll offset (which virtual row is at the top of the terminal) */
+  private scrollY = 0
   private renderScheduled = false
 
   constructor(
     urls: string[],
     options?: { width?: number; height?: number },
   ) {
-    this.width = options?.width ?? process.stdout.columns ?? 80
-    this.height = options?.height ?? process.stdout.rows ?? 24
-    this.grid = this.createGrid()
+    this.termWidth = options?.width ?? process.stdout.columns ?? 80
+    this.termHeight = options?.height ?? process.stdout.rows ?? 24
 
     this.views = urls.map((url) => ({
       url,
       ws: null,
       layout: null,
       tree: null,
-      rows: 0, // computed dynamically after first frames arrive
     }))
   }
 
   start(): void {
     process.stdout.write(HIDE_CURSOR + CLEAR)
-
-    for (const view of this.views) {
-      this.connectView(view)
-    }
+    for (const view of this.views) this.connectView(view)
+    this.setupKeyboardScroll()
   }
 
   close(): void {
-    for (const view of this.views) {
-      view.ws?.close()
-    }
+    for (const view of this.views) view.ws?.close()
+    if (process.stdin.isTTY) process.stdin.setRawMode(false)
     process.stdout.write(RESET + SHOW_CURSOR + CLEAR)
+  }
+
+  private setupKeyboardScroll(): void {
+    if (!process.stdin.isTTY) return
+    process.stdin.setRawMode(true)
+    process.stdin.resume()
+    process.stdin.on('data', (data) => {
+      const key = data.toString()
+      if (key === '\x03' || key === 'q') { // Ctrl+C or q
+        this.close()
+        process.exit(0)
+      }
+      const maxScroll = Math.max(0, this.vHeight - this.termHeight)
+      if (key === '\x1b[A' || key === 'k') { // Up arrow or k
+        this.scrollY = Math.max(0, this.scrollY - 3)
+        this.flushViewport()
+      } else if (key === '\x1b[B' || key === 'j') { // Down arrow or j
+        this.scrollY = Math.min(maxScroll, this.scrollY + 3)
+        this.flushViewport()
+      } else if (key === '\x1b[5~' || key === 'u') { // Page Up or u
+        this.scrollY = Math.max(0, this.scrollY - this.termHeight)
+        this.flushViewport()
+      } else if (key === '\x1b[6~' || key === 'd') { // Page Down or d
+        this.scrollY = Math.min(maxScroll, this.scrollY + this.termHeight)
+        this.flushViewport()
+      } else if (key === 'g') { // Home
+        this.scrollY = 0
+        this.flushViewport()
+      } else if (key === 'G') { // End
+        this.scrollY = maxScroll
+        this.flushViewport()
+      }
+    })
   }
 
   private connectView(view: ViewSlot): void {
@@ -134,10 +165,7 @@ export class TerminalCompositor {
     })
 
     ws.on('close', () => {
-      // Try reconnect after 3s
-      setTimeout(() => {
-        if (view.ws === ws) this.connectView(view)
-      }, 3000)
+      setTimeout(() => { if (view.ws === ws) this.connectView(view) }, 3000)
     })
   }
 
@@ -150,160 +178,172 @@ export class TerminalCompositor {
     })
   }
 
-  private computeRowAllocation(): void {
-    // Give header-like views (short) minimal rows, rest to content views
-    const isShort = this.views.map(v => {
-      if (!v.layout) return true
-      return v.layout.height < 200 // header views are typically < 100px
-    })
+  private compositeRender(): void {
+    // Compute scale: fit layout width to terminal columns
+    // Use the widest view's width as reference
+    let maxLayoutWidth = 1
+    for (const v of this.views) {
+      if (v.layout && v.layout.width > maxLayoutWidth) maxLayoutWidth = v.layout.width
+    }
+    const scaleX = this.termWidth / maxLayoutWidth
+    // Terminal chars are ~2x taller than wide
+    const scaleY = scaleX * 0.5
 
-    const shortCount = isShort.filter(Boolean).length
-    const tallCount = this.views.length - shortCount
-
-    for (let i = 0; i < this.views.length; i++) {
-      if (isShort[i]) {
-        // Short views (headers): give 2-3 rows
-        this.views[i]!.rows = Math.min(3, Math.max(2, Math.floor(this.height * 0.05)))
+    // Compute total virtual height across all views
+    let totalVRows = 0
+    for (const v of this.views) {
+      if (v.layout) {
+        totalVRows += Math.max(1, Math.ceil(v.layout.height * scaleY))
       } else {
-        // Tall views (content): split remaining rows equally
-        const remaining = this.height - shortCount * 3
-        this.views[i]!.rows = Math.max(4, Math.floor(remaining / Math.max(1, tallCount)))
+        totalVRows += 2
       }
     }
-  }
+    this.vHeight = totalVRows
 
-  private compositeRender(): void {
-    this.computeRowAllocation()
-    this.grid = this.createGrid()
+    // Build virtual grid
+    this.vGrid = this.createGrid(this.termWidth, this.vHeight)
 
+    // Paint each view into the virtual grid
     let yOffset = 0
     for (const view of this.views) {
       if (view.layout && view.tree) {
-        this.paintView(view.layout, view.tree, yOffset, view.rows)
+        const viewRows = Math.max(1, Math.ceil(view.layout.height * scaleY))
+        this.paintNode(view.tree, view.layout, 0, 0, scaleX, scaleY, yOffset)
+        yOffset += viewRows
+      } else {
+        yOffset += 2
       }
-      yOffset += view.rows
     }
 
-    // Flush grid to terminal
+    // Clamp scroll
+    this.scrollY = Math.min(this.scrollY, Math.max(0, this.vHeight - this.termHeight))
+
+    this.flushViewport()
+  }
+
+  /** Write the visible viewport slice of vGrid to the terminal */
+  private flushViewport(): void {
     let buf = moveTo(0, 0)
-    for (let y = 0; y < this.height; y++) {
-      buf += moveTo(0, y)
+    for (let ty = 0; ty < this.termHeight; ty++) {
+      buf += moveTo(0, ty)
+      const vy = ty + this.scrollY
       let lastFg = '', lastBg = ''
-      for (let x = 0; x < this.width; x++) {
-        const cell = this.grid[y]![x]!
+      for (let x = 0; x < this.termWidth; x++) {
+        const cell = this.vGrid[vy]?.[x] ?? { char: ' ', fg: '', bg: '' }
         if (cell.bg !== lastBg) { buf += cell.bg ? bg256(cell.bg) : RESET; lastBg = cell.bg }
         if (cell.fg !== lastFg) { buf += cell.fg ? fg256(cell.fg) : ''; lastFg = cell.fg }
         buf += cell.char
       }
       buf += RESET
     }
+    // Scroll indicator
+    if (this.vHeight > this.termHeight) {
+      const pct = Math.round(this.scrollY / Math.max(1, this.vHeight - this.termHeight) * 100)
+      const indicator = ` ${pct}% ↑↓ scroll `
+      buf += moveTo(this.termWidth - indicator.length - 1, this.termHeight - 1)
+      buf += `${ESC}48;5;237m${ESC}38;5;252m${indicator}${RESET}`
+    }
     process.stdout.write(buf)
   }
 
-  private paintView(layout: ComputedLayout, tree: UIElement, yOffset: number, maxRows: number): void {
-    // Scale independently to fill terminal width and fit allocated rows
-    const scaleX = this.width / layout.width
-    const scaleY = maxRows / layout.height
-    this.paintNode(tree, layout, 0, 0, scaleX, scaleY, yOffset, yOffset + maxRows)
-  }
-
   private paintNode(
-    element: UIElement,
-    layout: ComputedLayout,
-    offsetX: number,
-    offsetY: number,
-    scaleX: number,
-    scaleY: number,
-    minRow: number,
-    maxRow: number,
+    element: UIElement, layout: ComputedLayout,
+    offsetX: number, offsetY: number,
+    scaleX: number, scaleY: number, baseY: number,
   ): void {
     const x = Math.round((offsetX + layout.x) * scaleX)
-    const y = minRow + Math.round((offsetY + layout.y) * scaleY)
+    const y = baseY + Math.round((offsetY + layout.y) * scaleY)
     const w = Math.max(1, Math.round(layout.width * scaleX))
     const h = Math.max(1, Math.round(layout.height * scaleY))
 
     if (element.kind === 'box') {
-      this.paintBox(element, x, y, w, h, minRow, maxRow)
-
+      this.paintBox(element, x, y, w, h)
       const childOffsetX = offsetX + layout.x - ((element.props.scrollX as number) ?? 0)
       const childOffsetY = offsetY + layout.y - ((element.props.scrollY as number) ?? 0)
-
       for (let i = 0; i < element.children.length; i++) {
         const childLayout = layout.children[i]
         if (childLayout) {
-          this.paintNode(element.children[i]!, childLayout, childOffsetX, childOffsetY, scaleX, scaleY, minRow, maxRow)
+          this.paintNode(element.children[i]!, childLayout, childOffsetX, childOffsetY, scaleX, scaleY, baseY)
         }
       }
     } else if (element.kind === 'scene3d') {
-      // Skip 3D scenes in terminal
+      // skip
     } else if (element.kind !== 'image') {
-      this.paintText(element, x, y, w, minRow, maxRow)
+      this.paintText(element, x, y, w, h)
     }
   }
 
-  private paintBox(element: any, x: number, y: number, w: number, h: number, minRow: number, maxRow: number): void {
-    const bg = element.props.backgroundColor
-    const gradientBg = element.props.gradient?.stops[0]?.color
+  private paintBox(element: UIElement, x: number, y: number, w: number, h: number): void {
+    const props = element.props as Record<string, unknown>
+    const bg = props.backgroundColor as string | undefined
+    const gradientBg = (props.gradient as { stops: Array<{ color: string }> } | undefined)?.stops[0]?.color
     const fillColor = bg ?? gradientBg
     if (!fillColor) return
 
     for (let dy = 0; dy < h; dy++) {
       for (let dx = 0; dx < w; dx++) {
-        this.setCell(x + dx, y + dy, ' ', '', fillColor, minRow, maxRow)
+        this.setCell(x + dx, y + dy, ' ', '', fillColor)
       }
     }
 
-    if (element.props.borderColor) {
-      const bc = element.props.borderColor
-      if (w >= 2 && h >= 2) {
-        this.setCell(x, y, '\u250c', bc, fillColor, minRow, maxRow)
-        this.setCell(x + w - 1, y, '\u2510', bc, fillColor, minRow, maxRow)
-        this.setCell(x, y + h - 1, '\u2514', bc, fillColor, minRow, maxRow)
-        this.setCell(x + w - 1, y + h - 1, '\u2518', bc, fillColor, minRow, maxRow)
-        for (let dx = 1; dx < w - 1; dx++) {
-          this.setCell(x + dx, y, '\u2500', bc, fillColor, minRow, maxRow)
-          this.setCell(x + dx, y + h - 1, '\u2500', bc, fillColor, minRow, maxRow)
-        }
-        for (let dy = 1; dy < h - 1; dy++) {
-          this.setCell(x, y + dy, '\u2502', bc, fillColor, minRow, maxRow)
-          this.setCell(x + w - 1, y + dy, '\u2502', bc, fillColor, minRow, maxRow)
-        }
+    const bc = props.borderColor as string | undefined
+    if (bc && w >= 2 && h >= 2) {
+      this.setCell(x, y, '\u250c', bc, fillColor)
+      this.setCell(x + w - 1, y, '\u2510', bc, fillColor)
+      this.setCell(x, y + h - 1, '\u2514', bc, fillColor)
+      this.setCell(x + w - 1, y + h - 1, '\u2518', bc, fillColor)
+      for (let dx = 1; dx < w - 1; dx++) {
+        this.setCell(x + dx, y, '\u2500', bc, fillColor)
+        this.setCell(x + dx, y + h - 1, '\u2500', bc, fillColor)
+      }
+      for (let dy = 1; dy < h - 1; dy++) {
+        this.setCell(x, y + dy, '\u2502', bc, fillColor)
+        this.setCell(x + w - 1, y + dy, '\u2502', bc, fillColor)
       }
     }
   }
 
-  private paintText(element: any, x: number, y: number, w: number, minRow: number, maxRow: number): void {
-    const { text, color, backgroundColor } = element.props
-    const fg = color ?? '#ffffff'
-    const bg = backgroundColor ?? ''
+  private paintText(element: UIElement, x: number, y: number, w: number, h: number): void {
+    const props = element.props as Record<string, unknown>
+    const text = (props.text as string) ?? ''
+    const fg = (props.color as string) ?? '#ffffff'
+    const bg = (props.backgroundColor as string) ?? ''
 
+    // Smart truncation: fit text into allocated w×h cells
+    const lines = text.split('\n')
     let row = 0
-    for (const paragraph of text.split('\n')) {
-      if (!paragraph.length) { row++; continue }
-      for (let i = 0; i < paragraph.length; i += w) {
-        const chunk = paragraph.slice(i, i + w)
-        for (let c = 0; c < chunk.length; c++) {
-          this.setCell(x + c, y + row, chunk[c]!, fg, bg, minRow, maxRow)
+    for (const line of lines) {
+      if (row >= h) break
+      if (line.length <= w) {
+        // Fits — render as-is
+        for (let c = 0; c < line.length; c++) {
+          this.setCell(x + c, y + row, line[c]!, fg, bg)
         }
-        row++
+      } else {
+        // Truncate with ellipsis
+        const truncated = line.slice(0, Math.max(1, w - 1)) + '\u2026'
+        for (let c = 0; c < Math.min(truncated.length, w); c++) {
+          this.setCell(x + c, y + row, truncated[c]!, fg, bg)
+        }
       }
+      row++
     }
   }
 
-  private setCell(x: number, y: number, char: string, fg: string, bg: string, minRow: number, maxRow: number): void {
-    if (x < 0 || x >= this.width || y < minRow || y >= maxRow || y < 0 || y >= this.height) return
-    const cell = this.grid[y]?.[x]
+  private setCell(x: number, y: number, char: string, fg: string, bg: string): void {
+    if (x < 0 || x >= this.termWidth || y < 0 || y >= this.vHeight) return
+    const cell = this.vGrid[y]?.[x]
     if (!cell) return
     cell.char = char
     if (fg) cell.fg = fg
     if (bg) cell.bg = bg
   }
 
-  private createGrid(): Cell[][] {
+  private createGrid(w: number, h: number): Cell[][] {
     const grid: Cell[][] = []
-    for (let y = 0; y < this.height; y++) {
+    for (let y = 0; y < h; y++) {
       const row: Cell[] = []
-      for (let x = 0; x < this.width; x++) row.push({ char: ' ', fg: '', bg: '' })
+      for (let x = 0; x < w; x++) row.push({ char: ' ', fg: '', bg: '' })
       grid.push(row)
     }
     return grid
