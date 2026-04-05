@@ -4,6 +4,7 @@ import { createApp } from '../app.js'
 import { box, image, scene3d, text } from '../elements.js'
 import { clearFocus, focusedElement } from '../focus.js'
 import { layoutBoundsAreFinite } from '../layout-bounds.js'
+import { readPerformanceNow, safePerformanceNowMs } from '../performance-now.js'
 import { signal } from '../signals.js'
 import type { HitEvent, Renderer } from '../types.js'
 
@@ -1661,5 +1662,27 @@ describe('createApp waitForFonts', () => {
       vi.useRealTimers()
       vi.unstubAllGlobals()
     }
+  })
+})
+
+describe('performance now helpers', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('safePerformanceNowMs coerces non-finite now to 0; readPerformanceNow preserves NaN for canvas deltas', () => {
+    const spy = vi.spyOn(performance, 'now').mockReturnValue(Number.NaN)
+    expect(safePerformanceNowMs()).toBe(0)
+    expect(readPerformanceNow()).toBeNaN()
+    spy.mockRestore()
+  })
+
+  it('safePerformanceNowMs and readPerformanceNow return 0 when performance.now throws', () => {
+    const spy = vi.spyOn(performance, 'now').mockImplementation(() => {
+      throw new Error('clock')
+    })
+    expect(safePerformanceNowMs()).toBe(0)
+    expect(readPerformanceNow()).toBe(0)
+    spy.mockRestore()
   })
 })

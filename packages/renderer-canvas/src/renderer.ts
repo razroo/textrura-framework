@@ -21,6 +21,7 @@ import {
   toAccessibilityTree,
   hitPathAtPoint,
   collectFocusOrder,
+  readPerformanceNow,
 } from '@geometra/core'
 
 export interface CanvasRendererOptions {
@@ -236,7 +237,7 @@ export class CanvasRenderer implements Renderer {
 
   render(layout: ComputedLayout, tree: UIElement): void {
     const { ctx, canvas, dpr } = this
-    const frameStart = typeof performance !== 'undefined' ? performance.now() : 0
+    const frameStart = readPerformanceNow()
 
     canvas.width = layout.width * dpr
     canvas.height = layout.height * dpr
@@ -272,18 +273,13 @@ export class CanvasRenderer implements Renderer {
       }
     }
     if (this.layoutInspector && !skipOverlays) {
-      const hudRaw =
-        typeof performance !== 'undefined' ? performance.now() - frameStart : 0
+      const hudRaw = readPerformanceNow() - frameStart
       const msBeforeHud = Math.max(0, Number.isFinite(hudRaw) ? hudRaw : 0)
       this.paintLayoutInspectorHud(layout, tree, msBeforeHud)
     }
 
-    if (typeof performance !== 'undefined') {
-      const delta = performance.now() - frameStart
-      this.lastRenderWallMs = Math.max(0, Number.isFinite(delta) ? delta : 0)
-    } else {
-      this.lastRenderWallMs = 0
-    }
+    const delta = readPerformanceNow() - frameStart
+    this.lastRenderWallMs = Math.max(0, Number.isFinite(delta) ? delta : 0)
 
     ctx.setTransform(1, 0, 0, 1, 0, 0)
   }

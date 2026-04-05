@@ -8,29 +8,13 @@ import { effect } from './signals.js'
 import { focusedElement, setFocus } from './focus.js'
 import { collectFontFamiliesFromTree, resolveFontLoadTimeoutMs, waitForFonts } from './fonts.js'
 import { dispatchKeyboardEvent, dispatchCompositionEvent } from './keyboard.js'
+import { safePerformanceNowMs } from './performance-now.js'
 
 /** Only finite, non-negative numbers become Textura root constraints; otherwise the key is omitted (unconstrained). */
 function finiteRootExtent(value: number | undefined): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value)) return undefined
   const v = Object.is(value, -0) ? 0 : value
   return v >= 0 ? v : undefined
-}
-
-/**
- * Monotonic layout timing without throwing when `performance` is partial or hostile
- * (missing `now`, non-function `now`, or a throwing implementation).
- */
-function safePerformanceNowMs(): number {
-  try {
-    const perf = globalThis.performance
-    if (perf && typeof perf.now === 'function') {
-      const t = perf.now()
-      return typeof t === 'number' && Number.isFinite(t) ? t : 0
-    }
-  } catch {
-    // ignore
-  }
-  return 0
 }
 
 export interface AppOptions {

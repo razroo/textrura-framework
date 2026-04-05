@@ -42,6 +42,7 @@ export {
   layoutBoundsAreFinite,
   pointInInclusiveLayoutRect,
 } from './layout-bounds.js'
+export { safePerformanceNowMs, readPerformanceNow } from './performance-now.js'
 
 // Web fonts (browser)
 export {
