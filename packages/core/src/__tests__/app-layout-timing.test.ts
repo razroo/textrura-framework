@@ -56,6 +56,30 @@ describe('createApp layout direction (Textura computeLayout)', () => {
     expect(a!.x).toBeLessThan(b!.x)
   })
 
+  it('treats JSON null root dir like auto for Yoga (document-default ltr; flex row left-to-right)', async () => {
+    const layouts: Array<{ children: Array<{ x: number }> }> = []
+    const renderer: Renderer = {
+      render(layout) {
+        layouts.push(layout as { children: Array<{ x: number }> })
+      },
+      destroy: vi.fn(),
+    }
+
+    await createApp(
+      () =>
+        box({ width: 100, height: 40, flexDirection: 'row', dir: null as never }, [
+          box({ width: 30, height: 20 }),
+          box({ width: 30, height: 20 }),
+        ]),
+      renderer,
+      { width: 100, height: 50 },
+    )
+
+    expect(layouts).toHaveLength(1)
+    const [a, b] = layouts[0]!.children
+    expect(a!.x).toBeLessThan(b!.x)
+  })
+
   it('honors AppOptions.layoutDirection over the root element dir', async () => {
     const layouts: Array<{ children: Array<{ x: number }> }> = []
     const renderer: Renderer = {

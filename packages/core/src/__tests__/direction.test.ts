@@ -262,6 +262,15 @@ describe('resolveComputeLayoutDirection', () => {
     expect(resolveComputeLayoutDirection(null as never, bogusRoot)).toBe('ltr')
   })
 
+  it('derives ltr from JSON null root dir when host override is invalid (loose deserialization)', () => {
+    const nullDirRoot = box({ width: 1, height: 1, dir: null as never })
+    expect(resolveComputeLayoutDirection(undefined, nullDirRoot)).toBe('ltr')
+    expect(resolveComputeLayoutDirection('auto' as never, nullDirRoot)).toBe('ltr')
+    expect(resolveComputeLayoutDirection(null as never, nullDirRoot)).toBe('ltr')
+    expect(resolveComputeLayoutDirection('rtl', nullDirRoot)).toBe('rtl')
+    expect(resolveComputeLayoutDirection('ltr', nullDirRoot)).toBe('ltr')
+  })
+
   it('host primitive ltr/rtl overrides corrupt root dir (invalid root does not block layoutDirection)', () => {
     const bogusRoot = box({ width: 1, height: 1, dir: 'bogus' as never })
     expect(resolveComputeLayoutDirection('rtl', bogusRoot)).toBe('rtl')
