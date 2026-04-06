@@ -147,6 +147,9 @@ export function coalescePatches(patches: LayoutPatch[]): LayoutPatch[] {
  *
  * When `prev` and `next` are the same object reference (including a shared child subtree), returns
  * `[]` immediately without walking — safe for immutable layout snapshots.
+ *
+ * Non-array `children` on either side (corrupt snapshots / bad deserialization) is treated as `[]` for
+ * subtree pairing so patch generation does not throw; root `x`/`y`/`width`/`height` are still compared.
  */
 export function diffLayout(
   prev: ComputedLayout,
@@ -167,10 +170,12 @@ export function diffLayout(
 
   if (changed) patches.push(patch)
 
-  const maxChildren = Math.max(prev.children.length, next.children.length)
+  const prevChildren = Array.isArray(prev.children) ? prev.children : []
+  const nextChildren = Array.isArray(next.children) ? next.children : []
+  const maxChildren = Math.max(prevChildren.length, nextChildren.length)
   for (let i = 0; i < maxChildren; i++) {
-    const prevChild = prev.children[i]
-    const nextChild = next.children[i]
+    const prevChild = prevChildren[i]
+    const nextChild = nextChildren[i]
     if (prevChild && nextChild) {
       patches.push(...diffLayout(prevChild, nextChild, [...path, i]))
     }

@@ -165,6 +165,42 @@ describe('diffLayout', () => {
       { path: [0], y: 8, width: 91 },
     ])
   })
+
+  it('treats non-array children as empty so corrupt layouts do not throw (pairing uses [] fallback)', () => {
+    const prev: TestLayout = { x: 0, y: 0, width: 10, height: 10, children: [] }
+    const next = {
+      x: 1,
+      y: 0,
+      width: 10,
+      height: 10,
+      children: null,
+    } as unknown as TestLayout
+    expect(diffLayout(prev, next)).toEqual([{ path: [], x: 1 }])
+  })
+
+  it('does not throw when both sides have non-array children; still diffs root geometry', () => {
+    const prev = { x: 0, y: 0, width: 5, height: 5, children: {} as unknown as TestLayout[] }
+    const next = { x: 0, y: 0, width: 6, height: 5, children: 'nope' as unknown as TestLayout[] }
+    expect(diffLayout(prev as TestLayout, next as TestLayout)).toEqual([{ path: [], width: 6 }])
+  })
+
+  it('recurses safely when an inner node has non-array children', () => {
+    const prev: TestLayout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 10, height: 10, children: [] }],
+    }
+    const next = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 2, y: 0, width: 10, height: 10, children: null as unknown as TestLayout[] }],
+    } as unknown as TestLayout
+    expect(diffLayout(prev, next)).toEqual([{ path: [0], x: 2 }])
+  })
 })
 
 describe('isProtocolCompatible', () => {
