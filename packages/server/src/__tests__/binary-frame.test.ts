@@ -34,6 +34,11 @@ describe('isBinaryFrameBuffer', () => {
     expect(isBinaryFrameBuffer(headerOnly)).toBe(true)
     expect(isBinaryFrameBuffer(new Uint8Array(headerOnly))).toBe(true)
   })
+
+  it('returns false for nullish input without throwing (hostile / mistyped calls)', () => {
+    expect(isBinaryFrameBuffer(null as unknown as Buffer)).toBe(false)
+    expect(isBinaryFrameBuffer(undefined as unknown as Buffer)).toBe(false)
+  })
 })
 
 describe('binary frame envelope', () => {
@@ -86,6 +91,11 @@ describe('binary frame envelope', () => {
   it('throws when the buffer is not a GEOM binary frame', () => {
     expect(() => decodeBinaryFrameJson(Buffer.alloc(0))).toThrow('Not a GEOM binary frame')
     expect(() => decodeBinaryFrameJson(Buffer.from('not binary', 'utf8'))).toThrow('Not a GEOM binary frame')
+  })
+
+  it('throws when decode input is nullish (consistent error, not TypeError from property access)', () => {
+    expect(() => decodeBinaryFrameJson(null as unknown as Buffer)).toThrow('Not a GEOM binary frame')
+    expect(() => decodeBinaryFrameJson(undefined as unknown as Buffer)).toThrow('Not a GEOM binary frame')
   })
 
   it('throws when magic matches but frame version is not v1', () => {

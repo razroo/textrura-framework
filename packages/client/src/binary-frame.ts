@@ -35,8 +35,10 @@ function resolveFrameBytes(data: BinaryFrameBytes): {
  * Accepts a root `ArrayBuffer` / `SharedArrayBuffer` or any `ArrayBufferView` (e.g. `Uint8Array` subarray)
  * so callers can probe
  * frames embedded in a larger buffer without copying.
+ * `null` / `undefined` yield `false` (mistyped JS callers) instead of throwing from buffer resolution.
  */
 export function isBinaryFrameArrayBuffer(data: BinaryFrameBytes): boolean {
+  if (data == null) return false
   const { buffer, byteOffset, byteLength } = resolveFrameBytes(data)
   if (byteLength < HEADER_BYTES) return false
   const u8 = new Uint8Array(buffer, byteOffset, byteLength)

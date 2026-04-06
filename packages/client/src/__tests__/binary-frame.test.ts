@@ -43,6 +43,11 @@ describe('isBinaryFrameArrayBuffer', () => {
     expect(isBinaryFrameArrayBuffer(headerOnly.buffer)).toBe(true)
   })
 
+  it('returns false for nullish input without throwing (hostile / mistyped calls)', () => {
+    expect(isBinaryFrameArrayBuffer(null as unknown as ArrayBuffer)).toBe(false)
+    expect(isBinaryFrameArrayBuffer(undefined as unknown as ArrayBuffer)).toBe(false)
+  })
+
   it('returns false when a root SharedArrayBuffer is shorter than the v1 header', () => {
     if (typeof SharedArrayBuffer === 'undefined') return
     expect(isBinaryFrameArrayBuffer(new SharedArrayBuffer(8))).toBe(false)
@@ -105,6 +110,11 @@ describe('client binary frame decode', () => {
     expect(() => decodeBinaryFrameJson(new ArrayBuffer(0))).toThrow('Not a GEOM binary frame')
     const plain = new TextEncoder().encode('not binary').buffer
     expect(() => decodeBinaryFrameJson(plain)).toThrow('Not a GEOM binary frame')
+  })
+
+  it('throws when decode input is nullish (consistent error, not TypeError from property access)', () => {
+    expect(() => decodeBinaryFrameJson(null as unknown as ArrayBuffer)).toThrow('Not a GEOM binary frame')
+    expect(() => decodeBinaryFrameJson(undefined as unknown as ArrayBuffer)).toThrow('Not a GEOM binary frame')
   })
 
   it('throws when magic matches but frame version is not v1', () => {
