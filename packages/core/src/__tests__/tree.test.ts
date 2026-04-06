@@ -333,6 +333,15 @@ describe('toLayoutTree', () => {
     expect(layout).not.toHaveProperty('dir')
   })
 
+  it('defaults isLayoutRoot to true when omitted (parity with explicit true for createApp layout roots)', () => {
+    const row = box({ width: 100, height: 40, flexDirection: 'row', dir: 'rtl' })
+    expect(toLayoutTree(row)).toEqual(toLayoutTree(row, true))
+
+    const inner = box({ width: 50, height: 50, dir: 'rtl' })
+    const root = box({ width: 100, height: 100, dir: 'ltr' }, [inner])
+    expect(toLayoutTree(root)).toEqual(toLayoutTree(root, true))
+  })
+
   it('isLayoutRoot false preserves dir on subtree heads (advanced embedding; default true strips like app root)', () => {
     const row = box({ width: 100, height: 40, flexDirection: 'row', dir: 'rtl' })
     expect(toLayoutTree(row, true)).not.toHaveProperty('dir')
