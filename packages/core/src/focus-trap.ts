@@ -24,6 +24,10 @@ function collectFocusable(element: UIElement, layout: ComputedLayout, out: Focus
   }
 }
 
+function isValidScopeIndex(idx: unknown): idx is number {
+  return typeof idx === 'number' && Number.isInteger(idx) && idx >= 0
+}
+
 function resolveSubtree(
   tree: UIElement,
   layout: ComputedLayout,
@@ -32,6 +36,7 @@ function resolveSubtree(
   let el: UIElement = tree
   let lo: ComputedLayout = layout
   for (const idx of path) {
+    if (!isValidScopeIndex(idx)) return null
     if (el.kind !== 'box') return null
     const kids = el.children
     if (!Array.isArray(kids)) return null
@@ -61,7 +66,9 @@ function resolveSubtree(
  *   When `scopePath` is an empty array, this node **is** the trap root: it must be a
  *   {@link import('./types.js').BoxElement} or `trapFocusStep` returns `false` (text/image/scene3d roots cannot host a trap).
  * @param layout — Computed layout parallel to `tree` from Textura/Yoga.
- * @param scopePath — Indices from the tree root to the trap root box (inclusive). Pass `[]` to use
+ * @param scopePath — Indices from the tree root to the trap root box (inclusive). Each segment must be a
+ *   non-negative integer (`typeof idx === 'number'` and {@link Number.isInteger}); strings, booleans,
+ *   `NaN`, `±Infinity`, and fractions are rejected. Pass `[]` to use
  *   `tree` / `layout` as the trap scope (cycle every focusable under that subtree). Invalid
  *   paths (out-of-range index, non-box node, non-array `children` on a box along the path, or empty
  *   focusable list under the subtree) yield `false`. The resolved scope root’s layout must satisfy
