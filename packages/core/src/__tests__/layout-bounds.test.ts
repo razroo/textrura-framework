@@ -622,6 +622,13 @@ describe('scrollSafeChildOffsets', () => {
     // Scroll is coerced to 0; still non-finite abs poisons the difference.
     expect(scrollSafeChildOffsets(Number.NaN, 10, Number.NaN, Number.POSITIVE_INFINITY)).toBeNull()
   })
+
+  it('preserves IEEE −0 in child origins when abs uses −0 and scroll is 0 (hit-test / selection parity)', () => {
+    const r = scrollSafeChildOffsets(-0, 10, 0, 0)
+    expect(r).not.toBeNull()
+    expect(Object.is(r!.ox, -0)).toBe(true)
+    expect(r!.oy).toBe(10)
+  })
 })
 
 describe('finiteNumberOrZero', () => {
