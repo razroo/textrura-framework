@@ -1522,6 +1522,33 @@ describe('dispatchHit', () => {
     expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(true)
   })
 
+  it('overlapping siblings: two-child z-order updates when equal z-index ties break (fast-path cache)', () => {
+    const log: string[] = []
+    const first = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('first') } })
+    const second = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('second') } })
+    const root = box({ width: 100, height: 100 }, [first, second])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['second'])
+
+    log.length = 0
+    first.props.zIndex = 10
+    second.props.zIndex = 0
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['first'])
+    expect(hitPathAtPoint(root, layout, 10, 10)).toEqual([0])
+  })
+
   it('overlapping siblings: equal z-index on three children prefers last source order (stable sort + top-most paint)', () => {
     const log: string[] = []
     const first = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('first') } })
