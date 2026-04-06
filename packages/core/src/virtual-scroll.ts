@@ -18,6 +18,20 @@ function intRowMetric(n: number, fallback: number): number {
   return Math.max(0, Math.floor(finiteOr(n, fallback)))
 }
 
+/** Like `Math.max(0, n)` but maps non-finite `n` to `0` so corrupt floats cannot poison window indices. */
+function nonNegativeOrZero(n: number): number {
+  return Number.isFinite(n) ? Math.max(0, n) : 0
+}
+
+/**
+ * Inclusive last row index for a window starting at `start`. When `start + safeWindow - 1` overflows or is
+ * otherwise non-finite, returns `maxIndex` (same defensive rule as {@link import('./layout-bounds.js').pointInInclusiveLayoutRect}).
+ */
+function inclusiveEndIndex(start: number, maxIndex: number, safeWindow: number): number {
+  const spanEnd = start + safeWindow - 1
+  return Number.isFinite(spanEnd) ? Math.min(maxIndex, spanEnd) : maxIndex
+}
+
 /**
  * Keep the selected row index visible inside a fixed-size virtual window.
  *
@@ -43,21 +57,21 @@ export function syncVirtualWindow(
   const safeWindow = Math.max(1, Math.floor(finiteOr(windowSize, 1)))
   const maxIndex = Math.max(0, safeTotal - 1)
   const nextSelected = Math.max(0, Math.min(maxIndex, intRowMetric(selected, 0)))
-  const maxStart = Math.max(0, safeTotal - safeWindow)
+  const maxStart = nonNegativeOrZero(safeTotal - safeWindow)
 
-  let start = Math.max(0, Math.min(maxStart, intRowMetric(currentStart, 0)))
-  const end = Math.min(maxIndex, start + safeWindow - 1)
+  let start = nonNegativeOrZero(Math.min(maxStart, intRowMetric(currentStart, 0)))
+  const end = inclusiveEndIndex(start, maxIndex, safeWindow)
 
   if (nextSelected < start) {
     start = nextSelected
   } else if (nextSelected > end) {
-    start = Math.max(0, nextSelected - safeWindow + 1)
+    start = nonNegativeOrZero(nextSelected - safeWindow + 1)
   }
 
-  const clampedStart = Math.max(0, Math.min(maxStart, start))
+  const clampedStart = nonNegativeOrZero(Math.min(maxStart, start))
   return {
     start: clampedStart,
-    end: Math.min(maxIndex, clampedStart + safeWindow - 1),
+    end: inclusiveEndIndex(clampedStart, maxIndex, safeWindow),
     selected: nextSelected,
   }
 }

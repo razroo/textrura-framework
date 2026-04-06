@@ -98,8 +98,7 @@ describe('streamText', () => {
     const s = streamText()
     let updateCount = 0
     effect(() => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      s.value
+      void s.value
       updateCount++
     })
     // effect runs once on creation

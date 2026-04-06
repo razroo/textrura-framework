@@ -139,6 +139,15 @@ describe('syncVirtualWindow', () => {
     expect(syncVirtualWindow(8, 3, 2, five)).toEqual({ start: 0, end: 2, selected: 2 })
   })
 
+  it('returns finite start and end when window size is an extreme finite float (no NaN window indices)', () => {
+    const r = syncVirtualWindow(1000, Number.MAX_VALUE, 500, 0)
+    expect(Number.isFinite(r.start)).toBe(true)
+    expect(Number.isFinite(r.end)).toBe(true)
+    expect(r.selected).toBe(500)
+    expect(r.start).toBe(0)
+    expect(r.end).toBe(999)
+  })
+
   it(
     'keeps selection inside the visible window and bounds visible span for a grid of small inputs',
     () => {
