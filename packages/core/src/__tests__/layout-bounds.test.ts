@@ -603,6 +603,13 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(10, 20, 3, Object(4) as unknown as number)).toEqual({ ox: 7, oy: 20 })
   })
 
+  it('coerces BigInt scroll offsets to 0 without throwing (typeof guard; parity with finiteNumberOrZero / hit-test)', () => {
+    expect(() => scrollSafeChildOffsets(10, 20, 1n as unknown as number, 4)).not.toThrow()
+    expect(scrollSafeChildOffsets(10, 20, 1n as unknown as number, 4)).toEqual({ ox: 10, oy: 16 })
+    expect(() => scrollSafeChildOffsets(10, 20, 3, 2n as unknown as number)).not.toThrow()
+    expect(scrollSafeChildOffsets(10, 20, 3, 2n as unknown as number)).toEqual({ ox: 7, oy: 20 })
+  })
+
   it('returns null when abs minus scroll overflows to non-finite (hit-test / selection parity)', () => {
     const max = Number.MAX_VALUE
     expect(max - -max).toBe(Infinity)
