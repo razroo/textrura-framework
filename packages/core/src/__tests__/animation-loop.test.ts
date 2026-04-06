@@ -87,6 +87,51 @@ describe('animationLoop', () => {
     expect(dts[3]).toBeCloseTo(0.05, 6)
   })
 
+  it('ignores non-finite Date.now samples so dt stays finite and lastTime is not poisoned', async () => {
+    const pending: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      pending.push(cb)
+      return pending.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    let mockNow = 10_000
+    vi.spyOn(Date, 'now').mockImplementation(() => mockNow)
+
+    const animationLoop = await loadAnimationLoop()
+    const dts: number[] = []
+    let frames = 0
+
+    animationLoop(dt => {
+      expect(Number.isFinite(dt)).toBe(true)
+      dts.push(dt)
+      frames++
+      if (frames === 1) {
+        mockNow += 100
+      } else if (frames === 2) {
+        mockNow = Number.NaN
+      } else if (frames === 3) {
+        mockNow = Number.POSITIVE_INFINITY
+      } else {
+        mockNow = 10_250
+      }
+      return frames < 5
+    })
+
+    while (pending.length) {
+      const batch = pending.splice(0, pending.length)
+      for (const cb of batch) cb(0)
+    }
+
+    expect(frames).toBe(5)
+    expect(dts[0]).toBe(0)
+    expect(dts[1]).toBeCloseTo(0.1, 6)
+    expect(dts[2]).toBe(0)
+    expect(dts[3]).toBe(0)
+    // After bad samples, clock resumes from the last good anchor (10_100), not NaN/Infinity.
+    expect(dts[4]).toBeCloseTo(0.15, 6)
+  })
+
   it('returning false on the first tick does not schedule another frame', async () => {
     const pending: FrameRequestCallback[] = []
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {

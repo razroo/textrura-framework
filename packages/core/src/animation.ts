@@ -382,19 +382,25 @@ export function spring(
  * When `Date.now()` moves backward (clock skew, sleep/wake, manual adjustment), `dt` is clamped to `0`
  * so callbacks never see a negative delta.
  *
+ * When `Date.now()` is non-finite (NaN or ±Infinity from a broken host or mock), that sample is ignored:
+ * `lastTime` is not advanced with a bad value and `dt` is `0`, so callbacks never receive a non-finite delta.
+ *
  * If the callback throws, the loop stops (`running` cleared, no further frames scheduled) and the error
  * is rethrown so hosts retain normal exception visibility.
  */
 export function animationLoop(callback: (dt: number) => boolean): () => void {
-  let lastTime = Date.now()
+  const t0 = Date.now()
+  let lastTime = Number.isFinite(t0) ? t0 : 0
   let running = true
   let id: number
 
   function tick() {
     if (!running) return
     const now = Date.now()
-    const dt = Math.max(0, (now - lastTime) / 1000)
-    lastTime = now
+    const effectiveNow = Number.isFinite(now) ? now : lastTime
+    const dtRaw = (effectiveNow - lastTime) / 1000
+    const dt = Number.isFinite(dtRaw) && dtRaw >= 0 ? dtRaw : 0
+    lastTime = effectiveNow
     let scheduleNext: boolean
     try {
       scheduleNext = callback(dt) !== false
