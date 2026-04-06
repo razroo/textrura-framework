@@ -64,6 +64,8 @@ type MemoryHistoryOptions = {
  * - `initialIndex` is clamped to the stack; default is the last entry.
  * - `go(0)` does not notify listeners.
  * - Non-finite `delta` (`NaN`, `±Infinity`) is a no-op (does not move the index or notify).
+ * - Values that are not primitive finite numbers (`bigint`, strings, objects, etc.) are also no-ops so
+ *   `index + delta` never mixes types (BigInt + number throws).
  */
 export function createMemoryHistory(options: MemoryHistoryOptions = {}): HistoryAdapter {
   const entries = (options.initialEntries ?? ['/']).map(parseToLocation)
