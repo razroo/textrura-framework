@@ -1722,6 +1722,34 @@ describe('dispatchHit', () => {
     expect(hitPathAtPoint(root, layout, 10, 10)).toEqual([0])
   })
 
+  it('overlapping siblings: five children use general z-sort path; highest z wins (beyond four-child coverage)', () => {
+    const log: string[] = []
+    const a = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('a') } })
+    const b = box({ width: 50, height: 50, zIndex: 1, onClick: () => { log.push('b') } })
+    const c = box({ width: 50, height: 50, zIndex: 2, onClick: () => { log.push('c') } })
+    const d = box({ width: 50, height: 50, zIndex: 3, onClick: () => { log.push('d') } })
+    const e = box({ width: 50, height: 50, zIndex: 4, onClick: () => { log.push('e') } })
+    const root = box({ width: 100, height: 100 }, [a, b, c, d, e])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['e'])
+    expect(hitPathAtPoint(root, layout, 10, 10)).toEqual([4])
+    expect(getCursorAtPoint(root, layout, 10, 10)).toBeNull()
+  })
+
   it('overlapping siblings: missing layout for top z-index still dispatches to sibling behind', () => {
     const log: string[] = []
     const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } })
