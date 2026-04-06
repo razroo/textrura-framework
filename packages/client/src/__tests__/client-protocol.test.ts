@@ -765,6 +765,33 @@ describe('applyServerMessage', () => {
     expect(renders).toHaveLength(1)
   })
 
+  it('rejects non-string type discriminants without metrics (corrupt wire JSON)', () => {
+    type Msg = Parameters<typeof applyServerMessage>[2]
+    const bad = [
+      { type: 1, layout: layout(), tree: tree(), protocolVersion: 1 },
+      { type: true, layout: layout(), tree: tree(), protocolVersion: 1 },
+      { type: [], layout: layout(), tree: tree(), protocolVersion: 1 },
+      { type: {}, layout: layout(), tree: tree(), protocolVersion: 1 },
+      { type: null, layout: layout(), tree: tree(), protocolVersion: 1 },
+    ] as unknown as Msg[]
+
+    for (const msg of bad) {
+      const { renderer, renders } = createRendererSpy()
+      const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+      const errors: string[] = []
+      const metrics: ClientFrameMetrics[] = []
+
+      applyServerMessage(state, renderer, msg, e => errors.push(String(e)), m => metrics.push(m))
+
+      expect(errors).toHaveLength(1)
+      expect(errors[0]).toContain('Invalid server message')
+      expect(errors[0]).toContain('expected type frame')
+      expect(renders).toHaveLength(0)
+      expect(metrics).toHaveLength(0)
+      expect(state.layout).toBeNull()
+    }
+  })
+
   it('applies data messages via onData without rendering', () => {
     const { renderer, renders } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
