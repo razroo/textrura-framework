@@ -1716,6 +1716,81 @@ describe('text layout (Pretext + canvas measureText)', () => {
   })
 })
 
+describe('display none (Yoga Display.None)', () => {
+  it('row: display none child has zero size and does not consume main-axis space; next sibling starts at origin', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 40,
+      flexDirection: 'row',
+      children: [
+        { width: 60, height: 40, display: 'none' },
+        { width: 50, height: 40 },
+      ],
+    }
+    const result = computeLayout(tree, { width: 200, height: 40 })
+    expect(result.children[0]!.width).toBe(0)
+    expect(result.children[0]!.height).toBe(0)
+    expect(result.children[1]!.x).toBe(0)
+    expect(result.children[1]!.width).toBe(50)
+  })
+
+  it('column: display none child has zero size; following sibling stacks without a gap from the hidden node', () => {
+    const tree: BoxNode = {
+      width: 100,
+      height: 120,
+      flexDirection: 'column',
+      gap: 4,
+      children: [
+        { width: 100, height: 30, display: 'none' },
+        { width: 100, height: 24 },
+      ],
+    }
+    const result = computeLayout(tree, { width: 100, height: 120 })
+    expect(result.children[0]!.height).toBe(0)
+    expect(result.children[1]!.y).toBe(0)
+    expect(result.children[1]!.height).toBe(24)
+  })
+
+  it('explicit display flex keeps default flex participation (baseline vs none)', () => {
+    const noneFirst: BoxNode = {
+      width: 120,
+      height: 30,
+      flexDirection: 'row',
+      children: [
+        { width: 40, height: 20, display: 'none' },
+        { width: 40, height: 20 },
+      ],
+    }
+    const flexFirst: BoxNode = {
+      width: 120,
+      height: 30,
+      flexDirection: 'row',
+      children: [
+        { width: 40, height: 20, display: 'flex' },
+        { width: 40, height: 20 },
+      ],
+    }
+    const hidden = computeLayout(noneFirst, { width: 120, height: 30 })
+    const visible = computeLayout(flexFirst, { width: 120, height: 30 })
+    expect(hidden.children[1]!.x).toBe(0)
+    expect(visible.children[1]!.x).toBe(40)
+  })
+
+  it('malformed display string falls back to flex (only none opts out)', () => {
+    const tree: BoxNode = {
+      width: 100,
+      height: 40,
+      flexDirection: 'row',
+      children: [
+        { width: 30, height: 40, display: 'hidden' as never },
+        { width: 30, height: 40 },
+      ],
+    }
+    const result = computeLayout(tree, { width: 100, height: 40 })
+    expect(result.children[1]!.x).toBe(30)
+  })
+})
+
 describe('engine init contract', () => {
   it('computeLayout throws a clear error when Yoga config is missing (caller must init after destroy)', async () => {
     destroy()
