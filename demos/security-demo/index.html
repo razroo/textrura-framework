@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Geometra — Security Attack Surface Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0a;
+      color: #fff;
+      font-family: system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px;
+      gap: 16px;
+    }
+    h1 { font-size: 20px; font-weight: 600; color: #888; }
+    p.subtitle { font-size: 14px; color: #666; max-width: 700px; text-align: center; }
+    canvas { border: 1px solid #333; border-radius: 8px; cursor: pointer; }
+    .controls { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    button {
+      background: #222;
+      color: #fff;
+      border: 1px solid #444;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    button:hover { background: #333; }
+    button.active { background: #e94560; border-color: #e94560; }
+
+    .dom-demo {
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 16px;
+      background: #111;
+      width: 700px;
+      margin-top: 8px;
+    }
+    .dom-demo h3 { font-size: 14px; color: #e94560; margin-bottom: 8px; }
+    .dom-demo pre {
+      background: #1a1a2e;
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #ccc;
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+    .dom-demo .rendered {
+      margin-top: 8px;
+      padding: 12px;
+      background: #0d0d1a;
+      border-radius: 6px;
+      border: 1px dashed #333;
+    }
+    .label { font-size: 12px; color: #666; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Geometra — Security Attack Surface Demo</h1>
+  <p class="subtitle">
+    DOM-based UIs have hidden attack surfaces that AI agents can't detect.
+    Geometra's geometry pipeline renders only what you explicitly declare — no parsing, no hidden content, no injection vectors.
+  </p>
+
+  <div class="controls">
+    <button id="btn-hidden-html" class="active">Hidden HTML</button>
+    <button id="btn-css-tricks">CSS Tricks</button>
+    <button id="btn-xss">XSS Injection</button>
+    <button id="btn-fake-ui">Fake UI Elements</button>
+    <button id="btn-data-exfil">Data Exfiltration</button>
+  </div>
+
+  <!-- DOM vulnerability demonstration -->
+  <div class="dom-demo" id="dom-panel"></div>
+
+  <!-- Geometra safe rendering -->
+  <p class="label">Geometra renders the same content safely on canvas — no hidden attack surface:</p>
+  <canvas id="app" width="700" height="420"></canvas>
+
+  <script type="module" src="./app.ts"></script>
+</body>
+</html>

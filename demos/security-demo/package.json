@@ -1,0 +1,17 @@
+{
+  "name": "@geometra/demo-security",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@geometra/core": "*",
+    "@geometra/renderer-canvas": "*",
+    "@geometra/ui": "*"
+  },
+  "devDependencies": {
+    "vite": "^8.0.3"
+  }
+}

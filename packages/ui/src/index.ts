@@ -976,7 +976,7 @@ export function alert(message: string, options: AlertOptions = {}): UIElement {
 
   const body: UIElement[] = [
     text({ text: s.icon, font: '13px Inter', lineHeight: 18, color: s.color }),
-    box({ flexDirection: 'column', gap: 4, flexGrow: 1 }, content),
+    box({ flexDirection: 'column', gap: 4, flexGrow: 1, flexShrink: 1, minWidth: 0 }, content),
   ]
   if (options.onDismiss) {
     body.push(
@@ -994,7 +994,7 @@ export function alert(message: string, options: AlertOptions = {}): UIElement {
   return box(
     {
       flexDirection: 'row', alignItems: 'flex-start', gap: 10,
-      padding: 12, borderRadius: 10, borderWidth: 1,
+      padding: 12, borderRadius: 10, borderWidth: 1, minWidth: 0,
       borderColor: s.border, backgroundColor: s.bg,
       semantic: { role: 'alert', ariaLabel: options.title ? `${options.title}: ${message}` : message },
     },
