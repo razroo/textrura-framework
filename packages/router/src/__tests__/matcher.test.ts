@@ -128,6 +128,8 @@ describe('route matcher', () => {
     expect(matchPath('', '/')).toEqual({ params: {} })
     expect(matchPath('', '')).toEqual({ params: {} })
     expect(matchPath('', '/?ref=1')).toEqual({ params: {} })
+    expect(matchPath('', '#section')).toEqual({ params: {} })
+    expect(matchPath('', '?q=only')).toEqual({ params: {} })
     expect(matchPath('', '/foo')).toBeNull()
     expect(matchPath('', 'nested')).toBeNull()
   })
@@ -137,6 +139,8 @@ describe('route matcher', () => {
       expect(matchPath(pattern, '/')).toEqual({ params: {} })
       expect(matchPath(pattern, '')).toEqual({ params: {} })
       expect(matchPath(pattern, '/?ref=1')).toEqual({ params: {} })
+      expect(matchPath(pattern, '#section')).toEqual({ params: {} })
+      expect(matchPath(pattern, '?q=only')).toEqual({ params: {} })
       expect(matchPath(pattern, '/foo')).toBeNull()
       expect(matchPath(pattern, 'nested')).toBeNull()
     }
