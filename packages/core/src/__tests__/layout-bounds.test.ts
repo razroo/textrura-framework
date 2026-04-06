@@ -621,6 +621,16 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(0, -max, 0, max)).toBeNull()
   })
 
+  it('returns null when abs minus scroll overflows for 1e308-scale operands (finite inputs, infinite difference)', () => {
+    const big = 1e308
+    expect(big - -big).toBe(Infinity)
+    expect(scrollSafeChildOffsets(big, 0, -big, 0)).toBeNull()
+    expect(scrollSafeChildOffsets(0, big, 0, -big)).toBeNull()
+    expect(-big - big).toBe(-Infinity)
+    expect(scrollSafeChildOffsets(-big, 0, big, 0)).toBeNull()
+    expect(scrollSafeChildOffsets(0, -big, 0, big)).toBeNull()
+  })
+
   it('returns null when abs origin is non-finite (corrupt layout chain; must not walk children with NaN/∞ offsets)', () => {
     expect(scrollSafeChildOffsets(Number.NaN, 0, 0, 0)).toBeNull()
     expect(scrollSafeChildOffsets(0, Number.NaN, 0, 0)).toBeNull()
