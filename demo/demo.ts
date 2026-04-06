@@ -677,7 +677,7 @@ function textInputDemo(): UIElement {
 
   return box({ flexDirection: 'column', padding: 24, gap: 14, width: w, minHeight: 380 }, [
     text({ text: 'Text Input (@geometra/ui)', font: 'bold 18px Inter', lineHeight: 24, color: '#ffffff' }),
-    text({ text: 'Marketing demo now uses shared UI primitives. Advanced text-input behavior lives in demos/text-input-canvas and core tests.', font: '14px Inter', lineHeight: 22, color: '#e2e8f0' }),
+    text({ text: 'Marketing demo now uses shared UI primitives. Advanced text-input behavior lives in demos/text-input-canvas and core tests.', font: '14px Inter', lineHeight: 22, color: '#e2e8f0', whiteSpace: 'normal' }),
     box({
       backgroundColor: SURFACE,
       borderColor: BORDER,
@@ -841,7 +841,7 @@ function animationDemo(): UIElement {
         text({ text: `\u00b7 ${particles.length} particles`, font: '12px JetBrains Mono', lineHeight: 16, color: DIM }),
       ]),
     ]),
-    text({ text: 'Spring physics, particle bursts, and orbital motion \u2014 running at 60fps with zero DOM reflows or CSS transitions.', font: '14px Inter', lineHeight: 22, color: 'rgba(255,255,255,0.6)' }),
+    text({ text: 'Spring physics, particle bursts, and orbital motion \u2014 running at 60fps with zero DOM reflows or CSS transitions.', font: '14px Inter', lineHeight: 22, color: 'rgba(255,255,255,0.6)', whiteSpace: 'normal' }),
     stage,
     box({ flexDirection: direction.value, gap: 12, flexWrap: 'wrap' }, [
       infoCard('Spring physics', 'The red ball follows your clicks with stiffness + damping. No CSS keyframes.', '#e94560'),
@@ -929,7 +929,7 @@ function designShowcase(): UIElement {
 
   return box({ flexDirection: 'column', padding: 24, gap: 20, width: w, minHeight: 380 }, [
     text({ text: 'Design Showcase', font: 'bold 20px Inter', lineHeight: 26, color: '#ffffff' }),
-    text({ text: 'Gradients, layered shadows, glassmorphism, and floating orbs \u2014 all from the same element tree. No CSS, no DOM.', font: '14px Inter', lineHeight: 22, color: 'rgba(255,255,255,0.6)' }),
+    text({ text: 'Gradients, layered shadows, glassmorphism, and floating orbs \u2014 all from the same element tree. No CSS, no DOM.', font: '14px Inter', lineHeight: 22, color: 'rgba(255,255,255,0.6)', whiteSpace: 'normal' }),
 
     box({
       borderRadius: 16,
@@ -969,7 +969,7 @@ function seoDemo(): UIElement {
     text({ text: 'Same element tree generates HTML for crawlers and Canvas for users.', font: '14px Inter', lineHeight: 22, color: '#e2e8f0', semantic: { tag: 'p' } }),
     box({ backgroundColor: SURFACE, borderRadius: 10, padding: 16, flexDirection: 'column', gap: 10, semantic: { tag: 'article' } }, [
       text({ text: 'How it works', font: 'bold 15px Inter', lineHeight: 20, color: '#60a5fa', semantic: { tag: 'h2' } }),
-      text({ text: 'Elements carry semantic hints. toSemanticHTML() produces valid HTML with ARIA and Open Graph.', font: '13px Inter', lineHeight: 20, color: MUTED, semantic: { tag: 'p' } }),
+      text({ text: 'Elements carry semantic hints. toSemanticHTML() produces valid HTML with ARIA and Open Graph.', font: '13px Inter', lineHeight: 20, color: MUTED, whiteSpace: 'normal', semantic: { tag: 'p' } }),
     ]),
     box({ flexDirection: direction.value, gap: 12, flexWrap: 'wrap', semantic: { tag: 'nav' } }, [
       box({ backgroundColor: '#0f3460', borderRadius: 10, padding: 14, flexGrow: 1, flexDirection: 'column', gap: 4 }, [
@@ -1203,7 +1203,7 @@ function authDemo(): UIElement {
       text({ text: 'Auth Hooks Demo', font: 'bold 18px Inter', lineHeight: 24, color: TEXT_COLOR }),
       text({
         text: 'onConnection gates token, onMessage gates events by role, onDisconnect cleans up.',
-        font: '12px Inter', lineHeight: 16, color: DIM,
+        font: '12px Inter', lineHeight: 16, color: DIM, whiteSpace: 'normal',
       }),
     ]),
     box({ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }, [
@@ -1727,7 +1727,7 @@ function heroSection(): UIElement {
     box({ opacity: e2, marginTop: Math.round(s2) }, [
       center(text({
         text: 'Geometra replaces the entire browser rendering pipeline. One JSON geometry protocol powers Canvas, Terminal, and AI agents.',
-        font: '17px Inter', lineHeight: 26, color: MUTED,
+        font: '17px Inter', lineHeight: 26, color: MUTED, whiteSpace: 'normal',
       })),
     ]),
     spacer(12),
@@ -1773,7 +1773,7 @@ function heroSection(): UIElement {
             text: 'For a real app, clone the repo and generate the routed starter that combines @geometra/ui, @geometra/router, and the server/client protocol.',
             font: '13px Inter',
             lineHeight: 20,
-            color: MUTED,
+            color: MUTED, whiteSpace: 'normal',
           }),
           box({
             backgroundColor: CODE_BG,
