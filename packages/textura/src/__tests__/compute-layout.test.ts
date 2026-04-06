@@ -626,6 +626,54 @@ describe('box layout', () => {
     expect(row.children[0]!.x).toBeLessThan(row.children[1]!.x)
   })
 
+  it('nested row with explicit dir ltr under rtl owner keeps physical left-to-right main axis (overrides document direction)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'column',
+      children: [
+        {
+          width: 200,
+          height: 40,
+          flexDirection: 'row',
+          gap: 10,
+          dir: 'ltr',
+          children: [
+            { width: 50, height: 30 },
+            { width: 50, height: 30 },
+          ],
+        },
+      ],
+    }
+    const result = computeLayout(tree, { width: 200, height: 80, direction: 'rtl' })
+    const row = result.children[0]!
+    expect(row.children[0]!.x).toBeLessThan(row.children[1]!.x)
+  })
+
+  it('nested row with explicit dir rtl under ltr owner mirrors main axis (overrides document direction)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'column',
+      children: [
+        {
+          width: 200,
+          height: 40,
+          flexDirection: 'row',
+          gap: 10,
+          dir: 'rtl',
+          children: [
+            { width: 50, height: 30 },
+            { width: 50, height: 30 },
+          ],
+        },
+      ],
+    }
+    const result = computeLayout(tree, { width: 200, height: 80, direction: 'ltr' })
+    const row = result.children[0]!
+    expect(row.children[0]!.x).toBeGreaterThan(row.children[1]!.x)
+  })
+
   it('nested row with unknown dir inherits owner direction like auto (malformed serialized dir)', () => {
     const tree: BoxNode = {
       width: 200,
