@@ -7,7 +7,8 @@ fi
 
 # Drive Cursor Agent CLI in a loop (non-interactive). Each iteration is one agent
 # session that explores the codebase, picks the next best improvement, implements
-# it, runs the release gate, commits, and pushes.
+# it, runs the release gate, commits when there are real changes, and pushes only
+# if that iteration created a new commit (HEAD advanced). Default: composer-2, 100 iterations.
 #
 # Task selection (humans/agents): find unchecked Markdown boxes in ROADMAP.md (Phase A–C, post-1.0 plans,
 # release polish, next frontier) and in ROUTING_COMPETITIVENESS_CHECKLIST.md. Prefer a **line-anchored** task
@@ -83,11 +84,11 @@ fi
 #   - For push: a configured remote; new branches may need `git push -u origin HEAD` once so `git push` succeeds
 #
 # Environment (optional):
-#   CURSOR_AGENT_ITERATIONS   Max agent runs (default: 100). Lower for a short run, e.g. CURSOR_AGENT_ITERATIONS=1.
-#   CURSOR_AGENT_PUSH         If 1, agent commits and this script runs git push after each iteration (default: 1). Set to 0 to skip pushing.
+#   CURSOR_AGENT_ITERATIONS   Max agent runs (default: 100). Lower for a short run, e.g. CURSOR_AGENT_ITERATIONS=3.
+#   CURSOR_AGENT_PUSH         If 1, run git push after an iteration only when that iteration created a new commit (default: 1). Set to 0 to never push from this script.
 #   CURSOR_AGENT_FORCE_SHELL  If 1, pass --force so the agent can run shell without per-command approval (default: 1). Set to 0 for safer approval prompts. --force allows arbitrary commands: use a dedicated branch and review diffs.
 #   CURSOR_AGENT_WORKSPACE    Repo root (default: git top-level from current directory).
-#   CURSOR_AGENT_MODEL        Passed as --model to agent (default: composer-2). Override e.g. composer-2-fast or auto.
+#   CURSOR_AGENT_MODEL        Passed as --model to agent (default: composer-2). Override e.g. composer-2-fast.
 #   CURSOR_AGENT_EXTRA        Extra instructions appended to the built-in prompt.
 #   CURSOR_AGENT_VERBOSE      If 1, stream agent progress (tools, partial text) to the terminal via stream-json (default: 1). Set to 0 for final text only.
 #
@@ -137,7 +138,7 @@ cd "$WORKSPACE"
 
 current_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
 if [[ "$PUSH" == "1" && "$current_branch" == "main" ]]; then
-  echo "warning: will push to main after each iteration; use a feature branch or CURSOR_AGENT_PUSH=0 if that is not intended." >&2
+  echo "warning: will push to main when an iteration creates a new commit; use a feature branch or CURSOR_AGENT_PUSH=0 if that is not intended." >&2
 fi
 
 case "$ITERATIONS" in
@@ -152,7 +153,7 @@ if [[ "$ITERATIONS" -lt 1 ]]; then
 fi
 
 if [[ "$PUSH" == "1" ]]; then
-  PUSH_TEXT="After a successful commit, do not run git push; the host script runs git push immediately after this agent exits."
+  PUSH_TEXT="After a successful commit, do not run git push; the host script runs git push after this agent exits only if this iteration created a new commit (it compares HEAD before/after)."
 else
   PUSH_TEXT="Do not run git push."
 fi
@@ -220,6 +221,7 @@ while true; do
   fi
 
   echo "=== cursor-agent-loop: iteration $i of ${ITERATIONS} ===" >&2
+  head_before="$(git rev-parse HEAD)"
   prompt="$(build_prompt)"
   agent_status=0
   if [[ "$VERBOSE" == "1" ]]; then
@@ -245,7 +247,14 @@ while true; do
     exit "$agent_status"
   fi
 
-  if [[ "$PUSH" == "1" ]]; then
+  # The agent is instructed to commit after a successful release:gate. A clean tree
+  # is the usual success signal; dirty state often means a missed add/commit or WIP.
+  if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
+    echo "warning: working tree still dirty after agent exit 0 (iteration $i); review git status before continuing." >&2
+  fi
+
+  head_after="$(git rev-parse HEAD)"
+  if [[ "$PUSH" == "1" && "$head_before" != "$head_after" ]]; then
     git push
   fi
 
