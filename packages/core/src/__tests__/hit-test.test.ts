@@ -129,6 +129,30 @@ describe('dispatchHit', () => {
     }
   })
 
+  describe('corrupt element tree (non-array box.children)', () => {
+    it('hit walk does not throw; layout children are not followed without element children (matches collectFocusOrder)', () => {
+      const inner = box({ width: 50, height: 50, onClick: () => {} })
+      const root = box({ width: 100, height: 100 }, [inner])
+      ;(root as unknown as { children: unknown }).children = null
+      const layout = {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        children: [{ x: 0, y: 0, width: 50, height: 50, children: [] }],
+      }
+
+      expect(() => dispatchHit(root, layout, 'onClick', 25, 25)).not.toThrow()
+      expect(dispatchHit(root, layout, 'onClick', 25, 25)).toEqual({ handled: false })
+      expect(() => hitPathAtPoint(root, layout, 25, 25)).not.toThrow()
+      expect(hitPathAtPoint(root, layout, 25, 25)).toEqual([])
+      expect(() => hasInteractiveHitAtPoint(root, layout, 25, 25)).not.toThrow()
+      expect(hasInteractiveHitAtPoint(root, layout, 25, 25)).toBe(false)
+      expect(() => getCursorAtPoint(root, layout, 25, 25)).not.toThrow()
+      expect(getCursorAtPoint(root, layout, 25, 25)).toBeNull()
+    })
+  })
+
   describe('corrupt child layout (subtree skipped; parent still hit-testable)', () => {
     it('dispatchHit does not invoke child handlers and falls through to parent onClick', () => {
       let childFired = false

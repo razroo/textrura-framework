@@ -56,6 +56,8 @@ export interface SelectionRange {
  * Nodes whose {@link ComputedLayout} bounds fail {@link layoutBoundsAreFinite} are skipped, and box
  * subtrees under a corrupt parent are not walked — same rule as hit-testing and focus order so bad
  * geometry cannot poison absolute coordinates or flood selection with unusable entries.
+ * Boxes with a missing or non-array {@link import('./types.js').BoxElement.children} field are treated as
+ * leaves (no throw), matching {@link import('./focus.js').collectFocusOrder} and hit-testing.
  *
  * For each box, child origins subtract {@link import('./types.js').StyleProps.scrollX} /
  * `scrollY` (non-finite values → `0`), matching {@link import('./hit-test.js').dispatchHit} and
@@ -117,14 +119,17 @@ function collectTextNodesWalk(
 
   if (element.kind !== 'box') return
 
+  const kids = element.children
+  if (!Array.isArray(kids)) return
+
   const childOrigin = scrollSafeChildOffsets(x, y, element.props.scrollX, element.props.scrollY)
   if (!childOrigin) return
 
-  for (let i = 0; i < element.children.length; i++) {
+  for (let i = 0; i < kids.length; i++) {
     const childLayout = layout.children[i]
     if (childLayout) {
       collectTextNodesWalk(
-        element.children[i]!,
+        kids[i]!,
         childLayout,
         childOrigin.ox,
         childOrigin.oy,

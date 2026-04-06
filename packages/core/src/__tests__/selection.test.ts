@@ -175,6 +175,22 @@ describe('collectTextNodes', () => {
     expect(results[0].y).toBe(40)
   })
 
+  it('treats non-array box.children as a leaf without throwing (nested text unreachable; matches collectFocusOrder)', () => {
+    const t = text({ text: 'Hi', font: '14px sans-serif', lineHeight: 18, width: 10, height: 18 })
+    const root = box({ width: 100, height: 100 }, [t])
+    ;(root as unknown as { children: unknown }).children = null
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 0, y: 0, width: 10, height: 18, children: [] }],
+    }
+    const results: TextNodeInfo[] = []
+    expect(() => collectTextNodes(root, layout, 0, 0, results)).not.toThrow()
+    expect(results).toHaveLength(0)
+  })
+
   it('overlapping siblings: text node order follows children array index, not z-index paint stack', () => {
     const el = box({ width: 100, height: 40 }, [
       text({

@@ -29,14 +29,16 @@ function zIndexOf(el: UIElement): number {
 }
 
 function getChildrenByZAsc(boxEl: BoxElement): number[] {
-  const n = boxEl.children.length
+  const kids = boxEl.children
+  if (!Array.isArray(kids)) return []
+  const n = kids.length
   if (n === 0) return []
   if (n === 1) return [0]
 
   // Two children: compare z-index without map/sort allocations (common flex rows, label+control pairs).
   if (n === 2) {
-    const z0 = zIndexOf(boxEl.children[0]!)
-    const z1 = zIndexOf(boxEl.children[1]!)
+    const z0 = zIndexOf(kids[0]!)
+    const z1 = zIndexOf(kids[1]!)
     const asc = z0 <= z1 ? [0, 1] : [1, 0]
     const cached = zIndexOrderCache.get(boxEl)
     if (
@@ -54,10 +56,10 @@ function getChildrenByZAsc(boxEl: BoxElement): number[] {
 
   // Three+ children sharing one z-index: stable paint order matches source order; avoid map/sort allocations.
   if (n >= 3) {
-    const z0 = zIndexOf(boxEl.children[0]!)
+    const z0 = zIndexOf(kids[0]!)
     let allEqual = true
     for (let i = 1; i < n; i++) {
-      if (zIndexOf(boxEl.children[i]!) !== z0) {
+      if (zIndexOf(kids[i]!) !== z0) {
         allEqual = false
         break
       }
@@ -86,10 +88,10 @@ function getChildrenByZAsc(boxEl: BoxElement): number[] {
   }
 
   const cached = zIndexOrderCache.get(boxEl)
-  if (cached && cached.zValues.length === boxEl.children.length) {
+  if (cached && cached.zValues.length === kids.length) {
     let unchanged = true
-    for (let i = 0; i < boxEl.children.length; i++) {
-      if (cached.zValues[i] !== zIndexOf(boxEl.children[i]!)) {
+    for (let i = 0; i < kids.length; i++) {
+      if (cached.zValues[i] !== zIndexOf(kids[i]!)) {
         unchanged = false
         break
       }
@@ -97,8 +99,8 @@ function getChildrenByZAsc(boxEl: BoxElement): number[] {
     if (unchanged) return cached.asc
   }
 
-  const zValues = boxEl.children.map(child => zIndexOf(child))
-  const asc = boxEl.children
+  const zValues = kids.map(child => zIndexOf(child))
+  const asc = kids
     .map((_, i) => i)
     .sort((a, b) => zValues[a]! - zValues[b]!)
   zIndexOrderCache.set(boxEl, { zValues, asc })
