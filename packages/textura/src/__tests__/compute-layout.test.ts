@@ -1415,6 +1415,31 @@ describe('box layout', () => {
     expect(result.height).toBe(120)
   })
 
+  it('row: marginLeft and marginRight auto split leftover main-axis space (centers fixed-width child)', () => {
+    const tree: BoxNode = {
+      width: 300,
+      height: 50,
+      flexDirection: 'row',
+      justifyContent: 'flex-start',
+      children: [{ width: 100, height: 40, marginLeft: 'auto', marginRight: 'auto' }],
+    }
+    const result = computeLayout(tree)
+    expect(result.children[0]!.x).toBe(100)
+    expect(result.children[0]!.width).toBe(100)
+  })
+
+  it('row under rtl: marginHorizontal auto still centers the child on the main axis', () => {
+    const tree: BoxNode = {
+      width: 300,
+      height: 50,
+      flexDirection: 'row',
+      justifyContent: 'flex-start',
+      children: [{ width: 100, height: 40, marginHorizontal: 'auto' }],
+    }
+    const result = computeLayout(tree, { width: 300, height: 50, direction: 'rtl' })
+    expect(result.children[0]!.x).toBe(100)
+  })
+
   it('nested flex containers', () => {
     const tree: BoxNode = {
       width: 400,
