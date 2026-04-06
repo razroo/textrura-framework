@@ -74,6 +74,19 @@ async function main() {
     throw new Error('release:gate: no packages/**/*.test.ts paths found (gate misconfigured)')
   }
 
+  /** Invariants: do not drop these from `scripts.release:gate` without an explicit docs/gate update. */
+  const requiredVitestAllowlistPaths = [
+    'packages/core/src/__tests__/geometry-snapshot-ci.test.ts',
+    'packages/core/src/__tests__/hit-test.test.ts',
+  ]
+  for (const required of requiredVitestAllowlistPaths) {
+    if (!paths.includes(required)) {
+      throw new Error(
+        `release:gate: required vitest allowlist entry missing: ${required} (geometry CI + hit-test are release-critical; see GEOMETRY_SNAPSHOT_TESTING.md / FRAMEWORK_NORTH_STAR)`,
+      )
+    }
+  }
+
   const seen = new Map()
   for (const rel of paths) {
     if (rel.includes('\\')) {
