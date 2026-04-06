@@ -596,6 +596,13 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(10, 20, Number.NaN, Number.POSITIVE_INFINITY)).toEqual({ ox: 10, oy: 20 })
   })
 
+  it('coerces boxed Number scroll props to 0 (typeof object; same rule as hit-test / selection walks)', () => {
+    const boxed = Object(3) as unknown as number
+    expect(finiteNumberOrZero(boxed)).toBe(0)
+    expect(scrollSafeChildOffsets(10, 20, boxed, 4)).toEqual({ ox: 10, oy: 16 })
+    expect(scrollSafeChildOffsets(10, 20, 3, Object(4) as unknown as number)).toEqual({ ox: 7, oy: 20 })
+  })
+
   it('returns null when abs minus scroll overflows to non-finite (hit-test / selection parity)', () => {
     const max = Number.MAX_VALUE
     expect(max - -max).toBe(Infinity)
