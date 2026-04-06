@@ -2,6 +2,20 @@ import { describe, expect, it } from 'vitest'
 import { matchPath } from '../matcher.js'
 
 describe('route matcher', () => {
+  it('returns null for non-string pattern or pathname without throwing (parity with parseQuery guards)', () => {
+    expect(() => matchPath(null as never, '/a')).not.toThrow()
+    expect(matchPath(null as never, '/a')).toBeNull()
+    expect(matchPath(undefined as never, '/a')).toBeNull()
+    expect(matchPath('/a', null as never)).toBeNull()
+    expect(matchPath('/a', undefined as never)).toBeNull()
+    expect(matchPath(0 as never, '/a')).toBeNull()
+    expect(matchPath('/a', 1 as never)).toBeNull()
+    expect(matchPath(Object('/x') as never, '/a')).toBeNull()
+    expect(matchPath('/a', Object('/b') as never)).toBeNull()
+    expect(matchPath(Symbol('p') as never, '/a')).toBeNull()
+    expect(matchPath('/a', Symbol('u') as never)).toBeNull()
+  })
+
   it('matches static paths', () => {
     expect(matchPath('/settings/profile', '/settings/profile')).toEqual({ params: {} })
     expect(matchPath('/settings/profile', '/settings')).toBeNull()

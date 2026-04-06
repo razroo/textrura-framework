@@ -126,6 +126,8 @@ function matchRecursive(
  * - Each captured segment is passed through `decodeURIComponent`; invalid `%` sequences are left as-is.
  * - An empty `pattern` (`''`) parses to zero segments and matches only the root pathname (`/` or `''` after
  *   normalization), with empty `params`. Any non-root path misses.
+ * - Non-string `pattern` or `pathname` (e.g. `null` from loose deserialization) returns `null` without throwing,
+ *   matching the router package’s other string guards (see {@link import('./query.js').parseQuery}).
  *
  * @param pattern - Route pattern (`:id`, optional `?` segments, `*` splat); leading `/` optional.
  * @param pathname - Path to match; `?` and `#` are stripped before comparison. Trailing `/` is normalized
@@ -133,6 +135,7 @@ function matchRecursive(
  * @returns `{ params }` on success, or `null` when the pathname does not match.
  */
 export function matchPath(pattern: string, pathname: string): RouteMatch | null {
+  if (typeof pattern !== 'string' || typeof pathname !== 'string') return null
   const segments = parseSegments(pattern)
   const normalizedPath = normalizePath(pathname, true)
   const trimmedPath = trimSlashes(normalizedPath)
