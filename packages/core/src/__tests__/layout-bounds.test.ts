@@ -601,6 +601,10 @@ describe('scrollSafeChildOffsets', () => {
     expect(max - -max).toBe(Infinity)
     expect(scrollSafeChildOffsets(max, 0, -max, 0)).toBeNull()
     expect(scrollSafeChildOffsets(0, max, 0, -max)).toBeNull()
+    // Symmetric case: -max - max underflows to -Infinity (distinct from max - (-max) → +Infinity).
+    expect(-max - max).toBe(-Infinity)
+    expect(scrollSafeChildOffsets(-max, 0, max, 0)).toBeNull()
+    expect(scrollSafeChildOffsets(0, -max, 0, max)).toBeNull()
   })
 
   it('returns null when abs origin is non-finite (corrupt layout chain; must not walk children with NaN/∞ offsets)', () => {
