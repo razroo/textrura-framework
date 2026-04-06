@@ -264,6 +264,28 @@ describe('query helpers', () => {
     expect(stringifyQuery(arr)).toBe('?tag=a&tag=b')
   })
 
+  it('omits Map, Set, and Promise values without throwing (typeof object; same skip path as plain records)', () => {
+    const m = new Map([['k', 'v']])
+    const st = new Set(['x'])
+    const pending = Promise.resolve(1)
+    expect(() =>
+      stringifyQuery({
+        a: 'ok',
+        m: m as unknown as string,
+        s: st as unknown as number,
+        p: pending as unknown as boolean,
+      } as unknown as QueryInput),
+    ).not.toThrow()
+    expect(
+      stringifyQuery({
+        a: 'ok',
+        m: m as unknown as string,
+        s: st as unknown as number,
+        p: pending as unknown as boolean,
+      } as unknown as QueryInput),
+    ).toBe('?a=ok')
+  })
+
   it('omits non-finite entries inside arrays while preserving finite values', () => {
     expect(stringifyQuery({ mix: [Number.NaN, 'a', Number.POSITIVE_INFINITY, 3] })).toBe('?mix=a&mix=3')
     expect(stringifyQuery({ mix: ['a', Number.parseFloat('1e400'), 3] })).toBe('?mix=a&mix=3')
