@@ -1236,6 +1236,32 @@ describe('box layout', () => {
     expect(result.children[0]!.width).toBe(50)
   })
 
+  it('absolute positioning uses physical left/top regardless of parent dir and owner direction', () => {
+    const absChild: BoxNode = {
+      position: 'absolute',
+      top: 10,
+      left: 10,
+      width: 50,
+      height: 50,
+    }
+    const opts = { width: 300, height: 300 } as const
+    for (const parentDir of ['ltr', 'rtl'] as const) {
+      for (const owner of ['ltr', 'rtl'] as const) {
+        const tree: BoxNode = {
+          width: 300,
+          height: 300,
+          dir: parentDir,
+          children: [absChild],
+        }
+        const result = computeLayout(tree, { ...opts, direction: owner })
+        expect(result.children[0]!.x).toBe(10)
+        expect(result.children[0]!.y).toBe(10)
+        expect(result.children[0]!.width).toBe(50)
+        expect(result.children[0]!.height).toBe(50)
+      }
+    }
+  })
+
   it('justify content space-between', () => {
     const tree: BoxNode = {
       width: 300,
