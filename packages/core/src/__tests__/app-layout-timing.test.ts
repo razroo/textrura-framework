@@ -509,6 +509,32 @@ describe('createApp layout direction (Textura computeLayout)', () => {
     const [a, b] = row.children
     expect(a!.x).toBeLessThan(b!.x)
   })
+
+  it('rtl flex row mirrors source order for image, box, and scene3d leaves (Textura treats non-text leaves as flex items)', async () => {
+    const layouts: Array<{ children: Array<{ x: number }> }> = []
+    const renderer: Renderer = {
+      render(layout) {
+        layouts.push(layout as { children: Array<{ x: number }> })
+      },
+      destroy: vi.fn(),
+    }
+
+    await createApp(
+      () =>
+        box({ width: 200, height: 80, flexDirection: 'row', dir: 'rtl' }, [
+          image({ src: '/a.png', width: 30, height: 20 }),
+          box({ width: 30, height: 20 }),
+          scene3d({ width: 30, height: 20, objects: [] }),
+        ]),
+      renderer,
+      { width: 200, height: 80 },
+    )
+
+    expect(layouts).toHaveLength(1)
+    const [first, second, third] = layouts[0]!.children
+    expect(first!.x).toBeGreaterThan(second!.x)
+    expect(second!.x).toBeGreaterThan(third!.x)
+  })
 })
 
 describe('createApp non-box roots (layout + direction resolution)', () => {
