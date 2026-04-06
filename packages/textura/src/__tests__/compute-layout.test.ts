@@ -345,7 +345,7 @@ describe('box layout', () => {
       { ...base, dir: 'ltr' },
       { ...base, dir: 'rtl' },
       { ...base, dir: 'auto' },
-      { ...base, dir: 'bogus' as never },
+      { ...base, dir: 'bogus' },
       { ...base, dir: null },
     ]
     for (const tree of variants) {
@@ -637,7 +637,7 @@ describe('box layout', () => {
           height: 40,
           flexDirection: 'row',
           gap: 10,
-          dir: 'bogus' as never,
+          dir: 'bogus',
           children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
         },
       ],
@@ -676,7 +676,7 @@ describe('box layout', () => {
           height: 40,
           flexDirection: 'row',
           gap: 10,
-          dir: 'bogus' as never,
+          dir: 'bogus',
           children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
         },
       ],
@@ -700,7 +700,7 @@ describe('box layout', () => {
           height: 40,
           flexDirection: 'row',
           gap: 10,
-          dir: 'bogus' as never,
+          dir: 'bogus',
           children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
         },
       ],
@@ -769,7 +769,7 @@ describe('box layout', () => {
           height: 40,
           flexDirection: 'row',
           gap: 10,
-          dir: dir as never,
+          dir,
           children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
         },
       ],
@@ -1436,7 +1436,7 @@ describe('text layout (Pretext + canvas measureText)', () => {
     expect(pick(computeLayout({ ...base, dir: 'rtl' }))).toEqual(expected)
     expect(pick(computeLayout({ ...base, dir: 'auto' }))).toEqual(expected)
     // Malformed serialized dir maps to Yoga Inherit (same as auto on a root text leaf under default LTR owner).
-    expect(pick(computeLayout({ ...base, dir: 'bogus' as never }))).toEqual(expected)
+    expect(pick(computeLayout({ ...base, dir: 'bogus' }))).toEqual(expected)
   })
 
   it('text wraps to multiple lines in narrow container', () => {
@@ -1574,7 +1574,7 @@ describe('text layout (Pretext + canvas measureText)', () => {
       font: '16px sans-serif',
       lineHeight: 20,
       width: 50,
-      dir: 'bogus' as never,
+      dir: 'bogus',
     } satisfies TextNode
     const rtl = computeLayout(tree, { width: 200, height: 40, direction: 'rtl' })
     const ltr = computeLayout(tree, { width: 200, height: 40, direction: 'ltr' })

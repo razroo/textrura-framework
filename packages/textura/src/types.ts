@@ -89,8 +89,11 @@ export interface FlexProps {
    *   **Inherit** (parent, then the root owner direction from `computeLayout` options). Geometra may forward
    *   JSON `null` or unknown serialized `dir` strings on nested nodes for this path while resolving interaction
    *   direction separately in core.
+   *
+   * Type-level: `(string & {})` allows arbitrary strings from transport/fixtures without erasing the named
+   * literals above (same pattern as permissive JSON props elsewhere).
    */
-  dir?: 'ltr' | 'rtl' | 'auto' | null
+  dir?: 'ltr' | 'rtl' | 'auto' | null | (string & {})
 }
 
 /** A text leaf node. Has text content, font, and lineHeight for measurement. */
