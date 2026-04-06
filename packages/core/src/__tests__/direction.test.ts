@@ -222,6 +222,15 @@ describe('resolveComputeLayoutDirection', () => {
     expect(resolveComputeLayoutDirection([ 'rtl' ] as never, ltrRoot)).toBe('ltr')
   })
 
+  it('ignores NaN and ±Infinity host layoutDirection (only primitive ltr|rtl strings win), deriving from the root', () => {
+    const rtlRoot = box({ width: 1, height: 1, flexDirection: 'row', dir: 'rtl' }, [])
+    expect(resolveComputeLayoutDirection(Number.NaN as never, rtlRoot)).toBe('rtl')
+    expect(resolveComputeLayoutDirection(Number.POSITIVE_INFINITY as never, rtlRoot)).toBe('rtl')
+    expect(resolveComputeLayoutDirection(Number.NEGATIVE_INFINITY as never, rtlRoot)).toBe('rtl')
+    const ltrRoot = box({ width: 1, height: 1, flexDirection: 'row', dir: 'ltr' }, [])
+    expect(resolveComputeLayoutDirection(Number.NaN as never, ltrRoot)).toBe('ltr')
+  })
+
   it('ignores trimmed or wrong-case rtl/ltr strings (strict equality; parity with Textura ComputeOptions.direction)', () => {
     const rtlRoot = box({ width: 1, height: 1, flexDirection: 'row', dir: 'rtl' }, [])
     const ltrRoot = box({ width: 1, height: 1, flexDirection: 'row', dir: 'ltr' }, [])
