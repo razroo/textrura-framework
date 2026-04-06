@@ -420,6 +420,32 @@ describe('collectTextNodes', () => {
     expect(results).toHaveLength(0)
   })
 
+  it('does not descend when scroll-adjusted child origin overflows on Y (parity with hit-test)', () => {
+    const max = Number.MAX_VALUE
+    const t = text({ text: 'Hidden', font: '14px sans-serif', lineHeight: 18, width: 80, height: 18 })
+    const el = box({ width: 200, height: 120 }, [
+      box({ width: 100, height: 100, overflow: 'scroll', scrollY: -max }, [t]),
+    ])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 120,
+      children: [
+        {
+          x: 0,
+          y: max,
+          width: 100,
+          height: 100,
+          children: [{ x: 5, y: 30, width: 80, height: 18, children: [] }],
+        },
+      ],
+    }
+    const results: TextNodeInfo[] = []
+    collectTextNodes(el, layout, 0, 0, results)
+    expect(results).toHaveLength(0)
+  })
+
   it('skips the whole walk when root layout bounds are corrupt (aligned with hit-test / focus)', () => {
     const el = box({ width: 200, height: 100 }, [
       text({ text: 'Hi', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
