@@ -3668,6 +3668,22 @@ describe('scroll and overflow clipping', () => {
     expect(() => getCursorAtPoint(parent, layout, 50, max)).not.toThrow()
   })
 
+  it('overflow scroll: hasInteractiveHitAtPoint and hitPathAtPoint match dispatch when child offset overflows (sole pointer handler on child)', () => {
+    const child = box({ width: 50, height: 50, onClick: () => {} })
+    const max = Number.MAX_VALUE
+    const parent = box({ width: 100, height: 100, overflow: 'scroll', scrollX: -max }, [child])
+    const layout = {
+      x: max,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 10, y: 10, width: 50, height: 50, children: [] }],
+    }
+    // Same geometry as MAX_VALUE scrollX overflow case: descendants are not walked.
+    expect(hasInteractiveHitAtPoint(parent, layout, max, 50)).toBe(false)
+    expect(hitPathAtPoint(parent, layout, max, 50)).toEqual([])
+  })
+
   it('hitPathAtPoint resolves path under scrollX', () => {
     const child = box({ width: 50, height: 50 })
     const parent = box({ width: 100, height: 100, overflow: 'scroll', scrollX: 40 }, [child])
