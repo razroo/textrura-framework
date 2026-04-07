@@ -22,6 +22,10 @@ function isUnmodifiedActivation(event: KeyboardHitEvent): boolean {
   return !event.ctrlKey && !event.metaKey && !event.altKey
 }
 
+function isDirection(value: unknown): value is 'ltr' | 'rtl' | 'auto' {
+  return value === 'ltr' || value === 'rtl' || value === 'auto'
+}
+
 /**
  * Declarative navigation target: a focusable box with link semantics (`role: link`, `tag: a`) and
  * `cursor: pointer` unless overridden.
@@ -42,12 +46,15 @@ export function link(props: LinkProps, children: UIElement[] = []): BoxElement {
     onClick,
     onKeyDown,
     cursor,
+    dir,
     ...styleAndLayout
   } = props
+  const normalizedDir = isDirection(dir) ? dir : undefined
 
   return box(
     {
       ...styleAndLayout,
+      ...(normalizedDir ? { dir: normalizedDir } : {}),
       cursor: cursor ?? 'pointer',
       key,
       semantic: {

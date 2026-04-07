@@ -263,4 +263,19 @@ describe('declarative link primitive', () => {
     expect(actions).toEqual(['replace', 'replace', 'replace'])
     expect(router.getState().location.pathname).toBe('/about')
   })
+
+  it('drops null or unknown dir values before forwarding props to box', () => {
+    const history = createMemoryHistory({ initialEntries: ['/'] })
+    const router = createRouter({ routes, history })
+    router.start()
+
+    const withNullDir = link({ to: '/about', router, dir: null })
+    expect(withNullDir.props.dir).toBeUndefined()
+
+    const withUnknownDir = link({ to: '/about', router, dir: 'sideways' as never })
+    expect(withUnknownDir.props.dir).toBeUndefined()
+
+    const withAutoDir = link({ to: '/about', router, dir: 'auto' })
+    expect(withAutoDir.props.dir).toBe('auto')
+  })
 })

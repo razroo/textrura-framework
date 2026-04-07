@@ -20,6 +20,7 @@ const packages = [
   ['@geometra/router', 'packages/router/package.json'],
   ['@geometra/tw', 'packages/tw/package.json'],
   ['@geometra/proxy', 'packages/proxy/package.json'],
+  ['@geometra/mcp', 'mcp/package.json'],
 ]
 
 function assertNoFileProtocolDeps(pkg, relPath, releaseVersion) {
