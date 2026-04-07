@@ -1,6 +1,15 @@
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { formatConnectFailureMessage, normalizeConnectTarget } from '../connect-utils.js'
-import { formatProxyStartupFailure, parseProxyReadySignalLine } from '../proxy-spawn.js'
+import {
+  formatProxyStartupFailure,
+  parseProxyReadySignalLine,
+  resolveProxyScriptPath,
+  resolveProxyScriptPathWith,
+} from '../proxy-spawn.js'
 
 describe('normalizeConnectTarget', () => {
   it('accepts explicit pageUrl for http(s) pages', () => {
@@ -77,6 +86,35 @@ describe('formatConnectFailureMessage', () => {
 })
 
 describe('proxy ready helpers', () => {
+  it('resolves the bundled proxy CLI entry in the source tree', () => {
+    const scriptPath = resolveProxyScriptPath()
+
+    expect(existsSync(scriptPath)).toBe(true)
+    expect(path.basename(scriptPath)).toBe('index.js')
+    expect(scriptPath.includes(`${path.sep}proxy${path.sep}`)).toBe(true)
+  })
+
+  it('resolves the bundled proxy CLI entry from a packaged dependency layout', () => {
+    const tempRoot = mkdtempSync(path.join(tmpdir(), 'geometra-proxy-resolve-'))
+
+    try {
+      const scopeDir = path.join(tempRoot, 'node_modules', '@geometra')
+      const packageDir = path.join(scopeDir, 'proxy')
+      const probePath = path.join(tempRoot, 'probe.cjs')
+      mkdirSync(scopeDir, { recursive: true })
+      symlinkSync(path.resolve(process.cwd(), 'packages/proxy'), packageDir, 'dir')
+      writeFileSync(probePath, 'module.exports = {}')
+
+      const customRequire = createRequire(probePath)
+      const scriptPath = resolveProxyScriptPathWith(customRequire)
+
+      expect(existsSync(scriptPath)).toBe(true)
+      expect(path.basename(scriptPath)).toBe('index.js')
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true })
+    }
+  })
+
   it('parses structured proxy ready JSON', () => {
     const wsUrl = parseProxyReadySignalLine(
       '{"type":"geometra-proxy-ready","wsUrl":"ws://127.0.0.1:41237","pageUrl":"https://example.com"}',

@@ -1,21 +1,44 @@
 import { spawn, type ChildProcess } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const require = createRequire(import.meta.url)
 const READY_SIGNAL_TYPE = 'geometra-proxy-ready'
 const READY_TIMEOUT_MS = 45_000
+const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url))
 
 /** Resolve bundled @geometra/proxy CLI entry (dist/index.js). */
 export function resolveProxyScriptPath(): string {
+  return resolveProxyScriptPathWith(require)
+}
+
+export function resolveProxyScriptPathWith(customRequire: NodeRequire): string {
+  const errors: string[] = []
+
   try {
-    const pkgJson = require.resolve('@geometra/proxy/package.json')
+    const pkgJson = customRequire.resolve('@geometra/proxy/package.json')
     return path.join(path.dirname(pkgJson), 'dist/index.js')
-  } catch {
-    throw new Error(
-      'Could not resolve @geometra/proxy. Install it with the MCP package: npm install @geometra/proxy',
-    )
+  } catch (err) {
+    errors.push(err instanceof Error ? err.message : String(err))
   }
+
+  try {
+    return customRequire.resolve('@geometra/proxy')
+  } catch (err) {
+    errors.push(err instanceof Error ? err.message : String(err))
+  }
+
+  const workspaceDist = path.resolve(MODULE_DIR, '../../packages/proxy/dist/index.js')
+  if (existsSync(workspaceDist)) {
+    return workspaceDist
+  }
+  errors.push(`Workspace fallback not found at ${workspaceDist}`)
+
+  throw new Error(
+    `Could not resolve @geometra/proxy. Install it with the MCP package: npm install @geometra/proxy. Resolution errors: ${errors.join(' | ')}`,
+  )
 }
 
 export interface SpawnProxyParams {
