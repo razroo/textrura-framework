@@ -151,6 +151,28 @@ describe('dispatchHit', () => {
       expect(() => getCursorAtPoint(root, layout, 25, 25)).not.toThrow()
       expect(getCursorAtPoint(root, layout, 25, 25)).toBeNull()
     })
+
+    it('treats plain-object children like null (Array.isArray guard; bad deserialization)', () => {
+      const inner = box({ width: 50, height: 50, onClick: () => {} })
+      const root = box({ width: 100, height: 100 }, [inner])
+      ;(root as unknown as { children: unknown }).children = { 0: inner, length: 1 }
+      const layout = {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        children: [{ x: 0, y: 0, width: 50, height: 50, children: [] }],
+      }
+
+      expect(() => dispatchHit(root, layout, 'onClick', 25, 25)).not.toThrow()
+      expect(dispatchHit(root, layout, 'onClick', 25, 25)).toEqual({ handled: false })
+      expect(() => hitPathAtPoint(root, layout, 25, 25)).not.toThrow()
+      expect(hitPathAtPoint(root, layout, 25, 25)).toEqual([])
+      expect(() => hasInteractiveHitAtPoint(root, layout, 25, 25)).not.toThrow()
+      expect(hasInteractiveHitAtPoint(root, layout, 25, 25)).toBe(false)
+      expect(() => getCursorAtPoint(root, layout, 25, 25)).not.toThrow()
+      expect(getCursorAtPoint(root, layout, 25, 25)).toBeNull()
+    })
   })
 
   describe('corrupt child layout (subtree skipped; parent still hit-testable)', () => {
