@@ -302,7 +302,17 @@ function buildNode(desc: LayoutNode): BuildResult {
     const children = desc.children
     if (children) {
       for (let i = 0; i < children.length; i++) {
-        const child = buildNode(children[i]!)
+        const slot = children[i]
+        if (slot == null) {
+          // Preserve source indices for parallel element/layout walks (sparse arrays from bad hosts
+          // or hand-built trees) without throwing on `'text' in` guards in `buildNode`.
+          const placeholder = yoga.Node.create(getConfig())
+          placeholder.setDisplay(Display.None)
+          node.insertChild(placeholder, i)
+          meta.children.push({ children: [] })
+          continue
+        }
+        const child = buildNode(slot)
         node.insertChild(child.yogaNode, i)
         meta.children.push(child.meta)
       }
@@ -382,6 +392,10 @@ function sanitizeOwnerConstraint(value: unknown): number | undefined {
  *
  * Combine {@link ComputeOptions.direction} with optional per-node {@link FlexProps.dir} on each
  * {@link LayoutNode} for mixed-direction flex subtrees.
+ *
+ * `children` arrays may contain `null` or `undefined` holes (sparse runtime arrays). Those indices
+ * become Yoga `display: none` placeholders so output `children` length matches the source array,
+ * holes yield near-zero geometry, and layout does not throw while walking siblings.
  *
  * @throws {Error} If {@link init} has not completed (`textura: call init() first`).
  */

@@ -138,6 +138,63 @@ describe('box layout', () => {
     expect(result.children[1]!.height).toBe(70)
   })
 
+  it('sparse children: null and undefined slots do not throw; placeholders keep indices aligned', () => {
+    const dense: BoxNode = {
+      width: 200,
+      flexDirection: 'row',
+      height: 80,
+      children: [{ width: 60, height: 40 }],
+    }
+    const sparseLeading = {
+      width: 200,
+      flexDirection: 'row',
+      height: 80,
+      children: [undefined, { width: 60, height: 40 }],
+    } as unknown as BoxNode
+    const sparseNull = {
+      width: 200,
+      flexDirection: 'row',
+      height: 80,
+      children: [null, { width: 60, height: 40 }],
+    } as unknown as BoxNode
+
+    const denseResult = computeLayout(dense, { width: 200, height: 80 })
+    const leading = computeLayout(sparseLeading, { width: 200, height: 80 })
+    const nullSlot = computeLayout(sparseNull, { width: 200, height: 80 })
+
+    expect(leading.children).toHaveLength(2)
+    expect(nullSlot.children).toHaveLength(2)
+    expect(leading.children[0]!.width).toBe(0)
+    expect(leading.children[0]!.height).toBe(0)
+    expect(nullSlot.children[0]!.width).toBe(0)
+    expect(nullSlot.children[0]!.height).toBe(0)
+
+    expect(leading.children[1]).toEqual(denseResult.children[0])
+    expect(nullSlot.children[1]).toEqual(denseResult.children[0])
+  })
+
+  it('sparse children: middle hole does not shift following sibling in a column', () => {
+    const dense: BoxNode = {
+      width: 100,
+      flexDirection: 'column',
+      children: [{ width: 100, height: 30 }, { width: 100, height: 40 }],
+    }
+    const sparse: BoxNode = {
+      width: 100,
+      flexDirection: 'column',
+      children: [{ width: 100, height: 30 }, undefined, { width: 100, height: 40 }],
+    } as unknown as BoxNode
+
+    const denseResult = computeLayout(dense, { width: 100 })
+    const sparseResult = computeLayout(sparse, { width: 100 })
+
+    expect(sparseResult.children).toHaveLength(3)
+    expect(sparseResult.children[0]).toEqual(denseResult.children[0])
+    expect(sparseResult.children[1]!.width).toBe(0)
+    expect(sparseResult.children[1]!.height).toBe(0)
+    expect(sparseResult.children[2]).toEqual(denseResult.children[1])
+  })
+
   it('applies aspectRatio as width/height when width is definite (Yoga setAspectRatio)', () => {
     const tree: BoxNode = {
       width: 200,
