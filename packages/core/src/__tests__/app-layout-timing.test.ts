@@ -2038,6 +2038,13 @@ describe('performance now helpers', () => {
     obj.mockRestore()
   })
 
+  it('safePerformanceNowMs and readPerformanceNow return 0 when now returns null (typeof object)', () => {
+    const spy = vi.spyOn(performance, 'now').mockReturnValue(null as unknown as number)
+    expect(safePerformanceNowMs()).toBe(0)
+    expect(readPerformanceNow()).toBe(0)
+    spy.mockRestore()
+  })
+
   it('safePerformanceNowMs and readPerformanceNow return 0 when now returns a symbol (typeof guard)', () => {
     const spy = vi.spyOn(performance, 'now').mockReturnValue(Symbol('t') as unknown as number)
     expect(safePerformanceNowMs()).toBe(0)
