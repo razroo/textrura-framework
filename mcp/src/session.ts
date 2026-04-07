@@ -166,12 +166,36 @@ export function sendKey(session: Session, key: string, modifiers?: { shift?: boo
 export function sendFileUpload(
   session: Session,
   paths: string[],
-  click?: { x: number; y: number },
+  opts?: {
+    click?: { x: number; y: number }
+    strategy?: 'auto' | 'chooser' | 'hidden' | 'drop'
+    drop?: { x: number; y: number }
+  },
 ): Promise<void> {
   const payload: Record<string, unknown> = { type: 'file', paths }
-  if (click) {
-    payload.x = click.x
-    payload.y = click.y
+  if (opts?.click) {
+    payload.x = opts.click.x
+    payload.y = opts.click.y
+  }
+  if (opts?.strategy) payload.strategy = opts.strategy
+  if (opts?.drop) {
+    payload.dropX = opts.drop.x
+    payload.dropY = opts.drop.y
+  }
+  return sendAndWaitForUpdate(session, payload)
+}
+
+/** ARIA `role=option` listbox (e.g. React Select). Optional click opens the list. */
+export function sendListboxPick(
+  session: Session,
+  label: string,
+  opts?: { exact?: boolean; open?: { x: number; y: number } },
+): Promise<void> {
+  const payload: Record<string, unknown> = { type: 'listboxPick', label }
+  if (opts?.exact !== undefined) payload.exact = opts.exact
+  if (opts?.open) {
+    payload.openX = opts.open.x
+    payload.openY = opts.open.y
   }
   return sendAndWaitForUpdate(session, payload)
 }

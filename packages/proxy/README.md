@@ -22,9 +22,12 @@ Matches `packages/server` GEOM v1: `frame` with `layout`, `tree`, `protocolVersi
 
 Proxy-specific client messages (native Textura servers respond with `error`):
 
-- **`file`** — `{ type: 'file', paths: string[], x?: number, y?: number }` — attach files; optional click opens a file chooser.
+- **`file`** — `paths`, optional `x`/`y`, `strategy` (`auto`|`chooser`|`hidden`|`drop`), optional `dropX`/`dropY` for drop targets.
 - **`selectOption`** — `{ type: 'selectOption', x, y, value? | label? | index? }` — native `<select>` only.
+- **`listboxPick`** — `{ type: 'listboxPick', label, exact?, openX?, openY? }` — ARIA `role=option` (custom dropdowns).
 - **`wheel`** — `{ type: 'wheel', deltaY?, deltaX?, x?, y? }` — scroll / wheel at optional coordinates.
+
+Extraction merges **all nested iframes** (including cross-origin) into root viewport coordinates, walks **open shadow roots**, and best-effort **enriches names** from Chrome’s accessibility tree (CDP) for closed shadow / opaque widgets.
 
 Binary framing is not used (always JSON text), which is what the MCP server expects.
 

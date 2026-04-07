@@ -101,10 +101,12 @@ export type ClientMessage =
       paths: string[]
       x?: number
       y?: number
+      strategy?: 'auto' | 'chooser' | 'hidden' | 'drop'
+      dropX?: number
+      dropY?: number
     })
   /**
    * Choose an option on a native `<select>` after focusing it (click `x`,`y` on the control).
-   * Custom dropdowns are not supported here — use clicks + snapshots instead.
    */
   | (VersionedMessage & {
       type: 'selectOption'
@@ -113,6 +115,16 @@ export type ClientMessage =
       value?: string
       label?: string
       index?: number
+    })
+  /**
+   * ARIA listbox / `role=option` (Headless UI, React Select, etc.). Implemented by `@geometra/proxy`.
+   */
+  | (VersionedMessage & {
+      type: 'listboxPick'
+      label: string
+      exact?: boolean
+      openX?: number
+      openY?: number
     })
   /** Mouse wheel / scroll delta at optional viewport coordinates. */
   | (VersionedMessage & {

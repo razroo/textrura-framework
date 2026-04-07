@@ -8,6 +8,7 @@ import {
   sendType,
   sendKey,
   sendFileUpload,
+  sendListboxPick,
   sendSelectOption,
   sendWheel,
   buildA11yTree,
@@ -145,22 +146,60 @@ Each character is sent as a key event through the geometry protocol. Returns upd
   // ── upload files (proxy) ───────────────────────────────────────
   server.tool(
     'geometra_upload_files',
-    `Attach one or more local files to a file input. Requires \`@geometra/proxy\` (paths are resolved on the proxy host).
+    `Attach local files to a file input. Requires \`@geometra/proxy\` (paths exist on the proxy host).
 
-Without x,y: uses the first \`input[type=file]\` in any frame. With x,y: clicks to open a file chooser (e.g. custom "Upload" button).`,
+Strategies: **auto** (default) tries chooser click if x,y given, else hidden \`input[type=file]\` with force, else first visible file input. **hidden** forces \`setInputFiles\` on hidden inputs. **drop** needs dropX,dropY for drag-target zones. **chooser** requires x,y.`,
     {
       paths: z.array(z.string()).min(1).describe('Absolute paths on the proxy machine, e.g. /Users/you/resume.pdf'),
-      x: z.number().optional().describe('Click X to trigger file chooser'),
-      y: z.number().optional().describe('Click Y to trigger file chooser'),
+      x: z.number().optional().describe('Click X to trigger native file chooser'),
+      y: z.number().optional().describe('Click Y to trigger native file chooser'),
+      strategy: z
+        .enum(['auto', 'chooser', 'hidden', 'drop'])
+        .optional()
+        .describe('Upload strategy (default auto)'),
+      dropX: z.number().optional().describe('Drop target X (viewport) for strategy drop'),
+      dropY: z.number().optional().describe('Drop target Y (viewport) for strategy drop'),
     },
-    async ({ paths, x, y }) => {
+    async ({ paths, x, y, strategy, dropX, dropY }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       try {
-        await sendFileUpload(session, paths, x !== undefined && y !== undefined ? { x, y } : undefined)
+        await sendFileUpload(session, paths, {
+          click: x !== undefined && y !== undefined ? { x, y } : undefined,
+          strategy,
+          drop: dropX !== undefined && dropY !== undefined ? { x: dropX, y: dropY } : undefined,
+        })
         const a11y = session.tree && session.layout ? buildA11yTree(session.tree, session.layout) : null
         const summary = a11y ? summarizeTree(a11y) : 'No UI update received'
         return ok(`Uploaded ${paths.length} file(s). Updated UI:\n${summary}`)
+      } catch (e) {
+        return err((e as Error).message)
+      }
+    }
+  )
+
+  server.tool(
+    'geometra_pick_listbox_option',
+    `Pick a visible \`role=option\` (Headless UI, React Select, Radix, etc.). Requires \`@geometra/proxy\`.
+
+Optional openX,openY clicks the combobox first if the list is not open. Uses substring name match unless exact=true.`,
+    {
+      label: z.string().describe('Accessible name of the option (visible text or aria-label)'),
+      exact: z.boolean().optional().describe('Exact name match'),
+      openX: z.number().optional().describe('Click to open dropdown'),
+      openY: z.number().optional().describe('Click to open dropdown'),
+    },
+    async ({ label, exact, openX, openY }) => {
+      const session = getSession()
+      if (!session) return err('Not connected. Call geometra_connect first.')
+      try {
+        await sendListboxPick(session, label, {
+          exact,
+          open: openX !== undefined && openY !== undefined ? { x: openX, y: openY } : undefined,
+        })
+        const a11y = session.tree && session.layout ? buildA11yTree(session.tree, session.layout) : null
+        const summary = a11y ? summarizeTree(a11y) : 'No UI update received'
+        return ok(`Picked listbox option "${label}". Updated UI:\n${summary}`)
       } catch (e) {
         return err((e as Error).message)
       }

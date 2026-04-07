@@ -21,7 +21,8 @@ Geometra proxy:       Headless Chromium → DOM geometry → same WebSocket as n
 | `geometra_click` | Click an element by coordinates |
 | `geometra_type` | Type text into the focused element |
 | `geometra_key` | Send special keys (Enter, Tab, Escape, arrows) |
-| `geometra_upload_files` | Attach local file(s) to a file input (`@geometra/proxy` only) |
+| `geometra_upload_files` | Attach files: auto / hidden input / native chooser / synthetic drop (`@geometra/proxy` only) |
+| `geometra_pick_listbox_option` | Pick `role=option` (React Select, Headless UI, etc.; `@geometra/proxy` only) |
 | `geometra_select_option` | Choose an option on a native `<select>` (`@geometra/proxy` only) |
 | `geometra_wheel` | Mouse wheel / scroll (`@geometra/proxy` only) |
 | `geometra_snapshot` | Full accessibility tree with bounds (structured "screenshot") |

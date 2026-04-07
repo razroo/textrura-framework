@@ -6,6 +6,8 @@ function delay(ms: number): Promise<void> {
   return new Promise(r => setTimeout(r, ms))
 }
 
+export type FileAttachStrategy = 'auto' | 'chooser' | 'hidden' | 'drop'
+
 /**
  * Resolve and validate paths on the machine running the proxy (not the agent host).
  */
@@ -25,24 +27,100 @@ export function resolveExistingFiles(rawPaths: unknown[]): string[] {
   return paths
 }
 
+async function attachHiddenInAllFrames(page: Page, paths: string[]): Promise<boolean> {
+  for (const frame of page.frames()) {
+    const loc = frame.locator('input[type="file"]')
+    const n = await loc.count()
+    for (let i = 0; i < n; i++) {
+      try {
+        await loc.nth(i).setInputFiles(paths)
+        return true
+      } catch {
+        /* try next */
+      }
+    }
+  }
+  return false
+}
+
+async function attachViaChooser(page: Page, paths: string[], clickX: number, clickY: number): Promise<void> {
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser', { timeout: 12_000 }),
+    page.mouse.click(clickX, clickY),
+  ])
+  await chooser.setFiles(paths)
+}
+
+/** Synthetic drop at (x,y) using file bytes from the proxy host (targets elementFromPoint). */
+async function attachViaDropPlaywright(page: Page, paths: string[], dropX: number, dropY: number): Promise<void> {
+  const fs = await import('node:fs/promises')
+  const buffers = await Promise.all(paths.map(p => fs.readFile(p)))
+  const names = paths.map(p => p.split(/[/\\\\]/).pop() ?? 'file')
+  await page.mouse.move(dropX, dropY)
+  await page.mainFrame().evaluate(
+    ({ bufs, ns, x, y }: { bufs: number[][]; ns: string[]; x: number; y: number }) => {
+      const dt = new DataTransfer()
+      for (let i = 0; i < bufs.length; i++) {
+        const u8 = new Uint8Array(bufs[i]!)
+        const blob = new Blob([u8])
+        dt.items.add(new File([blob], ns[i]!, { type: 'application/octet-stream' }))
+      }
+      const target = document.elementFromPoint(x, y) ?? document.body
+      target.dispatchEvent(
+        new DragEvent('drop', { bubbles: true, cancelable: true, clientX: x, clientY: y, dataTransfer: dt }),
+      )
+    },
+    { bufs: buffers.map(b => Array.from(b)), ns: names, x: dropX, y: dropY },
+  )
+}
+
 /**
- * Attach files via Playwright: either click (x,y) to open a file chooser, or set on the first
- * `input[type=file]` in any frame.
+ * `strategy`:
+ * - `chooser` — requires x,y; opens native file chooser.
+ * - `hidden` — `setInputFiles({ force: true })` on every `input[type=file]` until one succeeds.
+ * - `drop` — requires dropX, dropY; synthetic drop with file payloads at coordinates.
+ * - `auto` — chooser if x,y; else hidden; if hidden fails, first visible file input without force.
  */
 export async function attachFiles(
   page: Page,
   paths: string[],
-  clickX?: number,
-  clickY?: number,
+  opts?: {
+    clickX?: number
+    clickY?: number
+    strategy?: FileAttachStrategy
+    dropX?: number
+    dropY?: number
+  },
 ): Promise<void> {
-  if (clickX !== undefined && clickY !== undefined && Number.isFinite(clickX) && Number.isFinite(clickY)) {
-    const [chooser] = await Promise.all([
-      page.waitForEvent('filechooser', { timeout: 12_000 }),
-      page.mouse.click(clickX, clickY),
-    ])
-    await chooser.setFiles(paths)
+  const strategy = opts?.strategy ?? 'auto'
+  const clickX = opts?.clickX
+  const clickY = opts?.clickY
+  const dropX = opts?.dropX
+  const dropY = opts?.dropY
+
+  if (strategy === 'chooser' || (strategy === 'auto' && clickX !== undefined && clickY !== undefined)) {
+    if (clickX === undefined || clickY === undefined) {
+      throw new Error('file: chooser strategy requires x,y click coordinates')
+    }
+    await attachViaChooser(page, paths, clickX, clickY)
     return
   }
+
+  if (strategy === 'hidden' || strategy === 'auto') {
+    if (await attachHiddenInAllFrames(page, paths)) return
+    if (strategy === 'hidden') {
+      throw new Error('file: hidden strategy could not set any input[type=file]')
+    }
+  }
+
+  if (strategy === 'drop' || (strategy === 'auto' && dropX !== undefined && dropY !== undefined)) {
+    if (dropX === undefined || dropY === undefined) {
+      throw new Error('file: drop strategy requires dropX, dropY')
+    }
+    await attachViaDropPlaywright(page, paths, dropX, dropY)
+    return
+  }
+
   for (const frame of page.frames()) {
     const loc = frame.locator('input[type="file"]')
     const n = await loc.count()
@@ -52,7 +130,7 @@ export async function attachFiles(
     }
   }
   throw new Error(
-    'file: no input[type=file] in any frame; pass x,y (center of upload control) to trigger a file chooser',
+    'file: no input[type=file] in any frame; pass x,y (chooser), dropX/dropY (drop), or strategy hidden',
   )
 }
 
@@ -62,9 +140,6 @@ export interface SelectOptionPayload {
   index?: number
 }
 
-/**
- * Click (x,y) then set value on the focused `<select>` in whichever frame owns focus.
- */
 export async function selectNativeOption(page: Page, x: number, y: number, opt: SelectOptionPayload): Promise<void> {
   if (opt.value === undefined && opt.label === undefined && opt.index === undefined) {
     throw new Error('selectOption: provide at least one of value, label, or index')
@@ -105,8 +180,25 @@ export async function selectNativeOption(page: Page, x: number, y: number, opt: 
     if (applied) return
   }
   throw new Error(
-    'selectOption: no focused <select> after click — try clicking the select center, or use geometra_click on custom dropdowns',
+    'selectOption: no focused <select> after click — use geometra_pick_listbox_option for custom dropdowns',
   )
+}
+
+/**
+ * Custom listbox / combobox (ARIA): optional click to open, then `getByRole('option')`.
+ */
+export async function pickListboxOption(
+  page: Page,
+  label: string,
+  opts?: { exact?: boolean; openX?: number; openY?: number },
+): Promise<void> {
+  if (opts?.openX !== undefined && opts?.openY !== undefined) {
+    await page.mouse.click(opts.openX, opts.openY)
+    await delay(120)
+  }
+  const opt = page.getByRole('option', { name: label, exact: opts?.exact ?? false }).first()
+  await opt.waitFor({ state: 'visible', timeout: 8000 })
+  await opt.click()
 }
 
 export async function wheelAt(page: Page, deltaX: number, deltaY: number, x?: number, y?: number): Promise<void> {

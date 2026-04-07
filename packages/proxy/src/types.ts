@@ -66,6 +66,18 @@ export type ClientFileMessage = {
   paths: string[]
   x?: number
   y?: number
+  strategy?: 'auto' | 'chooser' | 'hidden' | 'drop'
+  dropX?: number
+  dropY?: number
+  protocolVersion?: number
+}
+
+export type ClientListboxPickMessage = {
+  type: 'listboxPick'
+  label: string
+  exact?: boolean
+  openX?: number
+  openY?: number
   protocolVersion?: number
 }
 
@@ -94,6 +106,7 @@ export type ParsedClientMessage =
   | ClientResizeMessage
   | ClientCompositionMessage
   | ClientFileMessage
+  | ClientListboxPickMessage
   | ClientSelectOptionMessage
   | ClientWheelMessage
   | { type: string; protocolVersion?: number }
@@ -130,4 +143,8 @@ export function isSelectOptionMessage(msg: ParsedClientMessage): msg is ClientSe
 
 export function isWheelMessage(msg: ParsedClientMessage): msg is ClientWheelMessage {
   return msg.type === 'wheel'
+}
+
+export function isListboxPickMessage(msg: ParsedClientMessage): msg is ClientListboxPickMessage {
+  return msg.type === 'listboxPick' && 'label' in msg && typeof (msg as ClientListboxPickMessage).label === 'string'
 }

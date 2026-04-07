@@ -347,10 +347,15 @@ export async function createServer(
           }
           prevLayout = null
           computeAndBroadcast()
-        } else if (msg.type === 'file' || msg.type === 'selectOption' || msg.type === 'wheel') {
+        } else if (
+          msg.type === 'file' ||
+          msg.type === 'selectOption' ||
+          msg.type === 'listboxPick' ||
+          msg.type === 'wheel'
+        ) {
           const errorMsg: ServerMessage = {
             type: 'error',
-            message: `Client message type "${msg.type}" is not supported on the native Textura server (DOM-free layout). Use @geometra/proxy for file uploads, native <select> options, and wheel scrolling.`,
+            message: `Client message type "${msg.type}" is not supported on the native Textura server (DOM-free layout). Use @geometra/proxy for DOM automation (files, listbox, select, wheel).`,
             protocolVersion: PROTOCOL_VERSION,
           }
           ws.send(JSON.stringify(errorMsg))

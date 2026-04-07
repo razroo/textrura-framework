@@ -1,6 +1,12 @@
 import type { Page } from 'playwright'
 import { WebSocketServer, type WebSocket } from 'ws'
-import { attachFiles, resolveExistingFiles, selectNativeOption, wheelAt } from './dom-actions.js'
+import {
+  attachFiles,
+  pickListboxOption,
+  resolveExistingFiles,
+  selectNativeOption,
+  wheelAt,
+} from './dom-actions.js'
 import { coalescePatches, diffLayout } from './diff-layout.js'
 import { extractGeometry } from './extractor.js'
 import type { ClientKeyMessage, GeometrySnapshot, LayoutSnapshot, ParsedClientMessage } from './types.js'
@@ -9,6 +15,7 @@ import {
   isCompositionMessage,
   isFileMessage,
   isKeyMessage,
+  isListboxPickMessage,
   isResizeMessage,
   isSelectOptionMessage,
   isWheelMessage,
@@ -132,7 +139,23 @@ async function handleClientMessage(
 
     if (isFileMessage(msg)) {
       const paths = resolveExistingFiles(msg.paths)
-      await attachFiles(page, paths, msg.x, msg.y)
+      await attachFiles(page, paths, {
+        clickX: msg.x,
+        clickY: msg.y,
+        strategy: msg.strategy,
+        dropX: msg.dropX,
+        dropY: msg.dropY,
+      })
+      onViewportOrInput('input')
+      return
+    }
+
+    if (isListboxPickMessage(msg)) {
+      await pickListboxOption(page, msg.label, {
+        exact: msg.exact,
+        openX: msg.openX,
+        openY: msg.openY,
+      })
       onViewportOrInput('input')
       return
     }
