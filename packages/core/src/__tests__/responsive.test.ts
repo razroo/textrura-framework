@@ -141,6 +141,14 @@ describe('breakpoint edge cases', () => {
     w.set(0)
     expect(bp.value).toBe('')
   })
+
+  it('supports negative minimum widths (descending sort and fallback stay deterministic)', () => {
+    const bps = { wide: 100, mid: 0, narrow: -50 }
+    expect(breakpoint(signal(200), bps).value).toBe('wide')
+    expect(breakpoint(signal(50), bps).value).toBe('mid')
+    expect(breakpoint(signal(-10), bps).value).toBe('narrow')
+    expect(breakpoint(signal(-60), bps).value).toBe('narrow')
+  })
 })
 
 describe('responsive edge cases', () => {
