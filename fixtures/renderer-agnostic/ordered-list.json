@@ -1,0 +1,70 @@
+{
+  "tree": {
+    "kind": "box",
+    "props": { "width": 220, "height": 100 },
+    "semantic": { "tag": "article" },
+    "children": [
+      {
+        "kind": "box",
+        "props": { "width": 200, "height": 80 },
+        "semantic": { "tag": "ol" },
+        "children": [
+          {
+            "kind": "box",
+            "props": { "width": 180, "height": 22 },
+            "semantic": { "tag": "li" },
+            "children": [
+              {
+                "kind": "text",
+                "props": { "text": "First", "font": "14px sans-serif", "lineHeight": 18 }
+              }
+            ]
+          },
+          {
+            "kind": "box",
+            "props": { "width": 180, "height": 22 },
+            "semantic": { "tag": "li" },
+            "children": [
+              {
+                "kind": "text",
+                "props": { "text": "Second", "font": "14px sans-serif", "lineHeight": 18 }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "layout": {
+    "x": 0,
+    "y": 0,
+    "width": 220,
+    "height": 100,
+    "children": [
+      {
+        "x": 0,
+        "y": 0,
+        "width": 200,
+        "height": 80,
+        "children": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 180,
+            "height": 22,
+            "children": [{ "x": 0, "y": 0, "width": 36, "height": 18, "children": [] }]
+          },
+          {
+            "x": 0,
+            "y": 26,
+            "width": 180,
+            "height": 22,
+            "children": [{ "x": 0, "y": 0, "width": 48, "height": 18, "children": [] }]
+          }
+        ]
+      }
+    ]
+  },
+  "expectedSemanticIncludes": ["<article", "<ol", "<li>", "First", "Second", "</article>"],
+  "expectedA11yRoles": ["article", "list", "listitem", "text", "listitem", "text"]
+}
