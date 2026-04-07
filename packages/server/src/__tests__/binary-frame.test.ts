@@ -192,4 +192,32 @@ describe('binary frame envelope', () => {
     expect(isBinaryFrameBuffer(view)).toBe(true)
     expect(decodeBinaryFrameJson(view)).toBe(json)
   })
+
+  it('decodes a v1 frame from a dedicated root ArrayBuffer (parity with @geometra/client BinaryFrameBytes)', () => {
+    const json = '{"rootAb":true}'
+    const frame = encodeBinaryFrameJson(json)
+    const ab = new ArrayBuffer(frame.byteLength)
+    new Uint8Array(ab).set(frame)
+    expect(isBinaryFrameBuffer(ab)).toBe(true)
+    expect(decodeBinaryFrameJson(ab)).toBe(json)
+  })
+
+  it('decodes a v1 frame from a DataView slice into a larger ArrayBuffer', () => {
+    const json = '{"dataView":true}'
+    const frame = encodeBinaryFrameJson(json)
+    const prefix = 5
+    const combined = new Uint8Array(prefix + frame.byteLength)
+    combined.set(frame, prefix)
+    const dv = new DataView(combined.buffer, combined.byteOffset + prefix, frame.byteLength)
+    expect(isBinaryFrameBuffer(dv)).toBe(true)
+    expect(decodeBinaryFrameJson(dv)).toBe(json)
+  })
+
+  it('decodes a v1 frame from an Int8Array view (typed array other than Uint8Array)', () => {
+    const json = '{"i8":1}'
+    const frame = encodeBinaryFrameJson(json)
+    const i8 = new Int8Array(frame.buffer, frame.byteOffset, frame.byteLength)
+    expect(isBinaryFrameBuffer(i8)).toBe(true)
+    expect(decodeBinaryFrameJson(i8)).toBe(json)
+  })
 })

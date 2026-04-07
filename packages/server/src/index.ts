@@ -12,3 +12,4 @@ export {
   isBinaryFrameBuffer,
   MAX_V1_PAYLOAD_BYTES,
 } from './binary-frame.js'
+export type { BinaryFrameBytes } from './binary-frame.js'
