@@ -43,6 +43,19 @@ describe('streamText', () => {
     expect(s.value).toBe('new')
   })
 
+  it('set() with an Object.is-equal string does not notify subscribers again', () => {
+    const s = streamText('same')
+    let runs = 0
+    effect(() => {
+      void s.signal.value
+      runs++
+    })
+    expect(runs).toBe(1)
+    s.set('same')
+    expect(runs).toBe(1)
+    expect(s.value).toBe('same')
+  })
+
   it('clear resets to empty', () => {
     const s = streamText('some text')
     s.clear()
