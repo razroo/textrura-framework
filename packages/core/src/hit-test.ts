@@ -24,7 +24,8 @@ interface ZIndexCacheEntry {
 
 const zIndexOrderCache = new WeakMap<BoxElement, ZIndexCacheEntry>()
 
-function zIndexOf(el: UIElement): number {
+function zIndexOf(el: UIElement | undefined | null): number {
+  if (el == null) return 0
   return finiteNumberOrZero(el.props.zIndex)
 }
 
@@ -162,8 +163,9 @@ function collectHits(
   if (childOrigin) {
     for (const i of getChildrenByZAsc(boxEl)) {
       const childLayout = layout.children[i]
-      if (childLayout) {
-        collectHits(boxEl.children[i]!, childLayout, x, y, childOrigin.ox, childOrigin.oy, results)
+      const childEl = boxEl.children[i]
+      if (childLayout && childEl) {
+        collectHits(childEl, childLayout, x, y, childOrigin.ox, childOrigin.oy, results)
       }
     }
   }
@@ -200,9 +202,10 @@ function dispatchHitRecursive(
     for (let k = asc.length - 1; k >= 0; k--) {
       const i = asc[k]!
       const childLayout = layout.children[i]
-      if (!childLayout) continue
+      const childEl = boxEl.children[i]
+      if (!childLayout || !childEl) continue
       const childResult = dispatchHitRecursive(
-        boxEl.children[i]!,
+        childEl,
         childLayout,
         eventType,
         x,
@@ -424,8 +427,9 @@ export function hitPathAtPoint(
     for (let k = asc.length - 1; k >= 0; k--) {
       const i = asc[k]!
       const childLayout = layout.children[i]
-      if (!childLayout) continue
-      const sub = hitPathAtPoint(boxEl.children[i]!, childLayout, x, y, childOrigin.ox, childOrigin.oy)
+      const childEl = boxEl.children[i]
+      if (!childLayout || !childEl) continue
+      const sub = hitPathAtPoint(childEl, childLayout, x, y, childOrigin.ox, childOrigin.oy)
       if (sub !== null) return [i, ...sub]
     }
   }
@@ -479,9 +483,10 @@ export function getCursorAtPoint(
       for (let k = asc.length - 1; k >= 0; k--) {
         const i = asc[k]!
         const childLayout = layout.children[i]
-        if (childLayout) {
+        const childEl = element.children[i]
+        if (childLayout && childEl) {
           const childCursor = getCursorAtPoint(
-            element.children[i]!,
+            childEl,
             childLayout,
             x,
             y,

@@ -4,7 +4,7 @@ import { dispatchHit, getCursorAtPoint, hasInteractiveHitAtPoint, hitPathAtPoint
 import { pointInInclusiveLayoutRect } from '../layout-bounds.js'
 import { box, image, scene3d, text } from '../elements.js'
 import { toLayoutTree } from '../tree.js'
-import type { HitEvent, KeyboardHitEvent } from '../types.js'
+import type { HitEvent, KeyboardHitEvent, UIElement } from '../types.js'
 
 if (typeof globalThis.OffscreenCanvas === 'undefined') {
   ;(globalThis as unknown as { OffscreenCanvas: unknown }).OffscreenCanvas = class {
@@ -494,6 +494,32 @@ describe('dispatchHit', () => {
     expect(fired).toBe(true)
 
     expect(hitPathAtPoint(root, layout, 70, 20)).toEqual([1])
+  })
+
+  it('hole in element.children (sparse UI array) does not throw in z-order walk; dense layout sibling still hits', () => {
+    let fired = false
+    const target = box({ width: 40, height: 40, onClick: () => { fired = true } })
+    const sparseKids = [] as unknown as UIElement[]
+    sparseKids.length = 2
+    sparseKids[1] = target
+    const root = box({ width: 100, height: 100 }, sparseKids)
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 40, height: 40, children: [] as const },
+        { x: 50, y: 0, width: 40, height: 40, children: [] as const },
+      ] as const,
+    }
+
+    expect(() => dispatchHit(root, layout, 'onClick', 70, 20)).not.toThrow()
+    expect(dispatchHit(root, layout, 'onClick', 70, 20).handled).toBe(true)
+    expect(fired).toBe(true)
+    expect(() => hitPathAtPoint(root, layout, 70, 20)).not.toThrow()
+    expect(hitPathAtPoint(root, layout, 70, 20)).toEqual([1])
+    expect(() => getCursorAtPoint(root, layout, 70, 20)).not.toThrow()
   })
 
   it('corrupt child layout (own property shadows prototype with NaN width) skips that subtree; lower sibling still receives hit', () => {
