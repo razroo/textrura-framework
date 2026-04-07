@@ -54,4 +54,50 @@ describe('pickListboxOption', () => {
     expect(await page.locator('#trigger').textContent()).toBe('New York, NY')
     await page.close()
   })
+
+  it('prefers the visible dropdown trigger over a tiny labeled input', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; }
+        .field { width: 360px; position: relative; }
+        #trigger { width: 100%; min-height: 44px; text-align: left; }
+        #combo-input { width: 6px; height: 6px; border: 0; padding: 0; margin: 0; }
+        #menu[hidden] { display: none; }
+        #menu { border: 1px solid #ccc; margin-top: 6px; padding: 8px; display: grid; gap: 6px; }
+      </style>
+      <div class="field">
+        <label for="combo-input">Country</label>
+        <div>
+          <input id="combo-input" placeholder="Start typing..." />
+          <button id="trigger" type="button" aria-haspopup="listbox">Select country</button>
+        </div>
+        <div id="menu" hidden>
+          <button type="button">Canada</button>
+          <button type="button">United States</button>
+        </div>
+      </div>
+      <script>
+        const trigger = document.getElementById('trigger')
+        const menu = document.getElementById('menu')
+        trigger.addEventListener('click', () => {
+          menu.hidden = false
+        })
+        for (const option of menu.querySelectorAll('button')) {
+          option.addEventListener('click', () => {
+            trigger.textContent = option.textContent
+            menu.hidden = true
+          })
+        }
+      </script>
+    `)
+
+    await pickListboxOption(page, 'United States', {
+      fieldLabel: 'Country',
+      exact: false,
+    })
+
+    expect(await page.locator('#trigger').textContent()).toBe('United States')
+    await page.close()
+  })
 })

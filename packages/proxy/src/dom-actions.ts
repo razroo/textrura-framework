@@ -14,10 +14,24 @@ const LABELED_CONTROL_SELECTOR =
 const OPTION_PICKER_SELECTOR =
   '[role="option"], [role="menuitem"], [role="treeitem"], button, li, [data-value], [aria-selected], [aria-checked]'
 
-async function firstVisible(locator: Locator): Promise<Locator | null> {
+async function firstVisible(
+  locator: Locator,
+  opts?: { minWidth?: number; minHeight?: number; maxCandidates?: number; fallbackToAnyVisible?: boolean },
+): Promise<Locator | null> {
   try {
-    const first = locator.first()
-    if (await first.isVisible()) return first
+    const count = Math.min(await locator.count(), opts?.maxCandidates ?? 8)
+    let firstAnyVisible: Locator | null = null
+    for (let i = 0; i < count; i++) {
+      const candidate = locator.nth(i)
+      if (!(await candidate.isVisible())) continue
+      if (!firstAnyVisible) firstAnyVisible = candidate
+      const box = await candidate.boundingBox()
+      if (!box) continue
+      if ((opts?.minWidth ?? 0) <= box.width && (opts?.minHeight ?? 0) <= box.height) {
+        return candidate
+      }
+    }
+    return opts?.fallbackToAnyVisible === false ? null : firstAnyVisible
   } catch {
     /* ignore */
   }
@@ -49,7 +63,7 @@ async function findLabeledControl(frame: Frame, fieldLabel: string, exact: boole
   ]
 
   for (const candidate of directCandidates) {
-    const visible = await firstVisible(candidate)
+    const visible = await firstVisible(candidate, { minWidth: 48, minHeight: 18, fallbackToAnyVisible: false })
     if (visible) return visible
   }
 
@@ -110,12 +124,16 @@ async function findLabeledControl(frame: Frame, fieldLabel: string, exact: boole
     }
 
     function controlPriority(el: Element): number {
-      if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) return 0
+      const rect = el.getBoundingClientRect()
+      const sizePenalty = rect.width < 48 || rect.height < 18 ? 180 : 0
+      if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) {
+        return sizePenalty
+      }
       const role = el.getAttribute('role')
-      if (role === 'combobox' || role === 'textbox') return 4
-      if (el.getAttribute('aria-haspopup') === 'listbox') return 8
-      if (el.tagName.toLowerCase() === 'button') return 12
-      return 24
+      if (role === 'combobox' || role === 'textbox') return 4 + sizePenalty
+      if (el.getAttribute('aria-haspopup') === 'listbox') return 8 + sizePenalty
+      if (el.tagName.toLowerCase() === 'button') return 12 + sizePenalty
+      return 24 + sizePenalty
     }
 
     const labelNodes = Array.from(document.querySelectorAll('label, legend')).filter((el): el is HTMLElement => visible(el))
@@ -157,6 +175,14 @@ async function findLabeledControl(frame: Frame, fieldLabel: string, exact: boole
   }, { fieldLabel, exact })
 
   return bestIndex >= 0 ? fallbackCandidates.nth(bestIndex) : null
+}
+
+function textMatches(candidate: string | undefined, expected: string, exact: boolean): boolean {
+  if (!candidate) return false
+  const normalizedCandidate = candidate.replace(/\s+/g, ' ').trim().toLowerCase()
+  const normalizedExpected = expected.replace(/\s+/g, ' ').trim().toLowerCase()
+  if (!normalizedCandidate || !normalizedExpected) return false
+  return exact ? normalizedCandidate === normalizedExpected : normalizedCandidate.includes(normalizedExpected)
 }
 
 async function openDropdownControl(
@@ -289,6 +315,46 @@ async function clickVisibleOptionCandidate(
     }
   }
 
+  return false
+}
+
+async function locatorDisplayedValue(locator: Locator): Promise<string | undefined> {
+  try {
+    return await locator.evaluate((el) => {
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+        return el.value?.trim() || el.getAttribute('aria-valuetext')?.trim() || el.getAttribute('aria-label')?.trim() || undefined
+      }
+      if (el instanceof HTMLSelectElement) {
+        return el.selectedOptions[0]?.textContent?.trim() || el.value?.trim() || undefined
+      }
+      const ariaValueText = el.getAttribute('aria-valuetext')?.trim()
+      if (ariaValueText) return ariaValueText
+      const ariaLabel = el.getAttribute('aria-label')?.trim()
+      if (ariaLabel) return ariaLabel
+      const text = el.textContent?.trim()
+      return text || undefined
+    })
+  } catch {
+    return undefined
+  }
+}
+
+async function confirmListboxSelection(
+  page: Page,
+  fieldLabel: string,
+  label: string,
+  exact: boolean,
+): Promise<boolean> {
+  const deadline = Date.now() + 1500
+  while (Date.now() < deadline) {
+    for (const frame of page.frames()) {
+      const locator = await findLabeledControl(frame, fieldLabel, exact)
+      if (!locator) continue
+      const value = await locatorDisplayedValue(locator)
+      if (textMatches(value, label, exact)) return true
+    }
+    await delay(100)
+  }
   return false
 }
 
@@ -477,9 +543,11 @@ export async function pickListboxOption(
   opts?: { exact?: boolean; openX?: number; openY?: number; fieldLabel?: string; query?: string },
 ): Promise<void> {
   let anchorY: number | undefined
+  const exact = opts?.exact ?? false
+  let attemptedSelection = false
 
   if (opts?.fieldLabel) {
-    const opened = await openDropdownControl(page, opts.fieldLabel, opts?.exact ?? false)
+    const opened = await openDropdownControl(page, opts.fieldLabel, exact)
     anchorY = opened.anchorY
     const query = opts.query ?? label
     if (query && opened.editable) {
@@ -496,10 +564,16 @@ export async function pickListboxOption(
 
   const deadline = Date.now() + 3000
   while (Date.now() < deadline) {
-    if (await clickVisibleOptionCandidate(page, label, opts?.exact ?? false, anchorY)) return
+    if (await clickVisibleOptionCandidate(page, label, exact, anchorY)) {
+      attemptedSelection = true
+      if (!opts?.fieldLabel || await confirmListboxSelection(page, opts.fieldLabel, label, exact)) return
+    }
     await delay(120)
   }
 
+  if (opts?.fieldLabel && attemptedSelection) {
+    throw new Error(`listboxPick: selected "${label}" but could not confirm it on field "${opts.fieldLabel}"`)
+  }
   throw new Error(`listboxPick: no visible option matching "${label}"`)
 }
 

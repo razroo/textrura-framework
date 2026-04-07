@@ -112,4 +112,48 @@ describe('extractGeometry', () => {
 
     await page.close()
   })
+
+  it('expands tiny text-control bounds to the visible control wrapper', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; }
+        label { display: block; margin-bottom: 8px; }
+        .combo-shell {
+          width: 320px;
+          min-height: 44px;
+          padding: 10px 12px;
+          border: 1px solid #ccc;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+        }
+        .combo-shell input {
+          width: 6px;
+          height: 6px;
+          border: 0;
+          padding: 0;
+          margin: 0;
+          outline: none;
+        }
+      </style>
+      <label for="country-input">Country</label>
+      <div class="combo-shell">
+        <input id="country-input" placeholder="Start typing..." />
+      </div>
+    `)
+
+    const snapshot = await extractGeometry(page)
+    const nodes = flattenSnapshot(snapshot.tree, snapshot.layout)
+    const input = nodes.find(node =>
+      node.tree.semantic?.role === 'textbox' &&
+      node.tree.semantic?.ariaLabel === 'Country',
+    )
+
+    expect(input).toBeDefined()
+    expect(input?.layout.width).toBeGreaterThan(280)
+    expect(input?.layout.height).toBeGreaterThan(30)
+
+    await page.close()
+  })
 })

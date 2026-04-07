@@ -70,6 +70,56 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
     return undefined
   }
 
+  function isTextLikeControl(el: Element): boolean {
+    if (el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) return true
+    if (el instanceof HTMLInputElement) {
+      return !['checkbox', 'radio', 'file', 'button', 'submit', 'reset', 'hidden', 'range', 'color'].includes(el.type)
+    }
+    const role = el.getAttribute('role')
+    return role === 'textbox' || role === 'combobox'
+  }
+
+  function pickMeaningfulControlRect(el: Element): DOMRect {
+    const h = el as HTMLElement
+    const rect = h.getBoundingClientRect()
+    if (!isTextLikeControl(el)) return rect
+    if (rect.width >= 80 && rect.height >= 24) return rect
+
+    let best = rect
+    let bestScore = Number.POSITIVE_INFINITY
+    let current = h.parentElement
+    let depth = 0
+
+    while (current && depth < 6) {
+      const style = getComputedStyle(current)
+      const candidate = current.getBoundingClientRect()
+      if (
+        style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        candidate.width > 0 &&
+        candidate.height > 0 &&
+        candidate.width >= rect.width &&
+        candidate.height >= rect.height &&
+        candidate.width <= window.innerWidth * 0.98 &&
+        candidate.height <= Math.max(window.innerHeight * 0.9, 320)
+      ) {
+        const largeEnough = candidate.width >= 80 || candidate.height >= 24
+        if (largeEnough) {
+          const area = candidate.width * candidate.height
+          const score = area + depth * 1000
+          if (score < bestScore) {
+            best = candidate
+            bestScore = score
+          }
+        }
+      }
+      current = current.parentElement
+      depth++
+    }
+
+    return best
+  }
+
   function shouldSkip(el: Element): boolean {
     const tag = el.tagName.toLowerCase()
     if (SKIP_TAGS.has(tag)) return true
@@ -147,6 +197,7 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
       const alt = el.getAttribute('alt')
       if (alt) semantic.alt = alt
     }
+    if (document.activeElement === el) semantic.focused = true
     if (h.isContentEditable) semantic.role = 'textbox'
     return semantic
   }
@@ -158,7 +209,7 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
 
   function extractFormControl(el: Element, tag: string): { layout: LayoutSnapshot; tree: TreeSnapshot } {
     const h = el as HTMLElement
-    const rect = h.getBoundingClientRect()
+    const rect = pickMeaningfulControlRect(el)
     const layout: LayoutSnapshot = {
       x: Math.round(rect.x),
       y: Math.round(rect.y),
@@ -318,7 +369,13 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
   const tree: TreeSnapshot = {
     kind: 'box',
     props: {},
-    semantic: { tag: 'body', role: 'group' },
+    semantic: {
+      tag: 'body',
+      role: 'group',
+      pageUrl: location.href,
+      scrollX: window.scrollX,
+      scrollY: window.scrollY,
+    },
     children: treeChildren,
   }
   return { layout, tree }

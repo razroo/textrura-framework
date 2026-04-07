@@ -174,6 +174,16 @@ async function main(): Promise<void> {
   const wsUrl = await listeningPromise
   await hub.flushExtract()
   await installDomObserver(page, hub.scheduleExtract)
+  page.on('domcontentloaded', () => {
+    void installDomObserver(page, hub.scheduleExtract)
+      .then(() => {
+        hub.scheduleExtract()
+      })
+      .catch(err => {
+        const message = formatProxyFatalError(err)
+        console.error('[geometra-proxy] observer reinstall failed:', message)
+      })
+  })
 
   console.error(`[geometra-proxy] Ready. Connect MCP with geometra_connect({ url: "${wsUrl}" })`)
   emitReadySignal(wsUrl, url)

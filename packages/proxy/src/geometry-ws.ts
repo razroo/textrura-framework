@@ -24,6 +24,8 @@ import {
   PROXY_PROTOCOL_VERSION,
 } from './types.js'
 
+const DOM_OBSERVER_BINDINGS = new WeakSet<Page>()
+
 function isProtocolCompatible(peerVersion: number | undefined): boolean {
   if (peerVersion === undefined) return true
   if (typeof peerVersion !== 'number' || !Number.isFinite(peerVersion)) return false
@@ -299,7 +301,7 @@ export function startGeometryWebSocket(options: {
 
   async function runExtract(): Promise<boolean> {
     try {
-      const snap = await extractGeometry(options.page)
+      const snap = await extractGeometryWithRecovery(options.page)
       return broadcastSnapshot(snap)
     } catch (err) {
       options.onError?.(err)
@@ -436,11 +438,18 @@ export function startGeometryWebSocket(options: {
 }
 
 export async function installDomObserver(page: Page, scheduleExtract: () => void): Promise<void> {
-  await page.exposeFunction('__geometraProxyNotify', () => {
-    scheduleExtract()
-  })
+  if (!DOM_OBSERVER_BINDINGS.has(page)) {
+    await page.exposeFunction('__geometraProxyNotify', () => {
+      scheduleExtract()
+    })
+    DOM_OBSERVER_BINDINGS.add(page)
+  }
   await page.evaluate(() => {
-    const w = window as unknown as { __geometraProxyNotify?: () => Promise<void> }
+    const w = window as unknown as {
+      __geometraProxyNotify?: () => Promise<void>
+      __geometraProxyObserverInstalled?: boolean
+    }
+    if (w.__geometraProxyObserverInstalled) return
     const observer = new MutationObserver(() => {
       void w.__geometraProxyNotify?.()
     })
@@ -450,5 +459,29 @@ export async function installDomObserver(page: Page, scheduleExtract: () => void
       attributes: true,
       characterData: true,
     })
+    w.__geometraProxyObserverInstalled = true
   })
+}
+
+function isNavigationTransitionError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err)
+  return /Execution context was destroyed|Cannot find context with specified id|Frame was detached|navigation/i.test(message)
+}
+
+async function extractGeometryWithRecovery(page: Page): Promise<GeometrySnapshot> {
+  let lastNavigationError: Error | null = null
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await extractGeometry(page)
+    } catch (err) {
+      if (page.isClosed() || !isNavigationTransitionError(err)) throw err
+      lastNavigationError = err instanceof Error ? err : new Error(String(err))
+      await page.waitForLoadState('domcontentloaded', { timeout: 2500 }).catch(() => {})
+      await page.waitForLoadState('load', { timeout: 1000 }).catch(() => {})
+    }
+  }
+
+  const detail = lastNavigationError?.message ?? 'Navigation interrupted extraction'
+  throw new Error(`Page navigation interrupted extraction. Wait for the next frame or retry after the new route stabilizes. ${detail}`)
 }

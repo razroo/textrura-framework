@@ -10,7 +10,8 @@ import { spawnGeometraProxy } from './proxy-spawn.js'
 export interface A11yNode {
   role: string
   name?: string
-  state?: { disabled?: boolean; expanded?: boolean; selected?: boolean; checked?: boolean | 'mixed' }
+  state?: { disabled?: boolean; expanded?: boolean; selected?: boolean; checked?: boolean | 'mixed'; focused?: boolean }
+  meta?: { pageUrl?: string; scrollX?: number; scrollY?: number }
   bounds: { x: number; y: number; width: number; height: number }
   path: number[]
   children: A11yNode[]
@@ -23,9 +24,17 @@ export interface CompactUiNode {
   role: string
   name?: string
   state?: A11yNode['state']
+  pinned?: boolean
   bounds: { x: number; y: number; width: number; height: number }
   path: number[]
   focusable: boolean
+}
+
+export interface CompactUiContext {
+  pageUrl?: string
+  scrollX?: number
+  scrollY?: number
+  focusedNode?: CompactUiNode
 }
 
 export type PageSectionKind = 'landmark' | 'form' | 'dialog' | 'list'
@@ -149,6 +158,23 @@ export interface UiListCountChange {
   afterCount: number
 }
 
+export interface UiNavigationChange {
+  beforeUrl?: string
+  afterUrl?: string
+}
+
+export interface UiViewportChange {
+  beforeScrollX?: number
+  beforeScrollY?: number
+  afterScrollX?: number
+  afterScrollY?: number
+}
+
+export interface UiFocusChange {
+  before?: CompactUiNode
+  after?: CompactUiNode
+}
+
 /** Semantic delta between two compact viewport models. */
 export interface UiDelta {
   added: CompactUiNode[]
@@ -159,6 +185,9 @@ export interface UiDelta {
   formsAppeared: PageFormModel[]
   formsRemoved: PageFormModel[]
   listCountsChanged: UiListCountChange[]
+  navigation?: UiNavigationChange
+  viewport?: UiViewportChange
+  focus?: UiFocusChange
 }
 
 export interface Session {
@@ -481,7 +510,18 @@ const COMPACT_INDEX_ROLES = new Set([
   'main',
   'form',
   'article',
+  'tablist',
+  'tab',
   'listitem',
+])
+
+const PINNED_CONTEXT_ROLES = new Set([
+  'navigation',
+  'main',
+  'form',
+  'dialog',
+  'tablist',
+  'tab',
 ])
 
 const LANDMARK_ROLES = new Set([
@@ -616,6 +656,50 @@ function intersectsViewport(
   )
 }
 
+function intersectsViewportWithMargin(
+  b: { x: number; y: number; width: number; height: number },
+  vw: number,
+  vh: number,
+  marginY: number,
+): boolean {
+  return (
+    b.width > 0 &&
+    b.height > 0 &&
+    b.x + b.width > 0 &&
+    b.x < vw &&
+    b.y + b.height > -marginY &&
+    b.y < vh + marginY
+  )
+}
+
+function compactNodeFromA11y(node: A11yNode, pinned = false): CompactUiNode {
+  const name = sanitizeInlineName(node.name, 240)
+  return {
+    id: nodeIdForPath(node.path),
+    role: node.role,
+    ...(name ? { name } : {}),
+    ...(node.state && Object.keys(node.state).length > 0 ? { state: node.state } : {}),
+    ...(pinned ? { pinned: true } : {}),
+    bounds: { ...node.bounds },
+    path: node.path,
+    focusable: node.focusable,
+  }
+}
+
+function pinnedRolePriority(role: string): number {
+  if (role === 'tablist') return 0
+  if (role === 'tab') return 1
+  if (role === 'form') return 2
+  if (role === 'dialog') return 3
+  if (role === 'navigation') return 4
+  if (role === 'main') return 5
+  return 6
+}
+
+function shouldPinCompactContextNode(node: A11yNode): boolean {
+  return PINNED_CONTEXT_ROLES.has(node.role) || node.state?.focused === true
+}
+
 function includeInCompactIndex(n: A11yNode): boolean {
   if (n.focusable) return true
   if (COMPACT_INDEX_ROLES.has(n.role)) return true
@@ -630,39 +714,68 @@ function includeInCompactIndex(n: A11yNode): boolean {
 export function buildCompactUiIndex(
   root: A11yNode,
   options?: { viewportWidth?: number; viewportHeight?: number; maxNodes?: number },
-): { nodes: CompactUiNode[]; truncated: boolean } {
+): { nodes: CompactUiNode[]; truncated: boolean; context: CompactUiContext } {
   const vw = options?.viewportWidth ?? root.bounds.width
   const vh = options?.viewportHeight ?? root.bounds.height
   const maxNodes = options?.maxNodes ?? 400
 
-  const acc: CompactUiNode[] = []
+  const visibleNodes: CompactUiNode[] = []
+  const pinnedNodes = new Map<string, CompactUiNode>()
+  const marginY = Math.round(vh * 0.6)
 
-  function walk(n: A11yNode) {
-    if (includeInCompactIndex(n) && intersectsViewport(n.bounds, vw, vh)) {
-      const name = sanitizeInlineName(n.name, 240)
-      acc.push({
-        id: nodeIdForPath(n.path),
-        role: n.role,
-        ...(name ? { name } : {}),
-        ...(n.state && Object.keys(n.state).length > 0 ? { state: n.state } : {}),
-        bounds: { ...n.bounds },
-        path: n.path,
-        focusable: n.focusable,
-      })
-    }
-    for (const c of n.children) walk(c)
+  function pinNode(node: A11yNode) {
+    if (!shouldPinCompactContextNode(node)) return
+    pinnedNodes.set(nodeIdForPath(node.path), compactNodeFromA11y(node, true))
   }
 
-  walk(root)
+  function walk(n: A11yNode, ancestors: A11yNode[]) {
+    const visibleSelf = includeInCompactIndex(n) && intersectsViewport(n.bounds, vw, vh)
+    if (visibleSelf) {
+      visibleNodes.push(compactNodeFromA11y(n))
+      for (const ancestor of ancestors) {
+        pinNode(ancestor)
+      }
+    }
 
-  acc.sort((a, b) => {
+    if (shouldPinCompactContextNode(n) && intersectsViewportWithMargin(n.bounds, vw, vh, marginY)) {
+      pinNode(n)
+    }
+
+    for (const c of n.children) walk(c, [...ancestors, n])
+  }
+
+  walk(root, [])
+
+  const merged = new Map<string, CompactUiNode>()
+  for (const node of pinnedNodes.values()) {
+    merged.set(node.id, node)
+  }
+  for (const node of visibleNodes) {
+    const existing = merged.get(node.id)
+    merged.set(node.id, existing?.pinned ? { ...node, pinned: true } : node)
+  }
+
+  const nodes = [...merged.values()]
+  nodes.sort((a, b) => {
+    if ((a.pinned ?? false) !== (b.pinned ?? false)) return a.pinned ? -1 : 1
+    if (a.pinned && b.pinned && a.role !== b.role) {
+      return pinnedRolePriority(a.role) - pinnedRolePriority(b.role)
+    }
     if (a.focusable !== b.focusable) return a.focusable ? -1 : 1
     if (a.bounds.y !== b.bounds.y) return a.bounds.y - b.bounds.y
     return a.bounds.x - b.bounds.x
   })
 
-  if (acc.length > maxNodes) return { nodes: acc.slice(0, maxNodes), truncated: true }
-  return { nodes: acc, truncated: false }
+  const focusedNode = nodes.find(node => node.state?.focused)
+  const context: CompactUiContext = {
+    ...(root.meta?.pageUrl ? { pageUrl: root.meta.pageUrl } : {}),
+    ...(typeof root.meta?.scrollX === 'number' ? { scrollX: root.meta.scrollX } : {}),
+    ...(typeof root.meta?.scrollY === 'number' ? { scrollY: root.meta.scrollY } : {}),
+    ...(focusedNode ? { focusedNode } : {}),
+  }
+
+  if (nodes.length > maxNodes) return { nodes: nodes.slice(0, maxNodes), truncated: true, context }
+  return { nodes, truncated: false, context }
 }
 
 export function summarizeCompactIndex(nodes: CompactUiNode[], maxLines = 80): string {
@@ -672,8 +785,9 @@ export function summarizeCompactIndex(nodes: CompactUiNode[], maxLines = 80): st
     const nm = n.name ? ` "${truncateUiText(n.name, 48)}"` : ''
     const st = n.state && Object.keys(n.state).length ? ` ${JSON.stringify(n.state)}` : ''
     const foc = n.focusable ? ' *' : ''
+    const pin = n.pinned ? ' [pinned]' : ''
     const b = n.bounds
-    lines.push(`${n.id} ${n.role}${nm} (${b.x},${b.y} ${b.width}x${b.height})${st}${foc}`)
+    lines.push(`${n.id} ${n.role}${nm}${pin} (${b.x},${b.y} ${b.width}x${b.height})${st}${foc}`)
   }
   if (nodes.length > maxLines) {
     lines.push(`… and ${nodes.length - maxLines} more (use geometra_snapshot with a higher maxNodes or geometra_query)`)
@@ -692,6 +806,7 @@ function cloneState(state: A11yNode['state'] | undefined): A11yNode['state'] | u
   if (state.expanded !== undefined) next.expanded = state.expanded
   if (state.selected !== undefined) next.selected = state.selected
   if (state.checked !== undefined) next.checked = state.checked
+  if (state.focused !== undefined) next.focused = state.focused
   return Object.keys(next).length > 0 ? next : undefined
 }
 
@@ -1152,7 +1267,7 @@ function diffCompactNodes(before: CompactUiNode, after: CompactUiNode): string[]
 
   const beforeState = before.state ?? {}
   const afterState = after.state ?? {}
-  for (const key of ['disabled', 'expanded', 'selected', 'checked'] as const) {
+  for (const key of ['disabled', 'expanded', 'selected', 'checked', 'focused'] as const) {
     if (beforeState[key] !== afterState[key]) {
       changes.push(`${key} ${formatStateValue(beforeState[key])} -> ${formatStateValue(afterState[key])}`)
     }
@@ -1183,8 +1298,10 @@ export function buildUiDelta(
   options?: { maxNodes?: number },
 ): UiDelta {
   const maxNodes = options?.maxNodes ?? 250
-  const beforeCompact = buildCompactUiIndex(before, { maxNodes }).nodes
-  const afterCompact = buildCompactUiIndex(after, { maxNodes }).nodes
+  const beforeIndex = buildCompactUiIndex(before, { maxNodes })
+  const afterIndex = buildCompactUiIndex(after, { maxNodes })
+  const beforeCompact = beforeIndex.nodes
+  const afterCompact = afterIndex.nodes
 
   const beforeMap = new Map(beforeCompact.map(node => [node.id, node]))
   const afterMap = new Map(afterCompact.map(node => [node.id, node]))
@@ -1243,6 +1360,32 @@ export function buildUiDelta(
     }
   }
 
+  const navigation =
+    beforeIndex.context.pageUrl !== afterIndex.context.pageUrl
+      ? {
+          beforeUrl: beforeIndex.context.pageUrl,
+          afterUrl: afterIndex.context.pageUrl,
+        }
+      : undefined
+
+  const viewport =
+    beforeIndex.context.scrollX !== afterIndex.context.scrollX || beforeIndex.context.scrollY !== afterIndex.context.scrollY
+      ? {
+          beforeScrollX: beforeIndex.context.scrollX,
+          beforeScrollY: beforeIndex.context.scrollY,
+          afterScrollX: afterIndex.context.scrollX,
+          afterScrollY: afterIndex.context.scrollY,
+        }
+      : undefined
+
+  const focus =
+    beforeIndex.context.focusedNode?.id !== afterIndex.context.focusedNode?.id
+      ? {
+          before: beforeIndex.context.focusedNode,
+          after: afterIndex.context.focusedNode,
+        }
+      : undefined
+
   return {
     added,
     removed,
@@ -1252,6 +1395,9 @@ export function buildUiDelta(
     formsAppeared,
     formsRemoved,
     listCountsChanged,
+    ...(navigation ? { navigation } : {}),
+    ...(viewport ? { viewport } : {}),
+    ...(focus ? { focus } : {}),
   }
 }
 
@@ -1264,12 +1410,31 @@ export function hasUiDelta(delta: UiDelta): boolean {
     delta.dialogsClosed.length > 0 ||
     delta.formsAppeared.length > 0 ||
     delta.formsRemoved.length > 0 ||
-    delta.listCountsChanged.length > 0
+    delta.listCountsChanged.length > 0 ||
+    !!delta.navigation ||
+    !!delta.viewport ||
+    !!delta.focus
   )
 }
 
 export function summarizeUiDelta(delta: UiDelta, maxLines = 14): string {
   const lines: string[] = []
+
+  if (delta.navigation) {
+    lines.push(`~ navigation ${JSON.stringify(delta.navigation.beforeUrl ?? 'unknown')} -> ${JSON.stringify(delta.navigation.afterUrl ?? 'unknown')}`)
+  }
+
+  if (delta.viewport) {
+    lines.push(
+      `~ viewport scroll (${delta.viewport.beforeScrollX ?? 0},${delta.viewport.beforeScrollY ?? 0}) -> (${delta.viewport.afterScrollX ?? 0},${delta.viewport.afterScrollY ?? 0})`,
+    )
+  }
+
+  if (delta.focus) {
+    const beforeLabel = delta.focus.before ? compactNodeLabel(delta.focus.before) : 'unset'
+    const afterLabel = delta.focus.after ? compactNodeLabel(delta.focus.after) : 'unset'
+    lines.push(`~ focus ${beforeLabel} -> ${afterLabel}`)
+  }
 
   for (const dialog of delta.dialogsOpened.slice(0, 2)) {
     lines.push(`+ ${dialog.id} dialog${dialog.name ? ` "${truncateUiText(dialog.name, 40)}"` : ''} opened`)
@@ -1375,6 +1540,12 @@ function walkNode(element: Record<string, unknown>, layout: Record<string, unkno
   if (semantic?.ariaSelected !== undefined) state.selected = !!semantic.ariaSelected
   const checked = normalizeCheckedState(semantic?.ariaChecked)
   if (checked !== undefined) state.checked = checked
+  if (semantic?.focused !== undefined) state.focused = !!semantic.focused
+
+  const meta: A11yNode['meta'] = {}
+  if (typeof semantic?.pageUrl === 'string') meta.pageUrl = semantic.pageUrl
+  if (typeof semantic?.scrollX === 'number' && Number.isFinite(semantic.scrollX)) meta.scrollX = semantic.scrollX
+  if (typeof semantic?.scrollY === 'number' && Number.isFinite(semantic.scrollY)) meta.scrollY = semantic.scrollY
 
   const children: A11yNode[] = []
   const elementChildren = element.children as Record<string, unknown>[] | undefined
@@ -1392,6 +1563,7 @@ function walkNode(element: Record<string, unknown>, layout: Record<string, unkno
     role,
     ...(name ? { name } : {}),
     ...(Object.keys(state).length > 0 ? { state } : {}),
+    ...(Object.keys(meta).length > 0 ? { meta } : {}),
     bounds,
     path,
     children,

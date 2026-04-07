@@ -29,7 +29,7 @@ import type { A11yNode, Session, UpdateWaitResult } from './session.js'
 
 export function createServer(): McpServer {
   const server = new McpServer(
-    { name: 'geometra', version: '1.19.6' },
+    { name: 'geometra', version: '1.19.7' },
     { capabilities: { tools: {} } },
   )
 
@@ -111,7 +111,7 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
   // ── query ────────────────────────────────────────────────────
   server.tool(
     'geometra_query',
-    `Find elements in the current Geometra UI by stable id, role, name, or text content. Returns matching elements with their exact pixel bounds {x, y, width, height}, role, name, and tree path.
+    `Find elements in the current Geometra UI by stable id, role, name, or text content. Returns matching elements with their exact pixel bounds {x, y, width, height}, visible in-viewport bounds, an on-screen center point, role, name, and tree path.
 
 This is the Geometra equivalent of Playwright's locator — but instant, structured, and with no browser. Use the returned bounds to click elements or assert on layout.`,
     {
@@ -131,7 +131,7 @@ This is the Geometra equivalent of Playwright's locator — but instant, structu
         return ok(`No elements found matching ${JSON.stringify({ id, role, name, text })}`)
       }
 
-      const result = matches.map(formatNode)
+      const result = matches.map(node => formatNode(node, a11y.bounds))
       return ok(JSON.stringify(result, null, 2))
     }
   )
@@ -419,7 +419,7 @@ Prefer this over raw coordinate clicks for custom forms that keep the real input
   // ── snapshot ─────────────────────────────────────────────────
   server.tool(
     'geometra_snapshot',
-    `Get the current UI as JSON. Default **compact** view: flat list of viewport-visible actionable nodes (links, buttons, inputs, headings, landmarks, text leaves, focusable elements) with bounds and tree paths — far fewer tokens than a full nested tree. Use **full** for complete nested a11y + every wrapper when debugging layout.
+    `Get the current UI as JSON. Default **compact** view: flat list of viewport-visible actionable nodes plus a few pinned context anchors (for example tab strips / form roots) and root context like URL, scroll, and focus — far fewer tokens than a full nested tree. Use **full** for complete nested a11y + every wrapper when debugging layout.
 
 JSON is minified in compact view to save tokens. For a summary-first overview, use geometra_page_model, then geometra_expand_section for just the part you want.`,
     {
@@ -445,10 +445,11 @@ JSON is minified in compact view to save tokens. For a summary-first overview, u
       if (view === 'full') {
         return ok(JSON.stringify(a11y, null, 2))
       }
-      const { nodes, truncated } = buildCompactUiIndex(a11y, { maxNodes })
+      const { nodes, truncated, context } = buildCompactUiIndex(a11y, { maxNodes })
       const payload = {
         view: 'compact' as const,
         viewport: { width: a11y.bounds.width, height: a11y.bounds.height },
+        context,
         nodes,
         truncated,
       }
@@ -500,14 +501,18 @@ function sessionA11y(session: Session): A11yNode | null {
 
 function sessionOverviewFromA11y(a11y: A11yNode): string {
   const pageSummary = summarizePageModel(buildPageModel(a11y), 8)
-  const { nodes } = buildCompactUiIndex(a11y, { maxNodes: 32 })
+  const { nodes, context } = buildCompactUiIndex(a11y, { maxNodes: 32 })
+  const contextSummary = summarizeCompactContext(context)
   const keyNodes = nodes.length > 0 ? `Key nodes:\n${summarizeCompactIndex(nodes, 18)}` : ''
-  return [pageSummary, keyNodes].filter(Boolean).join('\n')
+  return [pageSummary, contextSummary, keyNodes].filter(Boolean).join('\n')
 }
 
 function postActionSummary(session: Session, before: A11yNode | null, wait?: UpdateWaitResult): string {
   const after = sessionA11y(session)
   const notes: string[] = []
+  if (wait?.status === 'acknowledged') {
+    notes.push('Proxy acknowledged the action quickly; waiting logic did not need to rely on a full frame/patch round-trip.')
+  }
   if (wait?.status === 'timed_out') {
     notes.push(
       `No frame or patch arrived within ${wait.timeoutMs}ms after the action. The action may still have succeeded if it did not change geometry or semantics.`,
@@ -521,6 +526,19 @@ function postActionSummary(session: Session, before: A11yNode | null, wait?: Upd
     }
   }
   return [...notes, `Current UI:\n${sessionOverviewFromA11y(after)}`].filter(Boolean).join('\n')
+}
+
+function summarizeCompactContext(context: ReturnType<typeof buildCompactUiIndex>['context']): string {
+  const parts: string[] = []
+  if (context.pageUrl) parts.push(`url=${context.pageUrl}`)
+  if (typeof context.scrollX === 'number' || typeof context.scrollY === 'number') {
+    parts.push(`scroll=(${context.scrollX ?? 0},${context.scrollY ?? 0})`)
+  }
+  if (context.focusedNode) {
+    const focusName = context.focusedNode.name ? ` "${context.focusedNode.name}"` : ''
+    parts.push(`focus=${context.focusedNode.role}${focusName}`)
+  }
+  return parts.length > 0 ? `Context: ${parts.join(' | ')}` : ''
 }
 
 function ok(text: string) {
@@ -548,15 +566,35 @@ function findNodes(node: A11yNode, filter: { id?: string; role?: string; name?: 
   return matches
 }
 
-function formatNode(node: A11yNode): Record<string, unknown> {
+function formatNode(
+  node: A11yNode,
+  viewport: { width: number; height: number },
+): Record<string, unknown> {
+  const visibleLeft = Math.max(0, node.bounds.x)
+  const visibleTop = Math.max(0, node.bounds.y)
+  const visibleRight = Math.min(viewport.width, node.bounds.x + node.bounds.width)
+  const visibleBottom = Math.min(viewport.height, node.bounds.y + node.bounds.height)
+  const hasVisibleIntersection = visibleRight > visibleLeft && visibleBottom > visibleTop
+  const centerX = hasVisibleIntersection
+    ? Math.round((visibleLeft + visibleRight) / 2)
+    : Math.round(Math.min(Math.max(node.bounds.x + node.bounds.width / 2, 0), viewport.width))
+  const centerY = hasVisibleIntersection
+    ? Math.round((visibleTop + visibleBottom) / 2)
+    : Math.round(Math.min(Math.max(node.bounds.y + node.bounds.height / 2, 0), viewport.height))
   return {
     id: nodeIdForPath(node.path),
     role: node.role,
     name: node.name,
     bounds: node.bounds,
+    visibleBounds: {
+      x: visibleLeft,
+      y: visibleTop,
+      width: Math.max(0, visibleRight - visibleLeft),
+      height: Math.max(0, visibleBottom - visibleTop),
+    },
     center: {
-      x: Math.round(node.bounds.x + node.bounds.width / 2),
-      y: Math.round(node.bounds.y + node.bounds.height / 2),
+      x: centerX,
+      y: centerY,
     },
     focusable: node.focusable,
     ...(node.state && Object.keys(node.state).length > 0 ? { state: node.state } : {}),

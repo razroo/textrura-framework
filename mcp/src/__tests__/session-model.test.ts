@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildCompactUiIndex,
   buildPageModel,
   expandPageSection,
   buildUiDelta,
@@ -16,6 +17,7 @@ function node(
     path?: number[]
     focusable?: boolean
     state?: A11yNode['state']
+    meta?: A11yNode['meta']
     children?: A11yNode[]
   },
 ): A11yNode {
@@ -23,6 +25,7 @@ function node(
     role,
     ...(name ? { name } : {}),
     ...(options?.state ? { state: options.state } : {}),
+    ...(options?.meta ? { meta: options.meta } : {}),
     bounds,
     path: options?.path ?? [],
     children: options?.children ?? [],
@@ -266,5 +269,67 @@ describe('buildUiDelta', () => {
       update.after.role === 'checkbox' && update.changes.includes('checked false -> true'),
     )).toBe(true)
     expect(summary).toContain('~ n:0.0 checkbox "New York, NY": checked false -> true')
+  })
+
+  it('keeps pinned context nodes and reports viewport/focus/navigation drift', () => {
+    const before = node('group', undefined, { x: 0, y: 0, width: 900, height: 700 }, {
+      meta: { pageUrl: 'https://jobs.example.com/apply', scrollX: 0, scrollY: 120 },
+      children: [
+        node('tablist', 'Application tabs', { x: 16, y: -64, width: 420, height: 40 }, { path: [0] }),
+        node('form', 'Application', { x: 24, y: -20, width: 760, height: 1400 }, {
+          path: [1],
+          children: [
+            node('textbox', 'Full name', { x: 48, y: 140, width: 320, height: 36 }, {
+              path: [1, 0],
+              focusable: true,
+              state: { focused: true },
+            }),
+          ],
+        }),
+      ],
+    })
+
+    const after = node('group', undefined, { x: 0, y: 0, width: 900, height: 700 }, {
+      meta: { pageUrl: 'https://jobs.example.com/apply?step=details', scrollX: 0, scrollY: 420 },
+      children: [
+        node('tablist', 'Application tabs', { x: 16, y: -96, width: 420, height: 40 }, { path: [0] }),
+        node('form', 'Application', { x: 24, y: -320, width: 760, height: 1400 }, {
+          path: [1],
+          children: [
+            node('textbox', 'Country', { x: 48, y: 182, width: 320, height: 36 }, {
+              path: [1, 1],
+              focusable: true,
+              state: { focused: true },
+            }),
+          ],
+        }),
+      ],
+    })
+
+    const compact = buildCompactUiIndex(before, { maxNodes: 20 })
+    expect(compact.context.pageUrl).toBe('https://jobs.example.com/apply')
+    expect(compact.context.scrollY).toBe(120)
+    expect(compact.context.focusedNode?.name).toBe('Full name')
+    expect(compact.nodes.some(item => item.role === 'tablist' && item.pinned)).toBe(true)
+    expect(compact.nodes.some(item => item.role === 'form' && item.pinned)).toBe(true)
+
+    const delta = buildUiDelta(before, after)
+    const summary = summarizeUiDelta(delta)
+
+    expect(delta.navigation).toEqual({
+      beforeUrl: 'https://jobs.example.com/apply',
+      afterUrl: 'https://jobs.example.com/apply?step=details',
+    })
+    expect(delta.viewport).toEqual({
+      beforeScrollX: 0,
+      beforeScrollY: 120,
+      afterScrollX: 0,
+      afterScrollY: 420,
+    })
+    expect(delta.focus?.before?.name).toBe('Full name')
+    expect(delta.focus?.after?.name).toBe('Country')
+    expect(summary).toContain('~ viewport scroll (0,120) -> (0,420)')
+    expect(summary).toContain('~ focus n:1.0 textbox "Full name" -> n:1.1 textbox "Country"')
+    expect(summary).toContain('~ navigation "https://jobs.example.com/apply" -> "https://jobs.example.com/apply?step=details"')
   })
 })
