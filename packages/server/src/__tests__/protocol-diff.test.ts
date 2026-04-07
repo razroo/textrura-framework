@@ -555,4 +555,25 @@ describe('coalescePatches', () => {
     expect(merged).toEqual([{ path: [0], x: 1, y: 2 }])
     expect(Object.keys(merged[0]!).sort()).toEqual(['path', 'x', 'y'])
   })
+
+  it('aliases sparse path arrays with explicit null segments (same JSON.stringify key; first path clone wins)', () => {
+    const sparse: number[] = [1]
+    sparse[2] = 3
+    const explicit: number[] = [1, null as unknown as number, 3]
+    expect(JSON.stringify(sparse)).toBe(JSON.stringify(explicit))
+
+    const sparseFirst = coalescePatches([
+      { path: sparse, x: 10 },
+      { path: explicit, y: 20 },
+    ])
+    expect(sparseFirst).toHaveLength(1)
+    expect(sparseFirst[0]).toEqual({ path: [1, undefined, 3], x: 10, y: 20 })
+
+    const explicitFirst = coalescePatches([
+      { path: explicit, x: 10 },
+      { path: sparse, y: 20 },
+    ])
+    expect(explicitFirst).toHaveLength(1)
+    expect(explicitFirst[0]).toEqual({ path: [1, null, 3], x: 10, y: 20 })
+  })
 })
