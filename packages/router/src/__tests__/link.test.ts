@@ -113,6 +113,26 @@ describe('declarative link primitive', () => {
     expect(router.getState().location.pathname).toBe('/')
   })
 
+  it('does not navigate for Enter-like key strings that are not canonical DOM values (strict matching)', () => {
+    const history = createMemoryHistory({ initialEntries: ['/'] })
+    const router = createRouter({ routes, history })
+    router.start()
+
+    const node = link({ to: '/about', router })
+    for (const key of ['enter', 'ENTER', ''] as const) {
+      node.handlers?.onKeyDown?.({
+        key,
+        code: 'Enter',
+        shiftKey: false,
+        ctrlKey: false,
+        altKey: false,
+        metaKey: false,
+        target,
+      })
+      expect(router.getState().location.pathname).toBe('/')
+    }
+  })
+
   it('invokes user onClick before navigate and still changes location', async () => {
     const history = createMemoryHistory({ initialEntries: ['/'] })
     const router = createRouter({ routes, history })
