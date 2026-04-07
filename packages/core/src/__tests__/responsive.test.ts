@@ -275,6 +275,19 @@ describe('createViewport edge cases', () => {
     expect(vp.height.value).toBe(0)
   })
 
+  it('resize coerces boxed numbers and non-number payloads like createViewport init (typeof guard)', () => {
+    const vp = createViewport(800, 600)
+    vp.resize(Object(1024) as unknown as number, Object(768) as unknown as number)
+    expect(vp.width.value).toBe(0)
+    expect(vp.height.value).toBe(0)
+    vp.resize(400, 300)
+    expect(vp.width.value).toBe(400)
+    expect(vp.height.value).toBe(300)
+    vp.resize('1024' as unknown as number, null as unknown as number)
+    expect(vp.width.value).toBe(0)
+    expect(vp.height.value).toBe(0)
+  })
+
   it('preserves IEEE negative zero on init and resize (finiteNumberOrZero parity with layout math)', () => {
     const vp = createViewport(-0, 10)
     expect(Object.is(vp.width.peek(), -0)).toBe(true)
