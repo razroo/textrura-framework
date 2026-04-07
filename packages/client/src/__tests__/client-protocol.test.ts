@@ -1047,6 +1047,9 @@ describe('applyServerMessage', () => {
       { nested: Object.assign(Object.create(null), { x: 1 }) },
       { boxedNum: Object(3) },
       { boxedStr: Object('x') },
+      { r: /x/ },
+      { e: new Error('x') },
+      { u8: new Uint8Array([1, 2]) },
     ]
 
     for (const payload of badPayloads) {
