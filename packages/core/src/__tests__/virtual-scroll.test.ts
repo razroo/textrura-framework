@@ -148,6 +148,24 @@ describe('syncVirtualWindow', () => {
     expect(r.end).toBe(999)
   })
 
+  it('when the window is larger than the list, the inclusive visible span still covers at most totalRows indices', () => {
+    const r = syncVirtualWindow(5, 12, 2, 0)
+    expect(r.end - r.start + 1).toBeLessThanOrEqual(5)
+    expect(r.selected).toBe(2)
+  })
+
+  it('at IEEE extremes with window smaller than total, keeps start + safeWindow within the floored row budget', () => {
+    const total = 1e308
+    const windowSize = 9e307
+    const safeTotal = Math.max(0, Math.floor(total))
+    const safeWindow = Math.max(1, Math.floor(windowSize))
+    expect(safeTotal).toBeGreaterThanOrEqual(safeWindow)
+    const r = syncVirtualWindow(total, windowSize, 4e307, 4e307)
+    expect(Number.isFinite(r.start)).toBe(true)
+    expect(Number.isFinite(r.end)).toBe(true)
+    expect(r.start + safeWindow).toBeLessThanOrEqual(safeTotal)
+  })
+
   it(
     'keeps selection inside the visible window and bounds visible span for a grid of small inputs',
     () => {
