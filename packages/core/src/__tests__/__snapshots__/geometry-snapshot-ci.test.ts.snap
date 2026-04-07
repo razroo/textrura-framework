@@ -759,6 +759,39 @@ exports[`geometry snapshot CI > stable row-reverse with gap and two text childre
 }
 `;
 
+exports[`geometry snapshot CI > stable rtl document: inner flex row with dir ltr keeps ltr main axis (overrides owner) (rounded) 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [],
+          "height": 56,
+          "width": 11,
+          "x": 0,
+          "y": 0,
+        },
+        {
+          "children": [],
+          "height": 56,
+          "width": 11,
+          "x": 19,
+          "y": 0,
+        },
+      ],
+      "height": 56,
+      "width": 176,
+      "x": 12,
+      "y": 12,
+    },
+  ],
+  "height": 80,
+  "width": 200,
+  "x": 0,
+  "y": 0,
+}
+`;
+
 exports[`geometry snapshot CI > stable rtl root column stacks two text children (rounded) 1`] = `
 {
   "children": [
