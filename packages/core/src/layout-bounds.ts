@@ -25,6 +25,10 @@ export function finiteNumberOrZero(value: unknown): number {
  * When the difference overflows to a non-finite value, returns `null` so descendants are not walked with
  * offsets that would become `0` inside downstream math using {@link finiteNumberOrZero} (which would
  * misplace children).
+ *
+ * `absX` / `absY` must be **primitive** finite `number` values: `typeof` rejects `BigInt` before subtraction
+ * (mixing `bigint` with `number` throws in JS) and rejects boxed numbers / strings so corrupt host input
+ * cannot coerce via `-` the way it could with loose `number`-typed parameters alone.
  */
 export function scrollSafeChildOffsets(
   absX: number,
@@ -32,6 +36,9 @@ export function scrollSafeChildOffsets(
   scrollX: unknown,
   scrollY: unknown,
 ): { ox: number; oy: number } | null {
+  if (typeof absX !== 'number' || !Number.isFinite(absX) || typeof absY !== 'number' || !Number.isFinite(absY)) {
+    return null
+  }
   const ox = absX - finiteNumberOrZero(scrollX)
   const oy = absY - finiteNumberOrZero(scrollY)
   if (!Number.isFinite(ox) || !Number.isFinite(oy)) return null

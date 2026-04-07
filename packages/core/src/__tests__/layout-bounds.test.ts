@@ -666,6 +666,20 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(Number.NaN, 10, Number.NaN, Number.POSITIVE_INFINITY)).toBeNull()
   })
 
+  it('returns null for bigint abs origins without throwing (bigint − number throws in JS)', () => {
+    expect(() => scrollSafeChildOffsets(1n as unknown as number, 0, 0, 0)).not.toThrow()
+    expect(scrollSafeChildOffsets(1n as unknown as number, 0, 0, 0)).toBeNull()
+    expect(() => scrollSafeChildOffsets(0, 2n as unknown as number, 0, 0)).not.toThrow()
+    expect(scrollSafeChildOffsets(0, 2n as unknown as number, 0, 0)).toBeNull()
+  })
+
+  it('returns null for string or boxed abs origins without numeric coercion (public API parity with layoutBoundsAreFinite)', () => {
+    expect(scrollSafeChildOffsets('10' as unknown as number, 0, 0, 0)).toBeNull()
+    expect(scrollSafeChildOffsets(0, '20' as unknown as number, 0, 0)).toBeNull()
+    expect(scrollSafeChildOffsets(Object(5) as unknown as number, 0, 0, 0)).toBeNull()
+    expect(scrollSafeChildOffsets(0, Object(6) as unknown as number, 0, 0)).toBeNull()
+  })
+
   it('preserves IEEE −0 in child origins when abs uses −0 and scroll is 0 (hit-test / selection parity)', () => {
     const r = scrollSafeChildOffsets(-0, 10, 0, 0)
     expect(r).not.toBeNull()
