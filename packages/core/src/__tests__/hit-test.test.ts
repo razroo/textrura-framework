@@ -2805,17 +2805,28 @@ describe('dispatchHit', () => {
   })
 
   it('hasInteractiveHitAtPoint ignores keyboard/composition-only handlers (hover uses pointer slots; click-to-focus stays separate)', () => {
-    const keyOnly = box({ width: 50, height: 50, onKeyDown: () => undefined })
-    const compOnly = box({ width: 50, height: 50, onCompositionUpdate: () => undefined })
+    const keyDownOnly = box({ width: 50, height: 50, onKeyDown: () => undefined })
+    const keyUpOnly = box({ width: 50, height: 50, onKeyUp: () => undefined })
+    const compStartOnly = box({ width: 50, height: 50, onCompositionStart: () => undefined })
+    const compUpdateOnly = box({ width: 50, height: 50, onCompositionUpdate: () => undefined })
+    const compEndOnly = box({ width: 50, height: 50, onCompositionEnd: () => undefined })
     const clickBox = box({ width: 50, height: 50, onClick: () => undefined })
     const leafLayout = { x: 0, y: 0, width: 50, height: 50, children: [] as const }
 
-    expect(hasInteractiveHitAtPoint(keyOnly, leafLayout, 25, 25)).toBe(false)
-    expect(hasInteractiveHitAtPoint(compOnly, leafLayout, 25, 25)).toBe(false)
+    expect(hasInteractiveHitAtPoint(keyDownOnly, leafLayout, 25, 25)).toBe(false)
+    expect(hasInteractiveHitAtPoint(keyUpOnly, leafLayout, 25, 25)).toBe(false)
+    expect(hasInteractiveHitAtPoint(compStartOnly, leafLayout, 25, 25)).toBe(false)
+    expect(hasInteractiveHitAtPoint(compUpdateOnly, leafLayout, 25, 25)).toBe(false)
+    expect(hasInteractiveHitAtPoint(compEndOnly, leafLayout, 25, 25)).toBe(false)
     expect(hasInteractiveHitAtPoint(clickBox, leafLayout, 25, 25)).toBe(true)
 
-    expect(dispatchHit(keyOnly, leafLayout, 'onClick', 25, 25).focusTarget?.element).toBe(keyOnly)
-    expect(dispatchHit(compOnly, leafLayout, 'onClick', 25, 25).focusTarget?.element).toBe(compOnly)
+    expect(dispatchHit(keyDownOnly, leafLayout, 'onClick', 25, 25).focusTarget?.element).toBe(keyDownOnly)
+    expect(dispatchHit(keyUpOnly, leafLayout, 'onClick', 25, 25).focusTarget?.element).toBe(keyUpOnly)
+    expect(dispatchHit(compStartOnly, leafLayout, 'onClick', 25, 25).focusTarget?.element).toBe(compStartOnly)
+    expect(dispatchHit(compUpdateOnly, leafLayout, 'onClick', 25, 25).focusTarget?.element).toBe(
+      compUpdateOnly,
+    )
+    expect(dispatchHit(compEndOnly, leafLayout, 'onClick', 25, 25).focusTarget?.element).toBe(compEndOnly)
   })
 
   it('onClick: parent without handlers still routes click-to-focus to key-only child', () => {
