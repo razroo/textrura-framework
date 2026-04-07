@@ -122,6 +122,13 @@ describe('breakpoint edge cases', () => {
     expect(breakpoint(wNan, bps).value).toBe('sm')
   })
 
+  it('negative infinity width matches no min-width tier and returns the same fallback as NaN (non-finite w)', () => {
+    const w = signal(Number.NEGATIVE_INFINITY)
+    expect(breakpoint(w, bps).value).toBe('sm')
+    const tight = { a: 100, b: 300 }
+    expect(breakpoint(w, tight).value).toBe('a')
+  })
+
   it('positive infinity width selects the largest breakpoint', () => {
     const w = signal(Number.POSITIVE_INFINITY)
     expect(breakpoint(w, bps).value).toBe('lg')
@@ -156,6 +163,12 @@ describe('responsive edge cases', () => {
 
   it('follows breakpoint fallback for NaN width', () => {
     const w = signal(Number.NaN)
+    const cols = responsive(w, { sm: 1, md: 2, lg: 3 }, bps)
+    expect(cols.value).toBe(1)
+  })
+
+  it('follows breakpoint fallback for negative infinity width (parity with NaN; corrupt payload guard)', () => {
+    const w = signal(Number.NEGATIVE_INFINITY)
     const cols = responsive(w, { sm: 1, md: 2, lg: 3 }, bps)
     expect(cols.value).toBe(1)
   })
