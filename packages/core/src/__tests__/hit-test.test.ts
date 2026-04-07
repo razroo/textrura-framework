@@ -1724,6 +1724,34 @@ describe('dispatchHit', () => {
     expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(true)
   })
 
+  it('overlapping siblings: three equal z-index cache refreshes when one child z-index diverges (exit identical-z fast path)', () => {
+    const log: string[] = []
+    const first = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('first') } })
+    const second = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('second') } })
+    const third = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('third') } })
+    const root = box({ width: 100, height: 100 }, [first, second, third])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['third'])
+
+    log.length = 0
+    first.props.zIndex = 10
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['first'])
+    expect(hitPathAtPoint(root, layout, 10, 10)).toEqual([0])
+  })
+
   it('overlapping siblings: equal z-index on four children prefers last source order (identical-z fast path, stable source order)', () => {
     const log: string[] = []
     const a = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('a') } })
