@@ -74,6 +74,8 @@ function resolveSubtree(
  *   focusable list under the subtree) yield `false`. The resolved scope root’s layout must satisfy
  *   {@link import('./layout-bounds.js').layoutBoundsAreFinite}; otherwise no focusables are collected.
  * @param direction — `'next'` for forward cycling (Tab-like), `'prev'` for backward (Shift+Tab-like); default `'next'`.
+ *   At runtime only exact `'prev'` selects backward; any other value (including typos from untyped callers) is treated
+ *   as `'next'` so accidental strings do not flip traversal direction.
  * @returns `true` if focus was moved, `false` if the scope is invalid or contains no focusables.
  */
 export function trapFocusStep(
@@ -82,6 +84,7 @@ export function trapFocusStep(
   scopePath: number[],
   direction: 'next' | 'prev' = 'next',
 ): boolean {
+  const step: 'next' | 'prev' = direction === 'prev' ? 'prev' : 'next'
   const scope = resolveSubtree(tree, layout, scopePath)
   if (!scope) return false
   const targets: FocusTarget[] = []
@@ -90,8 +93,8 @@ export function trapFocusStep(
 
   const current = focusedElement.peek()
   let idx = current ? targets.findIndex(t => t.element === current.element) : -1
-  if (idx < 0) idx = direction === 'next' ? -1 : 0
-  const nextIdx = direction === 'next'
+  if (idx < 0) idx = step === 'next' ? -1 : 0
+  const nextIdx = step === 'next'
     ? (idx + 1) % targets.length
     : (idx - 1 + targets.length) % targets.length
   const next = targets[nextIdx]!

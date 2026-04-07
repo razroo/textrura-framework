@@ -364,6 +364,44 @@ describe('trapFocusStep', () => {
     expect(focusedElement.peek()?.element).toBe(b)
   })
 
+  it('treats only exact prev as backward; unknown direction strings match next (runtime / mistyped callers)', () => {
+    const a = box({ onKeyDown: () => undefined }, [])
+    const b = box({ onKeyDown: () => undefined }, [])
+    const c = box({ onKeyDown: () => undefined }, [])
+    const tree = box({}, [box({}, [a, b, c])])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 160,
+      children: [
+        {
+          x: 0,
+          y: 0,
+          width: 200,
+          height: 160,
+          children: [
+            { x: 0, y: 0, width: 100, height: 40, children: [] },
+            { x: 0, y: 50, width: 100, height: 40, children: [] },
+            { x: 0, y: 100, width: 100, height: 40, children: [] },
+          ],
+        },
+      ],
+    }
+
+    setFocus(b, layout.children[0]!.children[1]!)
+    expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(c)
+
+    setFocus(b, layout.children[0]!.children[1]!)
+    expect(trapFocusStep(tree, layout, [0], 'typo' as 'next' | 'prev')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(c)
+
+    setFocus(b, layout.children[0]!.children[1]!)
+    expect(trapFocusStep(tree, layout, [0], 'prev')).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(a)
+  })
+
   it('when focus is outside the trap, next targets first focusable and prev targets last', () => {
     const modalA = box({ onKeyDown: () => undefined }, [])
     const modalB = box({ onKeyDown: () => undefined }, [])
