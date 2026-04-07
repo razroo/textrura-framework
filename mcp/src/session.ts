@@ -15,6 +15,16 @@ export interface A11yNode {
   focusable: boolean
 }
 
+/** Flat, viewport-filtered index for token-efficient agent context (see `buildCompactUiIndex`). */
+export interface CompactUiNode {
+  role: string
+  name?: string
+  state?: A11yNode['state']
+  bounds: { x: number; y: number; width: number; height: number }
+  path: number[]
+  focusable: boolean
+}
+
 export interface Session {
   ws: WebSocket
   layout: Record<string, unknown> | null
@@ -237,6 +247,107 @@ export function sendWheel(
  */
 export function buildA11yTree(tree: Record<string, unknown>, layout: Record<string, unknown>): A11yNode {
   return walkNode(tree, layout, [])
+}
+
+/** Roles that usually matter for interaction or landmarks (non-wrapper noise). */
+const COMPACT_INDEX_ROLES = new Set([
+  'link',
+  'button',
+  'textbox',
+  'checkbox',
+  'radio',
+  'combobox',
+  'heading',
+  'img',
+  'navigation',
+  'main',
+  'form',
+  'article',
+  'listitem',
+])
+
+function intersectsViewport(
+  b: { x: number; y: number; width: number; height: number },
+  vw: number,
+  vh: number,
+): boolean {
+  return (
+    b.width > 0 &&
+    b.height > 0 &&
+    b.x + b.width > 0 &&
+    b.y + b.height > 0 &&
+    b.x < vw &&
+    b.y < vh
+  )
+}
+
+function includeInCompactIndex(n: A11yNode): boolean {
+  if (n.focusable) return true
+  if (COMPACT_INDEX_ROLES.has(n.role)) return true
+  if (n.role === 'text' && n.name && n.name.trim().length > 0) return true
+  return false
+}
+
+/**
+ * Flat list of actionable / semantic nodes in the viewport, sorted with focusable first
+ * then top-to-bottom reading order. Intended to minimize LLM tokens vs a full nested tree.
+ */
+export function buildCompactUiIndex(
+  root: A11yNode,
+  options?: { viewportWidth?: number; viewportHeight?: number; maxNodes?: number },
+): { nodes: CompactUiNode[]; truncated: boolean } {
+  const vw = options?.viewportWidth ?? root.bounds.width
+  const vh = options?.viewportHeight ?? root.bounds.height
+  const maxNodes = options?.maxNodes ?? 400
+
+  const acc: CompactUiNode[] = []
+
+  function walk(n: A11yNode) {
+    if (includeInCompactIndex(n) && intersectsViewport(n.bounds, vw, vh)) {
+      const name =
+        n.name && n.name.length > 240 ? `${n.name.slice(0, 239)}\u2026` : n.name
+      acc.push({
+        role: n.role,
+        ...(name ? { name } : {}),
+        ...(n.state && Object.keys(n.state).length > 0 ? { state: n.state } : {}),
+        bounds: { ...n.bounds },
+        path: n.path,
+        focusable: n.focusable,
+      })
+    }
+    for (const c of n.children) walk(c)
+  }
+
+  walk(root)
+
+  acc.sort((a, b) => {
+    if (a.focusable !== b.focusable) return a.focusable ? -1 : 1
+    if (a.bounds.y !== b.bounds.y) return a.bounds.y - b.bounds.y
+    return a.bounds.x - b.bounds.x
+  })
+
+  if (acc.length > maxNodes) return { nodes: acc.slice(0, maxNodes), truncated: true }
+  return { nodes: acc, truncated: false }
+}
+
+export function summarizeCompactIndex(nodes: CompactUiNode[], maxLines = 80): string {
+  const lines: string[] = []
+  const slice = nodes.slice(0, maxLines)
+  for (const n of slice) {
+    const nm = n.name ? ` "${truncateUiText(n.name, 48)}"` : ''
+    const st = n.state && Object.keys(n.state).length ? ` ${JSON.stringify(n.state)}` : ''
+    const foc = n.focusable ? ' *' : ''
+    const b = n.bounds
+    lines.push(`${n.role}${nm} (${b.x},${b.y} ${b.width}x${b.height}) path=${JSON.stringify(n.path)}${st}${foc}`)
+  }
+  if (nodes.length > maxLines) {
+    lines.push(`… and ${nodes.length - maxLines} more (use geometra_snapshot with a higher maxNodes or geometra_query)`)
+  }
+  return lines.join('\n')
+}
+
+function truncateUiText(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max - 1) + '\u2026' : s
 }
 
 function walkNode(element: Record<string, unknown>, layout: Record<string, unknown>, path: number[]): A11yNode {

@@ -25,7 +25,7 @@ Geometra proxy:       Headless Chromium → DOM geometry → same WebSocket as n
 | `geometra_pick_listbox_option` | Pick `role=option` (React Select, Headless UI, etc.; `@geometra/proxy` only) |
 | `geometra_select_option` | Choose an option on a native `<select>` (`@geometra/proxy` only) |
 | `geometra_wheel` | Mouse wheel / scroll (`@geometra/proxy` only) |
-| `geometra_snapshot` | Full accessibility tree with bounds (structured "screenshot") |
+| `geometra_snapshot` | Default **compact**: flat viewport-visible actionable nodes (minified JSON, fewer tokens). `view=full` for nested tree |
 | `geometra_layout` | Raw computed geometry for every node |
 | `geometra_disconnect` | Close the connection |
 
@@ -149,7 +149,8 @@ Agent:  geometra_query({ role: "button", name: "Save" })
 1. The MCP server connects to a WebSocket peer that speaks GEOM v1 (`frame` with `layout` + `tree`, optional `patch` updates).
 2. It receives the computed layout (`{ x, y, width, height }` for every node) and the UI tree (`kind`, `semantic`, `props`, `handlers`, `children`).
 3. It builds an accessibility tree from that data — roles, names, focusable state, bounds.
-4. Tools expose query, click, type, and snapshot operations over this structured data.
-5. After each interaction, the peer sends updated geometry (full `frame` or `patch`) — the MCP tools return the new state.
+4. **`geometra_snapshot`** defaults to a **compact** flat list of viewport-visible actionable nodes (minified JSON) to reduce LLM tokens; use `view: "full"` for the complete nested tree. Connect and post-action tool replies use the same compact text summary.
+5. Tools expose query, click, type, and snapshot operations over this structured data.
+6. After each interaction, the peer sends updated geometry (full `frame` or `patch`) — the MCP tools return the new state.
 
 With a **native** Geometra server, layout comes from Textura/Yoga. With **`@geometra/proxy`**, layout comes from the browser’s computed DOM geometry; the MCP layer is the same.
