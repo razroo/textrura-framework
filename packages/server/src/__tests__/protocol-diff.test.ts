@@ -536,6 +536,17 @@ describe('coalescePatches', () => {
     ).toEqual([{ path: [2], y: 3 }])
   })
 
+  it('skips Arguments-shaped path values (array-like length/indices; Array.isArray is false)', () => {
+    const pathArg = (function () {
+      // eslint-disable-next-line prefer-rest-params -- real `arguments` object for Array.isArray regression
+      return arguments
+    })(0, 1) as unknown as number[]
+    expect(Array.isArray(pathArg)).toBe(false)
+    expect(
+      coalescePatches([{ path: pathArg, x: 1 }, { path: [2], y: 3 }]),
+    ).toEqual([{ path: [2], y: 3 }])
+  })
+
   it('ignores unknown patch keys; merged results only carry path and finite geometry fields', () => {
     const merged = coalescePatches([
       { path: [0], x: 1, rotation: 45, meta: { id: 'a' } } as unknown as LayoutPatch,
