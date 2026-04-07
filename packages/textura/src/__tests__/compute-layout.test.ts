@@ -247,6 +247,44 @@ describe('box layout', () => {
     expect(row.children[0]!.x).toBeGreaterThan(row.children[1]!.x)
   })
 
+  it('nested row: per-node dir uses strict primitive rtl/ltr (boxed strings inherit; same as owner direction rule)', () => {
+    const baseRow = {
+      width: 200,
+      height: 40,
+      flexDirection: 'row' as const,
+      gap: 10,
+      children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+    }
+    const column = {
+      width: 200,
+      height: 80,
+      flexDirection: 'column' as const,
+      children: [baseRow],
+    }
+    const opts = { width: 200, height: 80, direction: 'ltr' as const }
+    const omitted = computeLayout(column, opts)
+    const boxedRtl = computeLayout(
+      { ...column, children: [{ ...baseRow, dir: Object('rtl') as never }] },
+      opts,
+    )
+    const boxedLtr = computeLayout(
+      { ...column, children: [{ ...baseRow, dir: Object('ltr') as never }] },
+      opts,
+    )
+    const rowO = omitted.children[0]!
+    expect(boxedRtl.children[0]!.children[0]!.x).toBe(rowO.children[0]!.x)
+    expect(boxedRtl.children[0]!.children[1]!.x).toBe(rowO.children[1]!.x)
+    expect(boxedLtr.children[0]!.children[0]!.x).toBe(rowO.children[0]!.x)
+    expect(boxedLtr.children[0]!.children[1]!.x).toBe(rowO.children[1]!.x)
+    const primitiveRtl = computeLayout(
+      { ...column, children: [{ ...baseRow, dir: 'rtl' }] },
+      opts,
+    )
+    expect(primitiveRtl.children[0]!.children[0]!.x).toBeGreaterThan(
+      primitiveRtl.children[0]!.children[1]!.x,
+    )
+  })
+
   it('nested row with dir rtl mirrors text-leaf flex order under ltr owner direction', () => {
     const tree: BoxNode = {
       width: 200,
