@@ -240,6 +240,17 @@ describe('resolveComputeLayoutDirection', () => {
     expect(resolveComputeLayoutDirection('LTR' as never, rtlRoot)).toBe('rtl')
   })
 
+  it('derives ltr when root element dir is trimmed or wrong-case (strict equality; loose serializers do not imply RTL)', () => {
+    const spacedRtl = box({ width: 1, height: 1, dir: 'rtl ' as never })
+    const prefixedRtl = box({ width: 1, height: 1, dir: ' rtl' as never })
+    const upperRtl = box({ width: 1, height: 1, dir: 'RTL' as never })
+    expect(resolveComputeLayoutDirection(undefined, spacedRtl)).toBe('ltr')
+    expect(resolveComputeLayoutDirection(undefined, prefixedRtl)).toBe('ltr')
+    expect(resolveComputeLayoutDirection(undefined, upperRtl)).toBe('ltr')
+    // Invalid root dir still does not block a valid primitive host override.
+    expect(resolveComputeLayoutDirection('rtl', spacedRtl)).toBe('rtl')
+  })
+
   it('ignores boxed-string ltr/rtl (strict equality only), deriving from the root', () => {
     const rtlRoot = box({ width: 1, height: 1, dir: 'rtl' })
     expect(resolveComputeLayoutDirection(Object('rtl') as never, rtlRoot)).toBe('rtl')
