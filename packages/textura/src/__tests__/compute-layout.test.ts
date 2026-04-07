@@ -1381,6 +1381,27 @@ describe('box layout', () => {
     expect(computeLayout(junkCol)).toEqual(computeLayout(cleanCol))
   })
 
+  it('bigint gap, rowGap, and columnGap are ignored like omitting the prop (typeof guard; corrupt deserialization)', () => {
+    const gapChildren: LayoutNode[] = [
+      { width: 10, height: 10 },
+      { width: 10, height: 10 },
+    ]
+    const cleanRow: BoxNode = {
+      width: 100,
+      flexDirection: 'row',
+      children: gapChildren,
+    }
+    const junkRow: BoxNode = {
+      width: 100,
+      flexDirection: 'row',
+      gap: 3n as never,
+      rowGap: 2n as never,
+      columnGap: 1n as never,
+      children: gapChildren,
+    }
+    expect(computeLayout(junkRow)).toEqual(computeLayout(cleanRow))
+  })
+
   it('non-finite flexGrow, flexShrink, and numeric flexBasis match omitting those props (Yoga-stable)', () => {
     const rowBaseline: BoxNode = {
       width: 300,
