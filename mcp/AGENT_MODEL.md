@@ -21,7 +21,7 @@ This is what keeps token usage low while still preserving enough structure to ac
                     GEOM v1 WS
                         ^
                         |
-Normal webpage -> @geometra/proxy -> Chromium (headless or headed)
+Normal webpage -> @geometra/proxy (CLI or MCP-spawned) -> Chromium (headed by default)
                         |
                         v
                  +----------------+
@@ -44,6 +44,14 @@ Normal webpage -> @geometra/proxy -> Chromium (headless or headed)
                  semantic delta
                  (what changed)
 ```
+
+## Auto-start proxy (`pageUrl`)
+
+For real web pages, prefer **`geometra_connect({ pageUrl: "https://…" })`**. The MCP server spawns **`@geometra/proxy`** (bundled), waits until the WebSocket is listening, then connects. You do **not** need a separate terminal command or a `ws://` URL.
+
+Use **`geometra_connect({ url: "ws://…" })`** only when you already have a Geometra server or a manually started proxy.
+
+**IDE prompts:** Some clients ask the user to approve each MCP tool invocation or “sensitive” parameters. That policy lives in **Cursor / Claude Desktop / etc.** — the Geometra server cannot disable it. Using `pageUrl` avoids an *extra* approval for running a shell command to start the proxy and avoids typing a local `ws://` URL.
 
 ## Mental Model
 
@@ -172,18 +180,22 @@ That choice belongs to **`@geometra/proxy`**.
 
 Default:
 
-- `geometra-proxy` runs **headless**
+- `geometra-proxy` runs **headed** (real visible Chromium) so you can watch automation.
 
-To watch the browser in real time:
+For CI or hosts without a display, use **`--headless`** or set **`GEOMETRA_HEADLESS=1`**.
+
+Optional pacing for demos: **`--slow-mo <ms>`** (or **`GEOMETRA_SLOW_MO`**) adds Playwright `slowMo` so clicks/typing are easier to follow.
 
 ```bash
-npx geometra-proxy https://example.com --port 3200 --headed
+npx geometra-proxy https://example.com --port 3200
+npx geometra-proxy https://example.com --port 3200 --headless
 ```
 
 or from this repo:
 
 ```bash
-node packages/proxy/dist/index.js https://example.com --port 3200 --headed
+node packages/proxy/dist/index.js https://example.com --port 3200
+node packages/proxy/dist/index.js https://example.com --port 3200 --headless
 ```
 
 ### Does headed mode affect token usage?

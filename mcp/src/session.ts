@@ -1,4 +1,6 @@
+import type { ChildProcess } from 'node:child_process'
 import WebSocket from 'ws'
+import { pickFreePort, spawnGeometraProxy } from './proxy-spawn.js'
 
 /**
  * Parsed accessibility node from the UI tree + computed layout.
@@ -164,9 +166,29 @@ export interface Session {
   layout: Record<string, unknown> | null
   tree: Record<string, unknown> | null
   url: string
+  /** Present when this session owns a child geometra-proxy process (pageUrl connect). */
+  proxyChild?: ChildProcess
 }
 
 let activeSession: Session | null = null
+
+function shutdownPreviousSession(): void {
+  const prev = activeSession
+  if (!prev) return
+  activeSession = null
+  try {
+    prev.ws.close()
+  } catch {
+    /* ignore */
+  }
+  if (prev.proxyChild) {
+    try {
+      prev.proxyChild.kill('SIGTERM')
+    } catch {
+      /* ignore */
+    }
+  }
+}
 
 /**
  * Connect to a running Geometra server. Waits for the first frame so that
@@ -174,10 +196,7 @@ let activeSession: Session | null = null
  */
 export function connect(url: string): Promise<Session> {
   return new Promise((resolve, reject) => {
-    if (activeSession) {
-      activeSession.ws.close()
-      activeSession = null
-    }
+    shutdownPreviousSession()
 
     const ws = new WebSocket(url)
     const session: Session = { ws, layout: null, tree: null, url }
@@ -223,7 +242,16 @@ export function connect(url: string): Promise<Session> {
     })
 
     ws.on('close', () => {
-      if (activeSession === session) activeSession = null
+      if (activeSession === session) {
+        activeSession = null
+        if (session.proxyChild) {
+          try {
+            session.proxyChild.kill('SIGTERM')
+          } catch {
+            /* ignore */
+          }
+        }
+      }
       if (!resolved) {
         resolved = true
         clearTimeout(timeout)
@@ -233,15 +261,47 @@ export function connect(url: string): Promise<Session> {
   })
 }
 
+/**
+ * Start geometra-proxy for `pageUrl`, connect to its WebSocket, and attach the child
+ * process to the session so disconnect / reconnect can clean it up.
+ */
+export async function connectThroughProxy(options: {
+  pageUrl: string
+  port?: number
+  headless?: boolean
+  width?: number
+  height?: number
+  slowMo?: number
+}): Promise<Session> {
+  const port = await pickFreePort(options.port)
+  const { child, wsUrl } = await spawnGeometraProxy({
+    pageUrl: options.pageUrl,
+    port,
+    headless: options.headless,
+    width: options.width,
+    height: options.height,
+    slowMo: options.slowMo,
+  })
+  try {
+    const session = await connect(wsUrl)
+    session.proxyChild = child
+    return session
+  } catch (e) {
+    try {
+      child.kill('SIGTERM')
+    } catch {
+      /* ignore */
+    }
+    throw e
+  }
+}
+
 export function getSession(): Session | null {
   return activeSession
 }
 
 export function disconnect(): void {
-  if (activeSession) {
-    activeSession.ws.close()
-    activeSession = null
-  }
+  shutdownPreviousSession()
 }
 
 /**

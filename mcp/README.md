@@ -1,6 +1,6 @@
 # @geometra/mcp
 
-MCP server for [Geometra](https://github.com/razroo/geometra) — interact with running Geometra apps via the geometry protocol over WebSocket. For **native** Geometra apps there is no browser in the loop. For **any existing website**, pair this MCP server with [`@geometra/proxy`](../packages/proxy/README.md) (headless Chromium) so the same tools speak the same GEOM v1 wire format.
+MCP server for [Geometra](https://github.com/razroo/geometra) — interact with running Geometra apps via the geometry protocol over WebSocket. For **native** Geometra apps there is no browser in the loop. For **any existing website**, use **`geometra_connect` with `pageUrl`** — the MCP server starts [`@geometra/proxy`](../packages/proxy/README.md) for you (bundled dependency) so you do not need a separate terminal or a `ws://` URL. You can still pass `url: "ws://…"` if a proxy is already running.
 
 See [`AGENT_MODEL.md`](./AGENT_MODEL.md) for the MCP mental model, why token usage can be lower than large browser snapshots, and how headed vs headless proxy mode works.
 
@@ -11,14 +11,14 @@ Connects Claude Code, Codex, or any MCP-compatible AI agent to a WebSocket endpo
 ```
 Playwright + vision:  screenshot → model → guess coordinates → click → repeat
 Native Geometra:      WebSocket → JSON geometry (no browser on the agent path)
-Geometra proxy:       Headless Chromium → DOM geometry → same WebSocket as native → MCP tools unchanged
+Geometra proxy:       Chromium → DOM geometry → same WebSocket as native → MCP tools unchanged (often started via `pageUrl`, no manual CLI)
 ```
 
 ## Tools
 
 | Tool | Description |
 |---|---|
-| `geometra_connect` | Connect to a running Geometra server |
+| `geometra_connect` | Connect with `url` (ws://…) **or** `pageUrl` (https://…) to auto-start geometra-proxy |
 | `geometra_query` | Find elements by stable id, role, name, or text content |
 | `geometra_page_model` | Summary-first webpage model: archetypes, stable section ids, counts, top-level sections, primary actions |
 | `geometra_expand_section` | Expand one form/dialog/list/landmark from `geometra_page_model` on demand |
@@ -90,7 +90,7 @@ npx geometra-proxy http://localhost:8080 --port 3200
 # Requires Chromium: npx playwright install chromium
 ```
 
-To watch the browser in real time while the MCP interacts with it, run the proxy with `--headed` instead. This is useful for debugging or demos and usually does **not** materially change token usage, since token usage is driven by MCP tool output rather than whether Chromium is visible.
+`geometra-proxy` opens a **visible Chromium window by default**. For servers or CI, pass **`--headless`** or set **`GEOMETRA_HEADLESS=1`**. Optional **`--slow-mo <ms>`** slows Playwright actions so they are easier to watch. Headed vs headless usually does **not** materially change token usage, since token usage is driven by MCP tool output rather than whether Chromium is visible.
 
 Point MCP at `ws://127.0.0.1:3200` instead of a native Geometra server. The proxy translates clicks and keyboard messages into Playwright actions and streams updated geometry.
 

@@ -12,7 +12,7 @@ Every action costs 3-5 seconds and a vision model inference call. Vision models 
 
 ## Solution
 
-A proxy server that sits between a headless browser and AI agents, extracting computed geometry from any web app and streaming it as structured JSON over WebSocket — the Geometra geometry protocol.
+A proxy server that sits between Chromium (typically **visible / headed by default** in `geometra-proxy`) and AI agents, extracting computed geometry from any web app and streaming it as structured JSON over WebSocket — the Geometra geometry protocol.
 
 ```
 Traditional computer-use:
@@ -30,7 +30,7 @@ The browser still renders the page (handles all CSS — grid, floats, everything
 ┌─────────────┐     ┌──────────────────────┐     ┌─────────────┐
 │  AI Agent    │◄───►│   Geometra Proxy      │◄───►│  Any Web App │
 │  (MCP/WS)   │     │                        │     │  (existing)  │
-│              │     │  1. Headless browser   │     │              │
+│              │     │  1. Chromium (headed*)  │     │              │
 │  Reads JSON  │     │  2. DOM observer       │     │  Gmail,      │
 │  geometry    │     │  3. Geometry extractor │     │  Salesforce, │
 │              │     │  4. WebSocket server   │     │  any URL     │
@@ -41,15 +41,17 @@ The browser still renders the page (handles all CSS — grid, floats, everything
 
 ### 1. Browser Layer (Playwright/Puppeteer)
 
-Launch a headless browser, navigate to the target URL:
+Launch Chromium and navigate to the target URL. The **`geometra-proxy` CLI defaults to `headless: false`** (visible window); use `--headless` or `GEOMETRA_HEADLESS=1` for CI.
 
 ```ts
 import { chromium } from 'playwright'
 
-const browser = await chromium.launch({ headless: true })
+const browser = await chromium.launch({ headless: false })
 const page = await browser.newPage()
 await page.goto(targetUrl)
 ```
+
+\*Headless mode is still supported for automation hosts without a display.
 
 ### 2. Geometry Extraction
 

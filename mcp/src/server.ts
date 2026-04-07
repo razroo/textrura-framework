@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import {
   connect,
+  connectThroughProxy,
   disconnect,
   getSession,
   sendClick,
@@ -26,24 +27,78 @@ import type { A11yNode, Session } from './session.js'
 
 export function createServer(): McpServer {
   const server = new McpServer(
-    { name: 'geometra', version: '0.1.0' },
+    { name: 'geometra', version: '1.19.0' },
     { capabilities: { tools: {} } },
   )
 
   // ── connect ──────────────────────────────────────────────────
   server.tool(
     'geometra_connect',
-    `Connect to a running Geometra server over WebSocket. This replaces Playwright/browser automation — you get direct access to the UI's pixel-exact geometry as JSON.
+    `Connect to a Geometra WebSocket peer, or start \`geometra-proxy\` automatically for a normal web page.
 
-Call this first before using any other geometra tools. The peer must be listening (native Geometra server, or \`geometra-proxy\` for real web pages). File upload / wheel / native \`<select>\` require \`@geometra/proxy\`; native Textura servers return an error for those messages.`,
+**Prefer \`pageUrl\` for job sites and SPAs:** pass \`https://…\` and this server spawns geometra-proxy, picks a free port, and connects — you do **not** need a separate terminal or a \`ws://\` URL (fewer IDE approval steps for the human).
+
+Use \`url\` (ws://…) only when a Geometra/native server or an already-running proxy is listening.
+
+Chromium opens **visible** by default unless \`headless: true\`. File upload / wheel / native \`<select>\` need the proxy path (\`pageUrl\` or ws to proxy).`,
     {
-      url: z.string().describe('WebSocket URL of the Geometra server (e.g. ws://localhost:3100)'),
+      url: z
+        .string()
+        .optional()
+        .describe(
+          'WebSocket URL when a server is already running (e.g. ws://127.0.0.1:3200 or ws://localhost:3100). Omit if using pageUrl.',
+        ),
+      pageUrl: z
+        .string()
+        .url()
+        .optional()
+        .describe(
+          'HTTP(S) page to open. MCP starts geometra-proxy and connects automatically. Use this instead of url for most web apply flows.',
+        ),
+      port: z
+        .number()
+        .int()
+        .positive()
+        .max(65535)
+        .optional()
+        .describe('Local port for spawned proxy (default: ephemeral free port).'),
+      headless: z
+        .boolean()
+        .optional()
+        .describe('Run Chromium headless (default false = visible window).'),
+      width: z.number().int().positive().optional().describe('Viewport width for spawned proxy.'),
+      height: z.number().int().positive().optional().describe('Viewport height for spawned proxy.'),
+      slowMo: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe('Playwright slowMo (ms) on spawned proxy for easier visual following.'),
     },
-    async ({ url }) => {
+    async input => {
       try {
-        const session = await connect(url)
+        const hasUrl = typeof input.url === 'string' && input.url.length > 0
+        const hasPage = typeof input.pageUrl === 'string' && input.pageUrl.length > 0
+        if (hasUrl === hasPage) {
+          return err('Provide exactly one of: url (WebSocket) or pageUrl (https://…).')
+        }
+        if (hasPage) {
+          const session = await connectThroughProxy({
+            pageUrl: input.pageUrl!,
+            port: input.port,
+            headless: input.headless,
+            width: input.width,
+            height: input.height,
+            slowMo: input.slowMo,
+          })
+          const summary = compactSessionSummary(session)
+          return ok(
+            `Started geometra-proxy and connected at ${session.url} (page: ${input.pageUrl}). UI state:\n${summary}`,
+          )
+        }
+        const session = await connect(input.url!)
         const summary = compactSessionSummary(session)
-        return ok(`Connected to ${url}. UI state:\n${summary}`)
+        return ok(`Connected to ${input.url}. UI state:\n${summary}`)
       } catch (e) {
         return err(`Failed to connect: ${(e as Error).message}`)
       }
