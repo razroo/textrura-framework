@@ -267,6 +267,24 @@ describe('createViewport edge cases', () => {
     expect(hostile.height.value).toBe(0)
   })
 
+  it('coerces bigint initial dimensions to zero without throwing (parity with resize; finiteNumberOrZero guard)', () => {
+    expect(() => createViewport(1024n as unknown as number, 768n as unknown as number)).not.toThrow()
+    const vp = createViewport(1024n as unknown as number, 768n as unknown as number)
+    expect(vp.width.value).toBe(0)
+    expect(vp.height.value).toBe(0)
+  })
+
+  it('coerces symbol initial dimensions to zero without throwing (hostile / mistyped host payloads)', () => {
+    expect(() => createViewport(Symbol('w') as unknown as number, 600)).not.toThrow()
+    const one = createViewport(Symbol('w') as unknown as number, 600)
+    expect(one.width.value).toBe(0)
+    expect(one.height.value).toBe(600)
+    expect(() => createViewport(400, Symbol('h') as unknown as number)).not.toThrow()
+    const two = createViewport(400, Symbol('h') as unknown as number)
+    expect(two.width.value).toBe(400)
+    expect(two.height.value).toBe(0)
+  })
+
   it('coerces non-finite initial dimensions to zero (parity with layout / hit-test guards)', () => {
     const vp = createViewport(Number.NaN, Number.POSITIVE_INFINITY)
     expect(vp.width.value).toBe(0)
