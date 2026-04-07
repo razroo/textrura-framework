@@ -17,13 +17,18 @@ function isActivationKey(key: string): boolean {
   return key === 'Enter' || key === 'NumpadEnter' || key === ' ' || key === 'Spacebar'
 }
 
+/** True when Enter/Space should perform default link navigation (no ctrl/meta/alt chord). */
+function isUnmodifiedActivation(event: KeyboardHitEvent): boolean {
+  return !event.ctrlKey && !event.metaKey && !event.altKey
+}
+
 /**
  * Declarative navigation target: a focusable box with link semantics (`role: link`, `tag: a`) and
  * `cursor: pointer` unless overridden.
  *
  * - **Pointer**: `onClick` calls your handler first, then `router.navigate(to, { replace })`.
  * - **Keyboard**: `onKeyDown` runs first; **Enter**, **NumpadEnter**, **Space** (`' '`), and legacy **Spacebar**
- *   then navigate the same way.
+ *   then navigate when **Ctrl / Meta / Alt** are not held (modified chords skip in-app navigation so hosts can bind alternatives).
  *
  * Layout and style props are forwarded to {@link import('@geometra/core').box} like any other box element.
  */
@@ -56,7 +61,7 @@ export function link(props: LinkProps, children: UIElement[] = []): BoxElement {
       },
       onKeyDown: (event) => {
         onKeyDown?.(event)
-        if (isActivationKey(event.key)) {
+        if (isActivationKey(event.key) && isUnmodifiedActivation(event)) {
           router.navigate(to, { replace })
         }
       },

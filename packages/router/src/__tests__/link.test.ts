@@ -113,6 +113,59 @@ describe('declarative link primitive', () => {
     expect(router.getState().location.pathname).toBe('/')
   })
 
+  it('does not navigate on Enter/Space when Ctrl, Meta, or Alt is held (modified chord)', () => {
+    const history = createMemoryHistory({ initialEntries: ['/'] })
+    const router = createRouter({ routes, history })
+    router.start()
+
+    const node = link({ to: '/about', router })
+    const base = {
+      key: 'Enter',
+      code: 'Enter',
+      shiftKey: false,
+      target,
+    } as const
+
+    node.handlers?.onKeyDown?.({ ...base, ctrlKey: true, altKey: false, metaKey: false })
+    expect(router.getState().location.pathname).toBe('/')
+
+    node.handlers?.onKeyDown?.({ ...base, ctrlKey: false, altKey: true, metaKey: false })
+    expect(router.getState().location.pathname).toBe('/')
+
+    node.handlers?.onKeyDown?.({ ...base, ctrlKey: false, altKey: false, metaKey: true })
+    expect(router.getState().location.pathname).toBe('/')
+
+    node.handlers?.onKeyDown?.({
+      key: ' ',
+      code: 'Space',
+      shiftKey: false,
+      ctrlKey: true,
+      altKey: false,
+      metaKey: false,
+      target,
+    })
+    expect(router.getState().location.pathname).toBe('/')
+  })
+
+  it('still navigates on Enter when only Shift is held (shift does not block activation)', async () => {
+    const history = createMemoryHistory({ initialEntries: ['/'] })
+    const router = createRouter({ routes, history })
+    router.start()
+
+    const node = link({ to: '/about', router })
+    node.handlers?.onKeyDown?.({
+      key: 'Enter',
+      code: 'Enter',
+      shiftKey: true,
+      ctrlKey: false,
+      altKey: false,
+      metaKey: false,
+      target,
+    })
+    await Promise.resolve()
+    expect(router.getState().location.pathname).toBe('/about')
+  })
+
   it('does not navigate for Enter-like key strings that are not canonical DOM values (strict matching)', () => {
     const history = createMemoryHistory({ initialEntries: ['/'] })
     const router = createRouter({ routes, history })
