@@ -2,8 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { ComputedLayout } from 'textura'
 import { collectTextNodes, getSelectedText, hitTestText } from '../selection.js'
 import type { TextNodeInfo } from '../selection.js'
-import { text } from '../elements.js'
-import { box } from '../elements.js'
+import { box, image, scene3d, sphere, text } from '../elements.js'
 
 describe('collectTextNodes', () => {
   it('collects text elements (selectable by default)', () => {
@@ -46,6 +45,35 @@ describe('collectTextNodes', () => {
     expect(results).toHaveLength(1)
     expect(results[0].element.props.text).toBe('Selectable')
     expect(results[0].direction).toBe('ltr')
+  })
+
+  it('skips image and scene3d leaves but still collects sibling text (non-box branches are terminal)', () => {
+    const el = box({ width: 300, height: 100 }, [
+      text({ text: 'A', font: '14px sans-serif', lineHeight: 18, width: 40, height: 18 }),
+      image({ src: '/x.png', width: 40, height: 40 }),
+      scene3d({ width: 40, height: 40, objects: [sphere({ radius: 1 })] }),
+      text({ text: 'B', font: '14px sans-serif', lineHeight: 18, width: 40, height: 18 }),
+    ])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 40, height: 18, children: [] },
+        { x: 50, y: 0, width: 40, height: 40, children: [] },
+        { x: 100, y: 0, width: 40, height: 40, children: [] },
+        { x: 150, y: 0, width: 40, height: 18, children: [] },
+      ],
+    }
+
+    const results: TextNodeInfo[] = []
+    collectTextNodes(el, layout, 0, 0, results)
+    expect(results).toHaveLength(2)
+    expect(results[0].element.props.text).toBe('A')
+    expect(results[1].element.props.text).toBe('B')
+    expect(results[0].index).toBe(0)
+    expect(results[1].index).toBe(1)
   })
 
   it('inherits resolved direction through nested boxes', () => {
