@@ -205,9 +205,9 @@ describe('dispatchHit', () => {
     })
 
     it('skips null or undefined layout.children slots without throwing (JSON holes / null entries)', () => {
-      let c0Fired = false
-      let c1Fired = false
-      let parentFired = false
+      let c0Fired: boolean
+      let c1Fired: boolean
+      let parentFired: boolean
       const child0 = box({
         width: 40,
         height: 40,

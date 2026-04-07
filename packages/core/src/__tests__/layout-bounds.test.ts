@@ -47,7 +47,9 @@ describe('layoutBoundsAreFinite', () => {
   })
 
   it('rejects Arguments objects as children (array-like length/indices; Array.isArray is false)', () => {
+    // Need a real `Arguments` instance; rest parameters produce an Array, which would not exercise this guard.
     const children = (function () {
+      // eslint-disable-next-line prefer-rest-params -- intentional `arguments` object for Array.isArray regression
       return arguments
     })({ x: 0, y: 0, width: 1, height: 1, children: [] }) as unknown as ComputedLayout['children']
     expect(Array.isArray(children)).toBe(false)
