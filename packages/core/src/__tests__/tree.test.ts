@@ -191,12 +191,28 @@ describe('toLayoutTree', () => {
     })
   })
 
-  it('preserves display for Textura/Yoga (layout visibility, not paint-only metadata)', () => {
+  it('preserves display for Textura/Yoga on boxes and non-box leaves (layout visibility, not paint-only metadata)', () => {
     const none = box({ width: 100, height: 50, display: 'none' })
     expect(toLayoutTree(none)).toMatchObject({ width: 100, height: 50, display: 'none' })
 
     const flex = box({ width: 40, height: 40, display: 'flex' })
     expect(toLayoutTree(flex)).toMatchObject({ width: 40, height: 40, display: 'flex' })
+
+    const t = text({
+      text: 'hi',
+      font: '16px sans-serif',
+      lineHeight: 20,
+      width: 10,
+      height: 10,
+      display: 'none',
+    })
+    expect(toLayoutTree(t)).toMatchObject({ text: 'hi', display: 'none' })
+
+    const img = image({ src: 'x.png', alt: '', width: 4, height: 4, display: 'none' })
+    expect(toLayoutTree(img)).toMatchObject({ display: 'none' })
+
+    const s3 = scene3d({ objects: [], width: 8, height: 8, display: 'flex' })
+    expect(toLayoutTree(s3)).toMatchObject({ display: 'flex' })
   })
 
   it('strips src, alt, objectFit from image', () => {
