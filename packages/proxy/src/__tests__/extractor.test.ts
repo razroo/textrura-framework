@@ -58,4 +58,38 @@ describe('extractGeometry', () => {
 
     await page.close()
   })
+
+  it('preserves semantics for text-only buttons instead of downgrading them to plain text', async () => {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; }
+        .chips { display: flex; gap: 12px; }
+      </style>
+      <div class="chips">
+        <button>Yes</button>
+        <button>No</button>
+      </div>
+    `)
+
+    const snapshot = await extractGeometry(page)
+    const nodes = flattenSnapshot(snapshot.tree, snapshot.layout)
+    const yesButton = nodes.find(node =>
+      node.tree.kind === 'text' &&
+      node.tree.semantic?.role === 'button' &&
+      node.tree.props.text === 'Yes',
+    )
+    const noButton = nodes.find(node =>
+      node.tree.kind === 'text' &&
+      node.tree.semantic?.role === 'button' &&
+      node.tree.props.text === 'No',
+    )
+
+    expect(yesButton).toBeDefined()
+    expect(yesButton?.tree.handlers?.onClick).toBe(true)
+    expect(noButton).toBeDefined()
+    expect(noButton?.tree.handlers?.onClick).toBe(true)
+
+    await page.close()
+  })
 })

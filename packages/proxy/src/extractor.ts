@@ -241,10 +241,15 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
     if (elementChildren.length === 0) {
       const text = (el.textContent || '').trim()
       if (text.length > 0) {
+        const sem = semanticFor(el, tag)
+        const name = getAccessibleName(el)
+        if (name && !sem.ariaLabel) sem.ariaLabel = name
+        const focusable = isFocusable(el)
         const tree: TreeSnapshot = {
           kind: 'text',
           props: { text, font: '16px system-ui', lineHeight: 1.2 },
-          semantic: { tag },
+          semantic: sem,
+          handlers: handlersFor(focusable),
         }
         return { layout, tree }
       }
