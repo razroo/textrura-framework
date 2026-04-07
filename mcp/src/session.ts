@@ -10,7 +10,7 @@ import { spawnGeometraProxy } from './proxy-spawn.js'
 export interface A11yNode {
   role: string
   name?: string
-  state?: { disabled?: boolean; expanded?: boolean; selected?: boolean }
+  state?: { disabled?: boolean; expanded?: boolean; selected?: boolean; checked?: boolean | 'mixed' }
   bounds: { x: number; y: number; width: number; height: number }
   path: number[]
   children: A11yNode[]
@@ -428,6 +428,19 @@ export function sendSelectOption(
   })
 }
 
+/** Set a checkbox/radio by label instead of relying on coordinate clicks. */
+export function sendSetChecked(
+  session: Session,
+  label: string,
+  opts?: { checked?: boolean; exact?: boolean; controlType?: 'checkbox' | 'radio' },
+): Promise<UpdateWaitResult> {
+  const payload: Record<string, unknown> = { type: 'setChecked', label }
+  if (opts?.checked !== undefined) payload.checked = opts.checked
+  if (opts?.exact !== undefined) payload.exact = opts.exact
+  if (opts?.controlType) payload.controlType = opts.controlType
+  return sendAndWaitForUpdate(session, payload)
+}
+
 /** Mouse wheel / scroll. Optional `x`,`y` move pointer before scrolling. */
 export function sendWheel(
   session: Session,
@@ -676,6 +689,7 @@ function cloneState(state: A11yNode['state'] | undefined): A11yNode['state'] | u
   if (state.disabled) next.disabled = true
   if (state.expanded !== undefined) next.expanded = state.expanded
   if (state.selected !== undefined) next.selected = state.selected
+  if (state.checked !== undefined) next.checked = state.checked
   return Object.keys(next).length > 0 ? next : undefined
 }
 
@@ -1122,7 +1136,7 @@ function compactNodeLabel(node: CompactUiNode): string {
   return `${node.id} ${node.role}`
 }
 
-function formatStateValue(value: boolean | undefined): string {
+function formatStateValue(value: boolean | 'mixed' | undefined): string {
   return value === undefined ? 'unset' : String(value)
 }
 
@@ -1136,7 +1150,7 @@ function diffCompactNodes(before: CompactUiNode, after: CompactUiNode): string[]
 
   const beforeState = before.state ?? {}
   const afterState = after.state ?? {}
-  for (const key of ['disabled', 'expanded', 'selected'] as const) {
+  for (const key of ['disabled', 'expanded', 'selected', 'checked'] as const) {
     if (beforeState[key] !== afterState[key]) {
       changes.push(`${key} ${formatStateValue(beforeState[key])} -> ${formatStateValue(afterState[key])}`)
     }
@@ -1303,6 +1317,38 @@ function truncateUiText(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + '\u2026' : s
 }
 
+const A11Y_ROLE_HINTS = new Set([
+  'button',
+  'checkbox',
+  'radio',
+  'switch',
+  'link',
+  'textbox',
+  'combobox',
+  'heading',
+  'dialog',
+  'alertdialog',
+  'list',
+  'listitem',
+  'tab',
+  'tablist',
+  'tabpanel',
+])
+
+function normalizeCheckedState(value: unknown): boolean | 'mixed' | undefined {
+  if (value === 'mixed') return 'mixed'
+  if (value === true || value === false) return value
+  if (value === 'true') return true
+  if (value === 'false') return false
+  return undefined
+}
+
+function normalizeA11yRoleHint(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const normalized = value.trim().toLowerCase()
+  return A11Y_ROLE_HINTS.has(normalized) ? normalized : undefined
+}
+
 function walkNode(element: Record<string, unknown>, layout: Record<string, unknown>, path: number[]): A11yNode {
   const kind = element.kind as string | undefined
   const semantic = element.semantic as Record<string, unknown> | undefined
@@ -1325,6 +1371,8 @@ function walkNode(element: Record<string, unknown>, layout: Record<string, unkno
   if (semantic?.ariaDisabled) state.disabled = true
   if (semantic?.ariaExpanded !== undefined) state.expanded = !!semantic.ariaExpanded
   if (semantic?.ariaSelected !== undefined) state.selected = !!semantic.ariaSelected
+  const checked = normalizeCheckedState(semantic?.ariaChecked)
+  if (checked !== undefined) state.checked = checked
 
   const children: A11yNode[] = []
   const elementChildren = element.children as Record<string, unknown>[] | undefined
@@ -1351,6 +1399,8 @@ function walkNode(element: Record<string, unknown>, layout: Record<string, unkno
 
 function inferRole(kind: string | undefined, semantic: Record<string, unknown> | undefined, handlers: Record<string, unknown> | undefined): string {
   if (semantic?.role) return semantic.role as string
+  const hintedRole = normalizeA11yRoleHint(semantic?.a11yRoleHint)
+  if (hintedRole) return hintedRole
   const tag = semantic?.tag as string | undefined
   if (kind === 'text') {
     if (tag && /^h[1-6]$/.test(tag)) return 'heading'

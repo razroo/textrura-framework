@@ -201,6 +201,154 @@ export async function pickListboxOption(
   await opt.click()
 }
 
+export interface SetCheckedPayload {
+  checked?: boolean
+  exact?: boolean
+  controlType?: 'checkbox' | 'radio'
+}
+
+/**
+ * Set a checkbox/radio by accessible label instead of brittle coordinate clicks.
+ * Helps custom form UIs that keep the real control opacity-hidden but still interactive.
+ */
+export async function setCheckedControl(page: Page, label: string, opts?: SetCheckedPayload): Promise<void> {
+  const exact = opts?.exact ?? false
+  const desiredChecked = opts?.checked ?? true
+  const controlType = opts?.controlType
+
+  for (const frame of page.frames()) {
+    const result = await frame.evaluate(
+      (payload: { label: string; exact: boolean; checked: boolean; controlType: 'checkbox' | 'radio' | null }) => {
+        function normalize(value: string): string {
+          return value.replace(/\s+/g, ' ').trim().toLowerCase()
+        }
+
+        function matchesLabel(candidate: string | undefined): boolean {
+          if (!candidate) return false
+          const normalizedCandidate = normalize(candidate)
+          const normalizedNeedle = normalize(payload.label)
+          return payload.exact ? normalizedCandidate === normalizedNeedle : normalizedCandidate.includes(normalizedNeedle)
+        }
+
+        function visible(el: HTMLElement): boolean {
+          const rect = el.getBoundingClientRect()
+          if (rect.width <= 0 || rect.height <= 0) return false
+          const style = getComputedStyle(el)
+          return style.display !== 'none' && style.visibility !== 'hidden'
+        }
+
+        function referencedText(ids: string | null): string | undefined {
+          if (!ids) return undefined
+          const text = ids
+            .split(/\s+/)
+            .map(id => document.getElementById(id)?.textContent?.trim() ?? '')
+            .filter(Boolean)
+            .join(' ')
+            .trim()
+          return text || undefined
+        }
+
+        function controlKind(el: Element): 'checkbox' | 'radio' | undefined {
+          if (el instanceof HTMLInputElement) {
+            if (el.type === 'checkbox') return 'checkbox'
+            if (el.type === 'radio') return 'radio'
+            return undefined
+          }
+          const role = el.getAttribute('role')
+          if (role === 'switch' || role === 'checkbox') return 'checkbox'
+          if (role === 'radio') return 'radio'
+          return undefined
+        }
+
+        function controlName(el: Element): string | undefined {
+          const aria = el.getAttribute('aria-label')?.trim()
+          if (aria) return aria
+          const labelledBy = referencedText(el.getAttribute('aria-labelledby'))
+          if (labelledBy) return labelledBy
+          if (el instanceof HTMLInputElement) {
+            const labels = el.labels ? Array.from(el.labels) : []
+            for (const labelEl of labels) {
+              const text = labelEl.textContent?.trim()
+              if (text) return text
+            }
+            const nameAttr = el.getAttribute('name')?.trim()
+            if (nameAttr && /[A-Za-z]/.test(nameAttr) && /[\s,./()_-]/.test(nameAttr)) return nameAttr
+          }
+          const text = el.textContent?.trim()
+          return text || undefined
+        }
+
+        function readChecked(el: Element): boolean {
+          if (el instanceof HTMLInputElement) return !!el.checked
+          return el.getAttribute('aria-checked') === 'true'
+        }
+
+        function clickTarget(el: Element): HTMLElement | null {
+          if (el instanceof HTMLInputElement) {
+            const labelEl = el.labels?.[0]
+            if (labelEl instanceof HTMLElement) return labelEl
+          }
+          return el instanceof HTMLElement ? el : null
+        }
+
+        const selector = 'input[type=\"checkbox\"], input[type=\"radio\"], [role=\"checkbox\"], [role=\"radio\"], [role=\"switch\"]'
+        const candidates = Array.from(document.querySelectorAll(selector)).filter(
+          (el): el is HTMLElement => el instanceof HTMLElement && visible(el),
+        )
+        const target = candidates.find((el) => {
+          const kind = controlKind(el)
+          if (!kind) return false
+          if (payload.controlType && kind !== payload.controlType) return false
+          return matchesLabel(controlName(el))
+        })
+
+        if (!target) {
+          return { matched: false as const }
+        }
+
+        const kind = controlKind(target)!
+        const name = controlName(target) ?? payload.label
+        const before = readChecked(target)
+        if (kind === 'radio' && payload.checked === false) {
+          return { matched: true as const, success: before === false, reason: 'radio-uncheck' as const, kind, name }
+        }
+
+        if (before !== payload.checked) {
+          clickTarget(target)?.click()
+        }
+
+        let after = readChecked(target)
+        if (after !== payload.checked && target instanceof HTMLInputElement) {
+          target.checked = payload.checked
+          target.dispatchEvent(new Event('input', { bubbles: true }))
+          target.dispatchEvent(new Event('change', { bubbles: true }))
+          after = target.checked
+        }
+
+        return {
+          matched: true as const,
+          success: after === payload.checked,
+          kind,
+          name,
+          before,
+          after,
+        }
+      },
+      { label, exact, checked: desiredChecked, controlType: controlType ?? null },
+    )
+
+    if (!result.matched) continue
+    if (result.success) return
+    if (result.reason === 'radio-uncheck') {
+      throw new Error(`setChecked: radio "${result.name}" cannot be unchecked directly; choose a different option instead`)
+    }
+    throw new Error(`setChecked: matched ${result.kind} "${result.name}" but could not set it to ${String(desiredChecked)}`)
+  }
+
+  const kindLabel = controlType ?? 'checkbox/radio'
+  throw new Error(`setChecked: no visible ${kindLabel} matching "${label}"`)
+}
+
 export async function wheelAt(page: Page, deltaX: number, deltaY: number, x?: number, y?: number): Promise<void> {
   if (x !== undefined && y !== undefined && Number.isFinite(x) && Number.isFinite(y)) {
     await page.mouse.move(x, y)

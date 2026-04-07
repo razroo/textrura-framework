@@ -91,6 +91,15 @@ export type ClientSelectOptionMessage = {
   protocolVersion?: number
 }
 
+export type ClientSetCheckedMessage = {
+  type: 'setChecked'
+  label: string
+  checked?: boolean
+  exact?: boolean
+  controlType?: 'checkbox' | 'radio'
+  protocolVersion?: number
+}
+
 export type ClientWheelMessage = {
   type: 'wheel'
   deltaX?: number
@@ -108,6 +117,7 @@ export type ParsedClientMessage =
   | ClientFileMessage
   | ClientListboxPickMessage
   | ClientSelectOptionMessage
+  | ClientSetCheckedMessage
   | ClientWheelMessage
   | { type: string; protocolVersion?: number }
 
@@ -147,4 +157,8 @@ export function isWheelMessage(msg: ParsedClientMessage): msg is ClientWheelMess
 
 export function isListboxPickMessage(msg: ParsedClientMessage): msg is ClientListboxPickMessage {
   return msg.type === 'listboxPick' && 'label' in msg && typeof (msg as ClientListboxPickMessage).label === 'string'
+}
+
+export function isSetCheckedMessage(msg: ParsedClientMessage): msg is ClientSetCheckedMessage {
+  return msg.type === 'setChecked' && 'label' in msg && typeof (msg as ClientSetCheckedMessage).label === 'string'
 }

@@ -117,6 +117,16 @@ export type ClientMessage =
       index?: number
     })
   /**
+   * Set a checkbox/radio by accessible label. Implemented by `@geometra/proxy`.
+   */
+  | (VersionedMessage & {
+      type: 'setChecked'
+      label: string
+      checked?: boolean
+      exact?: boolean
+      controlType?: 'checkbox' | 'radio'
+    })
+  /**
    * ARIA listbox / `role=option` (Headless UI, React Select, etc.). Implemented by `@geometra/proxy`.
    */
   | (VersionedMessage & {

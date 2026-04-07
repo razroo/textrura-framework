@@ -227,4 +227,44 @@ describe('buildUiDelta', () => {
     expect(summary).toContain('~ ls:0.1 list "Results" items 2 -> 3')
     expect(summary).toContain('~ n:0.0 button "Save": disabled unset -> true')
   })
+
+  it('surfaces checkbox checked-state changes in semantic deltas', () => {
+    const before = node('group', undefined, { x: 0, y: 0, width: 640, height: 480 }, {
+      children: [
+        node('form', 'Application', { x: 20, y: 20, width: 600, height: 220 }, {
+          path: [0],
+          children: [
+            node('checkbox', 'New York, NY', { x: 40, y: 80, width: 24, height: 24 }, {
+              path: [0, 0],
+              focusable: true,
+              state: { checked: false },
+            }),
+          ],
+        }),
+      ],
+    })
+
+    const after = node('group', undefined, { x: 0, y: 0, width: 640, height: 480 }, {
+      children: [
+        node('form', 'Application', { x: 20, y: 20, width: 600, height: 220 }, {
+          path: [0],
+          children: [
+            node('checkbox', 'New York, NY', { x: 40, y: 80, width: 24, height: 24 }, {
+              path: [0, 0],
+              focusable: true,
+              state: { checked: true },
+            }),
+          ],
+        }),
+      ],
+    })
+
+    const delta = buildUiDelta(before, after)
+    const summary = summarizeUiDelta(delta)
+
+    expect(delta.updated.some(update =>
+      update.after.role === 'checkbox' && update.changes.includes('checked false -> true'),
+    )).toBe(true)
+    expect(summary).toContain('~ n:0.0 checkbox "New York, NY": checked false -> true')
+  })
 })

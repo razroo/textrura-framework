@@ -5,6 +5,7 @@ import {
   pickListboxOption,
   resolveExistingFiles,
   selectNativeOption,
+  setCheckedControl,
   wheelAt,
 } from './dom-actions.js'
 import { coalescePatches, diffLayout } from './diff-layout.js'
@@ -17,6 +18,7 @@ import {
   isKeyMessage,
   isListboxPickMessage,
   isResizeMessage,
+  isSetCheckedMessage,
   isSelectOptionMessage,
   isWheelMessage,
   PROXY_PROTOCOL_VERSION,
@@ -165,6 +167,16 @@ async function handleClientMessage(
         value: msg.value,
         label: msg.label,
         index: msg.index,
+      })
+      onViewportOrInput('input')
+      return
+    }
+
+    if (isSetCheckedMessage(msg)) {
+      await setCheckedControl(page, msg.label, {
+        checked: msg.checked,
+        exact: msg.exact,
+        controlType: msg.controlType,
       })
       onViewportOrInput('input')
       return

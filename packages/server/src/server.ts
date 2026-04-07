@@ -350,12 +350,13 @@ export async function createServer(
         } else if (
           msg.type === 'file' ||
           msg.type === 'selectOption' ||
+          msg.type === 'setChecked' ||
           msg.type === 'listboxPick' ||
           msg.type === 'wheel'
         ) {
           const errorMsg: ServerMessage = {
             type: 'error',
-            message: `Client message type "${msg.type}" is not supported on the native Textura server (DOM-free layout). Use @geometra/proxy for DOM automation (files, listbox, select, wheel).`,
+            message: `Client message type "${msg.type}" is not supported on the native Textura server (DOM-free layout). Use @geometra/proxy for DOM automation (files, listbox, select, checkbox/radio controls, wheel).`,
             protocolVersion: PROTOCOL_VERSION,
           }
           ws.send(JSON.stringify(errorMsg))

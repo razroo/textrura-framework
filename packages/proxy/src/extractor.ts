@@ -44,6 +44,28 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
     return ['a', 'button', 'input', 'select', 'textarea'].includes(tag)
   }
 
+  function shouldKeepDespiteOpacity(el: Element): boolean {
+    const tag = el.tagName.toLowerCase()
+    if (tag === 'input') {
+      const type = (el as HTMLInputElement).type
+      if (type === 'checkbox' || type === 'radio') return true
+    }
+    const role = el.getAttribute('role')
+    return role === 'checkbox' || role === 'radio' || role === 'switch'
+  }
+
+  function readCheckedState(el: Element): boolean | 'mixed' | undefined {
+    const ariaChecked = el.getAttribute('aria-checked')
+    if (ariaChecked === 'mixed') return 'mixed'
+    if (ariaChecked === 'true') return true
+    if (ariaChecked === 'false') return false
+    if (el instanceof HTMLInputElement && (el.type === 'checkbox' || el.type === 'radio')) {
+      if (el.indeterminate) return 'mixed'
+      return el.checked
+    }
+    return undefined
+  }
+
   function shouldSkip(el: Element): boolean {
     const tag = el.tagName.toLowerCase()
     if (SKIP_TAGS.has(tag)) return true
@@ -53,7 +75,7 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
     const rect = h.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return true
     const op = parseFloat(style.opacity)
-    if (op === 0) return true
+    if (op === 0 && !shouldKeepDespiteOpacity(el)) return true
     if (tag === 'input' && (el as HTMLInputElement).type === 'hidden') return true
     return false
   }
@@ -115,6 +137,8 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
     if (exp !== null) semantic.ariaExpanded = exp === 'true'
     const sel = el.getAttribute('aria-selected')
     if (sel !== null) semantic.ariaSelected = sel === 'true'
+    const checked = readCheckedState(el)
+    if (checked !== undefined) semantic.ariaChecked = checked
     if (tag === 'img') {
       const alt = el.getAttribute('alt')
       if (alt) semantic.alt = alt

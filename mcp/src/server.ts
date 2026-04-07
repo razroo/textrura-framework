@@ -12,6 +12,7 @@ import {
   sendFileUpload,
   sendListboxPick,
   sendSelectOption,
+  sendSetChecked,
   sendWheel,
   buildA11yTree,
   buildCompactUiIndex,
@@ -28,7 +29,7 @@ import type { A11yNode, Session, UpdateWaitResult } from './session.js'
 
 export function createServer(): McpServer {
   const server = new McpServer(
-    { name: 'geometra', version: '1.19.3' },
+    { name: 'geometra', version: '1.19.4' },
     { capabilities: { tools: {} } },
   )
 
@@ -356,6 +357,31 @@ Custom React/Vue dropdowns are not supported — open them with geometra_click a
         const wait = await sendSelectOption(session, x, y, { value, label, index })
         const summary = postActionSummary(session, before, wait)
         return ok(`Selected option.\n${summary}`)
+      } catch (e) {
+        return err((e as Error).message)
+      }
+    }
+  )
+
+  server.tool(
+    'geometra_set_checked',
+    `Set a checkbox or radio by label. Requires \`@geometra/proxy\`.
+
+Prefer this over raw coordinate clicks for custom forms that keep the real input visually hidden (common on Ashby, Greenhouse custom widgets, and design-system checkboxes/radios). Uses substring label matching unless exact=true.`,
+    {
+      label: z.string().describe('Accessible label or visible option text to match'),
+      checked: z.boolean().optional().default(true).describe('Desired checked state (radios only support true)'),
+      exact: z.boolean().optional().describe('Exact label match'),
+      controlType: z.enum(['checkbox', 'radio']).optional().describe('Limit matching to checkbox or radio'),
+    },
+    async ({ label, checked, exact, controlType }) => {
+      const session = getSession()
+      if (!session) return err('Not connected. Call geometra_connect first.')
+      const before = sessionA11y(session)
+      try {
+        const wait = await sendSetChecked(session, label, { checked, exact, controlType })
+        const summary = postActionSummary(session, before, wait)
+        return ok(`Set ${controlType ?? 'checkbox/radio'} "${label}" to ${String(checked ?? true)}.\n${summary}`)
       } catch (e) {
         return err((e as Error).message)
       }

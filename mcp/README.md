@@ -28,6 +28,7 @@ Geometra proxy:       Chromium → DOM geometry → same WebSocket as native →
 | `geometra_upload_files` | Attach files: auto / hidden input / native chooser / synthetic drop (`@geometra/proxy` only) |
 | `geometra_pick_listbox_option` | Pick `role=option` (React Select, Headless UI, etc.; `@geometra/proxy` only) |
 | `geometra_select_option` | Choose an option on a native `<select>` (`@geometra/proxy` only) |
+| `geometra_set_checked` | Set a checkbox or radio by label instead of coordinate clicks (`@geometra/proxy` only) |
 | `geometra_wheel` | Mouse wheel / scroll (`@geometra/proxy` only) |
 | `geometra_snapshot` | Default **compact**: flat viewport-visible actionable nodes (minified JSON). `view=full` for nested tree |
 | `geometra_layout` | Raw computed geometry for every node |

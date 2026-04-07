@@ -38,7 +38,7 @@ Normal webpage -> @geometra/proxy (CLI or MCP-spawned) -> Chromium (headed by de
           +-------------+----------------+
                         |
                         v
-          click / type / wheel / upload / select
+       click / type / set_checked / wheel / upload / select
                         |
                         v
                  semantic delta
