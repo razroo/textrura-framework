@@ -891,6 +891,38 @@ exports[`geometry snapshot CI > stable rtl root wrapped row with three fixed-wid
 }
 `;
 
+exports[`geometry snapshot CI > stable rtl root wrapped row-reverse with three fixed-width text children (rounded) 1`] = `
+{
+  "children": [
+    {
+      "children": [],
+      "height": 20,
+      "width": 40,
+      "x": 60,
+      "y": 100,
+    },
+    {
+      "children": [],
+      "height": 20,
+      "width": 40,
+      "x": 16,
+      "y": 100,
+    },
+    {
+      "children": [],
+      "height": 20,
+      "width": 40,
+      "x": 60,
+      "y": 38,
+    },
+  ],
+  "height": 120,
+  "width": 100,
+  "x": 0,
+  "y": 0,
+}
+`;
+
 exports[`geometry snapshot CI > stable rtl root: inner flex row with dir auto inherits rtl document direction (rounded) 1`] = `
 {
   "children": [
