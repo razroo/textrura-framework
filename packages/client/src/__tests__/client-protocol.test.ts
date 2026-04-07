@@ -1136,6 +1136,27 @@ describe('applyServerMessage', () => {
     expect(metrics[0]!.messageType).toBe('data')
     expect(renders).toHaveLength(0)
   })
+
+  it('rejects primitive decoded values (custom transport must pass a plain object; no metrics)', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const errors: string[] = []
+    const metrics: ClientFrameMetrics[] = []
+    type Msg = Parameters<typeof applyServerMessage>[2]
+
+    const badValues: unknown[] = ['not-an-object', 0, true, false, undefined, 1n, Symbol('x')]
+
+    for (const bad of badValues) {
+      applyServerMessage(state, renderer, bad as Msg, e => errors.push(String(e)), m => metrics.push(m))
+    }
+
+    expect(errors).toHaveLength(badValues.length)
+    for (const e of errors) {
+      expect(e).toContain('expected a JSON object')
+    }
+    expect(metrics).toHaveLength(0)
+    expect(renders).toHaveLength(0)
+  })
 })
 
 describe('GEOM data channel ids', () => {
