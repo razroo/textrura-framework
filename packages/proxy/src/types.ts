@@ -31,6 +31,7 @@ export type ClientEventMessage = {
   eventType: string
   x: number
   y: number
+  requestId?: string
   protocolVersion?: number
 }
 
@@ -43,6 +44,7 @@ export type ClientKeyMessage = {
   ctrlKey: boolean
   metaKey: boolean
   altKey: boolean
+  requestId?: string
   protocolVersion?: number
 }
 
@@ -51,6 +53,7 @@ export type ClientResizeMessage = {
   width: number
   height: number
   capabilities?: { binaryFraming?: boolean }
+  requestId?: string
   protocolVersion?: number
 }
 
@@ -58,6 +61,7 @@ export type ClientCompositionMessage = {
   type: 'composition'
   eventType: 'onCompositionStart' | 'onCompositionUpdate' | 'onCompositionEnd'
   data: string
+  requestId?: string
   protocolVersion?: number
 }
 
@@ -69,6 +73,7 @@ export type ClientFileMessage = {
   strategy?: 'auto' | 'chooser' | 'hidden' | 'drop'
   dropX?: number
   dropY?: number
+  requestId?: string
   protocolVersion?: number
 }
 
@@ -80,6 +85,7 @@ export type ClientListboxPickMessage = {
   openY?: number
   fieldLabel?: string
   query?: string
+  requestId?: string
   protocolVersion?: number
 }
 
@@ -90,6 +96,7 @@ export type ClientSelectOptionMessage = {
   value?: string
   label?: string
   index?: number
+  requestId?: string
   protocolVersion?: number
 }
 
@@ -99,6 +106,7 @@ export type ClientSetCheckedMessage = {
   checked?: boolean
   exact?: boolean
   controlType?: 'checkbox' | 'radio'
+  requestId?: string
   protocolVersion?: number
 }
 
@@ -108,6 +116,7 @@ export type ClientWheelMessage = {
   deltaY?: number
   x?: number
   y?: number
+  requestId?: string
   protocolVersion?: number
 }
 

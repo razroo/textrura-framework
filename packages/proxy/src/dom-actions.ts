@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
-import type { Frame, Locator, Page } from 'playwright'
+import type { ElementHandle, Frame, Locator, Page } from 'playwright'
 
 function delay(ms: number): Promise<void> {
   return new Promise(r => setTimeout(r, ms))
@@ -14,24 +14,157 @@ const LABELED_CONTROL_SELECTOR =
 const OPTION_PICKER_SELECTOR =
   '[role="option"], [role="menuitem"], [role="treeitem"], button, li, [data-value], [aria-selected], [aria-checked]'
 
+interface AnchorPoint {
+  x?: number
+  y?: number
+}
+
+function normalizedOptionLabel(value: string): string {
+  return value.replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+function semanticSelectionAliases(value: string): string[] {
+  const normalized = normalizedOptionLabel(value)
+  const aliases = new Set<string>([normalized])
+  if (normalized === 'yes' || normalized === 'true') {
+    for (const alias of ['agree', 'agreed', 'accept', 'accepted', 'consent', 'acknowledge', 'read', 'opt in']) {
+      aliases.add(alias)
+    }
+  }
+  if (normalized === 'no' || normalized === 'false') {
+    for (const alias of ['decline', 'declined', 'disagree', 'deny', 'opt out', 'prefer not']) {
+      aliases.add(alias)
+    }
+  }
+  if (normalized === 'decline') {
+    for (const alias of ['prefer not', 'opt out', 'do not']) {
+      aliases.add(alias)
+    }
+  }
+  return [...aliases]
+}
+
+function hasNegativeSelectionCue(value: string): boolean {
+  return /\b(no|not|do not|don't|decline|disagree|deny|opt out|prefer not)\b/.test(value)
+}
+
+function hasPositiveSelectionCue(value: string): boolean {
+  return /\b(yes|agree|accept|consent|acknowledge|opt in|allow|read)\b/.test(value)
+}
+
+function selectionMatchScore(candidate: string | undefined, expected: string, exact: boolean): number | null {
+  if (!candidate) return null
+  const normalizedCandidate = normalizedOptionLabel(candidate)
+  const normalizedExpected = normalizedOptionLabel(expected)
+  if (!normalizedCandidate || !normalizedExpected) return null
+  const expectsPositive = normalizedExpected === 'yes' || normalizedExpected === 'true'
+  const expectsNegative = normalizedExpected === 'no' || normalizedExpected === 'false' || normalizedExpected === 'decline'
+  if (exact) return normalizedCandidate === normalizedExpected ? 0 : null
+  if (normalizedCandidate === normalizedExpected) return 0
+  if (normalizedCandidate.includes(normalizedExpected)) return normalizedCandidate.length - normalizedExpected.length
+  if (expectsPositive && hasNegativeSelectionCue(normalizedCandidate)) return null
+  if (expectsNegative && hasPositiveSelectionCue(normalizedCandidate)) return null
+
+  const aliases = semanticSelectionAliases(normalizedExpected)
+  for (const alias of aliases) {
+    if (alias !== normalizedExpected && normalizedCandidate.includes(alias)) {
+      return 40 + normalizedCandidate.length - alias.length
+    }
+  }
+
+  const tokens = normalizedExpected.split(' ').filter(token => token.length >= 3)
+  if (tokens.length >= 2) {
+    const matchedTokens = tokens.filter(token => normalizedCandidate.includes(token))
+    if (matchedTokens.length >= Math.min(2, tokens.length)) {
+      return 80 + (tokens.length - matchedTokens.length) * 10
+    }
+  }
+
+  return null
+}
+
+function distanceFromPreferredAnchor(
+  box: { x: number; y: number; width: number; height: number },
+  anchor?: AnchorPoint,
+): number {
+  if (anchor?.x === undefined && anchor?.y === undefined) return 0
+  const centerX = box.x + box.width / 2
+  const centerY = box.y + box.height / 2
+  return Math.abs(centerX - (anchor?.x ?? centerX)) + Math.abs(centerY - (anchor?.y ?? centerY))
+}
+
+function browserDisplayedValues(el: Element): string[] {
+  const values = new Set<string>()
+  const push = (value: string | undefined) => {
+    const trimmed = value?.trim()
+    if (trimmed && trimmed.length <= 240) values.add(trimmed)
+  }
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    push(el.value)
+    push(el.getAttribute('aria-valuetext') ?? undefined)
+    push(el.getAttribute('aria-label') ?? undefined)
+  }
+  if (el instanceof HTMLSelectElement) {
+    push(el.selectedOptions[0]?.textContent ?? undefined)
+    push(el.value)
+  }
+  push(el.getAttribute('aria-valuetext') ?? undefined)
+  push(el.getAttribute('aria-label') ?? undefined)
+  push(el.textContent ?? undefined)
+
+  let current = el.parentElement
+  for (let depth = 0; current && depth < 4; depth++) {
+    const role = current.getAttribute('role')
+    if (role === 'listbox' || role === 'menu') {
+      current = current.parentElement
+      continue
+    }
+    const className = typeof current.className === 'string' ? current.className.toLowerCase() : ''
+    const looksLikeFieldContainer =
+      role === 'combobox' ||
+      current.getAttribute('aria-haspopup') === 'listbox' ||
+      current.tagName.toLowerCase() === 'button' ||
+      className.includes('select') ||
+      className.includes('combo') ||
+      className.includes('chip')
+    if (looksLikeFieldContainer) push(current.textContent ?? undefined)
+    current = current.parentElement
+  }
+
+  return [...values]
+}
+
 async function firstVisible(
   locator: Locator,
-  opts?: { minWidth?: number; minHeight?: number; maxCandidates?: number; fallbackToAnyVisible?: boolean },
+  opts?: {
+    minWidth?: number
+    minHeight?: number
+    maxCandidates?: number
+    fallbackToAnyVisible?: boolean
+    preferredAnchor?: AnchorPoint
+  },
 ): Promise<Locator | null> {
   try {
     const count = Math.min(await locator.count(), opts?.maxCandidates ?? 8)
-    let firstAnyVisible: Locator | null = null
+    let bestVisible: { locator: Locator; score: number } | null = null
+    let bestQualified: { locator: Locator; score: number } | null = null
     for (let i = 0; i < count; i++) {
       const candidate = locator.nth(i)
       if (!(await candidate.isVisible())) continue
-      if (!firstAnyVisible) firstAnyVisible = candidate
       const box = await candidate.boundingBox()
       if (!box) continue
+      const score = distanceFromPreferredAnchor(box, opts?.preferredAnchor)
+      if (!bestVisible || score < bestVisible.score) {
+        bestVisible = { locator: candidate, score }
+      }
       if ((opts?.minWidth ?? 0) <= box.width && (opts?.minHeight ?? 0) <= box.height) {
-        return candidate
+        if (!bestQualified || score < bestQualified.score) {
+          bestQualified = { locator: candidate, score }
+        }
       }
     }
-    return opts?.fallbackToAnyVisible === false ? null : firstAnyVisible
+    if (bestQualified) return bestQualified.locator
+    return opts?.fallbackToAnyVisible === false ? null : bestVisible?.locator ?? null
   } catch {
     /* ignore */
   }
@@ -54,7 +187,90 @@ async function locatorAnchorY(locator: Locator): Promise<number | undefined> {
   return bounds ? bounds.y + bounds.height / 2 : undefined
 }
 
-async function findLabeledControl(frame: Frame, fieldLabel: string, exact: boolean): Promise<Locator | null> {
+async function resolveMeaningfulClickTarget(
+  locator: Locator,
+): Promise<{ handle: ElementHandle<Element> | null; anchorX?: number; anchorY?: number }> {
+  const baseHandle = await locator.elementHandle()
+  if (!baseHandle) return { handle: null }
+
+  const targetHandle = (await baseHandle.evaluateHandle((el) => {
+    function isTextLikeControl(node: Element): boolean {
+      if (node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement) return true
+      if (node instanceof HTMLInputElement) {
+        return !['checkbox', 'radio', 'file', 'button', 'submit', 'reset', 'hidden', 'range', 'color'].includes(node.type)
+      }
+      const role = node.getAttribute('role')
+      return role === 'textbox' || role === 'combobox'
+    }
+
+    function visible(node: Element): node is HTMLElement {
+      if (!(node instanceof HTMLElement)) return false
+      const rect = node.getBoundingClientRect()
+      if (rect.width <= 0 || rect.height <= 0) return false
+      const style = getComputedStyle(node)
+      return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0'
+    }
+
+    if (!(el instanceof HTMLElement)) return el
+    const rect = el.getBoundingClientRect()
+    if (!isTextLikeControl(el) || (rect.width >= 48 && rect.height >= 18)) return el
+
+    let best: HTMLElement = el
+    let bestScore = Number.POSITIVE_INFINITY
+    let current = el.parentElement
+    let depth = 0
+
+    while (current && depth < 6) {
+      if (visible(current)) {
+        const candidate = current.getBoundingClientRect()
+        const className = typeof current.className === 'string' ? current.className.toLowerCase() : ''
+        const role = current.getAttribute('role')
+        const looksLikeControl =
+          role === 'combobox' ||
+          role === 'button' ||
+          current.getAttribute('aria-haspopup') === 'listbox' ||
+          className.includes('control') ||
+          className.includes('select') ||
+          className.includes('combo') ||
+          className.includes('input')
+
+        if (
+          candidate.width >= rect.width &&
+          candidate.height >= rect.height &&
+          candidate.width > 0 &&
+          candidate.height > 0 &&
+          candidate.width <= window.innerWidth * 0.98 &&
+          candidate.height <= Math.max(window.innerHeight * 0.9, 320) &&
+          (candidate.width >= 48 || candidate.height >= 18)
+        ) {
+          const score = candidate.width * candidate.height + depth * 1000 - (looksLikeControl ? 20000 : 0)
+          if (score < bestScore) {
+            best = current
+            bestScore = score
+          }
+        }
+      }
+      current = current.parentElement
+      depth++
+    }
+
+    return best
+  })) as ElementHandle<Element>
+
+  const bounds = await targetHandle.boundingBox()
+  return {
+    handle: targetHandle,
+    anchorX: bounds ? bounds.x + bounds.width / 2 : undefined,
+    anchorY: bounds ? bounds.y + bounds.height / 2 : undefined,
+  }
+}
+
+async function findLabeledControl(
+  frame: Frame,
+  fieldLabel: string,
+  exact: boolean,
+  opts?: { preferredAnchor?: AnchorPoint },
+): Promise<Locator | null> {
   const directCandidates = [
     frame.getByLabel(fieldLabel, { exact }),
     frame.getByRole('combobox', { name: fieldLabel, exact }),
@@ -63,7 +279,7 @@ async function findLabeledControl(frame: Frame, fieldLabel: string, exact: boole
   ]
 
   for (const candidate of directCandidates) {
-    const visible = await firstVisible(candidate, { minWidth: 48, minHeight: 18, fallbackToAnyVisible: false })
+    const visible = await firstVisible(candidate, { preferredAnchor: opts?.preferredAnchor })
     if (visible) return visible
   }
 
@@ -143,15 +359,21 @@ async function findLabeledControl(frame: Frame, fieldLabel: string, exact: boole
       const el = elements[i]
       if (!(el instanceof Element)) continue
       if (!visible(el)) continue
+      const rect = el.getBoundingClientRect()
 
       const explicit = explicitLabelText(el)
       if (matches(explicit)) {
-        const score = controlPriority(el)
+        const centerX = rect.left + rect.width / 2
+        const centerY = rect.top + rect.height / 2
+        const anchorDistance =
+          payload.anchorX === null && payload.anchorY === null
+            ? 0
+            : Math.abs(centerX - (payload.anchorX ?? centerX)) + Math.abs(centerY - (payload.anchorY ?? centerY))
+        const score = controlPriority(el) + anchorDistance / 8
         if (!best || score < best.score) best = { index: i, score }
         continue
       }
 
-      const rect = el.getBoundingClientRect()
       for (const labelNode of labelNodes) {
         const labelText = labelNode.textContent?.trim()
         if (!matches(labelText)) continue
@@ -166,38 +388,75 @@ async function findLabeledControl(frame: Frame, fieldLabel: string, exact: boole
           rect.top >= labelRect.bottom - 12
             ? rect.top - labelRect.bottom
             : 200 + Math.abs(rect.top - labelRect.top)
-        const score = 100 + verticalDistance * 3 + horizontalDistance + controlPriority(el)
+        const centerX = rect.left + rect.width / 2
+        const centerY = rect.top + rect.height / 2
+        const anchorDistance =
+          payload.anchorX === null && payload.anchorY === null
+            ? 0
+            : Math.abs(centerX - (payload.anchorX ?? centerX)) + Math.abs(centerY - (payload.anchorY ?? centerY))
+        const score = 100 + verticalDistance * 3 + horizontalDistance + anchorDistance / 8 + controlPriority(el)
         if (!best || score < best.score) best = { index: i, score }
       }
     }
 
     return best?.index ?? -1
-  }, { fieldLabel, exact })
+  }, {
+    fieldLabel,
+    exact,
+    anchorX: opts?.preferredAnchor?.x ?? null,
+    anchorY: opts?.preferredAnchor?.y ?? null,
+  })
 
   return bestIndex >= 0 ? fallbackCandidates.nth(bestIndex) : null
 }
 
 function textMatches(candidate: string | undefined, expected: string, exact: boolean): boolean {
-  if (!candidate) return false
-  const normalizedCandidate = candidate.replace(/\s+/g, ' ').trim().toLowerCase()
-  const normalizedExpected = expected.replace(/\s+/g, ' ').trim().toLowerCase()
-  if (!normalizedCandidate || !normalizedExpected) return false
-  return exact ? normalizedCandidate === normalizedExpected : normalizedCandidate.includes(normalizedExpected)
+  return selectionMatchScore(candidate, expected, exact) !== null
+}
+
+function displayedValueMatchesSelection(
+  candidate: string | undefined,
+  expected: string,
+  exact: boolean,
+  selectedOptionText?: string,
+): boolean {
+  if (textMatches(candidate, expected, exact)) return true
+  if (!candidate || !selectedOptionText || exact) return false
+
+  const normalizedCandidate = normalizedOptionLabel(candidate)
+  const normalizedSelectedOption = normalizedOptionLabel(selectedOptionText)
+  if (!normalizedCandidate || normalizedCandidate.length < 2 || !normalizedSelectedOption) return false
+
+  return (
+    normalizedSelectedOption.includes(normalizedCandidate) || normalizedCandidate.includes(normalizedSelectedOption)
+  )
 }
 
 async function openDropdownControl(
   page: Page,
   fieldLabel: string,
   exact: boolean,
-): Promise<{ locator: Locator; editable: boolean; anchorY?: number }> {
+): Promise<{ locator: Locator; handle: ElementHandle<Element> | null; editable: boolean; anchorX?: number; anchorY?: number }> {
   for (const frame of page.frames()) {
     const locator = await findLabeledControl(frame, fieldLabel, exact)
     if (!locator) continue
     await locator.scrollIntoViewIfNeeded()
-    const anchorY = await locatorAnchorY(locator)
+    const handle = await locator.elementHandle()
+    const clickTarget = await resolveMeaningfulClickTarget(locator)
     const editable = await locatorIsEditable(locator)
-    await locator.click()
-    return { locator, editable, anchorY }
+    if (clickTarget.handle) {
+      await clickTarget.handle.scrollIntoViewIfNeeded()
+      await clickTarget.handle.click()
+    } else {
+      await locator.click()
+    }
+    return {
+      locator,
+      handle,
+      editable,
+      anchorX: clickTarget.anchorX,
+      anchorY: clickTarget.anchorY ?? await locatorAnchorY(locator),
+    }
   }
 
   throw new Error(`listboxPick: no visible combobox/dropdown matching field "${fieldLabel}"`)
@@ -244,14 +503,8 @@ async function clickVisibleOptionCandidate(
   page: Page,
   label: string,
   exact: boolean,
-  anchorY?: number,
-): Promise<boolean> {
-  const roleOption = await firstVisible(page.getByRole('option', { name: label, exact }))
-  if (roleOption) {
-    await roleOption.click()
-    return true
-  }
-
+  anchor?: AnchorPoint,
+): Promise<string | null> {
   for (const frame of page.frames()) {
     const candidates = frame.locator(OPTION_PICKER_SELECTOR)
     const count = await candidates.count()
@@ -262,12 +515,63 @@ async function clickVisibleOptionCandidate(
         return value.replace(/\s+/g, ' ').trim().toLowerCase()
       }
 
-      function matches(candidate: string | undefined): boolean {
-        if (!candidate) return false
+      function aliases(value: string): string[] {
+        const out = new Set<string>([value])
+        if (value === 'yes' || value === 'true') {
+          for (const alias of ['agree', 'agreed', 'accept', 'accepted', 'consent', 'acknowledge', 'read', 'opt in']) {
+            out.add(alias)
+          }
+        }
+        if (value === 'no' || value === 'false') {
+          for (const alias of ['decline', 'declined', 'disagree', 'deny', 'opt out', 'prefer not']) {
+            out.add(alias)
+          }
+        }
+        if (value === 'decline') {
+          for (const alias of ['prefer not', 'opt out', 'do not']) {
+            out.add(alias)
+          }
+        }
+        return [...out]
+      }
+
+      function hasNegativeCue(value: string): boolean {
+        return /\b(no|not|do not|don't|decline|disagree|deny|opt out|prefer not)\b/.test(value)
+      }
+
+      function hasPositiveCue(value: string): boolean {
+        return /\b(yes|agree|accept|consent|acknowledge|opt in|allow|read)\b/.test(value)
+      }
+
+      function matchScore(candidate: string | undefined): number | null {
+        if (!candidate) return null
         const normalizedCandidate = normalize(candidate)
         const normalizedExpected = normalize(payload.label)
-        if (!normalizedCandidate || !normalizedExpected) return false
-        return payload.exact ? normalizedCandidate === normalizedExpected : normalizedCandidate.includes(normalizedExpected)
+        if (!normalizedCandidate || !normalizedExpected) return null
+        const expectsPositive = normalizedExpected === 'yes' || normalizedExpected === 'true'
+        const expectsNegative =
+          normalizedExpected === 'no' || normalizedExpected === 'false' || normalizedExpected === 'decline'
+        if (payload.exact) return normalizedCandidate === normalizedExpected ? 0 : null
+        if (normalizedCandidate === normalizedExpected) return 0
+        if (normalizedCandidate.includes(normalizedExpected)) return normalizedCandidate.length - normalizedExpected.length
+        if (expectsPositive && hasNegativeCue(normalizedCandidate)) return null
+        if (expectsNegative && hasPositiveCue(normalizedCandidate)) return null
+
+        for (const alias of aliases(normalizedExpected)) {
+          if (alias !== normalizedExpected && normalizedCandidate.includes(alias)) {
+            return 40 + normalizedCandidate.length - alias.length
+          }
+        }
+
+        const tokens = normalizedExpected.split(' ').filter(token => token.length >= 3)
+        if (tokens.length >= 2) {
+          const matches = tokens.filter(token => normalizedCandidate.includes(token))
+          if (matches.length >= Math.min(2, tokens.length)) {
+            return 80 + (tokens.length - matches.length) * 10
+          }
+        }
+
+        return null
       }
 
       function visible(el: Element): el is HTMLElement {
@@ -293,50 +597,163 @@ async function clickVisibleOptionCandidate(
         if (!visible(el)) continue
 
         const candidateText = el.getAttribute('aria-label')?.trim() || el.textContent?.trim() || ''
-        if (!matches(candidateText)) continue
+        const match = matchScore(candidateText)
+        if (match === null) continue
 
         const rect = el.getBoundingClientRect()
+        const centerX = rect.left + rect.width / 2
         const centerY = rect.top + rect.height / 2
         const upwardPenalty =
           payload.anchorY === null || centerY >= payload.anchorY - 16
             ? 0
             : 140
-        const proximity = payload.anchorY === null ? rect.top : Math.abs(centerY - payload.anchorY)
-        const score = popupWeight(el) + upwardPenalty + proximity
+        const verticalProximity = payload.anchorY === null ? rect.top : Math.abs(centerY - payload.anchorY)
+        const horizontalProximity = payload.anchorX === null ? 0 : Math.abs(centerX - payload.anchorX)
+        const score = popupWeight(el) + upwardPenalty + verticalProximity + horizontalProximity / 2 + match * 2
         if (!best || score < best.score) best = { index: i, score }
       }
 
       return best?.index ?? -1
-    }, { label, exact, anchorY: anchorY ?? null })
+    }, { label, exact, anchorX: anchor?.x ?? null, anchorY: anchor?.y ?? null })
 
     if (bestIndex >= 0) {
+      const selectedText =
+        (await candidates
+          .nth(bestIndex)
+          .evaluate(el => el.getAttribute('aria-label')?.trim() || el.textContent?.trim() || '')
+          .catch(() => '')) || null
       await candidates.nth(bestIndex).click()
-      return true
+      return selectedText
     }
   }
 
-  return false
+  return null
 }
 
-async function locatorDisplayedValue(locator: Locator): Promise<string | undefined> {
+async function locatorDisplayedValues(locator: Locator): Promise<string[]> {
   try {
-    return await locator.evaluate((el) => {
-      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-        return el.value?.trim() || el.getAttribute('aria-valuetext')?.trim() || el.getAttribute('aria-label')?.trim() || undefined
-      }
-      if (el instanceof HTMLSelectElement) {
-        return el.selectedOptions[0]?.textContent?.trim() || el.value?.trim() || undefined
-      }
-      const ariaValueText = el.getAttribute('aria-valuetext')?.trim()
-      if (ariaValueText) return ariaValueText
-      const ariaLabel = el.getAttribute('aria-label')?.trim()
-      if (ariaLabel) return ariaLabel
-      const text = el.textContent?.trim()
-      return text || undefined
-    })
+    return await locator.evaluate(browserDisplayedValues)
   } catch {
-    return undefined
+    return []
   }
+}
+
+async function elementHandleDisplayedValues(handle: ElementHandle<Element>): Promise<string[]> {
+  try {
+    return await handle.evaluate(browserDisplayedValues)
+  } catch {
+    return []
+  }
+}
+
+async function visibleOptionIsSelected(
+  page: Page,
+  label: string,
+  exact: boolean,
+  anchor?: AnchorPoint,
+): Promise<boolean> {
+  for (const frame of page.frames()) {
+    const candidates = frame.locator(OPTION_PICKER_SELECTOR)
+    const count = await candidates.count()
+    if (count === 0) continue
+
+    const selected = await candidates.evaluateAll((elements, payload) => {
+      function normalize(value: string): string {
+        return value.replace(/\s+/g, ' ').trim().toLowerCase()
+      }
+
+      function aliases(value: string): string[] {
+        const out = new Set<string>([value])
+        if (value === 'yes' || value === 'true') {
+          for (const alias of ['agree', 'agreed', 'accept', 'accepted', 'consent', 'acknowledge', 'read', 'opt in']) {
+            out.add(alias)
+          }
+        }
+        if (value === 'no' || value === 'false') {
+          for (const alias of ['decline', 'declined', 'disagree', 'deny', 'opt out', 'prefer not']) {
+            out.add(alias)
+          }
+        }
+        if (value === 'decline') {
+          for (const alias of ['prefer not', 'opt out', 'do not']) {
+            out.add(alias)
+          }
+        }
+        return [...out]
+      }
+
+      function hasNegativeCue(value: string): boolean {
+        return /\b(no|not|do not|don't|decline|disagree|deny|opt out|prefer not)\b/.test(value)
+      }
+
+      function hasPositiveCue(value: string): boolean {
+        return /\b(yes|agree|accept|consent|acknowledge|opt in|allow|read)\b/.test(value)
+      }
+
+      function matchScore(candidate: string | undefined): number | null {
+        if (!candidate) return null
+        const normalizedCandidate = normalize(candidate)
+        const normalizedExpected = normalize(payload.label)
+        if (!normalizedCandidate || !normalizedExpected) return null
+        const expectsPositive = normalizedExpected === 'yes' || normalizedExpected === 'true'
+        const expectsNegative =
+          normalizedExpected === 'no' || normalizedExpected === 'false' || normalizedExpected === 'decline'
+        if (payload.exact) return normalizedCandidate === normalizedExpected ? 0 : null
+        if (normalizedCandidate === normalizedExpected) return 0
+        if (normalizedCandidate.includes(normalizedExpected)) return normalizedCandidate.length - normalizedExpected.length
+        if (expectsPositive && hasNegativeCue(normalizedCandidate)) return null
+        if (expectsNegative && hasPositiveCue(normalizedCandidate)) return null
+        for (const alias of aliases(normalizedExpected)) {
+          if (alias !== normalizedExpected && normalizedCandidate.includes(alias)) {
+            return 40 + normalizedCandidate.length - alias.length
+          }
+        }
+        return null
+      }
+
+      function visible(el: Element): el is HTMLElement {
+        if (!(el instanceof HTMLElement)) return false
+        const rect = el.getBoundingClientRect()
+        if (rect.width <= 0 || rect.height <= 0) return false
+        const style = getComputedStyle(el)
+        return style.display !== 'none' && style.visibility !== 'hidden'
+      }
+
+      function isSelected(el: Element): boolean {
+        return (
+          el.getAttribute('aria-selected') === 'true' ||
+          el.getAttribute('aria-checked') === 'true' ||
+          el.getAttribute('data-selected') === 'true' ||
+          el.getAttribute('data-state') === 'checked' ||
+          el.getAttribute('data-state') === 'on'
+        )
+      }
+
+      let bestScore = Number.POSITIVE_INFINITY
+      for (const el of elements) {
+        if (!(el instanceof Element)) continue
+        if (!visible(el)) continue
+        if (!isSelected(el)) continue
+        const text = el.getAttribute('aria-label')?.trim() || el.textContent?.trim() || ''
+        const match = matchScore(text)
+        if (match === null) continue
+        const rect = el.getBoundingClientRect()
+        const centerX = rect.left + rect.width / 2
+        const centerY = rect.top + rect.height / 2
+        const distance =
+          payload.anchorX === null && payload.anchorY === null
+            ? 0
+            : Math.abs(centerX - (payload.anchorX ?? centerX)) + Math.abs(centerY - (payload.anchorY ?? centerY))
+        bestScore = Math.min(bestScore, match * 2 + distance / 2)
+      }
+
+      return Number.isFinite(bestScore)
+    }, { label, exact, anchorX: anchor?.x ?? null, anchorY: anchor?.y ?? null })
+
+    if (selected) return true
+  }
+
+  return false
 }
 
 async function confirmListboxSelection(
@@ -344,15 +761,26 @@ async function confirmListboxSelection(
   fieldLabel: string,
   label: string,
   exact: boolean,
+  anchor?: AnchorPoint,
+  currentHandle?: ElementHandle<Element> | null,
+  selectedOptionText?: string,
 ): Promise<boolean> {
+  if (currentHandle) {
+    const immediateValues = await elementHandleDisplayedValues(currentHandle)
+    if (immediateValues.some(value => displayedValueMatchesSelection(value, label, exact, selectedOptionText))) {
+      return true
+    }
+  }
+
   const deadline = Date.now() + 1500
   while (Date.now() < deadline) {
     for (const frame of page.frames()) {
-      const locator = await findLabeledControl(frame, fieldLabel, exact)
+      const locator = await findLabeledControl(frame, fieldLabel, exact, { preferredAnchor: anchor })
       if (!locator) continue
-      const value = await locatorDisplayedValue(locator)
-      if (textMatches(value, label, exact)) return true
+      const values = await locatorDisplayedValues(locator)
+      if (values.some(value => displayedValueMatchesSelection(value, label, exact, selectedOptionText))) return true
     }
+    if (await visibleOptionIsSelected(page, label, exact, anchor)) return true
     await delay(100)
   }
   return false
@@ -542,13 +970,16 @@ export async function pickListboxOption(
   label: string,
   opts?: { exact?: boolean; openX?: number; openY?: number; fieldLabel?: string; query?: string },
 ): Promise<void> {
-  let anchorY: number | undefined
+  let anchor: AnchorPoint | undefined
   const exact = opts?.exact ?? false
   let attemptedSelection = false
+  let selectedOptionText: string | undefined
+  let openedHandle: ElementHandle<Element> | null | undefined
 
   if (opts?.fieldLabel) {
     const opened = await openDropdownControl(page, opts.fieldLabel, exact)
-    anchorY = opened.anchorY
+    anchor = { x: opened.anchorX, y: opened.anchorY }
+    openedHandle = opened.handle
     const query = opts.query ?? label
     if (query && opened.editable) {
       await typeIntoEditableLocator(page, opened.locator, query)
@@ -558,15 +989,21 @@ export async function pickListboxOption(
     }
   } else if (opts?.openX !== undefined && opts?.openY !== undefined) {
     await page.mouse.click(opts.openX, opts.openY)
-    anchorY = opts.openY
+    anchor = { x: opts.openX, y: opts.openY }
     await delay(120)
   }
 
   const deadline = Date.now() + 3000
   while (Date.now() < deadline) {
-    if (await clickVisibleOptionCandidate(page, label, exact, anchorY)) {
+    selectedOptionText = (await clickVisibleOptionCandidate(page, label, exact, anchor)) ?? undefined
+    if (selectedOptionText) {
       attemptedSelection = true
-      if (!opts?.fieldLabel || await confirmListboxSelection(page, opts.fieldLabel, label, exact)) return
+      if (
+        !opts?.fieldLabel ||
+        await confirmListboxSelection(page, opts.fieldLabel, label, exact, anchor, openedHandle, selectedOptionText)
+      ) {
+        return
+      }
     }
     await delay(120)
   }

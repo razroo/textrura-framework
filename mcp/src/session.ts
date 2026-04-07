@@ -195,6 +195,7 @@ export interface Session {
   layout: Record<string, unknown> | null
   tree: Record<string, unknown> | null
   url: string
+  updateRevision: number
   /** Present when this session owns a child geometra-proxy process (pageUrl connect). */
   proxyChild?: ChildProcess
 }
@@ -206,6 +207,8 @@ export interface UpdateWaitResult {
 
 let activeSession: Session | null = null
 const ACTION_UPDATE_TIMEOUT_MS = 2000
+const LISTBOX_UPDATE_TIMEOUT_MS = 4500
+let nextRequestSequence = 0
 
 function shutdownPreviousSession(): void {
   const prev = activeSession
@@ -234,7 +237,7 @@ export function connect(url: string): Promise<Session> {
     shutdownPreviousSession()
 
     const ws = new WebSocket(url)
-    const session: Session = { ws, layout: null, tree: null, url }
+    const session: Session = { ws, layout: null, tree: null, url, updateRevision: 0 }
     let resolved = false
 
     const timeout = setTimeout(() => {
@@ -256,6 +259,7 @@ export function connect(url: string): Promise<Session> {
         if (msg.type === 'frame') {
           session.layout = msg.layout
           session.tree = msg.tree
+          session.updateRevision++
           if (!resolved) {
             resolved = true
             clearTimeout(timeout)
@@ -264,6 +268,7 @@ export function connect(url: string): Promise<Session> {
           }
         } else if (msg.type === 'patch' && session.layout) {
           applyPatches(session.layout, msg.patches)
+          session.updateRevision++
         }
       } catch { /* ignore malformed messages */ }
     })
@@ -441,7 +446,7 @@ export function sendListboxPick(
   }
   if (opts?.fieldLabel) payload.fieldLabel = opts.fieldLabel
   if (opts?.query) payload.query = opts.query
-  return sendAndWaitForUpdate(session, payload)
+  return sendAndWaitForUpdate(session, payload, LISTBOX_UPDATE_TIMEOUT_MS)
 }
 
 /** Native `<select>` only: click the control center, then pick by value, label text, or zero-based index. */
@@ -1618,39 +1623,65 @@ function applyPatches(layout: Record<string, unknown>, patches: Array<{ path: nu
   }
 }
 
-function sendAndWaitForUpdate(session: Session, message: Record<string, unknown>): Promise<UpdateWaitResult> {
+function sendAndWaitForUpdate(
+  session: Session,
+  message: Record<string, unknown>,
+  timeoutMs = ACTION_UPDATE_TIMEOUT_MS,
+): Promise<UpdateWaitResult> {
   return new Promise((resolve, reject) => {
     if (session.ws.readyState !== WebSocket.OPEN) {
       reject(new Error('Not connected'))
       return
     }
-    session.ws.send(JSON.stringify(message))
-    waitForNextUpdate(session).then(resolve).catch(reject)
+    const requestId = `req-${++nextRequestSequence}`
+    const startRevision = session.updateRevision
+    session.ws.send(JSON.stringify({ ...message, requestId }))
+    waitForNextUpdate(session, timeoutMs, requestId, startRevision).then(resolve).catch(reject)
   })
 }
 
-function waitForNextUpdate(session: Session): Promise<UpdateWaitResult> {
+function waitForNextUpdate(
+  session: Session,
+  timeoutMs = ACTION_UPDATE_TIMEOUT_MS,
+  requestId?: string,
+  startRevision = session.updateRevision,
+): Promise<UpdateWaitResult> {
   return new Promise((resolve, reject) => {
     const onMessage = (data: WebSocket.Data) => {
       try {
         const msg = JSON.parse(String(data))
+        const messageRequestId = typeof msg.requestId === 'string' ? msg.requestId : undefined
+
+        if (requestId) {
+          if (msg.type === 'error' && messageRequestId === requestId) {
+            cleanup()
+            reject(new Error(typeof msg.message === 'string' ? msg.message : 'Geometra server error'))
+            return
+          }
+          if (msg.type === 'ack' && messageRequestId === requestId) {
+            cleanup()
+            resolve({
+              status: session.updateRevision > startRevision ? 'updated' : 'acknowledged',
+              timeoutMs,
+            })
+          }
+          return
+        }
+
         if (msg.type === 'error') {
           cleanup()
           reject(new Error(typeof msg.message === 'string' ? msg.message : 'Geometra server error'))
           return
         }
         if (msg.type === 'frame') {
-          session.layout = msg.layout
-          session.tree = msg.tree
           cleanup()
-          resolve({ status: 'updated', timeoutMs: ACTION_UPDATE_TIMEOUT_MS })
+          resolve({ status: 'updated', timeoutMs })
         } else if (msg.type === 'patch' && session.layout) {
-          applyPatches(session.layout, msg.patches)
           cleanup()
-          resolve({ status: 'updated', timeoutMs: ACTION_UPDATE_TIMEOUT_MS })
+          resolve({ status: 'updated', timeoutMs })
         } else if (msg.type === 'ack') {
           cleanup()
-          resolve({ status: 'acknowledged', timeoutMs: ACTION_UPDATE_TIMEOUT_MS })
+          resolve({ status: 'acknowledged', timeoutMs })
         }
       } catch { /* ignore */ }
     }
@@ -1658,8 +1689,8 @@ function waitForNextUpdate(session: Session): Promise<UpdateWaitResult> {
     // Expose timeout explicitly so action handlers can tell the user the result is ambiguous.
     const timeout = setTimeout(() => {
       cleanup()
-      resolve({ status: 'timed_out', timeoutMs: ACTION_UPDATE_TIMEOUT_MS })
-    }, ACTION_UPDATE_TIMEOUT_MS)
+      resolve({ status: 'timed_out', timeoutMs })
+    }, timeoutMs)
 
     function cleanup() {
       clearTimeout(timeout)

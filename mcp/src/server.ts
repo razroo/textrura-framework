@@ -111,7 +111,7 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
   // ── query ────────────────────────────────────────────────────
   server.tool(
     'geometra_query',
-    `Find elements in the current Geometra UI by stable id, role, name, or text content. Returns matching elements with their exact pixel bounds {x, y, width, height}, visible in-viewport bounds, an on-screen center point, role, name, and tree path.
+    `Find elements in the current Geometra UI by stable id, role, name, or text content. Returns matching elements with their exact pixel bounds {x, y, width, height}, visible in-viewport bounds, an on-screen center point, visibility / scroll-reveal hints, role, name, and tree path.
 
 This is the Geometra equivalent of Playwright's locator — but instant, structured, and with no browser. Use the returned bounds to click elements or assert on layout.`,
     {
@@ -309,7 +309,7 @@ Strategies: **auto** (default) tries chooser click if x,y given, else hidden \`i
     'geometra_pick_listbox_option',
     `Pick an option from a custom dropdown / listbox / searchable combobox (Headless UI, React Select, Radix, Ashby-style custom selects, etc.). Requires \`@geometra/proxy\`.
 
-Pass \`fieldLabel\` to open a labeled dropdown semantically instead of relying on coordinates. If the opened control is editable, MCP types \`query\` (or the option label by default) before selecting. Uses substring name match unless exact=true.`,
+Pass \`fieldLabel\` to open a labeled dropdown semantically instead of relying on coordinates. If the opened control is editable, MCP types \`query\` (or the option label by default) before selecting. Uses substring name match unless exact=true, prefers the popup nearest the opened field, and handles a few short affirmative/negative aliases such as \`Yes\` /\`No\` for consent-style copy.`,
     {
       label: z.string().describe('Accessible name of the option (visible text or aria-label)'),
       exact: z.boolean().optional().describe('Exact name match'),
@@ -575,12 +575,19 @@ function formatNode(
   const visibleRight = Math.min(viewport.width, node.bounds.x + node.bounds.width)
   const visibleBottom = Math.min(viewport.height, node.bounds.y + node.bounds.height)
   const hasVisibleIntersection = visibleRight > visibleLeft && visibleBottom > visibleTop
+  const fullyVisible =
+    node.bounds.x >= 0 &&
+    node.bounds.y >= 0 &&
+    node.bounds.x + node.bounds.width <= viewport.width &&
+    node.bounds.y + node.bounds.height <= viewport.height
   const centerX = hasVisibleIntersection
     ? Math.round((visibleLeft + visibleRight) / 2)
     : Math.round(Math.min(Math.max(node.bounds.x + node.bounds.width / 2, 0), viewport.width))
   const centerY = hasVisibleIntersection
     ? Math.round((visibleTop + visibleBottom) / 2)
     : Math.round(Math.min(Math.max(node.bounds.y + node.bounds.height / 2, 0), viewport.height))
+  const revealDeltaX = Math.round(node.bounds.x + node.bounds.width / 2 - viewport.width / 2)
+  const revealDeltaY = Math.round(node.bounds.y + node.bounds.height / 2 - viewport.height / 2)
   return {
     id: nodeIdForPath(node.path),
     role: node.role,
@@ -595,6 +602,19 @@ function formatNode(
     center: {
       x: centerX,
       y: centerY,
+    },
+    visibility: {
+      intersectsViewport: hasVisibleIntersection,
+      fullyVisible,
+      offscreenAbove: node.bounds.y + node.bounds.height <= 0,
+      offscreenBelow: node.bounds.y >= viewport.height,
+      offscreenLeft: node.bounds.x + node.bounds.width <= 0,
+      offscreenRight: node.bounds.x >= viewport.width,
+    },
+    scrollHint: {
+      status: fullyVisible ? 'visible' : hasVisibleIntersection ? 'partial' : 'offscreen',
+      revealDeltaX,
+      revealDeltaY,
     },
     focusable: node.focusable,
     ...(node.state && Object.keys(node.state).length > 0 ? { state: node.state } : {}),

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { chromium, type Browser } from 'playwright'
-import { pickListboxOption } from '../dom-actions.js'
+import { pickListboxOption } from '../dom-actions.ts'
 
 describe('pickListboxOption', () => {
   let browser: Browser
@@ -98,6 +98,181 @@ describe('pickListboxOption', () => {
     })
 
     expect(await page.locator('#trigger').textContent()).toBe('United States')
+    await page.close()
+  })
+
+  it('keeps explicitly labeled tiny comboboxes anchored to their own wrapper instead of a nearby phone field', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; }
+        .stack { display: grid; gap: 12px; width: 420px; }
+        .select__control { width: 160px; min-height: 34px; border: 1px solid #ccc; padding: 4px 12px; display: flex; align-items: center; }
+        #country { width: 4px; border: 0; padding: 0; margin: 0; }
+        #menu[hidden] { display: none; }
+        #menu { border: 1px solid #ccc; margin-top: 6px; padding: 8px; display: grid; gap: 6px; width: 220px; }
+        #phone { width: 320px; min-height: 34px; }
+      </style>
+      <div class="stack">
+        <div class="field">
+          <label for="country">Country</label>
+          <div id="country-control" class="select__control">
+            <input id="country" role="combobox" aria-labelledby="country-label" aria-expanded="false" />
+            <span id="country-selected">Select country</span>
+          </div>
+          <div id="menu" hidden>
+            <button type="button">Canada</button>
+            <button type="button">United States +1</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="phone">Phone</label>
+          <input id="phone" aria-label="Phone" />
+        </div>
+      </div>
+      <script>
+        const label = document.querySelector('label[for="country"]')
+        label.id = 'country-label'
+        const input = document.getElementById('country')
+        const control = document.getElementById('country-control')
+        const selected = document.getElementById('country-selected')
+        const menu = document.getElementById('menu')
+        const options = Array.from(menu.querySelectorAll('button'))
+        control.addEventListener('click', () => {
+          menu.hidden = false
+          input.setAttribute('aria-expanded', 'true')
+          input.focus()
+        })
+        input.addEventListener('input', () => {
+          const query = input.value.toLowerCase()
+          menu.hidden = false
+          input.setAttribute('aria-expanded', 'true')
+          for (const option of options) {
+            option.hidden = !option.textContent.toLowerCase().includes(query)
+          }
+        })
+        for (const option of options) {
+          option.addEventListener('click', () => {
+            selected.textContent = option.textContent.includes('+1') ? '+1' : option.textContent
+            input.value = ''
+            menu.hidden = true
+            input.setAttribute('aria-expanded', 'false')
+          })
+        }
+      </script>
+    `)
+
+    await pickListboxOption(page, 'United States', {
+      fieldLabel: 'Country',
+      exact: false,
+    })
+
+    expect(await page.locator('#country-selected').textContent()).toBe('+1')
+    expect(await page.locator('#phone').inputValue()).toBe('')
+    await page.close()
+  })
+
+  it('matches short affirmative labels to longer consent-style option copy', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; }
+        .field { width: 420px; position: relative; }
+        #trigger { width: 100%; min-height: 44px; text-align: left; }
+        #menu[hidden] { display: none; }
+        #menu { border: 1px solid #ccc; margin-top: 6px; padding: 8px; display: grid; gap: 6px; }
+      </style>
+      <div class="field">
+        <label>GDPR consent</label>
+        <button id="trigger" type="button" aria-haspopup="listbox">Choose an answer</button>
+        <div id="menu" hidden>
+          <button type="button">I have read and acknowledge the privacy policy</button>
+          <button type="button">I do not agree</button>
+        </div>
+      </div>
+      <script>
+        const trigger = document.getElementById('trigger')
+        const menu = document.getElementById('menu')
+        trigger.addEventListener('click', () => {
+          menu.hidden = false
+        })
+        for (const option of menu.querySelectorAll('button')) {
+          option.addEventListener('click', () => {
+            trigger.textContent = option.textContent
+            menu.hidden = true
+          })
+        }
+      </script>
+    `)
+
+    await pickListboxOption(page, 'Yes', {
+      fieldLabel: 'GDPR consent',
+      exact: false,
+    })
+
+    expect(await page.locator('#trigger').textContent()).toBe('I have read and acknowledge the privacy policy')
+    await page.close()
+  })
+
+  it('confirms against the anchored field when matching labels repeat after DOM reordering', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; }
+        #stack { display: grid; gap: 16px; width: 420px; }
+        button.trigger { width: 100%; min-height: 44px; text-align: left; }
+        .menu[hidden] { display: none; }
+        .menu { border: 1px solid #ccc; padding: 8px; display: grid; gap: 6px; }
+      </style>
+      <div id="stack">
+        <div class="field" id="field-a">
+          <label>Country</label>
+          <button class="trigger" id="trigger-a" type="button" aria-haspopup="listbox">Choose country</button>
+          <div class="menu" id="menu-a" hidden>
+            <button type="button">Canada</button>
+            <button type="button">United States</button>
+          </div>
+        </div>
+        <div class="field" id="field-b">
+          <label>Country</label>
+          <button class="trigger" id="trigger-b" type="button" aria-haspopup="listbox">Choose country</button>
+          <div class="menu" id="menu-b" hidden>
+            <button type="button">Mexico</button>
+            <button type="button">Brazil</button>
+          </div>
+        </div>
+      </div>
+      <script>
+        const stack = document.getElementById('stack')
+        const fieldA = document.getElementById('field-a')
+        const fieldB = document.getElementById('field-b')
+        const triggerA = document.getElementById('trigger-a')
+        const menuA = document.getElementById('menu-a')
+        const triggerB = document.getElementById('trigger-b')
+        const menuB = document.getElementById('menu-b')
+        triggerA.addEventListener('click', () => {
+          menuA.hidden = false
+        })
+        triggerB.addEventListener('click', () => {
+          menuB.hidden = false
+        })
+        for (const option of menuA.querySelectorAll('button')) {
+          option.addEventListener('click', () => {
+            triggerA.textContent = option.textContent
+            menuA.hidden = true
+            stack.insertBefore(fieldB, fieldA)
+          })
+        }
+      </script>
+    `)
+
+    await pickListboxOption(page, 'Canada', {
+      fieldLabel: 'Country',
+      exact: false,
+    })
+
+    expect(await page.locator('#trigger-a').textContent()).toBe('Canada')
+    expect(await page.locator('#trigger-b').textContent()).toBe('Choose country')
     await page.close()
   })
 })

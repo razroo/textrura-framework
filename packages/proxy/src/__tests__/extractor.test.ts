@@ -156,4 +156,33 @@ describe('extractGeometry', () => {
 
     await page.close()
   })
+
+  it('falls back to accessibility-tree nodes when DOM extraction is effectively empty', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        #host { position: relative; width: 0; height: 0; }
+      </style>
+      <div id="host"></div>
+      <script>
+        const host = document.getElementById('host')
+        const root = host.attachShadow({ mode: 'closed' })
+        root.innerHTML = '<style>button { position: absolute; left: 48px; top: 40px; width: 160px; height: 44px; }</style><button aria-label="Apply now">Apply now</button>'
+      </script>
+    `)
+
+    const snapshot = await extractGeometry(page)
+    const nodes = flattenSnapshot(snapshot.tree, snapshot.layout)
+    const button = nodes.find(node =>
+      node.tree.semantic?.role === 'button' &&
+      node.tree.semantic?.ariaLabel === 'Apply now',
+    )
+
+    expect(snapshot.tree.semantic?.a11yFallbackUsed).toBe(true)
+    expect(button).toBeDefined()
+    expect(button?.tree.semantic?.a11yFallback).toBe(true)
+    expect(button?.tree.handlers?.onClick).toBe(true)
+
+    await page.close()
+  })
 })

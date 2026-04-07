@@ -26,6 +26,11 @@ import {
 
 const DOM_OBSERVER_BINDINGS = new WeakSet<Page>()
 
+interface PendingInputAck {
+  ws: WebSocket
+  requestId?: string
+}
+
 function isProtocolCompatible(peerVersion: number | undefined): boolean {
   if (peerVersion === undefined) return true
   if (typeof peerVersion !== 'number' || !Number.isFinite(peerVersion)) return false
@@ -81,7 +86,7 @@ async function handleClientMessage(
   page: Page,
   ws: WebSocket,
   raw: unknown,
-  onViewportOrInput: (kind: 'resize' | 'input') => void,
+  onViewportOrInput: (kind: 'resize' | 'input', requestId?: string) => void,
   onHandlerError: (err: unknown) => void,
 ): Promise<void> {
   let msg: ParsedClientMessage
@@ -92,11 +97,15 @@ async function handleClientMessage(
   }
   if (typeof msg !== 'object' || msg === null || typeof msg.type !== 'string') return
   const pv = 'protocolVersion' in msg ? msg.protocolVersion : undefined
+  const requestId = typeof (msg as { requestId?: unknown }).requestId === 'string'
+    ? (msg as { requestId?: string }).requestId
+    : undefined
   if (!isProtocolCompatible(pv)) {
     ws.send(
       JSON.stringify({
         type: 'error',
         message: `Client protocol ${String(pv)} is newer than proxy protocol ${PROXY_PROTOCOL_VERSION}`,
+        ...(requestId ? { requestId } : {}),
         protocolVersion: PROXY_PROTOCOL_VERSION,
       }),
     )
@@ -104,7 +113,12 @@ async function handleClientMessage(
   }
 
   const wireError = (message: string) => {
-    ws.send(JSON.stringify({ type: 'error', message, protocolVersion: PROXY_PROTOCOL_VERSION }))
+    ws.send(JSON.stringify({
+      type: 'error',
+      message,
+      ...(requestId ? { requestId } : {}),
+      protocolVersion: PROXY_PROTOCOL_VERSION,
+    }))
   }
 
   try {
@@ -112,7 +126,7 @@ async function handleClientMessage(
       const w = Math.max(1, Math.floor(msg.width))
       const h = Math.max(1, Math.floor(msg.height))
       await page.setViewportSize({ width: w, height: h })
-      onViewportOrInput('resize')
+      onViewportOrInput('resize', requestId)
       return
     }
 
@@ -121,14 +135,14 @@ async function handleClientMessage(
       const y = msg.y
       if (typeof x === 'number' && typeof y === 'number' && Number.isFinite(x) && Number.isFinite(y)) {
         await page.mouse.click(x, y)
-        onViewportOrInput('input')
+        onViewportOrInput('input', requestId)
       }
       return
     }
 
     if (isKeyMessage(msg)) {
       await applyKeyPhase(page, msg)
-      onViewportOrInput('input')
+      onViewportOrInput('input', requestId)
       return
     }
 
@@ -136,7 +150,7 @@ async function handleClientMessage(
       const data = typeof msg.data === 'string' ? msg.data : ''
       if (msg.eventType === 'onCompositionUpdate' || msg.eventType === 'onCompositionEnd') {
         await page.keyboard.insertText(data)
-        onViewportOrInput('input')
+        onViewportOrInput('input', requestId)
       }
       return
     }
@@ -150,7 +164,7 @@ async function handleClientMessage(
         dropX: msg.dropX,
         dropY: msg.dropY,
       })
-      onViewportOrInput('input')
+      onViewportOrInput('input', requestId)
       return
     }
 
@@ -162,7 +176,7 @@ async function handleClientMessage(
         fieldLabel: msg.fieldLabel,
         query: msg.query,
       })
-      onViewportOrInput('input')
+      onViewportOrInput('input', requestId)
       return
     }
 
@@ -172,7 +186,7 @@ async function handleClientMessage(
         label: msg.label,
         index: msg.index,
       })
-      onViewportOrInput('input')
+      onViewportOrInput('input', requestId)
       return
     }
 
@@ -182,7 +196,7 @@ async function handleClientMessage(
         exact: msg.exact,
         controlType: msg.controlType,
       })
-      onViewportOrInput('input')
+      onViewportOrInput('input', requestId)
       return
     }
 
@@ -192,7 +206,7 @@ async function handleClientMessage(
       const x = typeof msg.x === 'number' && Number.isFinite(msg.x) ? msg.x : undefined
       const y = typeof msg.y === 'number' && Number.isFinite(msg.y) ? msg.y : undefined
       await wheelAt(page, dx, dy, x, y)
-      onViewportOrInput('input')
+      onViewportOrInput('input', requestId)
     }
   } catch (err) {
     onHandlerError(err)
@@ -224,33 +238,47 @@ export function startGeometryWebSocket(options: {
   let prevTreeJson: string | null = null
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
-  let ackTimer: ReturnType<typeof setTimeout> | null = null
   let extracting = false
   let pendingExtract = false
-  const pendingInputAcks = new Set<WebSocket>()
-
-  function clearAckTimer() {
-    if (ackTimer !== null) {
-      clearTimeout(ackTimer)
-      ackTimer = null
-    }
-  }
-
-  function clearPendingInputAcks() {
-    pendingInputAcks.clear()
-    clearAckTimer()
-  }
+  let actionQueue: Promise<void> = Promise.resolve()
+  let pendingInputAcks: PendingInputAck[] = []
 
   function sendPendingInputAcks() {
-    if (pendingInputAcks.size === 0) return
-    const text = JSON.stringify({ type: 'ack', protocolVersion: PROXY_PROTOCOL_VERSION })
-    for (const ws of pendingInputAcks) {
+    if (pendingInputAcks.length === 0) return
+    const pending = pendingInputAcks
+    pendingInputAcks = []
+    for (const { ws, requestId } of pending) {
       if (ws.readyState === ws.OPEN) {
-        ws.send(text)
+        ws.send(JSON.stringify({
+          type: 'ack',
+          ...(requestId ? { requestId } : {}),
+          protocolVersion: PROXY_PROTOCOL_VERSION,
+        }))
       }
     }
-    pendingInputAcks.clear()
-    clearAckTimer()
+  }
+
+  function sendPendingInputErrors(message: string) {
+    if (pendingInputAcks.length === 0) {
+      const errText = JSON.stringify({ type: 'error', message, protocolVersion: PROXY_PROTOCOL_VERSION })
+      for (const ws of clients) {
+        if (ws.readyState === ws.OPEN) ws.send(errText)
+      }
+      return
+    }
+
+    const pending = pendingInputAcks
+    pendingInputAcks = []
+    for (const { ws, requestId } of pending) {
+      if (ws.readyState === ws.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'error',
+          message,
+          ...(requestId ? { requestId } : {}),
+          protocolVersion: PROXY_PROTOCOL_VERSION,
+        }))
+      }
+    }
   }
 
   function broadcastSnapshot(snap: GeometrySnapshot): boolean {
@@ -295,7 +323,6 @@ export function startGeometryWebSocket(options: {
         ws.send(text)
       }
     }
-    clearPendingInputAcks()
     return true
   }
 
@@ -305,16 +332,7 @@ export function startGeometryWebSocket(options: {
       return broadcastSnapshot(snap)
     } catch (err) {
       options.onError?.(err)
-      const errMsg = {
-        type: 'error',
-        message: err instanceof Error ? err.message : String(err),
-        protocolVersion: PROXY_PROTOCOL_VERSION,
-      }
-      const errText = JSON.stringify(errMsg)
-      for (const ws of clients) {
-        if (ws.readyState === ws.OPEN) ws.send(errText)
-      }
-      clearPendingInputAcks()
+      sendPendingInputErrors(err instanceof Error ? err.message : String(err))
       return false
     }
   }
@@ -338,31 +356,13 @@ export function startGeometryWebSocket(options: {
     return changed
   }
 
-  function schedulePendingAck() {
-    if (pendingInputAcks.size === 0) return
-    clearAckTimer()
-    ackTimer = setTimeout(() => {
-      ackTimer = null
-      if (extracting || debounceTimer !== null) {
-        schedulePendingAck()
-        return
-      }
-      void runExtractQueued()
-        .then(changed => {
-          if (!changed) sendPendingInputAcks()
-        })
-        .catch(err => options.onError?.(err))
-    }, 120)
-  }
-
   function scheduleExtract() {
-    clearAckTimer()
     if (debounceTimer !== null) clearTimeout(debounceTimer)
     debounceTimer = setTimeout(() => {
       debounceTimer = null
       void runExtractQueued()
-        .then(changed => {
-          if (!changed) schedulePendingAck()
+        .then(() => {
+          sendPendingInputAcks()
         })
         .catch(err => options.onError?.(err))
     }, debounceMs)
@@ -395,36 +395,41 @@ export function startGeometryWebSocket(options: {
       if (ws.readyState === ws.OPEN) ws.send(text)
     }
     ws.on('message', (raw) => {
-      void handleClientMessage(
-        options.page,
-        ws,
-        raw,
-        kind => {
-          if (kind === 'resize') {
-            void runExtractQueued()
-          } else {
-            pendingInputAcks.add(ws)
-            scheduleExtract()
-          }
-        },
-        err => options.onError?.(err),
-      ).catch(err => options.onError?.(err))
+      actionQueue = actionQueue
+        .then(() =>
+          handleClientMessage(
+            options.page,
+            ws,
+            raw,
+            (kind, requestId) => {
+              if (kind === 'resize') {
+                void runExtractQueued()
+              } else {
+                pendingInputAcks.push({ ws, ...(requestId ? { requestId } : {}) })
+                scheduleExtract()
+              }
+            },
+            err => options.onError?.(err),
+          ),
+        )
+        .catch(err => options.onError?.(err))
     })
     ws.on('close', () => {
       clients.delete(ws)
-      pendingInputAcks.delete(ws)
+      pendingInputAcks = pendingInputAcks.filter(entry => entry.ws !== ws)
     })
   })
 
   return {
     scheduleExtract,
     flushExtract: async () => {
+      await actionQueue.catch(() => {})
       if (debounceTimer !== null) {
         clearTimeout(debounceTimer)
         debounceTimer = null
       }
-      clearAckTimer()
       await runExtractQueued()
+      sendPendingInputAcks()
     },
     close: () =>
       new Promise((resolve, reject) => {

@@ -8,6 +8,45 @@ interface AxBounds {
   height: number
 }
 
+interface AxSnapshotCandidate {
+  name?: string
+  role: string
+  bounds: AxBounds
+  selected?: boolean
+  expanded?: boolean
+  checked?: boolean | 'mixed'
+  disabled?: boolean
+  focused?: boolean
+}
+
+const INTERACTIVE_AX_ROLES = new Set([
+  'button',
+  'link',
+  'textbox',
+  'combobox',
+  'checkbox',
+  'radio',
+  'tab',
+])
+
+const INTERESTING_AX_ROLES = new Set([
+  ...INTERACTIVE_AX_ROLES,
+  'heading',
+  'text',
+  'img',
+  'navigation',
+  'main',
+  'form',
+  'article',
+  'dialog',
+  'alertdialog',
+  'region',
+  'list',
+  'listitem',
+  'tablist',
+  'tabpanel',
+])
+
 function parseAxBounds(props: unknown[] | undefined): AxBounds | null {
   if (!Array.isArray(props)) return null
   for (const p of props) {
@@ -29,6 +68,23 @@ function parseAxBounds(props: unknown[] | undefined): AxBounds | null {
   return null
 }
 
+function quadToBounds(quad: number[] | undefined): AxBounds | null {
+  if (!Array.isArray(quad) || quad.length < 8) return null
+  const xs = [quad[0], quad[2], quad[4], quad[6]].map(Number)
+  const ys = [quad[1], quad[3], quad[5], quad[7]].map(Number)
+  if (![...xs, ...ys].every(Number.isFinite)) return null
+  const left = Math.min(...xs)
+  const top = Math.min(...ys)
+  const right = Math.max(...xs)
+  const bottom = Math.max(...ys)
+  return {
+    left,
+    top,
+    width: right - left,
+    height: bottom - top,
+  }
+}
+
 function boundsIntersectsViewport(b: AxBounds, root: LayoutSnapshot): boolean {
   return (
     b.left + b.width >= root.x &&
@@ -36,6 +92,157 @@ function boundsIntersectsViewport(b: AxBounds, root: LayoutSnapshot): boolean {
     b.top + b.height >= root.y &&
     b.top <= root.y + root.height
   )
+}
+
+function parseAxPropertyValue(props: unknown[] | undefined, expectedName: string): unknown {
+  if (!Array.isArray(props)) return undefined
+  for (const p of props) {
+    if (p && typeof p === 'object' && 'name' in p && 'value' in p) {
+      const name = (p as { name: unknown }).name
+      if (name === expectedName) return (p as { value: unknown }).value
+    }
+  }
+  return undefined
+}
+
+function parseAxBooleanProperty(props: unknown[] | undefined, expectedName: string): boolean | undefined {
+  const value = parseAxPropertyValue(props, expectedName)
+  if (value === true || value === false) return value
+  if (typeof value === 'string') {
+    if (value === 'true') return true
+    if (value === 'false') return false
+  }
+  if (value && typeof value === 'object' && 'value' in value) {
+    const nested = (value as { value: unknown }).value
+    if (nested === true || nested === false) return nested
+    if (nested === 'true') return true
+    if (nested === 'false') return false
+  }
+  return undefined
+}
+
+function parseAxCheckedProperty(props: unknown[] | undefined): boolean | 'mixed' | undefined {
+  const value = parseAxPropertyValue(props, 'checked')
+  if (value === 'mixed') return 'mixed'
+  if (value === true || value === false) return value
+  if (value === 'true') return true
+  if (value === 'false') return false
+  if (value && typeof value === 'object' && 'value' in value) {
+    const nested = (value as { value: unknown }).value
+    if (nested === 'mixed') return 'mixed'
+    if (nested === true || nested === false) return nested
+    if (nested === 'true') return true
+    if (nested === 'false') return false
+  }
+  return undefined
+}
+
+function normalizeAxRole(rawRole: string | undefined): string | undefined {
+  if (!rawRole) return undefined
+  const normalized = rawRole.trim().toLowerCase().replace(/[\s_-]+/g, '')
+  if (!normalized) return undefined
+  if (normalized === 'rootwebarea' || normalized === 'webarea' || normalized === 'inlinetextbox') return undefined
+  if (normalized === 'statictext' || normalized === 'labeltext' || normalized === 'text') return 'text'
+  if (normalized === 'image') return 'img'
+  if (normalized === 'searchbox' || normalized === 'textarea' || normalized === 'textinput') return 'textbox'
+  if (normalized === 'editablecombobox') return 'combobox'
+  if (normalized === 'radiobutton') return 'radio'
+  if (normalized === 'listboxoption' || normalized === 'option') return 'listitem'
+  if (normalized === 'menubutton' || normalized === 'menuitem') return 'button'
+  if (normalized === 'contentinfo') return 'contentinfo'
+  return normalized
+}
+
+function countMeaningfulSnapshotNodes(node: TreeSnapshot, isRoot = true): number {
+  const semantic = node.semantic ?? {}
+  const role = typeof semantic.role === 'string' ? semantic.role : undefined
+  const text = typeof node.props.text === 'string' ? node.props.text.trim() : ''
+  let count = 0
+  if (!isRoot) {
+    if (node.handlers || text || (role && role !== 'group')) count++
+  }
+  for (const child of node.children ?? []) {
+    count += countMeaningfulSnapshotNodes(child, false)
+  }
+  return count
+}
+
+function buildAxFallbackChildren(candidates: AxSnapshotCandidate[]): {
+  layoutChildren: LayoutSnapshot[]
+  treeChildren: TreeSnapshot[]
+} {
+  const layoutChildren: LayoutSnapshot[] = []
+  const treeChildren: TreeSnapshot[] = []
+  const seen = new Set<string>()
+
+  const sorted = [...candidates].sort((a, b) => {
+    if (a.bounds.top !== b.bounds.top) return a.bounds.top - b.bounds.top
+    return a.bounds.left - b.bounds.left
+  })
+
+  for (const candidate of sorted) {
+    const rounded = {
+      left: Math.round(candidate.bounds.left),
+      top: Math.round(candidate.bounds.top),
+      width: Math.round(candidate.bounds.width),
+      height: Math.round(candidate.bounds.height),
+    }
+    const key = `${candidate.role}|${candidate.name ?? ''}|${rounded.left}|${rounded.top}|${rounded.width}|${rounded.height}`
+    if (seen.has(key)) continue
+    seen.add(key)
+
+    const layout: LayoutSnapshot = {
+      x: rounded.left,
+      y: rounded.top,
+      width: rounded.width,
+      height: rounded.height,
+      children: [],
+    }
+
+    const semantic: Record<string, unknown> = {
+      tag: 'ax-fallback',
+      role: candidate.role,
+      a11yEnriched: true,
+      a11yFallback: true,
+    }
+    if (candidate.name) semantic.ariaLabel = candidate.name
+    if (candidate.selected !== undefined) semantic.ariaSelected = candidate.selected
+    if (candidate.expanded !== undefined) semantic.ariaExpanded = candidate.expanded
+    if (candidate.checked !== undefined) semantic.ariaChecked = candidate.checked
+    if (candidate.disabled) semantic.ariaDisabled = true
+    if (candidate.focused) semantic.focused = true
+
+    const tree: TreeSnapshot = {
+      kind: candidate.role === 'text' || candidate.role === 'heading' ? 'text' : candidate.role === 'img' ? 'image' : 'box',
+      props:
+        candidate.role === 'text' || candidate.role === 'heading'
+          ? { text: candidate.name ?? '', font: '16px system-ui', lineHeight: 1.2 }
+          : candidate.role === 'img'
+            ? { src: '', alt: candidate.name ?? '' }
+            : {},
+      semantic,
+      ...(INTERACTIVE_AX_ROLES.has(candidate.role)
+        ? { handlers: { onClick: true, onKeyDown: true, onKeyUp: true } }
+        : {}),
+    }
+
+    layoutChildren.push(layout)
+    treeChildren.push(tree)
+  }
+
+  return { layoutChildren, treeChildren }
+}
+
+async function boundsForBackendNode(session: CDPSession, backendDOMNodeId: number | undefined): Promise<AxBounds | null> {
+  if (!backendDOMNodeId || !Number.isFinite(backendDOMNodeId)) return null
+  try {
+    const res = (await session.send('DOM.getBoxModel', { backendNodeId: backendDOMNodeId })) as {
+      model?: { border?: number[]; content?: number[] }
+    }
+    return quadToBounds(res.model?.border ?? res.model?.content)
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -47,24 +254,43 @@ export async function enrichSnapshotWithCdpAx(page: Page, snap: GeometrySnapshot
   try {
     session = await page.context().newCDPSession(page)
     await session.send('Accessibility.enable')
+    try {
+      await session.send('DOM.enable')
+    } catch {
+      /* optional */
+    }
     const res = (await session.send('Accessibility.getFullAXTree')) as {
       nodes?: Array<{
+        ignored?: boolean
         role?: { value?: string }
         name?: { value?: string }
         properties?: unknown[]
+        backendDOMNodeId?: number
       }>
     }
     const nodes = res.nodes ?? []
     const root = snap.layout
-    const candidates: { name: string; role: string; bounds: AxBounds }[] = []
+    const candidates: AxSnapshotCandidate[] = []
     for (const n of nodes) {
-      const name = n.name?.value?.trim()
-      const role = n.role?.value ?? ''
-      if (!name) continue
-      const b = parseAxBounds(n.properties as unknown[] | undefined)
+      if (n.ignored) continue
+      const role = normalizeAxRole(n.role?.value)
+      if (!role || !INTERESTING_AX_ROLES.has(role)) continue
+      const name = n.name?.value?.trim() || undefined
+      const b = parseAxBounds(n.properties as unknown[] | undefined) ??
+        await boundsForBackendNode(session, n.backendDOMNodeId)
       if (!b || b.width <= 0 || b.height <= 0) continue
       if (!boundsIntersectsViewport(b, root)) continue
-      candidates.push({ name, role, bounds: b })
+      if (!name && !INTERACTIVE_AX_ROLES.has(role) && role !== 'img') continue
+      candidates.push({
+        ...(name ? { name } : {}),
+        role,
+        bounds: b,
+        selected: parseAxBooleanProperty(n.properties as unknown[] | undefined, 'selected'),
+        expanded: parseAxBooleanProperty(n.properties as unknown[] | undefined, 'expanded'),
+        checked: parseAxCheckedProperty(n.properties as unknown[] | undefined),
+        disabled: parseAxBooleanProperty(n.properties as unknown[] | undefined, 'disabled'),
+        focused: parseAxBooleanProperty(n.properties as unknown[] | undefined, 'focused'),
+      })
     }
 
     const visit = (tNode: TreeSnapshot, lNode: LayoutSnapshot): void => {
@@ -94,6 +320,18 @@ export async function enrichSnapshotWithCdpAx(page: Page, snap: GeometrySnapshot
       }
     }
     visit(snap.tree, snap.layout)
+
+    if (countMeaningfulSnapshotNodes(snap.tree) <= 1) {
+      const fallback = buildAxFallbackChildren(candidates)
+      if (fallback.treeChildren.length > 0) {
+        snap.layout.children = fallback.layoutChildren
+        snap.tree.children = fallback.treeChildren
+        snap.tree.semantic = {
+          ...(snap.tree.semantic ?? {}),
+          a11yFallbackUsed: true,
+        }
+      }
+    }
   } catch {
     /* optional */
   } finally {
