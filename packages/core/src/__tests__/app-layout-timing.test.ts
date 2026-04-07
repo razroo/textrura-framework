@@ -321,6 +321,41 @@ describe('createApp layout direction (Textura computeLayout)', () => {
     expect(a!.x).toBeGreaterThan(b!.x)
   })
 
+  it('document-level rtl does not invert top-level column main-axis stacking (y order matches ltr owner)', async () => {
+    const rtlLayouts: Array<{ children: Array<{ y: number }> }> = []
+    const ltrLayouts: Array<{ children: Array<{ y: number }> }> = []
+    const rtlRenderer: Renderer = {
+      render(layout) {
+        rtlLayouts.push(layout as { children: Array<{ y: number }> })
+      },
+      destroy: vi.fn(),
+    }
+    const ltrRenderer: Renderer = {
+      render(layout) {
+        ltrLayouts.push(layout as { children: Array<{ y: number }> })
+      },
+      destroy: vi.fn(),
+    }
+
+    const view = () =>
+      box({ width: 100, height: 120, flexDirection: 'column', gap: 0 }, [
+        box({ width: 100, height: 40 }),
+        box({ width: 100, height: 40 }),
+      ])
+
+    await createApp(view, rtlRenderer, { width: 100, height: 120, layoutDirection: 'rtl' })
+    await createApp(view, ltrRenderer, { width: 100, height: 120, layoutDirection: 'ltr' })
+
+    expect(rtlLayouts).toHaveLength(1)
+    expect(ltrLayouts).toHaveLength(1)
+    const [rtlFirst, rtlSecond] = rtlLayouts[0]!.children
+    const [ltrFirst, ltrSecond] = ltrLayouts[0]!.children
+    expect(rtlFirst!.y).toBeLessThan(rtlSecond!.y)
+    expect(ltrFirst!.y).toBeLessThan(ltrSecond!.y)
+    expect(rtlFirst!.y).toBe(ltrFirst!.y)
+    expect(rtlSecond!.y).toBe(ltrSecond!.y)
+  })
+
   it('applies AppOptions.layoutDirection rtl when the root dir is auto (document RTL vs inherited ltr on the node)', async () => {
     const layouts: Array<{ children: Array<{ x: number }> }> = []
     const renderer: Renderer = {
