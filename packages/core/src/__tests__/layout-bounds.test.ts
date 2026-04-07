@@ -593,6 +593,13 @@ describe('finiteRootExtent', () => {
     expect(finiteRootExtent(Number.MAX_VALUE)).toBe(Number.MAX_VALUE)
   })
 
+  it('accepts the next representable double beyond MAX_SAFE_INTEGER (unsafe integers are still finite roots)', () => {
+    const step = Number.MAX_SAFE_INTEGER + 1
+    expect(Number.isSafeInteger(step)).toBe(false)
+    expect(Number.isFinite(step)).toBe(true)
+    expect(finiteRootExtent(step)).toBe(step)
+  })
+
   it('returns undefined when the value overflows double range (JSON exponent edge cases)', () => {
     const posOverflow = Number.parseFloat('1e400')
     const negOverflow = Number.parseFloat('-1e400')
