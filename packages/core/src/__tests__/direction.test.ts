@@ -294,6 +294,20 @@ describe('resolveComputeLayoutDirection', () => {
     expect(resolveComputeLayoutDirection(null as never, bogusRoot)).toBe('ltr')
   })
 
+  it('derives ltr from boxed-string root dir when host override is invalid (strict equality; same as resolveDirectionValue)', () => {
+    const boxedRtl = box({ width: 1, height: 1, dir: Object('rtl') as never })
+    expect(resolveComputeLayoutDirection(undefined, boxedRtl)).toBe('ltr')
+    expect(resolveComputeLayoutDirection('auto' as never, boxedRtl)).toBe('ltr')
+    expect(resolveComputeLayoutDirection(Object('rtl') as never, boxedRtl)).toBe('ltr')
+    expect(resolveComputeLayoutDirection('rtl', boxedRtl)).toBe('rtl')
+
+    const boxedLtr = box({ width: 1, height: 1, dir: Object('ltr') as never })
+    expect(resolveComputeLayoutDirection(undefined, boxedLtr)).toBe('ltr')
+    expect(resolveComputeLayoutDirection('auto' as never, boxedLtr)).toBe('ltr')
+    expect(resolveComputeLayoutDirection(Object('ltr') as never, boxedLtr)).toBe('ltr')
+    expect(resolveComputeLayoutDirection('rtl', boxedLtr)).toBe('rtl')
+  })
+
   it('derives ltr from JSON null root dir when host override is invalid (loose deserialization)', () => {
     const nullDirRoot = box({ width: 1, height: 1, dir: null as never })
     expect(resolveComputeLayoutDirection(undefined, nullDirRoot)).toBe('ltr')
