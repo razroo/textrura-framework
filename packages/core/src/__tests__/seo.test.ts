@@ -543,11 +543,16 @@ describe('toSemanticHTML', () => {
       text({ text: 'Dvmin h4', font: 'bold 1.7dvmin sans-serif', lineHeight: 20 }),
       text({ text: 'Svi minor', font: 'bold 5.2svi sans-serif', lineHeight: 22 }),
       text({ text: 'Dvb edge', font: 'bold 5dvb sans-serif', lineHeight: 22 }),
+      // Inline/block axis dynamic + small viewport units share the *3 px mapping in `fontLengthToApproxPx`.
+      text({ text: 'Dvi h3', font: 'bold 6dvi sans-serif', lineHeight: 28 }),
+      text({ text: 'Svb h3', font: 'bold 6svb sans-serif', lineHeight: 28 }),
     ])
     const html = toSemanticHTML(el)
     expect(html).toContain('<h1>Dvh hero</h1>')
     expect(html).toContain('<h2>Svw section</h2>')
     expect(html).toContain('<h3>Lvh sub</h3>')
+    expect(html).toContain('<h3>Dvi h3</h3>')
+    expect(html).toContain('<h3>Svb h3</h3>')
     expect(html).toContain('<h4>Dvmin h4</h4>')
     expect(html).toContain('<h4>Svi minor</h4>')
     expect(html).toContain('<h4>Dvb edge</h4>')
