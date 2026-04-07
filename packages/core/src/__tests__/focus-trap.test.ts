@@ -154,7 +154,7 @@ describe('trapFocusStep', () => {
     expect(trapFocusStep(tree, layout, onePast, 'next')).toBe(false)
   })
 
-  it('returns false when a scope path segment is not a non-negative integer (string / boolean / null / undefined)', () => {
+  it('returns false when a scope path segment is not a non-negative integer (string / boolean / null / undefined / boxed number / symbol)', () => {
     const inner = box({ onKeyDown: () => undefined }, [])
     const tree = box({}, [inner])
     const layout: ComputedLayout = {
@@ -171,6 +171,9 @@ describe('trapFocusStep', () => {
       [false as never],
       [null as never],
       [undefined as never],
+      [Object(0) as never],
+      [Object(1) as never],
+      [Symbol('scope') as never],
     ]) {
       expect(() => trapFocusStep(tree, layout, badPath, 'next')).not.toThrow()
       expect(trapFocusStep(tree, layout, badPath, 'next')).toBe(false)
