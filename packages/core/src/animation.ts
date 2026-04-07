@@ -385,22 +385,38 @@ export function spring(
  * When `Date.now()` is non-finite (NaN or ±Infinity from a broken host or mock), that sample is ignored:
  * `lastTime` is not advanced with a bad value and `dt` is `0`, so callbacks never receive a non-finite delta.
  *
+ * When the **initial** `Date.now()` at loop start is non-finite, the loop stays unanchored until the first finite
+ * sample; that tick delivers `dt === 0` and sets the anchor so a later finite sample cannot inherit a bogus
+ * `lastTime` of `0` (which would otherwise produce a huge first delta).
+ *
  * If the callback throws, the loop stops (`running` cleared, no further frames scheduled) and the error
  * is rethrown so hosts retain normal exception visibility.
  */
 export function animationLoop(callback: (dt: number) => boolean): () => void {
   const t0 = Date.now()
   let lastTime = Number.isFinite(t0) ? t0 : 0
+  let anchored = Number.isFinite(t0)
   let running = true
   let id: number
 
   function tick() {
     if (!running) return
     const now = Date.now()
-    const effectiveNow = Number.isFinite(now) ? now : lastTime
-    const dtRaw = (effectiveNow - lastTime) / 1000
-    const dt = Number.isFinite(dtRaw) && dtRaw >= 0 ? dtRaw : 0
-    lastTime = effectiveNow
+    let dt: number
+    if (!anchored) {
+      if (Number.isFinite(now)) {
+        lastTime = now
+        anchored = true
+        dt = 0
+      } else {
+        dt = 0
+      }
+    } else {
+      const effectiveNow = Number.isFinite(now) ? now : lastTime
+      const dtRaw = (effectiveNow - lastTime) / 1000
+      dt = Number.isFinite(dtRaw) && dtRaw >= 0 ? dtRaw : 0
+      lastTime = effectiveNow
+    }
     let scheduleNext: boolean
     try {
       scheduleNext = callback(dt) !== false

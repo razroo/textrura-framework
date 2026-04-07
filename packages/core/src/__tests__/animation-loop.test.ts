@@ -132,6 +132,43 @@ describe('animationLoop', () => {
     expect(dts[4]).toBeCloseTo(0.15, 6)
   })
 
+  it('anchors on the first finite clock after a non-finite loop start (avoids huge dt from lastTime 0)', async () => {
+    const pending: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      pending.push(cb)
+      return pending.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    let mockNow = Number.NaN
+    vi.spyOn(Date, 'now').mockImplementation(() => mockNow)
+
+    const animationLoop = await loadAnimationLoop()
+    const dts: number[] = []
+    let frames = 0
+
+    animationLoop(dt => {
+      dts.push(dt)
+      frames++
+      if (frames === 1) {
+        mockNow = 5_000
+      } else if (frames === 2) {
+        mockNow = 5_050
+      }
+      return frames < 3
+    })
+
+    while (pending.length) {
+      const batch = pending.splice(0, pending.length)
+      for (const cb of batch) cb(0)
+    }
+
+    expect(frames).toBe(3)
+    expect(dts[0]).toBe(0)
+    expect(dts[1]).toBe(0)
+    expect(dts[2]).toBeCloseTo(0.05, 6)
+  })
+
   it('returning false on the first tick does not schedule another frame', async () => {
     const pending: FrameRequestCallback[] = []
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
