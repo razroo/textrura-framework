@@ -43,6 +43,101 @@ The key insight: because layout output is just JSON coordinates, an AI agent can
 
 Your app still calls your API for data. Geometra handles what happens *after* you have the data: turning it into pixels.
 
+### Agents and renderers are the same class of client
+
+In a traditional web stack, an AI agent and a human user interact with fundamentally different interfaces. The human gets pixels; the agent scrapes DOM, parses accessibility trees, or interprets screenshots. They are different classes of client.
+
+In Geometra, both consume the same WebSocket stream of `{ x, y, width, height }` geometry plus semantic metadata. The `@geometra/client` (~2KB paint loop) is just one consumer of that stream. An AI agent is another — same protocol, same data, no translation layer. This isn't a bolted-on "AI mode"; it's a consequence of the architecture. When layout output is structured data over a socket, every consumer is a thin client.
+
+```
+Traditional:
+  Server → HTML/CSS/JS → Browser renders pixels → Human sees UI
+  Server → HTML/CSS/JS → Headless browser → Scraper → Agent sees DOM
+
+Geometra:
+  Server → JSON geometry stream → Canvas renderer → Human sees UI
+  Server → JSON geometry stream → Agent reads JSON directly
+                                  ↑ same socket, same data
+```
+
+This means agents can observe UI state, interact with elements (via the same `event`/`key`/`composition` messages the client sends), and verify outcomes — all at JSON speed, not browser speed.
+
+### Why this replaces browser automation (Playwright, Puppeteer, etc.)
+
+Browser automation tools solve a specific problem: programmatically controlling a system (the browser) that was designed for humans. They launch a real browser, wait for layout/paint, query the DOM, simulate clicks, and assert on rendered state. This is expensive, flaky, and slow — because the browser was never designed to be an API.
+
+Geometra eliminates the need for this entire category of tooling:
+
+| Concern | Playwright approach | Geometra approach |
+|---|---|---|
+| **Observe UI state** | Query DOM or accessibility tree from headless browser | Read geometry JSON directly from WebSocket |
+| **Interact with elements** | Simulate mouse/keyboard events through browser APIs | Send `event`/`key` messages on the same WebSocket |
+| **Assert on layout** | Screenshot comparison or DOM assertions | JSON snapshot: `expect(layout).toMatchSnapshot()` |
+| **Test in CI** | Headless Chromium (~200MB) + browser launch overhead | Yoga WASM (~200KB) + geometry assertions in-process |
+| **Speed** | Seconds per test (browser startup + rendering + waiting) | Milliseconds (JSON in, JSON out, no browser) |
+
+This doesn't mean Playwright is useless in general — it's still the right tool for testing DOM-based apps. But for Geometra apps, the entire concept of "browser automation" is a solved problem at the protocol level. The geometry stream *is* the test interface.
+
+See `GEOMETRY_SNAPSHOT_TESTING.md` for CI patterns using layout JSON assertions.
+
+### How this compares to agent-to-UI approaches
+
+Most agent-to-UI systems (computer-use agents, accessibility-tree scrapers, vision-based agents) share the same fundamental constraint: the UI was built for humans, so the agent needs a translation layer to understand it.
+
+These approaches typically:
+1. **Scrape** — parse DOM, accessibility trees, or screenshots after the browser renders
+2. **Interpret** — use vision models or heuristics to map pixels/DOM to semantic meaning
+3. **Act** — inject synthetic events through browser automation APIs
+4. **Verify** — re-scrape to confirm the action worked
+
+Each step is lossy, slow, and fragile. The agent is reverse-engineering a human interface.
+
+Geometra inverts this. The server already produces structured, semantic data as its *primary output* — not as a retrofit. An agent connecting to a Geometra server gets:
+
+- **Exact geometry** — every element's position and size, no OCR or bounding-box estimation
+- **Semantic metadata** — roles, labels, focusable state, from `toAccessibilityTree()` built into the pipeline
+- **Interaction parity** — the same `event`/`key`/`resize` messages the human client sends
+- **Real-time updates** — geometry diffs stream over WebSocket, no polling or re-scraping
+
+The agent doesn't need to scrape, interpret, or guess. It reads the same structured protocol the renderer reads. This is not "AI-accessible UI" — it's UI that was never inaccessible to machines in the first place.
+
+### Edge and resource-constrained hardware
+
+The traditional web stack assumes a full browser engine on the client: HTML parser, CSS engine, JavaScript runtime, layout engine, compositor. That's hundreds of megabytes before your app loads. This makes serving real web UI on embedded devices, kiosks, IoT dashboards, or edge nodes impractical.
+
+Geometra's pipeline breaks this assumption:
+
+| Component | Size | Runs where |
+|---|---|---|
+| Yoga WASM (layout engine) | ~200KB | Server or client |
+| Thin client (paint loop) | ~2KB | Client |
+| Canvas/Terminal renderer | Small, pluggable | Client |
+| Layout computation | Zero on client in server-computed mode | Server |
+
+In server-computed mode, the client does *zero layout work*. It receives pre-computed coordinates and paints them. A Raspberry Pi, an ESP32 with a display, or a terminal on a remote server can be a Geometra client.
+
+The JSON-native protocol also opens an interesting door for fine-tuned models. The entire UI lifecycle is JSON manipulation:
+
+- **Tree construction**: generate `box()`/`text()` trees (structured JSON)
+- **Layout output**: `{ x, y, width, height }` (flat JSON)
+- **Updates**: geometry diffs (JSON patches)
+- **Interaction**: `event`/`key` messages (JSON)
+
+A small model fine-tuned on JSON manipulation could drive the entire UI pipeline — generating views, processing updates, handling interaction — without ever touching HTML, CSS, or a browser API. On edge hardware where you can't run a browser but *can* run a quantized model + Yoga WASM, this becomes a viable path to serving real interactive UI.
+
+```
+Edge deployment:
+  Fine-tuned model (JSON generation) → Geometra server (Yoga WASM layout)
+       ↓
+  WebSocket geometry stream → Thin client on display hardware
+```
+
+This is particularly relevant for:
+- **Industrial dashboards** on ARM/RISC-V devices with limited memory
+- **Kiosk/signage** where a browser engine is overkill for the interaction model
+- **Multi-instance AI workloads** where many UI sessions run server-side and stream to lightweight displays
+- **Offline-capable edge nodes** where the model + Yoga WASM run locally without internet
+
 ### Benchmark Comparison
 
 | Metric | Geometra | React (DOM) | SSR (Next.js etc.) |
