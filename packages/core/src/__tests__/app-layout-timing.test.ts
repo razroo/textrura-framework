@@ -225,6 +225,45 @@ describe('createApp layout direction (Textura computeLayout)', () => {
     expect(a!.x).toBeGreaterThan(b!.x)
   })
 
+  it('ignores trimmed layoutDirection strings (only exact primitive ltr/rtl win), deriving from the root', async () => {
+    const layouts: Array<{ children: Array<{ x: number }> }> = []
+    const renderer: Renderer = {
+      render(layout) {
+        layouts.push(layout as { children: Array<{ x: number }> })
+      },
+      destroy: vi.fn(),
+    }
+
+    await createApp(
+      () =>
+        box({ width: 100, height: 40, flexDirection: 'row', dir: 'rtl' }, [
+          box({ width: 30, height: 20 }),
+          box({ width: 30, height: 20 }),
+        ]),
+      renderer,
+      { width: 100, height: 50, layoutDirection: 'rtl ' as never },
+    )
+
+    expect(layouts).toHaveLength(1)
+    const [mirroredA, mirroredB] = layouts[0]!.children
+    expect(mirroredA!.x).toBeGreaterThan(mirroredB!.x)
+
+    layouts.length = 0
+    await createApp(
+      () =>
+        box({ width: 100, height: 40, flexDirection: 'row' }, [
+          box({ width: 30, height: 20 }),
+          box({ width: 30, height: 20 }),
+        ]),
+      renderer,
+      { width: 100, height: 50, layoutDirection: ' ltr' as never },
+    )
+
+    expect(layouts).toHaveLength(1)
+    const [ltrFirst, ltrSecond] = layouts[0]!.children
+    expect(ltrFirst!.x).toBeLessThan(ltrSecond!.x)
+  })
+
   it('ignores uppercase layoutDirection and derives direction from the root dir (only lowercase ltr/rtl override)', async () => {
     const layouts: Array<{ children: Array<{ x: number }> }> = []
     const renderer: Renderer = {
