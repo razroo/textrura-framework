@@ -94,7 +94,8 @@ async function main() {
     }
   }
 
-  const seen = new Map()
+  /** @type {Array<{ rel: string, canonical: string }>} */
+  const validated = []
   for (const rel of paths) {
     if (rel.includes('\\')) {
       throw new Error(
@@ -107,12 +108,25 @@ async function main() {
       )
     }
     const canonical = canonicalPackagesTestPath(rel)
-    if (seen.has(canonical)) {
+    validated.push({ rel, canonical })
+  }
+
+  /** @type {Map<string, string[]>} */
+  const byCanonical = new Map()
+  for (const { rel, canonical } of validated) {
+    const list = byCanonical.get(canonical) ?? []
+    list.push(rel)
+    byCanonical.set(canonical, list)
+  }
+  for (const [canonical, list] of byCanonical) {
+    if (list.length > 1) {
       throw new Error(
-        `release:gate: duplicate vitest entry after path resolution "${canonical}" (listed as "${seen.get(canonical)}" and "${rel}"; vitest would run it twice)`,
+        `release:gate: duplicate vitest entry after path resolution "${canonical}" (listed as: ${list.join(' | ')}; vitest would run the file ${list.length} times)`,
       )
     }
-    seen.set(canonical, rel)
+  }
+
+  for (const { rel } of validated) {
     const abs = resolve(root, rel)
     try {
       await access(abs, fsConstants.R_OK)
