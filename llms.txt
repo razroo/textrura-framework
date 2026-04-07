@@ -1,13 +1,12 @@
 # Geometra
 
-> DOM-free UI framework. Replaces the browser rendering pipeline with:
-> Declarative Tree → Yoga WASM → Computed Geometry → Render Target
+> The geometry protocol for UI. Server-computed `{ x, y, w, h }` pixels — not component descriptions — streamed to humans and AI agents over the same socket.
 
 ## What is Geometra?
 
-Geometra is a frontend framework that eliminates the DOM entirely. Instead of HTML/CSS, you build UIs with `box()` and `text()` function calls that produce a declarative tree. The Yoga flexbox engine (compiled to WASM) computes layout, producing `{ x, y, width, height }` geometry that pluggable renderers paint to Canvas2D, Terminal, WebGPU, or Three.js.
+Geometra is a UI framework that replaces the browser rendering pipeline with server-computed pixel geometry. You build UIs with `box()` and `text()` function calls that produce a declarative tree. The Yoga flexbox engine (compiled to WASM) computes layout on the server, producing `{ x, y, width, height }` geometry streamed over WebSocket. The thin client (~2KB) just paints. AI agents read the same JSON stream directly — no browser, no scraping, no vision model.
 
-The same geometry protocol works on both client and server over WebSocket. The server computes layout and streams pre-computed coordinates; the thin client (~2KB) just paints. AI agents interact with the server directly via the same JSON protocol — no browser, no scraping.
+Unlike agent-to-UI systems that send component descriptions (json-render, A2UI) or scrape rendered output (Playwright, computer-use), Geometra sends pixel-exact coordinates. Agents get positions, sizes, and semantic metadata at JSON speed. Renderers paint to Canvas2D, Terminal, WebGPU, or Three.js.
 
 ## Core Concepts
 

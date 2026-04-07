@@ -1,6 +1,6 @@
 # Geometra
 
-DOM-free UI framework. Replaces the browser rendering pipeline with: `Tree → Yoga WASM → Geometry → Pixels`.
+The geometry protocol for UI. Server-computed `{ x, y, w, h }` — not component descriptions — streamed to humans and AI agents over the same socket. Pipeline: `Tree → Yoga WASM → Geometry → Render Target`.
 
 See **`ROADMAP.md`** for phased framework goals (a11y, text input, protocol, etc.).
 See **`FRAMEWORK_NORTH_STAR.md`** for the always-on coding priorities and quality bar.

@@ -1,7 +1,7 @@
 {
   "name": "@geometra/renderer-terminal",
   "version": "1.17.0",
-  "description": "Terminal/TUI renderer for Geometra — the singularity frontend framework",
+  "description": "Terminal/TUI renderer for Geometra — the geometry protocol for UI",
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -12,7 +12,7 @@
   "homepage": "https://razroo.github.io/geometra",
   "keywords": [
     "geometra",
-    "singularity",
+    "geometry-protocol",
     "renderer",
     "terminal",
     "tui",

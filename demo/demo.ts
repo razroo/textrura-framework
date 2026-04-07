@@ -1695,7 +1695,7 @@ function heroSection(): UIElement {
           paddingLeft: 16, paddingRight: 16, paddingTop: 5, paddingBottom: 5,
           boxShadow: { offsetX: 0, offsetY: 0, blur: 30, color: 'rgba(233,69,96,0.25)' },
         }, [
-          text({ text: 'THE SINGULARITY FRONTEND FRAMEWORK', font: '600 11px Inter', lineHeight: 15, color: '#ffffff' }),
+          text({ text: 'THE GEOMETRY PROTOCOL FOR UI', font: '600 11px Inter', lineHeight: 15, color: '#ffffff' }),
         ]),
       ),
     ]),
@@ -1703,7 +1703,7 @@ function heroSection(): UIElement {
     // Title lines — per-character mouse proximity (impossible in DOM without per-char <span> wrapping)
     box({ opacity: e1, marginTop: Math.round(s1) }, [
       reactiveHeroText(
-        'The client is the server.',
+        'Not components. Geometry.',
         `bold ${titleSize}px Inter`, titleLine,
         [250, 250, 250], [56, 189, 248],
         130,
@@ -1711,7 +1711,7 @@ function heroSection(): UIElement {
     ]),
     box({ opacity: e2, marginTop: Math.round(s2) }, [
       reactiveHeroText(
-        'The server is the client.',
+        'Pixels, not descriptions.',
         `bold ${titleSize}px Inter`, titleLine,
         [233, 69, 96], [255, 160, 210],
         130 + titleLine + 20,
@@ -1726,7 +1726,7 @@ function heroSection(): UIElement {
     // Subtitle
     box({ opacity: e2, marginTop: Math.round(s2) }, [
       center(text({
-        text: 'Geometra replaces the entire browser rendering pipeline. One JSON geometry protocol powers Canvas, Terminal, and AI agents.',
+        text: 'The server computes pixel-exact {x, y, w, h} geometry. Humans paint it. AI agents read it. Same protocol, same socket.',
         font: '17px Inter', lineHeight: 26, color: MUTED, whiteSpace: 'normal',
       })),
     ]),

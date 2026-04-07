@@ -1,6 +1,6 @@
 # Geometra
 
-**The Singularity Frontend Framework**
+**The geometry protocol for UI.** Server-computed `{ x, y, w, h }` — not component descriptions — streamed to humans and AI agents over the same socket.
 
 > **AI Agents:** See [`llms.txt`](llms.txt) for a structured overview of the entire framework — architecture, props, components, protocols, and APIs.
 
@@ -8,18 +8,29 @@
 
 https://github.com/user-attachments/assets/1610d856-3c7d-4fce-be42-1c43306e6520
 
-## Why Singularity Tech?
+## Why geometry, not components?
 
-The boundary between client and server dissolves. The same geometry protocol that renders pixels on a canvas also feeds data to AI agents. Humans and AI agents are first-class citizens on both sides of the wire.
+Other agent-to-UI systems (json-render, A2UI, computer-use agents) send **component descriptions** or scrape rendered output. The agent still has to interpret what it sees. Geometra sends **pixel-exact geometry** — every element's position and size, computed on the server, streamed as flat JSON. Nothing to interpret. Nothing to scrape.
 
-- **Client = Server** — the same JSON geometry protocol runs on both; either side can compute, either side can render
-- **AI-native** — agents interact with the server directly, no browser needed, no scraping — 1000x faster than DOM-based frameworks
-- **Multi-instance** — run multiple client/server pairs inside a single client for parallel AI agent workloads
-- **No DOM API calls** — zero style recalculation, zero reflow, zero composite
-- **WASM layout** — Yoga runs at near-native speed
+This matters for three audiences:
+
+### AI agents
+Agents connect to the same WebSocket as human clients. They get `{ x, y, w, h }` geometry + semantic metadata — no browser, no headless Chrome, no vision model. Interaction uses the same `event`/`key` messages the renderer sends. JSON speed, not browser speed.
+
+### Ultra-constrained clients
+A Raspberry Pi, kiosk, or ESP32 with a display can be a Geometra client. The thin client (~2KB) receives pre-computed coordinates and paints them. Zero layout work on the client.
+
+### Deterministic testing
+Layout output is JSON. Assert on `{ x, y, w, h }` directly — no screenshot diffs, no Playwright, no headless browser in CI. Milliseconds, not seconds.
+
+### Architecture at a glance
+
 - **Server-computed** — clients never pay layout cost, just paint pre-computed coordinates
+- **WASM layout** — Yoga flexbox runs at near-native speed
 - **Geometry diffs** — updates send only changed `{ x, y, w, h }`, not full re-renders
+- **No DOM** — zero style recalculation, zero reflow, zero composite
 - **No framework runtime on client** — the thin client is a paint loop, not a reconciler
+- **Multi-instance** — run multiple server/client pairs in a single process for parallel AI workloads
 
 ### "Server is client" — what does that actually mean?
 
@@ -82,7 +93,7 @@ See `GEOMETRY_SNAPSHOT_TESTING.md` for CI patterns using layout JSON assertions.
 
 ### How this compares to agent-to-UI approaches
 
-Most agent-to-UI systems (computer-use agents, accessibility-tree scrapers, vision-based agents) share the same fundamental constraint: the UI was built for humans, so the agent needs a translation layer to understand it.
+Most agent-to-UI systems — json-render (Vercel), A2UI (Google), computer-use agents, accessibility-tree scrapers — share the same fundamental constraint: they send **component descriptions** or scrape rendered output, so the agent still needs a translation layer. Geometra sends **pixel-exact geometry**. The distinction matters:
 
 These approaches typically:
 1. **Scrape** — parse DOM, accessibility trees, or screenshots after the browser renders

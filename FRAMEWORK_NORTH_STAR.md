@@ -1,12 +1,12 @@
 # Geometra Framework North Star
 
-This project exists to deliver a production-grade, DOM-free UI framework where app UI is compiled into geometry and rendered across targets (Canvas, Terminal, and server/client protocol) with predictable behavior, strong performance, and first-class accessibility and text input foundations.
+Geometra is the geometry protocol for UI. The server computes pixel-exact `{ x, y, w, h }` layout and streams it to thin clients — human renderers and AI agents alike — over the same JSON protocol. No DOM. No component descriptions. Just coordinates.
 
 ## Mission
 
-- Replace browser layout/rendering with `Tree -> Yoga WASM -> Geometry -> Pixels`.
-- Keep one declarative UI model across all targets.
-- Make server/client interchangeable through a stable geometry protocol.
+- Compute layout once on the server, stream geometry everywhere: `Tree → Yoga WASM → { x, y, w, h } → Render Target`.
+- Give AI agents first-class access to UI state — same socket, same data, no scraping.
+- Keep clients minimal: a paint loop, not a framework runtime.
 
 ## Non-Negotiables
 
