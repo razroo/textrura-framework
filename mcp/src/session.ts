@@ -1,6 +1,6 @@
 import type { ChildProcess } from 'node:child_process'
 import WebSocket from 'ws'
-import { pickFreePort, spawnGeometraProxy } from './proxy-spawn.js'
+import { spawnGeometraProxy } from './proxy-spawn.js'
 
 /**
  * Parsed accessibility node from the UI tree + computed layout.
@@ -170,7 +170,13 @@ export interface Session {
   proxyChild?: ChildProcess
 }
 
+export interface UpdateWaitResult {
+  status: 'updated' | 'timed_out'
+  timeoutMs: number
+}
+
 let activeSession: Session | null = null
+const ACTION_UPDATE_TIMEOUT_MS = 2000
 
 function shutdownPreviousSession(): void {
   const prev = activeSession
@@ -273,10 +279,9 @@ export async function connectThroughProxy(options: {
   height?: number
   slowMo?: number
 }): Promise<Session> {
-  const port = await pickFreePort(options.port)
   const { child, wsUrl } = await spawnGeometraProxy({
     pageUrl: options.pageUrl,
-    port,
+    port: options.port ?? 0,
     headless: options.headless,
     width: options.width,
     height: options.height,
@@ -307,7 +312,7 @@ export function disconnect(): void {
 /**
  * Send a click event at (x, y) and wait for the next frame/patch response.
  */
-export function sendClick(session: Session, x: number, y: number): Promise<void> {
+export function sendClick(session: Session, x: number, y: number): Promise<UpdateWaitResult> {
   return sendAndWaitForUpdate(session, {
     type: 'event',
     eventType: 'onClick',
@@ -319,7 +324,7 @@ export function sendClick(session: Session, x: number, y: number): Promise<void>
 /**
  * Send a sequence of key events to type text into the focused element.
  */
-export function sendType(session: Session, text: string): Promise<void> {
+export function sendType(session: Session, text: string): Promise<UpdateWaitResult> {
   return new Promise((resolve, reject) => {
     if (session.ws.readyState !== WebSocket.OPEN) {
       reject(new Error('Not connected'))
@@ -350,7 +355,11 @@ export function sendType(session: Session, text: string): Promise<void> {
 /**
  * Send a special key (Enter, Tab, Escape, etc.)
  */
-export function sendKey(session: Session, key: string, modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; alt?: boolean }): Promise<void> {
+export function sendKey(
+  session: Session,
+  key: string,
+  modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; alt?: boolean },
+): Promise<UpdateWaitResult> {
   return sendAndWaitForUpdate(session, {
     type: 'key',
     eventType: 'onKeyDown',
@@ -375,7 +384,7 @@ export function sendFileUpload(
     strategy?: 'auto' | 'chooser' | 'hidden' | 'drop'
     drop?: { x: number; y: number }
   },
-): Promise<void> {
+): Promise<UpdateWaitResult> {
   const payload: Record<string, unknown> = { type: 'file', paths }
   if (opts?.click) {
     payload.x = opts.click.x
@@ -394,7 +403,7 @@ export function sendListboxPick(
   session: Session,
   label: string,
   opts?: { exact?: boolean; open?: { x: number; y: number } },
-): Promise<void> {
+): Promise<UpdateWaitResult> {
   const payload: Record<string, unknown> = { type: 'listboxPick', label }
   if (opts?.exact !== undefined) payload.exact = opts.exact
   if (opts?.open) {
@@ -410,7 +419,7 @@ export function sendSelectOption(
   x: number,
   y: number,
   option: { value?: string; label?: string; index?: number },
-): Promise<void> {
+): Promise<UpdateWaitResult> {
   return sendAndWaitForUpdate(session, {
     type: 'selectOption',
     x,
@@ -424,7 +433,7 @@ export function sendWheel(
   session: Session,
   deltaY: number,
   opts?: { deltaX?: number; x?: number; y?: number },
-): Promise<void> {
+): Promise<UpdateWaitResult> {
   return sendAndWaitForUpdate(session, {
     type: 'wheel',
     deltaY,
@@ -1385,7 +1394,7 @@ function applyPatches(layout: Record<string, unknown>, patches: Array<{ path: nu
   }
 }
 
-function sendAndWaitForUpdate(session: Session, message: Record<string, unknown>): Promise<void> {
+function sendAndWaitForUpdate(session: Session, message: Record<string, unknown>): Promise<UpdateWaitResult> {
   return new Promise((resolve, reject) => {
     if (session.ws.readyState !== WebSocket.OPEN) {
       reject(new Error('Not connected'))
@@ -1396,7 +1405,7 @@ function sendAndWaitForUpdate(session: Session, message: Record<string, unknown>
   })
 }
 
-function waitForNextUpdate(session: Session): Promise<void> {
+function waitForNextUpdate(session: Session): Promise<UpdateWaitResult> {
   return new Promise((resolve, reject) => {
     const onMessage = (data: WebSocket.Data) => {
       try {
@@ -1410,17 +1419,20 @@ function waitForNextUpdate(session: Session): Promise<void> {
           session.layout = msg.layout
           session.tree = msg.tree
           cleanup()
-          resolve()
+          resolve({ status: 'updated', timeoutMs: ACTION_UPDATE_TIMEOUT_MS })
         } else if (msg.type === 'patch' && session.layout) {
           applyPatches(session.layout, msg.patches)
           cleanup()
-          resolve()
+          resolve({ status: 'updated', timeoutMs: ACTION_UPDATE_TIMEOUT_MS })
         }
       } catch { /* ignore */ }
     }
 
-    // Resolve after timeout even if no update comes (action may not change layout)
-    const timeout = setTimeout(() => { cleanup(); resolve() }, 2000)
+    // Expose timeout explicitly so action handlers can tell the user the result is ambiguous.
+    const timeout = setTimeout(() => {
+      cleanup()
+      resolve({ status: 'timed_out', timeoutMs: ACTION_UPDATE_TIMEOUT_MS })
+    }, ACTION_UPDATE_TIMEOUT_MS)
 
     function cleanup() {
       clearTimeout(timeout)

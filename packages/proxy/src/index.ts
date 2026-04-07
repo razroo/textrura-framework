@@ -2,6 +2,8 @@
 import { chromium } from 'playwright'
 import { installDomObserver, startGeometryWebSocket } from './geometry-ws.js'
 
+const READY_SIGNAL_TYPE = 'geometra-proxy-ready'
+
 function printUsage(): void {
   console.error(`Usage: geometra-proxy <url> [--port <n>] [--width <n>] [--height <n>] [--headless] [--headed] [--slow-mo <ms>]
 
@@ -23,6 +25,52 @@ Requires Chromium for Playwright:  npx playwright install chromium
 function envRequestsHeadless(): boolean {
   const v = (process.env.GEOMETRA_HEADLESS ?? '').toLowerCase()
   return v === '1' || v === 'true' || v === 'yes'
+}
+
+function envRequestsReadyJson(): boolean {
+  const v = (process.env.GEOMETRA_PROXY_READY_JSON ?? '').toLowerCase()
+  return v === '1' || v === 'true' || v === 'yes'
+}
+
+function parseHttpPageUrl(raw: string): string {
+  let parsed: URL
+  try {
+    parsed = new URL(raw)
+  } catch {
+    throw new Error(`Invalid URL: ${raw}`)
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`Unsupported URL protocol: ${parsed.protocol}. geometra-proxy only opens http:// or https:// pages.`)
+  }
+
+  return parsed.toString()
+}
+
+function parsePortArg(raw: string | undefined): number {
+  const n = Number(raw ?? '')
+  if (Number.isInteger(n) && n >= 0 && n <= 65535) return n
+  throw new Error(`Invalid --port value: ${raw ?? '(missing)'}`)
+}
+
+function parsePositiveIntArg(flag: string, raw: string | undefined, fallback: number): number {
+  const n = Number(raw ?? '')
+  if (Number.isInteger(n) && n > 0) return n
+  if (raw === undefined) return fallback
+  throw new Error(`Invalid ${flag} value: ${raw}`)
+}
+
+function emitReadySignal(wsUrl: string, pageUrl: string): void {
+  if (!envRequestsReadyJson()) return
+  process.stdout.write(`${JSON.stringify({ type: READY_SIGNAL_TYPE, wsUrl, pageUrl })}\n`)
+}
+
+function formatProxyFatalError(err: unknown): string {
+  const base = err instanceof Error ? err.message : String(err)
+  if (/Executable doesn't exist|playwright install chromium|browserType\.launch/i.test(base)) {
+    return `${base}\nInstall Chromium with: npx playwright install chromium`
+  }
+  return base
 }
 
 function parseArgs(argv: string[]): {
@@ -49,11 +97,11 @@ function parseArgs(argv: string[]): {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!
     if (a === '--port') {
-      port = Math.max(1, Number(argv[++i] ?? '0') || 3200)
+      port = parsePortArg(argv[++i])
     } else if (a === '--width') {
-      width = Math.max(1, Number(argv[++i] ?? '0') || 1280)
+      width = parsePositiveIntArg('--width', argv[++i], 1280)
     } else if (a === '--height') {
-      height = Math.max(1, Number(argv[++i] ?? '0') || 720)
+      height = parsePositiveIntArg('--height', argv[++i], 720)
     } else if (a === '--headed') {
       headed = true
     } else if (a === '--headless') {
@@ -73,11 +121,12 @@ function parseArgs(argv: string[]): {
 }
 
 async function main(): Promise<void> {
-  const { url, port, width, height, headed, slowMo } = parseArgs(process.argv.slice(2))
-  if (!url) {
+  const { url: rawUrl, port, width, height, headed, slowMo } = parseArgs(process.argv.slice(2))
+  if (!rawUrl) {
     printUsage()
     process.exit(1)
   }
+  const url = parseHttpPageUrl(rawUrl)
 
   const launchOpts: Parameters<typeof chromium.launch>[0] = { headless: !headed }
   if (slowMo > 0) launchOpts.slowMo = slowMo
@@ -85,6 +134,14 @@ async function main(): Promise<void> {
   const browser = await chromium.launch(launchOpts)
   const page = await browser.newPage()
   await page.setViewportSize({ width, height })
+
+  let listeningWsUrl = port === 0 ? '' : `ws://127.0.0.1:${port}`
+  let resolveListening: ((wsUrl: string) => void) | undefined
+  let rejectListening: ((err: Error) => void) | undefined
+  const listeningPromise = new Promise<string>((resolve, reject) => {
+    resolveListening = resolve
+    rejectListening = reject
+  })
 
   const mode = headed ? 'headed (visible window)' : 'headless'
   const pace = slowMo > 0 ? `, slowMo ${slowMo}ms` : ''
@@ -97,21 +154,34 @@ async function main(): Promise<void> {
     page,
     debounceMs: 50,
     onListening(p) {
-      console.error(`[geometra-proxy] WebSocket listening on ws://127.0.0.1:${p}`)
+      listeningWsUrl = `ws://127.0.0.1:${p}`
+      resolveListening?.(listeningWsUrl)
+      resolveListening = undefined
+      rejectListening = undefined
+      console.error(`[geometra-proxy] WebSocket listening on ${listeningWsUrl}`)
     },
     onError(err) {
-      console.error('[geometra-proxy] error:', err)
+      const message = formatProxyFatalError(err)
+      console.error('[geometra-proxy] error:', message)
+      if (!listeningWsUrl) {
+        rejectListening?.(new Error(message))
+        rejectListening = undefined
+        resolveListening = undefined
+      }
     },
   })
 
+  const wsUrl = await listeningPromise
   await hub.flushExtract()
   await installDomObserver(page, hub.scheduleExtract)
 
-  console.error(
-    `[geometra-proxy] Ready. Connect MCP with geometra_connect({ url: "ws://127.0.0.1:${port}" })`,
-  )
+  console.error(`[geometra-proxy] Ready. Connect MCP with geometra_connect({ url: "${wsUrl}" })`)
+  emitReadySignal(wsUrl, url)
 
+  let shuttingDown = false
   const shutdown = async () => {
+    if (shuttingDown) return
+    shuttingDown = true
     try {
       await hub.close()
     } catch {
@@ -123,9 +193,10 @@ async function main(): Promise<void> {
 
   process.on('SIGINT', () => void shutdown())
   process.on('SIGTERM', () => void shutdown())
+  process.on('SIGHUP', () => void shutdown())
 }
 
 main().catch(err => {
-  console.error('[geometra-proxy] fatal:', err)
+  console.error('[geometra-proxy] fatal:', formatProxyFatalError(err))
   process.exit(1)
 })

@@ -2,6 +2,19 @@
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { createServer } from './server.js'
+import { disconnect } from './session.js'
+
+let cleanedUp = false
+
+function cleanupActiveSession() {
+  if (cleanedUp) return
+  cleanedUp = true
+  try {
+    disconnect()
+  } catch {
+    /* ignore */
+  }
+}
 
 async function main() {
   const server = createServer()
@@ -9,7 +22,25 @@ async function main() {
   await server.connect(transport)
 }
 
+process.on('SIGINT', () => {
+  cleanupActiveSession()
+  process.exit(0)
+})
+
+process.on('SIGTERM', () => {
+  cleanupActiveSession()
+  process.exit(0)
+})
+
+process.on('SIGHUP', () => {
+  cleanupActiveSession()
+  process.exit(0)
+})
+
+process.on('exit', cleanupActiveSession)
+
 main().catch((err) => {
+  cleanupActiveSession()
   console.error('geometra-mcp: failed to start', err)
   process.exit(1)
 })

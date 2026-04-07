@@ -20,6 +20,8 @@ npx geometra-proxy https://example.com --port 3200 --slow-mo 50
 
 **Default is a visible browser** so you can watch MCP-driven clicks and typing. Use **`--headless`** (or env **`GEOMETRA_HEADLESS=1`**) for automation on servers / CI. **`--slow-mo <ms>`** (or **`GEOMETRA_SLOW_MO`**) adds Playwright `slowMo` to make actions easier to follow.
 
+The proxy only opens **`http://`** or **`https://`** pages. For debugging you can still choose a fixed `--port`, but `--port 0` asks the OS for an ephemeral free port (useful for tools that auto-spawn the proxy).
+
 Headed vs headless usually does **not** materially change token usage, because token usage comes from MCP response payloads rather than whether Chromium is visible.
 
 ## Protocol

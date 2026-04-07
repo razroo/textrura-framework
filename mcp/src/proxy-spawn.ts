@@ -1,9 +1,10 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createRequire } from 'node:module'
-import { createServer } from 'node:net'
 import path from 'node:path'
 
 const require = createRequire(import.meta.url)
+const READY_SIGNAL_TYPE = 'geometra-proxy-ready'
+const READY_TIMEOUT_MS = 45_000
 
 /** Resolve bundled @geometra/proxy CLI entry (dist/index.js). */
 export function resolveProxyScriptPath(): string {
@@ -17,42 +18,6 @@ export function resolveProxyScriptPath(): string {
   }
 }
 
-function canBindPort(p: number): Promise<boolean> {
-  return new Promise(resolve => {
-    const s = createServer()
-    s.once('error', () => resolve(false))
-    s.listen(p, '127.0.0.1', () => {
-      s.close(() => resolve(true))
-    })
-  })
-}
-
-function getEphemeralPort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const s = createServer()
-    s.once('error', reject)
-    s.listen(0, '127.0.0.1', () => {
-      const a = s.address()
-      s.close(err => {
-        if (err) {
-          reject(err)
-          return
-        }
-        if (typeof a === 'object' && a !== null && 'port' in a) resolve(a.port)
-        else reject(new Error('Could not allocate ephemeral port'))
-      })
-    })
-  })
-}
-
-/** Prefer `preferred` when free; otherwise an ephemeral port on 127.0.0.1. */
-export async function pickFreePort(preferred?: number): Promise<number> {
-  if (preferred != null && preferred > 0 && preferred <= 65535) {
-    if (await canBindPort(preferred)) return preferred
-  }
-  return getEphemeralPort()
-}
-
 export interface SpawnProxyParams {
   pageUrl: string
   port: number
@@ -62,10 +27,48 @@ export interface SpawnProxyParams {
   slowMo?: number
 }
 
-const LISTEN_RE = /WebSocket listening on (ws:\/\/127\.0\.0\.1:\d+)/
+export function parseProxyReadySignalLine(line: string): string | undefined {
+  const trimmed = line.trim()
+  if (!trimmed) return undefined
+
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(trimmed) as { type?: unknown; wsUrl?: unknown }
+      if (
+        parsed.type === READY_SIGNAL_TYPE &&
+        typeof parsed.wsUrl === 'string' &&
+        /^ws:\/\/127\.0\.0\.1:\d+$/.test(parsed.wsUrl)
+      ) {
+        return parsed.wsUrl
+      }
+    } catch {
+      /* ignore non-JSON lines */
+    }
+  }
+
+  const fallback = trimmed.match(/WebSocket listening on (ws:\/\/127\.0\.0\.1:\d+)/)
+  return fallback?.[1]
+}
+
+export function formatProxyStartupFailure(message: string, opts: SpawnProxyParams): string {
+  const hints: string[] = []
+
+  if (/Executable doesn't exist|playwright install chromium|browserType\.launch/i.test(message)) {
+    hints.push('Install Chromium with: npx playwright install chromium')
+  }
+
+  if (opts.port > 0 && /EADDRINUSE|address already in use/i.test(message)) {
+    hints.push(
+      `Requested port ${opts.port} is unavailable. Omit the port to use an ephemeral OS-assigned port, or choose another local port.`,
+    )
+  }
+
+  if (hints.length === 0) return message
+  return `${message}\nHint: ${hints.join(' ')}`
+}
 
 /**
- * Spawn geometra-proxy as a child process and resolve when the WebSocket is listening.
+ * Spawn geometra-proxy as a child process and resolve when it emits a structured ready signal.
  */
 export function spawnGeometraProxy(opts: SpawnProxyParams): Promise<{ child: ChildProcess; wsUrl: string }> {
   const script = resolveProxyScriptPath()
@@ -79,49 +82,81 @@ export function spawnGeometraProxy(opts: SpawnProxyParams): Promise<{ child: Chi
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env },
+      env: { ...process.env, GEOMETRA_PROXY_READY_JSON: '1' },
     })
 
     let settled = false
+    let stdoutBuf = ''
     let stderrBuf = ''
+
+    const cleanup = () => {
+      clearTimeout(deadline)
+      child.stdout?.removeAllListeners('data')
+      child.stderr?.removeAllListeners('data')
+    }
+
+    const tryResolveReady = (line: string) => {
+      const wsUrl = parseProxyReadySignalLine(line)
+      if (!wsUrl || settled) return false
+      settled = true
+      cleanup()
+      resolve({ child, wsUrl })
+      return true
+    }
+
+    const consumeStdout = (chunk: Buffer) => {
+      stdoutBuf += chunk.toString()
+      const lines = stdoutBuf.split(/\r?\n/)
+      stdoutBuf = lines.pop() ?? ''
+      for (const line of lines) {
+        if (tryResolveReady(line)) return
+      }
+    }
+
+    const consumeStderr = (chunk: Buffer) => {
+      stderrBuf += chunk.toString()
+      const lines = stderrBuf.split(/\r?\n/)
+      stderrBuf = lines.pop() ?? ''
+      for (const line of lines) {
+        if (tryResolveReady(line)) return
+      }
+    }
 
     const deadline = setTimeout(() => {
       if (!settled) {
         settled = true
         child.kill('SIGTERM')
-        reject(new Error('geometra-proxy did not report a listening WebSocket within 45s'))
+        cleanup()
+        reject(
+          new Error(
+            formatProxyStartupFailure('geometra-proxy did not emit a ready signal within 45s', opts),
+          ),
+        )
       }
-    }, 45_000)
+    }, READY_TIMEOUT_MS)
 
-    const flushStderr = (chunk: Buffer) => {
-      stderrBuf += chunk.toString()
-      const m = stderrBuf.match(LISTEN_RE)
-      if (m && !settled) {
-        settled = true
-        clearTimeout(deadline)
-        child.stderr?.removeAllListeners('data')
-        resolve({ child, wsUrl: m[1]! })
-      }
-    }
-
-    child.stderr?.on('data', flushStderr)
+    child.stdout?.on('data', consumeStdout)
+    child.stderr?.on('data', consumeStderr)
 
     child.on('error', err => {
       if (!settled) {
         settled = true
-        clearTimeout(deadline)
-        reject(err)
+        cleanup()
+        reject(new Error(formatProxyStartupFailure(err.message, opts)))
       }
     })
 
     child.on('exit', (code, sig) => {
       if (!settled) {
         settled = true
-        clearTimeout(deadline)
-        const tail = stderrBuf.trim().slice(-2000)
+        cleanup()
+        const stderrTail = stderrBuf.trim().slice(-2000)
         reject(
           new Error(
-            `geometra-proxy exited before ready (code=${code} signal=${sig}). Stderr (tail): ${tail || '(empty)'}`,
+            formatProxyStartupFailure(
+              `geometra-proxy exited before ready (code=${code} signal=${sig}). Stderr (tail): ${stderrTail || '(empty)'}`,
+              opts,
+            ),
           ),
         )
       }

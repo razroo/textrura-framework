@@ -1,6 +1,6 @@
 # @geometra/mcp
 
-MCP server for [Geometra](https://github.com/razroo/geometra) — interact with running Geometra apps via the geometry protocol over WebSocket. For **native** Geometra apps there is no browser in the loop. For **any existing website**, use **`geometra_connect` with `pageUrl`** — the MCP server starts [`@geometra/proxy`](../packages/proxy/README.md) for you (bundled dependency) so you do not need a separate terminal or a `ws://` URL. You can still pass `url: "ws://…"` if a proxy is already running.
+MCP server for [Geometra](https://github.com/razroo/geometra) — interact with running Geometra apps via the geometry protocol over WebSocket. For **native** Geometra apps there is no browser in the loop. For **any existing website**, use **`geometra_connect` with `pageUrl`** — the MCP server starts [`@geometra/proxy`](../packages/proxy/README.md) for you (bundled dependency) so you do not need a separate terminal or a `ws://` URL. You can still pass `url: "ws://…"` if a proxy is already running, and if you accidentally pass `https://…` in `url`, MCP will treat it as `pageUrl` and auto-start the proxy.
 
 See [`AGENT_MODEL.md`](./AGENT_MODEL.md) for the MCP mental model, why token usage can be lower than large browser snapshots, and how headed vs headless proxy mode works.
 
@@ -18,7 +18,7 @@ Geometra proxy:       Chromium → DOM geometry → same WebSocket as native →
 
 | Tool | Description |
 |---|---|
-| `geometra_connect` | Connect with `url` (ws://…) **or** `pageUrl` (https://…) to auto-start geometra-proxy |
+| `geometra_connect` | Connect with `url` (ws://…) **or** `pageUrl` (https://…) to auto-start geometra-proxy; `url: "https://…"` is auto-coerced onto the proxy path |
 | `geometra_query` | Find elements by stable id, role, name, or text content |
 | `geometra_page_model` | Summary-first webpage model: archetypes, stable section ids, counts, top-level sections, primary actions |
 | `geometra_expand_section` | Expand one form/dialog/list/landmark from `geometra_page_model` on demand |
@@ -75,6 +75,8 @@ npm run server  # starts on ws://localhost:3100
 ```
 
 ### Any web app (Geometra proxy)
+
+**Preferred path for agents:** call `geometra_connect({ pageUrl: "https://…" })` and let MCP spawn the proxy for you on an ephemeral local port. The manual CLI below is still useful for debugging or when you want to inspect the proxy directly.
 
 In one terminal, serve or open a page (example uses the repo sample):
 

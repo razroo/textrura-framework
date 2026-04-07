@@ -304,6 +304,10 @@ export function startGeometryWebSocket(options: {
     options.onListening?.(p)
   })
 
+  wss.on('error', err => {
+    options.onError?.(err)
+  })
+
   wss.on('connection', (ws) => {
     clients.add(ws)
     if (prevLayout && prevTreeJson !== null) {

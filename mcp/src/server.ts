@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
+import { formatConnectFailureMessage, isHttpUrl, normalizeConnectTarget } from './connect-utils.js'
 import {
   connect,
   connectThroughProxy,
@@ -23,11 +24,11 @@ import {
   summarizePageModel,
   summarizeUiDelta,
 } from './session.js'
-import type { A11yNode, Session } from './session.js'
+import type { A11yNode, Session, UpdateWaitResult } from './session.js'
 
 export function createServer(): McpServer {
   const server = new McpServer(
-    { name: 'geometra', version: '1.19.0' },
+    { name: 'geometra', version: '1.19.1' },
     { capabilities: { tools: {} } },
   )
 
@@ -36,9 +37,9 @@ export function createServer(): McpServer {
     'geometra_connect',
     `Connect to a Geometra WebSocket peer, or start \`geometra-proxy\` automatically for a normal web page.
 
-**Prefer \`pageUrl\` for job sites and SPAs:** pass \`https://…\` and this server spawns geometra-proxy, picks a free port, and connects — you do **not** need a separate terminal or a \`ws://\` URL (fewer IDE approval steps for the human).
+**Prefer \`pageUrl\` for job sites and SPAs:** pass \`https://…\` and this server spawns geometra-proxy on an ephemeral local port and connects — you do **not** need a separate terminal or a \`ws://\` URL (fewer IDE approval steps for the human).
 
-Use \`url\` (ws://…) only when a Geometra/native server or an already-running proxy is listening.
+Use \`url\` (ws://…) only when a Geometra/native server or an already-running proxy is listening. If you accidentally pass \`https://…\` in \`url\`, MCP treats it like \`pageUrl\` and starts the proxy for you.
 
 Chromium opens **visible** by default unless \`headless: true\`. File upload / wheel / native \`<select>\` need the proxy path (\`pageUrl\` or ws to proxy).`,
     {
@@ -46,11 +47,12 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
         .string()
         .optional()
         .describe(
-          'WebSocket URL when a server is already running (e.g. ws://127.0.0.1:3200 or ws://localhost:3100). Omit if using pageUrl.',
+          'WebSocket URL when a server is already running (e.g. ws://127.0.0.1:3200 or ws://localhost:3100). If you pass http(s) here by mistake, MCP will treat it as a page URL and start geometra-proxy.',
         ),
       pageUrl: z
         .string()
         .url()
+        .refine(isHttpUrl, 'pageUrl must use http:// or https://')
         .optional()
         .describe(
           'HTTP(S) page to open. MCP starts geometra-proxy and connects automatically. Use this instead of url for most web apply flows.',
@@ -61,7 +63,7 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
         .positive()
         .max(65535)
         .optional()
-        .describe('Local port for spawned proxy (default: ephemeral free port).'),
+        .describe('Preferred local port for spawned proxy (default: ephemeral OS-assigned port).'),
       headless: z
         .boolean()
         .optional()
@@ -76,15 +78,14 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
         .describe('Playwright slowMo (ms) on spawned proxy for easier visual following.'),
     },
     async input => {
+      const normalized = normalizeConnectTarget({ url: input.url, pageUrl: input.pageUrl })
+      if (!normalized.ok) return err(normalized.error)
+      const target = normalized.value
+
       try {
-        const hasUrl = typeof input.url === 'string' && input.url.length > 0
-        const hasPage = typeof input.pageUrl === 'string' && input.pageUrl.length > 0
-        if (hasUrl === hasPage) {
-          return err('Provide exactly one of: url (WebSocket) or pageUrl (https://…).')
-        }
-        if (hasPage) {
+        if (target.kind === 'proxy') {
           const session = await connectThroughProxy({
-            pageUrl: input.pageUrl!,
+            pageUrl: target.pageUrl!,
             port: input.port,
             headless: input.headless,
             width: input.width,
@@ -92,15 +93,16 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
             slowMo: input.slowMo,
           })
           const summary = compactSessionSummary(session)
+          const inferred = target.autoCoercedFromUrl ? ' inferred from url input' : ''
           return ok(
-            `Started geometra-proxy and connected at ${session.url} (page: ${input.pageUrl}). UI state:\n${summary}`,
+            `Started geometra-proxy and connected at ${session.url} (page: ${target.pageUrl}${inferred}). UI state:\n${summary}`,
           )
         }
-        const session = await connect(input.url!)
+        const session = await connect(target.wsUrl!)
         const summary = compactSessionSummary(session)
-        return ok(`Connected to ${input.url}. UI state:\n${summary}`)
+        return ok(`Connected to ${target.wsUrl}. UI state:\n${summary}`)
       } catch (e) {
-        return err(`Failed to connect: ${(e as Error).message}`)
+        return err(`Failed to connect: ${formatConnectFailureMessage(e, target)}`)
       }
     }
   )
@@ -216,9 +218,9 @@ After clicking, returns a compact semantic delta when possible (dialogs/forms/li
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
 
-      await sendClick(session, x, y)
+      const wait = await sendClick(session, x, y)
 
-      const summary = postActionSummary(session, before)
+      const summary = postActionSummary(session, before, wait)
       return ok(`Clicked at (${x}, ${y}).\n${summary}`)
     }
   )
@@ -237,9 +239,9 @@ Each character is sent as a key event through the geometry protocol. Returns a c
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
 
-      await sendType(session, text)
+      const wait = await sendType(session, text)
 
-      const summary = postActionSummary(session, before)
+      const summary = postActionSummary(session, before, wait)
       return ok(`Typed "${text}".\n${summary}`)
     }
   )
@@ -260,9 +262,9 @@ Each character is sent as a key event through the geometry protocol. Returns a c
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
 
-      await sendKey(session, key, { shift, ctrl, meta, alt })
+      const wait = await sendKey(session, key, { shift, ctrl, meta, alt })
 
-      const summary = postActionSummary(session, before)
+      const summary = postActionSummary(session, before, wait)
       return ok(`Pressed ${formatKeyCombo(key, { shift, ctrl, meta, alt })}.\n${summary}`)
     }
   )
@@ -289,12 +291,12 @@ Strategies: **auto** (default) tries chooser click if x,y given, else hidden \`i
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
       try {
-        await sendFileUpload(session, paths, {
+        const wait = await sendFileUpload(session, paths, {
           click: x !== undefined && y !== undefined ? { x, y } : undefined,
           strategy,
           drop: dropX !== undefined && dropY !== undefined ? { x: dropX, y: dropY } : undefined,
         })
-        const summary = postActionSummary(session, before)
+        const summary = postActionSummary(session, before, wait)
         return ok(`Uploaded ${paths.length} file(s).\n${summary}`)
       } catch (e) {
         return err((e as Error).message)
@@ -318,11 +320,11 @@ Optional openX,openY clicks the combobox first if the list is not open. Uses sub
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
       try {
-        await sendListboxPick(session, label, {
+        const wait = await sendListboxPick(session, label, {
           exact,
           open: openX !== undefined && openY !== undefined ? { x: openX, y: openY } : undefined,
         })
-        const summary = postActionSummary(session, before)
+        const summary = postActionSummary(session, before, wait)
         return ok(`Picked listbox option "${label}".\n${summary}`)
       } catch (e) {
         return err((e as Error).message)
@@ -351,8 +353,8 @@ Custom React/Vue dropdowns are not supported — open them with geometra_click a
       }
       const before = sessionA11y(session)
       try {
-        await sendSelectOption(session, x, y, { value, label, index })
-        const summary = postActionSummary(session, before)
+        const wait = await sendSelectOption(session, x, y, { value, label, index })
+        const summary = postActionSummary(session, before, wait)
         return ok(`Selected option.\n${summary}`)
       } catch (e) {
         return err((e as Error).message)
@@ -375,8 +377,8 @@ Custom React/Vue dropdowns are not supported — open them with geometra_click a
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
       try {
-        await sendWheel(session, deltaY, { deltaX, x, y })
-        const summary = postActionSummary(session, before)
+        const wait = await sendWheel(session, deltaY, { deltaX, x, y })
+        const summary = postActionSummary(session, before, wait)
         return ok(`Wheel delta (${deltaX ?? 0}, ${deltaY}).\n${summary}`)
       } catch (e) {
         return err((e as Error).message)
@@ -473,16 +475,22 @@ function sessionOverviewFromA11y(a11y: A11yNode): string {
   return [pageSummary, keyNodes].filter(Boolean).join('\n')
 }
 
-function postActionSummary(session: Session, before: A11yNode | null): string {
+function postActionSummary(session: Session, before: A11yNode | null, wait?: UpdateWaitResult): string {
   const after = sessionA11y(session)
-  if (!after) return 'No UI update received'
+  const notes: string[] = []
+  if (wait?.status === 'timed_out') {
+    notes.push(
+      `No frame or patch arrived within ${wait.timeoutMs}ms after the action. The action may still have succeeded if it did not change geometry or semantics.`,
+    )
+  }
+  if (!after) return [...notes, 'No UI update received'].filter(Boolean).join('\n')
   if (before) {
     const delta = buildUiDelta(before, after)
     if (hasUiDelta(delta)) {
-      return `Changes:\n${summarizeUiDelta(delta)}`
+      return [...notes, `Changes:\n${summarizeUiDelta(delta)}`].filter(Boolean).join('\n')
     }
   }
-  return `Current UI:\n${sessionOverviewFromA11y(after)}`
+  return [...notes, `Current UI:\n${sessionOverviewFromA11y(after)}`].filter(Boolean).join('\n')
 }
 
 function ok(text: string) {
