@@ -88,6 +88,40 @@ export type ClientMessage =
       /** Optional capability negotiation (v1+). */
       capabilities?: { binaryFraming?: boolean }
     })
+  /**
+   * Attach local file(s) to a file input. Implemented by `@geometra/proxy` (Playwright);
+   * the native Textura server responds with `error` — not applicable to DOM-free apps.
+   *
+   * `paths` are absolute paths on the machine that runs the browser (the proxy process).
+   * With `x`/`y`, the proxy clicks first to trigger a native file chooser; without them,
+   * it attaches to the first `input[type=file]` in any frame.
+   */
+  | (VersionedMessage & {
+      type: 'file'
+      paths: string[]
+      x?: number
+      y?: number
+    })
+  /**
+   * Choose an option on a native `<select>` after focusing it (click `x`,`y` on the control).
+   * Custom dropdowns are not supported here — use clicks + snapshots instead.
+   */
+  | (VersionedMessage & {
+      type: 'selectOption'
+      x: number
+      y: number
+      value?: string
+      label?: string
+      index?: number
+    })
+  /** Mouse wheel / scroll delta at optional viewport coordinates. */
+  | (VersionedMessage & {
+      type: 'wheel'
+      deltaX?: number
+      deltaY?: number
+      x?: number
+      y?: number
+    })
 
 /** A patch describing a change to a single node's geometry. */
 export interface LayoutPatch {

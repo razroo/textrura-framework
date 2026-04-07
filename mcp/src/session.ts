@@ -160,6 +160,53 @@ export function sendKey(session: Session, key: string, modifiers?: { shift?: boo
 }
 
 /**
+ * Attach local file(s). Paths must exist on the machine running `@geometra/proxy` (not the MCP host).
+ * Optional `x`,`y` click opens a file chooser; omit to use the first `input[type=file]` in any frame.
+ */
+export function sendFileUpload(
+  session: Session,
+  paths: string[],
+  click?: { x: number; y: number },
+): Promise<void> {
+  const payload: Record<string, unknown> = { type: 'file', paths }
+  if (click) {
+    payload.x = click.x
+    payload.y = click.y
+  }
+  return sendAndWaitForUpdate(session, payload)
+}
+
+/** Native `<select>` only: click the control center, then pick by value, label text, or zero-based index. */
+export function sendSelectOption(
+  session: Session,
+  x: number,
+  y: number,
+  option: { value?: string; label?: string; index?: number },
+): Promise<void> {
+  return sendAndWaitForUpdate(session, {
+    type: 'selectOption',
+    x,
+    y,
+    ...option,
+  })
+}
+
+/** Mouse wheel / scroll. Optional `x`,`y` move pointer before scrolling. */
+export function sendWheel(
+  session: Session,
+  deltaY: number,
+  opts?: { deltaX?: number; x?: number; y?: number },
+): Promise<void> {
+  return sendAndWaitForUpdate(session, {
+    type: 'wheel',
+    deltaY,
+    deltaX: opts?.deltaX ?? 0,
+    ...(opts?.x !== undefined ? { x: opts.x } : {}),
+    ...(opts?.y !== undefined ? { y: opts.y } : {}),
+  })
+}
+
+/**
  * Build a flat accessibility tree from the raw UI tree + layout.
  * This is a standalone reimplementation that works with raw JSON —
  * no dependency on @geometra/core.
@@ -271,10 +318,15 @@ function sendAndWaitForUpdate(session: Session, message: Record<string, unknown>
 }
 
 function waitForNextUpdate(session: Session): Promise<void> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const onMessage = (data: WebSocket.Data) => {
       try {
         const msg = JSON.parse(String(data))
+        if (msg.type === 'error') {
+          cleanup()
+          reject(new Error(typeof msg.message === 'string' ? msg.message : 'Geometra server error'))
+          return
+        }
         if (msg.type === 'frame') {
           session.layout = msg.layout
           session.tree = msg.tree

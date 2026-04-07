@@ -61,11 +61,41 @@ export type ClientCompositionMessage = {
   protocolVersion?: number
 }
 
+export type ClientFileMessage = {
+  type: 'file'
+  paths: string[]
+  x?: number
+  y?: number
+  protocolVersion?: number
+}
+
+export type ClientSelectOptionMessage = {
+  type: 'selectOption'
+  x: number
+  y: number
+  value?: string
+  label?: string
+  index?: number
+  protocolVersion?: number
+}
+
+export type ClientWheelMessage = {
+  type: 'wheel'
+  deltaX?: number
+  deltaY?: number
+  x?: number
+  y?: number
+  protocolVersion?: number
+}
+
 export type ParsedClientMessage =
   | ClientEventMessage
   | ClientKeyMessage
   | ClientResizeMessage
   | ClientCompositionMessage
+  | ClientFileMessage
+  | ClientSelectOptionMessage
+  | ClientWheelMessage
   | { type: string; protocolVersion?: number }
 
 export function isKeyMessage(msg: ParsedClientMessage): msg is ClientKeyMessage {
@@ -82,4 +112,22 @@ export function isClickEventMessage(msg: ParsedClientMessage): msg is ClientEven
 
 export function isCompositionMessage(msg: ParsedClientMessage): msg is ClientCompositionMessage {
   return msg.type === 'composition' && 'eventType' in msg && 'data' in msg
+}
+
+export function isFileMessage(msg: ParsedClientMessage): msg is ClientFileMessage {
+  return msg.type === 'file' && 'paths' in msg && Array.isArray((msg as ClientFileMessage).paths)
+}
+
+export function isSelectOptionMessage(msg: ParsedClientMessage): msg is ClientSelectOptionMessage {
+  return (
+    msg.type === 'selectOption' &&
+    'x' in msg &&
+    'y' in msg &&
+    typeof (msg as ClientSelectOptionMessage).x === 'number' &&
+    typeof (msg as ClientSelectOptionMessage).y === 'number'
+  )
+}
+
+export function isWheelMessage(msg: ParsedClientMessage): msg is ClientWheelMessage {
+  return msg.type === 'wheel'
 }

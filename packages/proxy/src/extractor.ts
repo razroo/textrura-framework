@@ -57,6 +57,21 @@ export async function extractGeometry(page: Page): Promise<GeometrySnapshot> {
       return false
     }
 
+    /** Light-DOM children plus direct `shadowRoot` children (open shadow roots only). */
+    function displayedElementChildren(container: Element): Element[] {
+      const out: Element[] = []
+      for (const c of container.children) {
+        if (!shouldSkip(c)) out.push(c)
+      }
+      const sr = (container as HTMLElement).shadowRoot
+      if (sr) {
+        for (const c of sr.children) {
+          if (!shouldSkip(c)) out.push(c)
+        }
+      }
+      return out
+    }
+
     function defaultRoleForTag(el: Element, tag: string): string | undefined {
       const explicit = el.getAttribute('role')
       if (explicit) return explicit
@@ -125,6 +140,10 @@ export async function extractGeometry(page: Page): Promise<GeometrySnapshot> {
       }
       const name = getAccessibleName(el)
       const sem = semanticFor(el, tag)
+      if (h instanceof HTMLInputElement && h.type === 'file') {
+        sem.role = 'button'
+        sem.fileInput = true
+      }
       if (name && !sem.ariaLabel) sem.ariaLabel = name
       const focusable = isFocusable(el)
       const tree: TreeSnapshot = {
@@ -159,6 +178,42 @@ export async function extractGeometry(page: Page): Promise<GeometrySnapshot> {
       if (tag === 'img' && el instanceof HTMLImageElement) return extractImage(el)
       if (LEAF_FORM_TAGS.has(tag)) return extractFormControl(el, tag)
 
+      if (tag === 'iframe' && el instanceof HTMLIFrameElement) {
+        const iframe = el as HTMLIFrameElement
+        const rect = iframe.getBoundingClientRect()
+        const layout: LayoutSnapshot = {
+          x: Math.round(rect.x),
+          y: Math.round(rect.y),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+          children: [],
+        }
+        const treeChildren: TreeSnapshot[] = []
+        const doc = iframe.contentDocument
+        const ibody = doc?.body
+        if (ibody) {
+          for (const c of displayedElementChildren(ibody)) {
+            const sub = extractElement(c)
+            if (sub) {
+              layout.children.push(sub.layout)
+              treeChildren.push(sub.tree)
+            }
+          }
+        }
+        const sem = semanticFor(iframe, 'iframe')
+        sem.iframe = true
+        return {
+          layout,
+          tree: {
+            kind: 'box',
+            props: {},
+            semantic: sem,
+            handlers: handlersFor(isFocusable(iframe)),
+            children: treeChildren,
+          },
+        }
+      }
+
       const h = el as HTMLElement
       const rect = h.getBoundingClientRect()
       const layout: LayoutSnapshot = {
@@ -169,7 +224,7 @@ export async function extractGeometry(page: Page): Promise<GeometrySnapshot> {
         children: [],
       }
 
-      const elementChildren = Array.from(el.children).filter(c => !shouldSkip(c))
+      const elementChildren = displayedElementChildren(el)
       if (elementChildren.length === 0) {
         const text = (el.textContent || '').trim()
         if (text.length > 0) {
@@ -222,7 +277,7 @@ export async function extractGeometry(page: Page): Promise<GeometrySnapshot> {
       return { layout: emptyLayout, tree: emptyTree }
     }
 
-    const elementChildren = Array.from(body.children).filter(c => !shouldSkip(c))
+    const elementChildren = displayedElementChildren(body)
     const layout: LayoutSnapshot = {
       x: 0,
       y: 0,

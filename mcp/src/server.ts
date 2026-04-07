@@ -1,6 +1,17 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { connect, disconnect, getSession, sendClick, sendType, sendKey, buildA11yTree } from './session.js'
+import {
+  connect,
+  disconnect,
+  getSession,
+  sendClick,
+  sendType,
+  sendKey,
+  sendFileUpload,
+  sendSelectOption,
+  sendWheel,
+  buildA11yTree,
+} from './session.js'
 import type { A11yNode } from './session.js'
 
 export function createServer(): McpServer {
@@ -14,7 +25,7 @@ export function createServer(): McpServer {
     'geometra_connect',
     `Connect to a running Geometra server over WebSocket. This replaces Playwright/browser automation — you get direct access to the UI's pixel-exact geometry as JSON.
 
-Call this first before using any other geometra tools. The server must already be running (e.g. via \`npm run server\` in a Geometra app).`,
+Call this first before using any other geometra tools. The peer must be listening (native Geometra server, or \`geometra-proxy\` for real web pages). File upload / wheel / native \`<select>\` require \`@geometra/proxy\`; native Textura servers return an error for those messages.`,
     {
       url: z.string().describe('WebSocket URL of the Geometra server (e.g. ws://localhost:3100)'),
     },
@@ -128,6 +139,85 @@ Each character is sent as a key event through the geometry protocol. Returns upd
         : null
       const summary = a11y ? summarizeTree(a11y) : 'No UI update received'
       return ok(`Pressed ${formatKeyCombo(key, { shift, ctrl, meta, alt })}. Updated UI:\n${summary}`)
+    }
+  )
+
+  // ── upload files (proxy) ───────────────────────────────────────
+  server.tool(
+    'geometra_upload_files',
+    `Attach one or more local files to a file input. Requires \`@geometra/proxy\` (paths are resolved on the proxy host).
+
+Without x,y: uses the first \`input[type=file]\` in any frame. With x,y: clicks to open a file chooser (e.g. custom "Upload" button).`,
+    {
+      paths: z.array(z.string()).min(1).describe('Absolute paths on the proxy machine, e.g. /Users/you/resume.pdf'),
+      x: z.number().optional().describe('Click X to trigger file chooser'),
+      y: z.number().optional().describe('Click Y to trigger file chooser'),
+    },
+    async ({ paths, x, y }) => {
+      const session = getSession()
+      if (!session) return err('Not connected. Call geometra_connect first.')
+      try {
+        await sendFileUpload(session, paths, x !== undefined && y !== undefined ? { x, y } : undefined)
+        const a11y = session.tree && session.layout ? buildA11yTree(session.tree, session.layout) : null
+        const summary = a11y ? summarizeTree(a11y) : 'No UI update received'
+        return ok(`Uploaded ${paths.length} file(s). Updated UI:\n${summary}`)
+      } catch (e) {
+        return err((e as Error).message)
+      }
+    }
+  )
+
+  // ── select option (proxy, native <select>) ─────────────────────
+  server.tool(
+    'geometra_select_option',
+    `Set a native HTML \`<select>\` after clicking its center (x,y from geometra_query). Requires \`@geometra/proxy\`.
+
+Custom React/Vue dropdowns are not supported — open them with geometra_click and pick options by snapshot instead.`,
+    {
+      x: z.number().describe('X coordinate (e.g. center of the select from geometra_query)'),
+      y: z.number().describe('Y coordinate'),
+      value: z.string().optional().describe('Option value= attribute'),
+      label: z.string().optional().describe('Visible option label (substring match)'),
+      index: z.number().int().min(0).optional().describe('Zero-based option index'),
+    },
+    async ({ x, y, value, label, index }) => {
+      const session = getSession()
+      if (!session) return err('Not connected. Call geometra_connect first.')
+      if (value === undefined && label === undefined && index === undefined) {
+        return err('Provide at least one of value, label, or index')
+      }
+      try {
+        await sendSelectOption(session, x, y, { value, label, index })
+        const a11y = session.tree && session.layout ? buildA11yTree(session.tree, session.layout) : null
+        const summary = a11y ? summarizeTree(a11y) : 'No UI update received'
+        return ok(`Selected option. Updated UI:\n${summary}`)
+      } catch (e) {
+        return err((e as Error).message)
+      }
+    }
+  )
+
+  // ── wheel / scroll (proxy) ─────────────────────────────────────
+  server.tool(
+    'geometra_wheel',
+    `Scroll the page or an element under the pointer using the mouse wheel. Requires \`@geometra/proxy\` (e.g. virtualized lists, long application forms).`,
+    {
+      deltaY: z.number().describe('Vertical scroll delta (positive scrolls down, typical step ~100)'),
+      deltaX: z.number().optional().describe('Horizontal scroll delta'),
+      x: z.number().optional().describe('Move pointer to X before scrolling'),
+      y: z.number().optional().describe('Move pointer to Y before scrolling'),
+    },
+    async ({ deltaY, deltaX, x, y }) => {
+      const session = getSession()
+      if (!session) return err('Not connected. Call geometra_connect first.')
+      try {
+        await sendWheel(session, deltaY, { deltaX, x, y })
+        const a11y = session.tree && session.layout ? buildA11yTree(session.tree, session.layout) : null
+        const summary = a11y ? summarizeTree(a11y) : 'No UI update received'
+        return ok(`Wheel delta (${deltaX ?? 0}, ${deltaY}). Updated UI:\n${summary}`)
+      } catch (e) {
+        return err((e as Error).message)
+      }
     }
   )
 

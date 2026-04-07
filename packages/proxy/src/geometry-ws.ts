@@ -1,13 +1,17 @@
 import type { Page } from 'playwright'
 import { WebSocketServer, type WebSocket } from 'ws'
+import { attachFiles, resolveExistingFiles, selectNativeOption, wheelAt } from './dom-actions.js'
 import { coalescePatches, diffLayout } from './diff-layout.js'
 import { extractGeometry } from './extractor.js'
 import type { ClientKeyMessage, GeometrySnapshot, LayoutSnapshot, ParsedClientMessage } from './types.js'
 import {
   isClickEventMessage,
   isCompositionMessage,
+  isFileMessage,
   isKeyMessage,
   isResizeMessage,
+  isSelectOptionMessage,
+  isWheelMessage,
   PROXY_PROTOCOL_VERSION,
 } from './types.js'
 
@@ -67,6 +71,7 @@ async function handleClientMessage(
   ws: WebSocket,
   raw: unknown,
   onViewportOrInput: (kind: 'resize' | 'input') => void,
+  onHandlerError: (err: unknown) => void,
 ): Promise<void> {
   let msg: ParsedClientMessage
   try {
@@ -87,36 +92,72 @@ async function handleClientMessage(
     return
   }
 
-  if (isResizeMessage(msg)) {
-    const w = Math.max(1, Math.floor(msg.width))
-    const h = Math.max(1, Math.floor(msg.height))
-    await page.setViewportSize({ width: w, height: h })
-    onViewportOrInput('resize')
-    return
+  const wireError = (message: string) => {
+    ws.send(JSON.stringify({ type: 'error', message, protocolVersion: PROXY_PROTOCOL_VERSION }))
   }
 
-  if (isClickEventMessage(msg)) {
-    const x = msg.x
-    const y = msg.y
-    if (typeof x === 'number' && typeof y === 'number' && Number.isFinite(x) && Number.isFinite(y)) {
-      await page.mouse.click(x, y)
+  try {
+    if (isResizeMessage(msg)) {
+      const w = Math.max(1, Math.floor(msg.width))
+      const h = Math.max(1, Math.floor(msg.height))
+      await page.setViewportSize({ width: w, height: h })
+      onViewportOrInput('resize')
+      return
+    }
+
+    if (isClickEventMessage(msg)) {
+      const x = msg.x
+      const y = msg.y
+      if (typeof x === 'number' && typeof y === 'number' && Number.isFinite(x) && Number.isFinite(y)) {
+        await page.mouse.click(x, y)
+        onViewportOrInput('input')
+      }
+      return
+    }
+
+    if (isKeyMessage(msg)) {
+      await applyKeyPhase(page, msg)
+      onViewportOrInput('input')
+      return
+    }
+
+    if (isCompositionMessage(msg)) {
+      const data = typeof msg.data === 'string' ? msg.data : ''
+      if (msg.eventType === 'onCompositionUpdate' || msg.eventType === 'onCompositionEnd') {
+        await page.keyboard.insertText(data)
+        onViewportOrInput('input')
+      }
+      return
+    }
+
+    if (isFileMessage(msg)) {
+      const paths = resolveExistingFiles(msg.paths)
+      await attachFiles(page, paths, msg.x, msg.y)
+      onViewportOrInput('input')
+      return
+    }
+
+    if (isSelectOptionMessage(msg)) {
+      await selectNativeOption(page, msg.x, msg.y, {
+        value: msg.value,
+        label: msg.label,
+        index: msg.index,
+      })
+      onViewportOrInput('input')
+      return
+    }
+
+    if (isWheelMessage(msg)) {
+      const dx = typeof msg.deltaX === 'number' && Number.isFinite(msg.deltaX) ? msg.deltaX : 0
+      const dy = typeof msg.deltaY === 'number' && Number.isFinite(msg.deltaY) ? msg.deltaY : 0
+      const x = typeof msg.x === 'number' && Number.isFinite(msg.x) ? msg.x : undefined
+      const y = typeof msg.y === 'number' && Number.isFinite(msg.y) ? msg.y : undefined
+      await wheelAt(page, dx, dy, x, y)
       onViewportOrInput('input')
     }
-    return
-  }
-
-  if (isKeyMessage(msg)) {
-    await applyKeyPhase(page, msg)
-    onViewportOrInput('input')
-    return
-  }
-
-  if (isCompositionMessage(msg)) {
-    const data = typeof msg.data === 'string' ? msg.data : ''
-    if (msg.eventType === 'onCompositionUpdate' || msg.eventType === 'onCompositionEnd') {
-      await page.keyboard.insertText(data)
-      onViewportOrInput('input')
-    }
+  } catch (err) {
+    onHandlerError(err)
+    wireError(err instanceof Error ? err.message : String(err))
   }
 }
 
@@ -257,13 +298,19 @@ export function startGeometryWebSocket(options: {
       if (ws.readyState === ws.OPEN) ws.send(text)
     }
     ws.on('message', (raw) => {
-      void handleClientMessage(options.page, ws, raw, kind => {
-        if (kind === 'resize') {
-          void runExtractQueued()
-        } else {
-          scheduleExtract()
-        }
-      }).catch(err => options.onError?.(err))
+      void handleClientMessage(
+        options.page,
+        ws,
+        raw,
+        kind => {
+          if (kind === 'resize') {
+            void runExtractQueued()
+          } else {
+            scheduleExtract()
+          }
+        },
+        err => options.onError?.(err),
+      ).catch(err => options.onError?.(err))
     })
     ws.on('close', () => {
       clients.delete(ws)
