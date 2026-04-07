@@ -58,6 +58,24 @@ describe('toSemanticHTML', () => {
     expect(toSemanticHTML(el, { dir: 0 as never })).toContain('<html lang="en">\n')
   })
 
+  it('omits document dir and element dir for wrong-case ltr/rtl/auto (strict primitive; parity with layoutDirection)', () => {
+    const plain = box({ width: 100, height: 100 })
+    for (const bad of ['RTL', 'LTR', 'Auto'] as const) {
+      const html = toSemanticHTML(plain, { dir: bad as never })
+      expect(html).toContain('<html lang="en">\n')
+      expect(html).not.toMatch(/<html lang="en" dir=/)
+    }
+    expect(toSemanticHTML(box({ width: 10, height: 10, dir: 'RTL' as never }))).not.toContain('dir="')
+    expect(
+      toSemanticHTML(
+        text({ text: 'x', font: '14px sans-serif', lineHeight: 18, width: 10, height: 18, dir: 'LTR' as never }),
+      ),
+    ).not.toContain('dir="')
+    expect(
+      toSemanticHTML(image({ src: '/a.png', width: 8, height: 8, alt: '', dir: 'Auto' as never })),
+    ).not.toContain('dir="')
+  })
+
   it('ignores non-string head/meta option values at runtime (no throw; matches lang guard)', () => {
     const el = box({ width: 100, height: 100 })
     expect(() =>
