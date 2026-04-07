@@ -156,6 +156,12 @@ describe('direction model', () => {
     expect(toLayoutTree(el)).not.toHaveProperty('dir')
   })
 
+  it('keeps dir on image for resolveElementDirection while toLayoutTree omits it on the layout root', () => {
+    const el = image({ src: '/x.png', width: 50, height: 50, dir: 'rtl' })
+    expect(resolveElementDirection(el, 'ltr')).toBe('rtl')
+    expect(toLayoutTree(el)).not.toHaveProperty('dir')
+  })
+
   it('toLayoutTree omits dir on the root only; nested layout nodes forward dir; live tree still resolves mixed rtl/auto/ltr per node', () => {
     const leaf = text({
       text: 'a',
