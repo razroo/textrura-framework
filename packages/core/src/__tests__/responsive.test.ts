@@ -215,6 +215,24 @@ describe('breakpoint non-finite min-width', () => {
     const bps = { sm: 0, bogus: Number.POSITIVE_INFINITY }
     expect(breakpoint(signal(2000), bps).value).toBe('sm')
   })
+
+  it('skips undefined min-width entries (loose JSON / missing fields) without throwing', () => {
+    const bps = { sm: 0, ghost: undefined as unknown as number, lg: 1024 }
+    expect(breakpoint(signal(800), bps).value).toBe('sm')
+    expect(breakpoint(signal(1200), bps).value).toBe('lg')
+  })
+
+  it('skips null min-width entries (corrupt deserialization) without throwing', () => {
+    const bps = { sm: 0, hole: null as unknown as number, lg: 1024 }
+    expect(breakpoint(signal(800), bps).value).toBe('sm')
+    expect(breakpoint(signal(1200), bps).value).toBe('lg')
+  })
+
+  it('skips string min-width entries (mistyped host data) without coercion', () => {
+    const bps = { sm: 0, bogus: '640' as unknown as number, lg: 1024 }
+    expect(breakpoint(signal(800), bps).value).toBe('sm')
+    expect(breakpoint(signal(1200), bps).value).toBe('lg')
+  })
 })
 
 describe('createViewport edge cases', () => {
