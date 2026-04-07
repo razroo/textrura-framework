@@ -18,6 +18,7 @@ Geometra proxy:       Headless Chromium → DOM geometry → same WebSocket as n
 |---|---|
 | `geometra_connect` | Connect to a running Geometra server |
 | `geometra_query` | Find elements by role, name, or text content |
+| `geometra_page_model` | Higher-level webpage model: landmarks, forms, dialogs, lists, short previews |
 | `geometra_click` | Click an element by coordinates |
 | `geometra_type` | Type text into the focused element |
 | `geometra_key` | Send special keys (Enter, Tab, Escape, arrows) |
@@ -25,7 +26,7 @@ Geometra proxy:       Headless Chromium → DOM geometry → same WebSocket as n
 | `geometra_pick_listbox_option` | Pick `role=option` (React Select, Headless UI, etc.; `@geometra/proxy` only) |
 | `geometra_select_option` | Choose an option on a native `<select>` (`@geometra/proxy` only) |
 | `geometra_wheel` | Mouse wheel / scroll (`@geometra/proxy` only) |
-| `geometra_snapshot` | Default **compact**: flat viewport-visible actionable nodes (minified JSON, fewer tokens). `view=full` for nested tree |
+| `geometra_snapshot` | Default **compact**: flat viewport-visible actionable nodes (minified JSON). `view=full` for nested tree |
 | `geometra_layout` | Raw computed geometry for every node |
 | `geometra_disconnect` | Close the connection |
 
@@ -93,6 +94,8 @@ Then in Claude Code (either backend):
 ```
 > Connect to my Geometra app at ws://localhost:3100 and tell me what's on screen
 
+> Give me the page model first, then find the main form
+
 > Click the "Submit" button
 
 > Type "hello@example.com" into the email input
@@ -132,6 +135,9 @@ With `python3 -m http.server 8080` in `demos/proxy-mcp-sample` and `npx geometra
 Agent:  geometra_connect({ url: "ws://127.0.0.1:3200" })
         → Connected. UI includes textbox "Email", button "Save", …
 
+Agent:  geometra_page_model({})
+        → {"viewport":{"width":1024,"height":768},"landmarks":[...],"forms":[...],"dialogs":[],"lists":[]}
+
 Agent:  geometra_query({ role: "textbox", name: "Email" })
         → bounds for the email field (viewport coordinates)
 
@@ -149,8 +155,10 @@ Agent:  geometra_query({ role: "button", name: "Save" })
 1. The MCP server connects to a WebSocket peer that speaks GEOM v1 (`frame` with `layout` + `tree`, optional `patch` updates).
 2. It receives the computed layout (`{ x, y, width, height }` for every node) and the UI tree (`kind`, `semantic`, `props`, `handlers`, `children`).
 3. It builds an accessibility tree from that data — roles, names, focusable state, bounds.
-4. **`geometra_snapshot`** defaults to a **compact** flat list of viewport-visible actionable nodes (minified JSON) to reduce LLM tokens; use `view: "full"` for the complete nested tree. Connect and post-action tool replies use the same compact text summary.
-5. Tools expose query, click, type, and snapshot operations over this structured data.
-6. After each interaction, the peer sends updated geometry (full `frame` or `patch`) — the MCP tools return the new state.
+4. **`geometra_snapshot`** defaults to a **compact** flat list of viewport-visible actionable nodes (minified JSON) to reduce LLM tokens; use `view: "full"` for the complete nested tree.
+5. **`geometra_page_model`** extracts higher-level webpage structure (landmarks, forms, dialogs, lists) so agents can reason about normal HTML pages without pulling a full tree first.
+6. After interactions, action tools return a **semantic delta** when possible (dialogs opened/closed, forms appeared/removed, list counts changed, named/focusable nodes added/removed/updated). If nothing meaningful changed, they fall back to a short current-UI overview.
+7. Tools expose query, click, type, snapshot, and page-model operations over this structured data.
+8. After each interaction, the peer sends updated geometry (full `frame` or `patch`) — the MCP tools interpret that into compact summaries.
 
 With a **native** Geometra server, layout comes from Textura/Yoga. With **`@geometra/proxy`**, layout comes from the browser’s computed DOM geometry; the MCP layer is the same.

@@ -13,7 +13,12 @@ import {
   sendWheel,
   buildA11yTree,
   buildCompactUiIndex,
+  buildPageModel,
+  buildUiDelta,
+  hasUiDelta,
   summarizeCompactIndex,
+  summarizePageModel,
+  summarizeUiDelta,
 } from './session.js'
 import type { A11yNode, Session } from './session.js'
 
@@ -70,12 +75,54 @@ This is the Geometra equivalent of Playwright's locator — but instant, structu
     }
   )
 
+  // ── page model ────────────────────────────────────────────────
+  server.tool(
+    'geometra_page_model',
+    `Get a higher-level webpage model instead of a raw node dump. Extracts common structures such as landmarks, forms, dialogs, and lists, with short previews of fields/actions/items.
+
+Use this first on normal HTML pages when you want to understand the page shape with fewer tokens than a full snapshot.`,
+    {
+      maxFieldsPerForm: z
+        .number()
+        .int()
+        .min(1)
+        .max(40)
+        .optional()
+        .default(12)
+        .describe('Cap returned fields per form (default 12).'),
+      maxActionsPerContainer: z
+        .number()
+        .int()
+        .min(1)
+        .max(20)
+        .optional()
+        .default(8)
+        .describe('Cap returned actions per form/dialog (default 8).'),
+      maxItemsPerList: z
+        .number()
+        .int()
+        .min(1)
+        .max(20)
+        .optional()
+        .default(5)
+        .describe('Cap list item preview strings (default 5).'),
+    },
+    async ({ maxFieldsPerForm, maxActionsPerContainer, maxItemsPerList }) => {
+      const session = getSession()
+      if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
+
+      const a11y = buildA11yTree(session.tree, session.layout)
+      const model = buildPageModel(a11y, { maxFieldsPerForm, maxActionsPerContainer, maxItemsPerList })
+      return ok(JSON.stringify(model))
+    }
+  )
+
   // ── click ────────────────────────────────────────────────────
   server.tool(
     'geometra_click',
     `Click an element in the Geometra UI. Provide either the element's bounds (from geometra_query) or raw x,y coordinates. The click is dispatched server-side via the geometry protocol — no browser, no simulated DOM events.
 
-After clicking, returns the updated UI state so you can verify the click had the intended effect.`,
+After clicking, returns a compact semantic delta when possible (dialogs/forms/lists/nodes changed). If nothing meaningful changed, returns a short current-UI overview.`,
     {
       x: z.number().describe('X coordinate to click (use center of element bounds from geometra_query)'),
       y: z.number().describe('Y coordinate to click'),
@@ -83,11 +130,12 @@ After clicking, returns the updated UI state so you can verify the click had the
     async ({ x, y }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
+      const before = sessionA11y(session)
 
       await sendClick(session, x, y)
 
-      const summary = compactSessionSummary(session)
-      return ok(`Clicked at (${x}, ${y}). Updated UI:\n${summary}`)
+      const summary = postActionSummary(session, before)
+      return ok(`Clicked at (${x}, ${y}).\n${summary}`)
     }
   )
 
@@ -96,18 +144,19 @@ After clicking, returns the updated UI state so you can verify the click had the
     'geometra_type',
     `Type text into the currently focused element. First click a textbox/input with geometra_click to focus it, then use this to type.
 
-Each character is sent as a key event through the geometry protocol. Returns updated UI state after typing.`,
+Each character is sent as a key event through the geometry protocol. Returns a compact semantic delta when possible, otherwise a short current-UI overview.`,
     {
       text: z.string().describe('Text to type into the focused element'),
     },
     async ({ text }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
+      const before = sessionA11y(session)
 
       await sendType(session, text)
 
-      const summary = compactSessionSummary(session)
-      return ok(`Typed "${text}". Updated UI:\n${summary}`)
+      const summary = postActionSummary(session, before)
+      return ok(`Typed "${text}".\n${summary}`)
     }
   )
 
@@ -125,11 +174,12 @@ Each character is sent as a key event through the geometry protocol. Returns upd
     async ({ key, shift, ctrl, meta, alt }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
+      const before = sessionA11y(session)
 
       await sendKey(session, key, { shift, ctrl, meta, alt })
 
-      const summary = compactSessionSummary(session)
-      return ok(`Pressed ${formatKeyCombo(key, { shift, ctrl, meta, alt })}. Updated UI:\n${summary}`)
+      const summary = postActionSummary(session, before)
+      return ok(`Pressed ${formatKeyCombo(key, { shift, ctrl, meta, alt })}.\n${summary}`)
     }
   )
 
@@ -138,7 +188,7 @@ Each character is sent as a key event through the geometry protocol. Returns upd
     'geometra_upload_files',
     `Attach local files to a file input. Requires \`@geometra/proxy\` (paths exist on the proxy host).
 
-Strategies: **auto** (default) tries chooser click if x,y given, else hidden \`input[type=file]\` with force, else first visible file input. **hidden** forces \`setInputFiles\` on hidden inputs. **drop** needs dropX,dropY for drag-target zones. **chooser** requires x,y.`,
+Strategies: **auto** (default) tries chooser click if x,y given, else hidden \`input[type=file]\`, else first visible file input. **hidden** targets hidden inputs directly. **drop** needs dropX,dropY for drag-target zones. **chooser** requires x,y.`,
     {
       paths: z.array(z.string()).min(1).describe('Absolute paths on the proxy machine, e.g. /Users/you/resume.pdf'),
       x: z.number().optional().describe('Click X to trigger native file chooser'),
@@ -153,14 +203,15 @@ Strategies: **auto** (default) tries chooser click if x,y given, else hidden \`i
     async ({ paths, x, y, strategy, dropX, dropY }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
+      const before = sessionA11y(session)
       try {
         await sendFileUpload(session, paths, {
           click: x !== undefined && y !== undefined ? { x, y } : undefined,
           strategy,
           drop: dropX !== undefined && dropY !== undefined ? { x: dropX, y: dropY } : undefined,
         })
-        const summary = compactSessionSummary(session)
-        return ok(`Uploaded ${paths.length} file(s). Updated UI:\n${summary}`)
+        const summary = postActionSummary(session, before)
+        return ok(`Uploaded ${paths.length} file(s).\n${summary}`)
       } catch (e) {
         return err((e as Error).message)
       }
@@ -181,13 +232,14 @@ Optional openX,openY clicks the combobox first if the list is not open. Uses sub
     async ({ label, exact, openX, openY }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
+      const before = sessionA11y(session)
       try {
         await sendListboxPick(session, label, {
           exact,
           open: openX !== undefined && openY !== undefined ? { x: openX, y: openY } : undefined,
         })
-        const summary = compactSessionSummary(session)
-        return ok(`Picked listbox option "${label}". Updated UI:\n${summary}`)
+        const summary = postActionSummary(session, before)
+        return ok(`Picked listbox option "${label}".\n${summary}`)
       } catch (e) {
         return err((e as Error).message)
       }
@@ -213,10 +265,11 @@ Custom React/Vue dropdowns are not supported — open them with geometra_click a
       if (value === undefined && label === undefined && index === undefined) {
         return err('Provide at least one of value, label, or index')
       }
+      const before = sessionA11y(session)
       try {
         await sendSelectOption(session, x, y, { value, label, index })
-        const summary = compactSessionSummary(session)
-        return ok(`Selected option. Updated UI:\n${summary}`)
+        const summary = postActionSummary(session, before)
+        return ok(`Selected option.\n${summary}`)
       } catch (e) {
         return err((e as Error).message)
       }
@@ -236,10 +289,11 @@ Custom React/Vue dropdowns are not supported — open them with geometra_click a
     async ({ deltaY, deltaX, x, y }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
+      const before = sessionA11y(session)
       try {
         await sendWheel(session, deltaY, { deltaX, x, y })
-        const summary = compactSessionSummary(session)
-        return ok(`Wheel delta (${deltaX ?? 0}, ${deltaY}). Updated UI:\n${summary}`)
+        const summary = postActionSummary(session, before)
+        return ok(`Wheel delta (${deltaX ?? 0}, ${deltaY}).\n${summary}`)
       } catch (e) {
         return err((e as Error).message)
       }
@@ -251,7 +305,7 @@ Custom React/Vue dropdowns are not supported — open them with geometra_click a
     'geometra_snapshot',
     `Get the current UI as JSON. Default **compact** view: flat list of viewport-visible actionable nodes (links, buttons, inputs, headings, landmarks, text leaves, focusable elements) with bounds and tree paths — far fewer tokens than a full nested tree. Use **full** for complete nested a11y + every wrapper when debugging layout.
 
-JSON is minified in compact view to save tokens.`,
+JSON is minified in compact view to save tokens. For a webpage-shaped overview (forms, dialogs, lists, landmarks), use geometra_page_model.`,
     {
       view: z
         .enum(['compact', 'full'])
@@ -318,10 +372,33 @@ For a token-efficient semantic view, use geometra_snapshot (default compact). Fo
 // ── Helpers ──────────────────────────────────────────────────────
 
 function compactSessionSummary(session: Session): string {
-  if (!session.tree || !session.layout) return 'No UI update received'
-  const a11y = buildA11yTree(session.tree, session.layout)
-  const { nodes } = buildCompactUiIndex(a11y, { maxNodes: 120 })
-  return summarizeCompactIndex(nodes, 100)
+  const a11y = sessionA11y(session)
+  if (!a11y) return 'No UI update received'
+  return sessionOverviewFromA11y(a11y)
+}
+
+function sessionA11y(session: Session): A11yNode | null {
+  if (!session.tree || !session.layout) return null
+  return buildA11yTree(session.tree, session.layout)
+}
+
+function sessionOverviewFromA11y(a11y: A11yNode): string {
+  const pageSummary = summarizePageModel(buildPageModel(a11y), 8)
+  const { nodes } = buildCompactUiIndex(a11y, { maxNodes: 32 })
+  const keyNodes = nodes.length > 0 ? `Key nodes:\n${summarizeCompactIndex(nodes, 18)}` : ''
+  return [pageSummary, keyNodes].filter(Boolean).join('\n')
+}
+
+function postActionSummary(session: Session, before: A11yNode | null): string {
+  const after = sessionA11y(session)
+  if (!after) return 'No UI update received'
+  if (before) {
+    const delta = buildUiDelta(before, after)
+    if (hasUiDelta(delta)) {
+      return `Changes:\n${summarizeUiDelta(delta)}`
+    }
+  }
+  return `Current UI:\n${sessionOverviewFromA11y(after)}`
 }
 
 function ok(text: string) {

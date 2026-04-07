@@ -25,6 +25,89 @@ export interface CompactUiNode {
   focusable: boolean
 }
 
+/** Higher-level webpage structures extracted from the a11y tree. */
+export interface PageLandmark {
+  role: string
+  name?: string
+  bounds: { x: number; y: number; width: number; height: number }
+  path: number[]
+}
+
+export interface PageFieldModel {
+  role: string
+  name?: string
+  state?: A11yNode['state']
+  bounds: { x: number; y: number; width: number; height: number }
+  path: number[]
+}
+
+export interface PageActionModel {
+  role: string
+  name?: string
+  state?: A11yNode['state']
+  bounds: { x: number; y: number; width: number; height: number }
+  path: number[]
+}
+
+export interface PageFormModel {
+  name?: string
+  bounds: { x: number; y: number; width: number; height: number }
+  path: number[]
+  fieldCount: number
+  actionCount: number
+  fields: PageFieldModel[]
+  actions: PageActionModel[]
+}
+
+export interface PageDialogModel {
+  name?: string
+  bounds: { x: number; y: number; width: number; height: number }
+  path: number[]
+  actionCount: number
+  actions: PageActionModel[]
+}
+
+export interface PageListModel {
+  name?: string
+  bounds: { x: number; y: number; width: number; height: number }
+  path: number[]
+  itemCount: number
+  itemsPreview: string[]
+}
+
+export interface PageModel {
+  viewport: { width: number; height: number }
+  landmarks: PageLandmark[]
+  forms: PageFormModel[]
+  dialogs: PageDialogModel[]
+  lists: PageListModel[]
+}
+
+export interface UiNodeUpdate {
+  before: CompactUiNode
+  after: CompactUiNode
+  changes: string[]
+}
+
+export interface UiListCountChange {
+  name?: string
+  path: number[]
+  beforeCount: number
+  afterCount: number
+}
+
+/** Semantic delta between two compact viewport models. */
+export interface UiDelta {
+  added: CompactUiNode[]
+  removed: CompactUiNode[]
+  updated: UiNodeUpdate[]
+  dialogsOpened: PageDialogModel[]
+  dialogsClosed: PageDialogModel[]
+  formsAppeared: PageFormModel[]
+  formsRemoved: PageFormModel[]
+  listCountsChanged: UiListCountChange[]
+}
+
 export interface Session {
   ws: WebSocket
   layout: Record<string, unknown> | null
@@ -266,6 +349,34 @@ const COMPACT_INDEX_ROLES = new Set([
   'listitem',
 ])
 
+const LANDMARK_ROLES = new Set([
+  'banner',
+  'navigation',
+  'main',
+  'search',
+  'form',
+  'article',
+  'region',
+  'contentinfo',
+])
+
+const FORM_FIELD_ROLES = new Set([
+  'textbox',
+  'combobox',
+  'checkbox',
+  'radio',
+])
+
+const ACTION_ROLES = new Set([
+  'button',
+  'link',
+])
+
+const DIALOG_ROLES = new Set([
+  'dialog',
+  'alertdialog',
+])
+
 function intersectsViewport(
   b: { x: number; y: number; width: number; height: number },
   vw: number,
@@ -343,6 +454,408 @@ export function summarizeCompactIndex(nodes: CompactUiNode[], maxLines = 80): st
   if (nodes.length > maxLines) {
     lines.push(`… and ${nodes.length - maxLines} more (use geometra_snapshot with a higher maxNodes or geometra_query)`)
   }
+  return lines.join('\n')
+}
+
+function cloneBounds(bounds: A11yNode['bounds']): A11yNode['bounds'] {
+  return { ...bounds }
+}
+
+function cloneState(state: A11yNode['state'] | undefined): A11yNode['state'] | undefined {
+  if (!state) return undefined
+  const next: A11yNode['state'] = {}
+  if (state.disabled) next.disabled = true
+  if (state.expanded !== undefined) next.expanded = state.expanded
+  if (state.selected !== undefined) next.selected = state.selected
+  return Object.keys(next).length > 0 ? next : undefined
+}
+
+function clonePath(path: number[]): number[] {
+  return [...path]
+}
+
+function sortByBounds<T extends { bounds: A11yNode['bounds'] }>(items: T[]): T[] {
+  return items.sort((a, b) => {
+    if (a.bounds.y !== b.bounds.y) return a.bounds.y - b.bounds.y
+    return a.bounds.x - b.bounds.x
+  })
+}
+
+function collectDescendants(node: A11yNode, predicate: (candidate: A11yNode) => boolean): A11yNode[] {
+  const out: A11yNode[] = []
+  function walk(current: A11yNode) {
+    for (const child of current.children) {
+      if (predicate(child)) out.push(child)
+      walk(child)
+    }
+  }
+  walk(node)
+  return out
+}
+
+function firstNamedDescendant(node: A11yNode, allowedRoles?: ReadonlySet<string>): string | undefined {
+  const queue = [...node.children]
+  while (queue.length > 0) {
+    const current = queue.shift()!
+    if ((!allowedRoles || allowedRoles.has(current.role)) && current.name && current.name.trim().length > 0) {
+      return current.name
+    }
+    queue.push(...current.children)
+  }
+  return undefined
+}
+
+function containerName(node: A11yNode): string | undefined {
+  return node.name ?? firstNamedDescendant(node, new Set(['heading', 'text']))
+}
+
+function listItemName(node: A11yNode): string | undefined {
+  return node.name ?? firstNamedDescendant(node, new Set(['heading', 'text', 'link', 'button']))
+}
+
+function truncateForModel(value: string | undefined, max = 120): string | undefined {
+  if (!value) return undefined
+  return value.length > max ? `${value.slice(0, max - 1)}\u2026` : value
+}
+
+function toFieldModel(node: A11yNode): PageFieldModel {
+  return {
+    role: node.role,
+    ...(truncateForModel(node.name, 160) ? { name: truncateForModel(node.name, 160) } : {}),
+    ...(cloneState(node.state) ? { state: cloneState(node.state) } : {}),
+    bounds: cloneBounds(node.bounds),
+    path: clonePath(node.path),
+  }
+}
+
+function toActionModel(node: A11yNode): PageActionModel {
+  return {
+    role: node.role,
+    ...(truncateForModel(node.name, 160) ? { name: truncateForModel(node.name, 160) } : {}),
+    ...(cloneState(node.state) ? { state: cloneState(node.state) } : {}),
+    bounds: cloneBounds(node.bounds),
+    path: clonePath(node.path),
+  }
+}
+
+function toLandmarkModel(node: A11yNode): PageLandmark {
+  return {
+    role: node.role,
+    ...(truncateForModel(containerName(node), 120) ? { name: truncateForModel(containerName(node), 120) } : {}),
+    bounds: cloneBounds(node.bounds),
+    path: clonePath(node.path),
+  }
+}
+
+/**
+ * Build a compact, webpage-shaped model from the accessibility tree:
+ * landmarks, dialogs, forms, and lists with short previews.
+ */
+export function buildPageModel(
+  root: A11yNode,
+  options?: {
+    maxFieldsPerForm?: number
+    maxActionsPerContainer?: number
+    maxItemsPerList?: number
+  },
+): PageModel {
+  const maxFieldsPerForm = options?.maxFieldsPerForm ?? 12
+  const maxActionsPerContainer = options?.maxActionsPerContainer ?? 8
+  const maxItemsPerList = options?.maxItemsPerList ?? 5
+
+  const landmarks: PageLandmark[] = []
+  const forms: PageFormModel[] = []
+  const dialogs: PageDialogModel[] = []
+  const lists: PageListModel[] = []
+
+  function walk(node: A11yNode) {
+    if (LANDMARK_ROLES.has(node.role)) {
+      landmarks.push(toLandmarkModel(node))
+    }
+
+    if (node.role === 'form') {
+      const fields = sortByBounds(collectDescendants(node, candidate => FORM_FIELD_ROLES.has(candidate.role)))
+      const actions = sortByBounds(
+        collectDescendants(node, candidate => ACTION_ROLES.has(candidate.role) && candidate.focusable),
+      )
+      const name = truncateForModel(containerName(node), 120)
+      forms.push({
+        ...(name ? { name } : {}),
+        bounds: cloneBounds(node.bounds),
+        path: clonePath(node.path),
+        fieldCount: fields.length,
+        actionCount: actions.length,
+        fields: fields.slice(0, maxFieldsPerForm).map(toFieldModel),
+        actions: actions.slice(0, maxActionsPerContainer).map(toActionModel),
+      })
+    }
+
+    if (DIALOG_ROLES.has(node.role)) {
+      const actions = sortByBounds(
+        collectDescendants(node, candidate => ACTION_ROLES.has(candidate.role) && candidate.focusable),
+      )
+      const name = truncateForModel(containerName(node), 120)
+      dialogs.push({
+        ...(name ? { name } : {}),
+        bounds: cloneBounds(node.bounds),
+        path: clonePath(node.path),
+        actionCount: actions.length,
+        actions: actions.slice(0, maxActionsPerContainer).map(toActionModel),
+      })
+    }
+
+    if (node.role === 'list') {
+      const items = sortByBounds(collectDescendants(node, candidate => candidate.role === 'listitem'))
+      const preview = items
+        .map(item => truncateForModel(listItemName(item), 80))
+        .filter((value): value is string => !!value)
+        .slice(0, maxItemsPerList)
+      const name = truncateForModel(containerName(node), 120)
+      lists.push({
+        ...(name ? { name } : {}),
+        bounds: cloneBounds(node.bounds),
+        path: clonePath(node.path),
+        itemCount: items.length,
+        itemsPreview: preview,
+      })
+    }
+
+    for (const child of node.children) walk(child)
+  }
+
+  walk(root)
+
+  return {
+    viewport: {
+      width: root.bounds.width,
+      height: root.bounds.height,
+    },
+    landmarks: sortByBounds(landmarks),
+    forms: sortByBounds(forms),
+    dialogs: sortByBounds(dialogs),
+    lists: sortByBounds(lists),
+  }
+}
+
+export function summarizePageModel(model: PageModel, maxLines = 10): string {
+  const lines: string[] = []
+
+  if (model.landmarks.length > 0) {
+    const landmarks = model.landmarks
+      .slice(0, 5)
+      .map(landmark => landmark.name ? `${landmark.role} "${truncateUiText(landmark.name, 36)}"` : landmark.role)
+      .join(', ')
+    lines.push(`landmarks: ${landmarks}`)
+  }
+
+  for (const form of model.forms.slice(0, 3)) {
+    const name = form.name ? ` "${truncateUiText(form.name, 40)}"` : ''
+    lines.push(`form${name}: ${form.fieldCount} fields, ${form.actionCount} actions`)
+  }
+
+  for (const dialog of model.dialogs.slice(0, 2)) {
+    const name = dialog.name ? ` "${truncateUiText(dialog.name, 40)}"` : ''
+    lines.push(`dialog${name}: ${dialog.actionCount} actions`)
+  }
+
+  for (const list of model.lists.slice(0, 3)) {
+    const name = list.name ? ` "${truncateUiText(list.name, 40)}"` : ''
+    const preview = list.itemsPreview.length > 0
+      ? ` [${list.itemsPreview.map(item => `"${truncateUiText(item, 24)}"`).join(', ')}]`
+      : ''
+    lines.push(`list${name}: ${list.itemCount} items${preview}`)
+  }
+
+  if (lines.length === 0) {
+    return `viewport ${model.viewport.width}x${model.viewport.height}; no common page structures detected`
+  }
+
+  return lines.slice(0, maxLines).join('\n')
+}
+
+function pathKey(path: number[]): string {
+  return path.join('.')
+}
+
+function compactNodeLabel(node: CompactUiNode): string {
+  if (node.name) return `${node.role} "${truncateUiText(node.name, 40)}"`
+  return `${node.role} @ ${JSON.stringify(node.path)}`
+}
+
+function formatStateValue(value: boolean | undefined): string {
+  return value === undefined ? 'unset' : String(value)
+}
+
+function diffCompactNodes(before: CompactUiNode, after: CompactUiNode): string[] {
+  const changes: string[] = []
+
+  if (before.role !== after.role) changes.push(`role ${before.role} -> ${after.role}`)
+  if ((before.name ?? '') !== (after.name ?? '')) {
+    changes.push(`name ${JSON.stringify(truncateUiText(before.name ?? 'unset', 32))} -> ${JSON.stringify(truncateUiText(after.name ?? 'unset', 32))}`)
+  }
+
+  const beforeState = before.state ?? {}
+  const afterState = after.state ?? {}
+  for (const key of ['disabled', 'expanded', 'selected'] as const) {
+    if (beforeState[key] !== afterState[key]) {
+      changes.push(`${key} ${formatStateValue(beforeState[key])} -> ${formatStateValue(afterState[key])}`)
+    }
+  }
+
+  const moved = Math.abs(before.bounds.x - after.bounds.x) + Math.abs(before.bounds.y - after.bounds.y)
+  const resized = Math.abs(before.bounds.width - after.bounds.width) + Math.abs(before.bounds.height - after.bounds.height)
+  if (moved >= 8 || resized >= 8) {
+    changes.push(
+      `bounds (${before.bounds.x},${before.bounds.y} ${before.bounds.width}x${before.bounds.height}) -> (${after.bounds.x},${after.bounds.y} ${after.bounds.width}x${after.bounds.height})`,
+    )
+  }
+
+  return changes
+}
+
+function pageContainerKey<T extends { path: number[]; name?: string }>(value: T): string {
+  return `${pathKey(value.path)}|${value.name ?? ''}`
+}
+
+/**
+ * Compare two accessibility trees at the compact viewport layer plus a few
+ * higher-level structures (dialogs, forms, lists).
+ */
+export function buildUiDelta(
+  before: A11yNode,
+  after: A11yNode,
+  options?: { maxNodes?: number },
+): UiDelta {
+  const maxNodes = options?.maxNodes ?? 250
+  const beforeCompact = buildCompactUiIndex(before, { maxNodes }).nodes
+  const afterCompact = buildCompactUiIndex(after, { maxNodes }).nodes
+
+  const beforeMap = new Map(beforeCompact.map(node => [pathKey(node.path), node]))
+  const afterMap = new Map(afterCompact.map(node => [pathKey(node.path), node]))
+
+  const added: CompactUiNode[] = []
+  const removed: CompactUiNode[] = []
+  const updated: UiNodeUpdate[] = []
+
+  for (const [key, afterNode] of afterMap) {
+    const beforeNode = beforeMap.get(key)
+    if (!beforeNode) {
+      added.push(afterNode)
+      continue
+    }
+    const changes = diffCompactNodes(beforeNode, afterNode)
+    if (changes.length > 0) updated.push({ before: beforeNode, after: afterNode, changes })
+  }
+
+  for (const [key, beforeNode] of beforeMap) {
+    if (!afterMap.has(key)) removed.push(beforeNode)
+  }
+
+  const beforePage = buildPageModel(before)
+  const afterPage = buildPageModel(after)
+
+  const beforeDialogs = new Map(beforePage.dialogs.map(dialog => [pageContainerKey(dialog), dialog]))
+  const afterDialogs = new Map(afterPage.dialogs.map(dialog => [pageContainerKey(dialog), dialog]))
+  const dialogsOpened = [...afterDialogs.entries()]
+    .filter(([key]) => !beforeDialogs.has(key))
+    .map(([, value]) => value)
+  const dialogsClosed = [...beforeDialogs.entries()]
+    .filter(([key]) => !afterDialogs.has(key))
+    .map(([, value]) => value)
+
+  const beforeForms = new Map(beforePage.forms.map(form => [pageContainerKey(form), form]))
+  const afterForms = new Map(afterPage.forms.map(form => [pageContainerKey(form), form]))
+  const formsAppeared = [...afterForms.entries()]
+    .filter(([key]) => !beforeForms.has(key))
+    .map(([, value]) => value)
+  const formsRemoved = [...beforeForms.entries()]
+    .filter(([key]) => !afterForms.has(key))
+    .map(([, value]) => value)
+
+  const beforeLists = new Map(beforePage.lists.map(list => [pathKey(list.path), list]))
+  const afterLists = new Map(afterPage.lists.map(list => [pathKey(list.path), list]))
+  const listCountsChanged: UiListCountChange[] = []
+  for (const [key, afterList] of afterLists) {
+    const beforeList = beforeLists.get(key)
+    if (beforeList && beforeList.itemCount !== afterList.itemCount) {
+      listCountsChanged.push({
+        ...(afterList.name ? { name: afterList.name } : {}),
+        path: clonePath(afterList.path),
+        beforeCount: beforeList.itemCount,
+        afterCount: afterList.itemCount,
+      })
+    }
+  }
+
+  return {
+    added,
+    removed,
+    updated,
+    dialogsOpened,
+    dialogsClosed,
+    formsAppeared,
+    formsRemoved,
+    listCountsChanged,
+  }
+}
+
+export function hasUiDelta(delta: UiDelta): boolean {
+  return (
+    delta.added.length > 0 ||
+    delta.removed.length > 0 ||
+    delta.updated.length > 0 ||
+    delta.dialogsOpened.length > 0 ||
+    delta.dialogsClosed.length > 0 ||
+    delta.formsAppeared.length > 0 ||
+    delta.formsRemoved.length > 0 ||
+    delta.listCountsChanged.length > 0
+  )
+}
+
+export function summarizeUiDelta(delta: UiDelta, maxLines = 14): string {
+  const lines: string[] = []
+
+  for (const dialog of delta.dialogsOpened.slice(0, 2)) {
+    lines.push(`+ dialog${dialog.name ? ` "${truncateUiText(dialog.name, 40)}"` : ''} opened`)
+  }
+
+  for (const dialog of delta.dialogsClosed.slice(0, 2)) {
+    lines.push(`- dialog${dialog.name ? ` "${truncateUiText(dialog.name, 40)}"` : ''} closed`)
+  }
+
+  for (const form of delta.formsAppeared.slice(0, 2)) {
+    lines.push(`+ form${form.name ? ` "${truncateUiText(form.name, 40)}"` : ''} appeared (${form.fieldCount} fields)`)
+  }
+
+  for (const form of delta.formsRemoved.slice(0, 2)) {
+    lines.push(`- form${form.name ? ` "${truncateUiText(form.name, 40)}"` : ''} removed`)
+  }
+
+  for (const list of delta.listCountsChanged.slice(0, 3)) {
+    lines.push(`~ list${list.name ? ` "${truncateUiText(list.name, 40)}"` : ''} items ${list.beforeCount} -> ${list.afterCount}`)
+  }
+
+  for (const update of delta.updated.slice(0, 5)) {
+    lines.push(`~ ${compactNodeLabel(update.after)}: ${update.changes.join('; ')}`)
+  }
+
+  for (const node of delta.added.slice(0, 4)) {
+    lines.push(`+ ${compactNodeLabel(node)}`)
+  }
+
+  for (const node of delta.removed.slice(0, 4)) {
+    lines.push(`- ${compactNodeLabel(node)}`)
+  }
+
+  if (lines.length === 0) {
+    return 'No semantic changes detected in the compact viewport model.'
+  }
+
+  if (lines.length > maxLines) {
+    const hidden = lines.length - maxLines
+    return `${lines.slice(0, maxLines).join('\n')}\n… and ${hidden} more changes`
+  }
+
   return lines.join('\n')
 }
 
