@@ -103,14 +103,21 @@ function isFinitePatchNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
 }
 
+/** Finite primitive `number` with `>= 0` for layout width/height (matches GEOM v1 client patch validation). */
+function isNonNegativePatchDimension(value: unknown): value is number {
+  return isFinitePatchNumber(value) && value >= 0
+}
+
 /**
  * Coalesce multiple patches on the same path (last write wins per field).
  * Paths are keyed with `JSON.stringify` so distinct index sequences never alias (e.g. `[0, 1]` vs `[0.1]` would
  * both stringify to `"0.1"` under a naive `join('.')` key).
  * Entries with a missing or non-array `path` (including `null` list slots), or paths that `JSON.stringify`
  * rejects (`BigInt` segments, circular arrays, etc.), are skipped so corrupt hand-built batches cannot throw.
- * Geometry fields apply only when the incoming value is a finite primitive `number` — JSON `null`, `NaN`, `±Infinity`,
- * boxed numbers, and other garbage cannot overwrite a prior good coordinate (last finite write still wins).
+ * `x` / `y` apply when the incoming value is a finite primitive `number`. `width` / `height` additionally require
+ * `>= 0` (IEEE `−0` counts as non-negative) so negative sizes from corrupt streams cannot overwrite good dimensions
+ * or produce coalesced patches the GEOM v1 client rejects. JSON `null`, `NaN`, `±Infinity`, boxed numbers, and other
+ * garbage are ignored per field (last valid write still wins).
  */
 export function coalescePatches(patches: LayoutPatch[]): LayoutPatch[] {
   const byPath = new Map<string, LayoutPatch>()
@@ -130,8 +137,8 @@ export function coalescePatches(patches: LayoutPatch[]): LayoutPatch[] {
     const next = byPath.get(key)!
     if (isFinitePatchNumber(patch.x)) next.x = patch.x
     if (isFinitePatchNumber(patch.y)) next.y = patch.y
-    if (isFinitePatchNumber(patch.width)) next.width = patch.width
-    if (isFinitePatchNumber(patch.height)) next.height = patch.height
+    if (isNonNegativePatchDimension(patch.width)) next.width = patch.width
+    if (isNonNegativePatchDimension(patch.height)) next.height = patch.height
   }
   return order.map(k => byPath.get(k)!)
 }

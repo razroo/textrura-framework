@@ -350,6 +350,36 @@ describe('coalescePatches', () => {
     ).toEqual([{ path: [1], x: 7 }])
   })
 
+  it('ignores negative width and height so coalescing stays aligned with client non-negative layout bounds', () => {
+    expect(
+      coalescePatches([
+        { path: [0], width: 10, height: 20 },
+        { path: [0], width: -1, height: -0.5 },
+      ]),
+    ).toEqual([{ path: [0], width: 10, height: 20 }])
+    expect(
+      coalescePatches([
+        { path: [1], width: -5 },
+        { path: [1], width: 12 },
+      ]),
+    ).toEqual([{ path: [1], width: 12 }])
+    const negSub = -Number.MIN_VALUE
+    expect(negSub).toBeLessThan(0)
+    expect(
+      coalescePatches([
+        { path: [2], width: 8 },
+        { path: [2], width: negSub },
+      ]),
+    ).toEqual([{ path: [2], width: 8 }])
+  })
+
+  it('still merges IEEE negative zero width and height (non-negative in JS; degenerate rects stay expressible)', () => {
+    const merged = coalescePatches([{ path: [0], width: -0, height: -0 }])
+    expect(merged).toEqual([{ path: [0], width: -0, height: -0 }])
+    expect(Object.is(merged[0]!.width, -0)).toBe(true)
+    expect(Object.is(merged[0]!.height, -0)).toBe(true)
+  })
+
   it('ignores boxed Number and bigint geometry fields (only finite primitive numbers merge)', () => {
     expect(
       coalescePatches([
