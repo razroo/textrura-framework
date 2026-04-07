@@ -461,6 +461,15 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(0, max, 0, max, 1, 1e307)).toBe(false)
   })
 
+  it('accepts the far inclusive corner at Number.MAX_VALUE when the rect starts at the origin (finite right/bottom; no abs+size overflow)', () => {
+    const max = Number.MAX_VALUE
+    expect(max + max).toBe(Infinity)
+    // Distinct from the translated-max case: here absX+width and absY+height stay finite.
+    expect(pointInInclusiveLayoutRect(max, max, 0, 0, max, max)).toBe(true)
+    expect(pointInInclusiveLayoutRect(max, 0, 0, 0, max, 10)).toBe(true)
+    expect(pointInInclusiveLayoutRect(0, max, 0, 0, 10, max)).toBe(true)
+  })
+
   it('returns false when both right and bottom overflow (finite corner point; naive <= edge would accept)', () => {
     const max = Number.MAX_VALUE
     expect(max + max).toBe(Infinity)
