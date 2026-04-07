@@ -2,6 +2,8 @@
 
 MCP server for [Geometra](https://github.com/razroo/geometra) — interact with running Geometra apps via the geometry protocol over WebSocket. For **native** Geometra apps there is no browser in the loop. For **any existing website**, pair this MCP server with [`@geometra/proxy`](../packages/proxy/README.md) (headless Chromium) so the same tools speak the same GEOM v1 wire format.
 
+See [`AGENT_MODEL.md`](./AGENT_MODEL.md) for the MCP mental model, why token usage can be lower than large browser snapshots, and how headed vs headless proxy mode works.
+
 ## What this does
 
 Connects Claude Code, Codex, or any MCP-compatible AI agent to a WebSocket endpoint that streams `frame` / `patch` messages. The agent gets structured `{ x, y, width, height }` geometry and semantic metadata for every UI node — not screenshots, not a vision model.
@@ -87,6 +89,8 @@ In another terminal (from repo root after `npm install` / `bun install` and `bun
 npx geometra-proxy http://localhost:8080 --port 3200
 # Requires Chromium: npx playwright install chromium
 ```
+
+To watch the browser in real time while the MCP interacts with it, run the proxy with `--headed` instead. This is useful for debugging or demos and usually does **not** materially change token usage, since token usage is driven by MCP tool output rather than whether Chromium is visible.
 
 Point MCP at `ws://127.0.0.1:3200` instead of a native Geometra server. The proxy translates clicks and keyboard messages into Playwright actions and streams updated geometry.
 

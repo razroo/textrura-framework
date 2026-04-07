@@ -16,6 +16,8 @@ npx geometra-proxy https://example.com --port 3200
 npx geometra-proxy http://localhost:8080 --width 1440 --height 900 --headed
 ```
 
+Default mode is headless. Use `--headed` when you want to watch the browser interact in real time while driving it through `@geometra/mcp`. This is mainly for debugging / demos and usually does **not** materially change token usage, because token usage comes from MCP response payloads rather than whether Chromium is visible.
+
 ## Protocol
 
 Matches `packages/server` GEOM v1: `frame` with `layout`, `tree`, `protocolVersion`; `patch` with `patches`; client messages `resize`, `event` (`onClick`), `key`, `composition`.
