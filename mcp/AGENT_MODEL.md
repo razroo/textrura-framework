@@ -12,6 +12,39 @@ Instead of giving the model a screenshot, raw HTML, or a large browser accessibi
 
 This is what keeps token usage low while still preserving enough structure to act on the page.
 
+## At A Glance
+
+```text
+                 Native Geometra app
+                        |
+                        v
+                    GEOM v1 WS
+                        ^
+                        |
+Normal webpage -> @geometra/proxy -> Chromium (headless or headed)
+                        |
+                        v
+                 +----------------+
+                 | @geometra/mcp  |
+                 +----------------+
+                        |
+        +---------------+------------------+
+        |               |                  |
+        v               v                  v
+  page_model      expand_section      snapshot/query
+  (cheap map)     (one section)       (precise target)
+        \               |                  /
+         \              |                 /
+          +-------------+----------------+
+                        |
+                        v
+          click / type / wheel / upload / select
+                        |
+                        v
+                 semantic delta
+                 (what changed)
+```
+
 ## Mental Model
 
 Geometra MCP does **not** treat the page as "browser internals the model must interpret".
