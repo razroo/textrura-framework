@@ -41,6 +41,8 @@ fi
 # Root `npm run release:gate` allowlists specific vitest entry files (see package.json), not every
 # `packages/*/src/__tests__/**/*.test.ts` that `npm run test` / vitest.fast.config.ts includes — a file
 # passing `vitest.fast` does not imply it runs in CI gate; check package.json before assuming coverage ships.
+# `verify-release-gate.mjs` requires exactly one `vitest run` substring in `scripts.release:gate` (one batch);
+# do not split the allowlist across `vitest run ... && vitest run ...` — duplicate-path checks only apply per argv list.
 # Before appending a path to the gate script, confirm it is not already listed (duplicate paths make
 # vitest run the same file twice). Scan the whole `scripts.release:gate` string — paths are not strictly
 # ordered, so a file can appear early in the vitest argv list while you only eyeball a later segment.

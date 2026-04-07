@@ -39,6 +39,13 @@ async function main() {
     )
   }
 
+  const vitestRunMatches = gate.match(/\bvitest\s+run\b/g)
+  if (!vitestRunMatches || vitestRunMatches.length !== 1) {
+    throw new Error(
+      'release:gate: scripts.release:gate must include exactly one `vitest run` (single argv batch for the allowlist; multiple runs split duplicate detection and can double CI time)',
+    )
+  }
+
   const segments = gate.split(/\s+&&\s+/).map(s => s.trim())
   const lastSegment = segments[segments.length - 1] ?? ''
   if (!lastSegment.includes('test:terminal-input')) {
