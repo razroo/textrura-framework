@@ -17,6 +17,7 @@ export interface A11yNode {
 
 /** Flat, viewport-filtered index for token-efficient agent context (see `buildCompactUiIndex`). */
 export interface CompactUiNode {
+  id: string
   role: string
   name?: string
   state?: A11yNode['state']
@@ -25,62 +26,112 @@ export interface CompactUiNode {
   focusable: boolean
 }
 
+export type PageSectionKind = 'landmark' | 'form' | 'dialog' | 'list'
+
+export type PageArchetype =
+  | 'shell'
+  | 'form'
+  | 'dialog'
+  | 'results'
+  | 'content'
+  | 'dashboard'
+
+interface PageSectionSummaryBase {
+  id: string
+  role: string
+  name?: string
+  bounds: { x: number; y: number; width: number; height: number }
+}
+
 /** Higher-level webpage structures extracted from the a11y tree. */
-export interface PageLandmark {
-  role: string
-  name?: string
-  bounds: { x: number; y: number; width: number; height: number }
-  path: number[]
-}
+export interface PageLandmark extends PageSectionSummaryBase {}
 
-export interface PageFieldModel {
+export interface PagePrimaryAction {
+  id: string
   role: string
   name?: string
   state?: A11yNode['state']
   bounds: { x: number; y: number; width: number; height: number }
-  path: number[]
 }
 
-export interface PageActionModel {
-  role: string
-  name?: string
-  state?: A11yNode['state']
-  bounds: { x: number; y: number; width: number; height: number }
-  path: number[]
-}
-
-export interface PageFormModel {
-  name?: string
-  bounds: { x: number; y: number; width: number; height: number }
-  path: number[]
+export interface PageFormModel extends PageSectionSummaryBase {
   fieldCount: number
   actionCount: number
-  fields: PageFieldModel[]
-  actions: PageActionModel[]
 }
 
-export interface PageDialogModel {
-  name?: string
-  bounds: { x: number; y: number; width: number; height: number }
-  path: number[]
+export interface PageDialogModel extends PageSectionSummaryBase {
+  fieldCount: number
   actionCount: number
-  actions: PageActionModel[]
 }
 
-export interface PageListModel {
-  name?: string
-  bounds: { x: number; y: number; width: number; height: number }
-  path: number[]
+export interface PageListModel extends PageSectionSummaryBase {
   itemCount: number
-  itemsPreview: string[]
 }
 
 export interface PageModel {
   viewport: { width: number; height: number }
+  archetypes: PageArchetype[]
+  summary: {
+    landmarkCount: number
+    formCount: number
+    dialogCount: number
+    listCount: number
+    focusableCount: number
+  }
+  primaryActions: PagePrimaryAction[]
   landmarks: PageLandmark[]
   forms: PageFormModel[]
   dialogs: PageDialogModel[]
   lists: PageListModel[]
+}
+
+export interface PageHeadingModel {
+  id: string
+  name: string
+  bounds?: { x: number; y: number; width: number; height: number }
+}
+
+export interface PageFieldModel {
+  id: string
+  role: string
+  name?: string
+  state?: A11yNode['state']
+  bounds?: { x: number; y: number; width: number; height: number }
+}
+
+export interface PageActionModel {
+  id: string
+  role: string
+  name?: string
+  state?: A11yNode['state']
+  bounds?: { x: number; y: number; width: number; height: number }
+}
+
+export interface PageListItemModel {
+  id: string
+  name?: string
+  bounds?: { x: number; y: number; width: number; height: number }
+}
+
+export interface PageSectionDetail {
+  id: string
+  kind: PageSectionKind
+  role: string
+  name?: string
+  bounds: { x: number; y: number; width: number; height: number }
+  summary: {
+    headingCount: number
+    fieldCount: number
+    actionCount: number
+    listCount: number
+    itemCount: number
+  }
+  headings: PageHeadingModel[]
+  fields: PageFieldModel[]
+  actions: PageActionModel[]
+  lists: PageListModel[]
+  items: PageListItemModel[]
+  textPreview: string[]
 }
 
 export interface UiNodeUpdate {
@@ -90,8 +141,8 @@ export interface UiNodeUpdate {
 }
 
 export interface UiListCountChange {
+  id: string
   name?: string
-  path: number[]
   beforeCount: number
   afterCount: number
 }
@@ -377,6 +428,95 @@ const DIALOG_ROLES = new Set([
   'alertdialog',
 ])
 
+const FIELD_LABEL_ROLES = new Set(['textbox', 'combobox', 'checkbox', 'radio'])
+const CONTENT_NAME_ROLES = new Set(['heading', 'text'])
+
+function encodePath(path: number[]): string {
+  return path.length === 0 ? 'root' : path.map(part => part.toString(36)).join('.')
+}
+
+function decodePath(encoded: string): number[] | null {
+  if (encoded === 'root') return []
+  const parts = encoded.split('.')
+  const out: number[] = []
+  for (const part of parts) {
+    const value = Number.parseInt(part, 36)
+    if (!Number.isFinite(value) || value < 0) return null
+    out.push(value)
+  }
+  return out
+}
+
+export function nodeIdForPath(path: number[]): string {
+  return `n:${encodePath(path)}`
+}
+
+function sectionPrefix(kind: PageSectionKind): string {
+  if (kind === 'landmark') return 'lm'
+  if (kind === 'form') return 'fm'
+  if (kind === 'dialog') return 'dg'
+  return 'ls'
+}
+
+function sectionIdForPath(kind: PageSectionKind, path: number[]): string {
+  return `${sectionPrefix(kind)}:${encodePath(path)}`
+}
+
+function parseSectionId(id: string): { kind: PageSectionKind; path: number[] } | null {
+  const [prefix, encoded] = id.split(':', 2)
+  if (!prefix || !encoded) return null
+  const path = decodePath(encoded)
+  if (!path) return null
+  if (prefix === 'lm') return { kind: 'landmark', path }
+  if (prefix === 'fm') return { kind: 'form', path }
+  if (prefix === 'dg') return { kind: 'dialog', path }
+  if (prefix === 'ls') return { kind: 'list', path }
+  return null
+}
+
+function normalizeUiText(value: string): string {
+  return value.replace(/\s+/g, ' ').replace(/\s*\u00a0\s*/g, ' ').trim()
+}
+
+function trimPunctuation(value: string): string {
+  return value.replace(/[:*]+$/g, '').trim()
+}
+
+function sanitizeInlineName(value: string | undefined, max = 120): string | undefined {
+  if (!value) return undefined
+  const normalized = normalizeUiText(value)
+  if (!normalized) return undefined
+  return normalized.length > max ? `${normalized.slice(0, max - 1)}\u2026` : normalized
+}
+
+function sanitizeFieldName(value: string | undefined, max = 80): string | undefined {
+  const normalized = sanitizeInlineName(value, max + 8)
+  if (!normalized) return undefined
+  const trimmed = trimPunctuation(normalized)
+  if (!trimmed) return undefined
+  return trimmed.length > max ? `${trimmed.slice(0, max - 1)}\u2026` : trimmed
+}
+
+function looksNoisyContainerName(value: string): boolean {
+  const starCount = (value.match(/\*/g) ?? []).length
+  const labelMatches = value.match(
+    /\b(first name|last name|email|phone|country|location|resume|linkedin|portfolio|website|city)\b/gi,
+  )
+  const tokenCount = value.split(/\s+/).filter(Boolean).length
+  if (value.length > 90) return true
+  if (starCount >= 2) return true
+  if ((labelMatches?.length ?? 0) >= 3) return true
+  if (tokenCount >= 12) return true
+  return false
+}
+
+function sanitizeContainerName(value: string | undefined, max = 80): string | undefined {
+  const normalized = sanitizeInlineName(value, max + 24)
+  if (!normalized) return undefined
+  if (looksNoisyContainerName(normalized)) return undefined
+  return normalized.length > max ? `${normalized.slice(0, max - 1)}\u2026` : normalized
+}
+
 function intersectsViewport(
   b: { x: number; y: number; width: number; height: number },
   vw: number,
@@ -415,9 +555,9 @@ export function buildCompactUiIndex(
 
   function walk(n: A11yNode) {
     if (includeInCompactIndex(n) && intersectsViewport(n.bounds, vw, vh)) {
-      const name =
-        n.name && n.name.length > 240 ? `${n.name.slice(0, 239)}\u2026` : n.name
+      const name = sanitizeInlineName(n.name, 240)
       acc.push({
+        id: nodeIdForPath(n.path),
         role: n.role,
         ...(name ? { name } : {}),
         ...(n.state && Object.keys(n.state).length > 0 ? { state: n.state } : {}),
@@ -449,7 +589,7 @@ export function summarizeCompactIndex(nodes: CompactUiNode[], maxLines = 80): st
     const st = n.state && Object.keys(n.state).length ? ` ${JSON.stringify(n.state)}` : ''
     const foc = n.focusable ? ' *' : ''
     const b = n.bounds
-    lines.push(`${n.role}${nm} (${b.x},${b.y} ${b.width}x${b.height}) path=${JSON.stringify(n.path)}${st}${foc}`)
+    lines.push(`${n.id} ${n.role}${nm} (${b.x},${b.y} ${b.width}x${b.height})${st}${foc}`)
   }
   if (nodes.length > maxLines) {
     lines.push(`… and ${nodes.length - maxLines} more (use geometra_snapshot with a higher maxNodes or geometra_query)`)
@@ -505,63 +645,156 @@ function firstNamedDescendant(node: A11yNode, allowedRoles?: ReadonlySet<string>
   return undefined
 }
 
-function containerName(node: A11yNode): string | undefined {
-  return node.name ?? firstNamedDescendant(node, new Set(['heading', 'text']))
+function findNodeByPath(root: A11yNode, path: number[]): A11yNode | null {
+  let current: A11yNode = root
+  for (const index of path) {
+    if (!current.children[index]) return null
+    current = current.children[index]!
+  }
+  return current
+}
+
+function countFocusableNodes(root: A11yNode): number {
+  let count = 0
+  function walk(node: A11yNode) {
+    if (node.focusable) count++
+    for (const child of node.children) walk(child)
+  }
+  walk(root)
+  return count
+}
+
+function dedupeStrings(values: Array<string | undefined>, max: number): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const value of values) {
+    if (!value || seen.has(value)) continue
+    seen.add(value)
+    out.push(value)
+    if (out.length >= max) break
+  }
+  return out
+}
+
+function fieldLabel(node: A11yNode): string | undefined {
+  return sanitizeFieldName(node.name, 80)
+}
+
+function contentPreviewName(node: A11yNode): string | undefined {
+  if (node.role === 'heading') return sanitizeInlineName(node.name, 80)
+  if (node.role === 'text') return sanitizeInlineName(node.name, 80)
+  if (node.role === 'link' || node.role === 'button') return sanitizeInlineName(node.name, 80)
+  return undefined
+}
+
+function sectionDisplayName(node: A11yNode, kind: PageSectionKind): string | undefined {
+  const headingName = sanitizeInlineName(firstNamedDescendant(node, new Set(['heading'])), 80)
+  if (headingName) return headingName
+
+  if (kind === 'list') {
+    return sanitizeContainerName(node.name, 80)
+      ?? sanitizeInlineName(firstNamedDescendant(node, new Set(['text', 'link', 'button'])), 80)
+  }
+
+  if (kind === 'landmark') {
+    return sanitizeContainerName(node.name, 80)
+      ?? sanitizeInlineName(firstNamedDescendant(node, CONTENT_NAME_ROLES), 80)
+  }
+
+  return sanitizeContainerName(node.name, 80)
 }
 
 function listItemName(node: A11yNode): string | undefined {
-  return node.name ?? firstNamedDescendant(node, new Set(['heading', 'text', 'link', 'button']))
+  return sanitizeInlineName(
+    node.name ?? firstNamedDescendant(node, new Set(['heading', 'text', 'link', 'button'])),
+    80,
+  )
 }
 
-function truncateForModel(value: string | undefined, max = 120): string | undefined {
-  if (!value) return undefined
-  return value.length > max ? `${value.slice(0, max - 1)}\u2026` : value
+function textPreview(node: A11yNode, maxItems: number): string[] {
+  const texts = collectDescendants(
+    node,
+    candidate =>
+      (candidate.role === 'heading' || candidate.role === 'text') &&
+      !!sanitizeInlineName(candidate.name, 90),
+  )
+  return dedupeStrings(texts.map(candidate => contentPreviewName(candidate)), maxItems)
 }
 
-function toFieldModel(node: A11yNode): PageFieldModel {
+function primaryAction(node: A11yNode): PagePrimaryAction {
   return {
+    id: nodeIdForPath(node.path),
     role: node.role,
-    ...(truncateForModel(node.name, 160) ? { name: truncateForModel(node.name, 160) } : {}),
+    ...(sanitizeInlineName(node.name, 80) ? { name: sanitizeInlineName(node.name, 80) } : {}),
     ...(cloneState(node.state) ? { state: cloneState(node.state) } : {}),
     bounds: cloneBounds(node.bounds),
-    path: clonePath(node.path),
   }
 }
 
-function toActionModel(node: A11yNode): PageActionModel {
+function toFieldModel(node: A11yNode, includeBounds = true): PageFieldModel {
   return {
+    id: nodeIdForPath(node.path),
     role: node.role,
-    ...(truncateForModel(node.name, 160) ? { name: truncateForModel(node.name, 160) } : {}),
+    ...(fieldLabel(node) ? { name: fieldLabel(node) } : {}),
     ...(cloneState(node.state) ? { state: cloneState(node.state) } : {}),
-    bounds: cloneBounds(node.bounds),
-    path: clonePath(node.path),
+    ...(includeBounds ? { bounds: cloneBounds(node.bounds) } : {}),
+  }
+}
+
+function toActionModel(node: A11yNode, includeBounds = true): PageActionModel {
+  return {
+    id: nodeIdForPath(node.path),
+    role: node.role,
+    ...(sanitizeInlineName(node.name, 80) ? { name: sanitizeInlineName(node.name, 80) } : {}),
+    ...(cloneState(node.state) ? { state: cloneState(node.state) } : {}),
+    ...(includeBounds ? { bounds: cloneBounds(node.bounds) } : {}),
   }
 }
 
 function toLandmarkModel(node: A11yNode): PageLandmark {
+  const name = sectionDisplayName(node, 'landmark')
   return {
+    id: sectionIdForPath('landmark', node.path),
     role: node.role,
-    ...(truncateForModel(containerName(node), 120) ? { name: truncateForModel(containerName(node), 120) } : {}),
+    ...(name ? { name } : {}),
     bounds: cloneBounds(node.bounds),
-    path: clonePath(node.path),
   }
 }
 
+function inferPageArchetypes(model: Omit<PageModel, 'archetypes'>): PageArchetype[] {
+  const out = new Set<PageArchetype>()
+  const landmarkRoles = new Set(model.landmarks.map(landmark => landmark.role))
+  if (landmarkRoles.has('navigation') && landmarkRoles.has('main')) out.add('shell')
+  if (model.summary.formCount > 0) out.add('form')
+  if (model.summary.dialogCount > 0) out.add('dialog')
+  if (model.summary.listCount > 0) out.add('results')
+  if (model.summary.focusableCount >= 14 && model.summary.listCount >= 2 && model.summary.formCount === 0) {
+    out.add('dashboard')
+  }
+  if (
+    model.summary.formCount === 0 &&
+    model.summary.dialogCount === 0 &&
+    model.summary.listCount <= 1 &&
+    model.summary.focusableCount <= 8
+  ) {
+    out.add('content')
+  }
+  return [...out]
+}
+
 /**
- * Build a compact, webpage-shaped model from the accessibility tree:
- * landmarks, dialogs, forms, and lists with short previews.
+ * Build a summary-first, stable-ID webpage model from the accessibility tree.
+ * Use {@link expandPageSection} to fetch details for a specific section on demand.
  */
 export function buildPageModel(
   root: A11yNode,
   options?: {
-    maxFieldsPerForm?: number
-    maxActionsPerContainer?: number
-    maxItemsPerList?: number
+    maxPrimaryActions?: number
+    maxSectionsPerKind?: number
   },
 ): PageModel {
-  const maxFieldsPerForm = options?.maxFieldsPerForm ?? 12
-  const maxActionsPerContainer = options?.maxActionsPerContainer ?? 8
-  const maxItemsPerList = options?.maxItemsPerList ?? 5
+  const maxPrimaryActions = options?.maxPrimaryActions ?? 6
+  const maxSectionsPerKind = options?.maxSectionsPerKind ?? 8
 
   const landmarks: PageLandmark[] = []
   const forms: PageFormModel[] = []
@@ -574,49 +807,48 @@ export function buildPageModel(
     }
 
     if (node.role === 'form') {
-      const fields = sortByBounds(collectDescendants(node, candidate => FORM_FIELD_ROLES.has(candidate.role)))
-      const actions = sortByBounds(
-        collectDescendants(node, candidate => ACTION_ROLES.has(candidate.role) && candidate.focusable),
+      const fields = collectDescendants(node, candidate => FORM_FIELD_ROLES.has(candidate.role))
+      const actions = collectDescendants(
+        node,
+        candidate => ACTION_ROLES.has(candidate.role) && candidate.focusable,
       )
-      const name = truncateForModel(containerName(node), 120)
+      const name = sectionDisplayName(node, 'form')
       forms.push({
+        id: sectionIdForPath('form', node.path),
+        role: node.role,
         ...(name ? { name } : {}),
         bounds: cloneBounds(node.bounds),
-        path: clonePath(node.path),
         fieldCount: fields.length,
         actionCount: actions.length,
-        fields: fields.slice(0, maxFieldsPerForm).map(toFieldModel),
-        actions: actions.slice(0, maxActionsPerContainer).map(toActionModel),
       })
     }
 
     if (DIALOG_ROLES.has(node.role)) {
-      const actions = sortByBounds(
-        collectDescendants(node, candidate => ACTION_ROLES.has(candidate.role) && candidate.focusable),
+      const fields = collectDescendants(node, candidate => FORM_FIELD_ROLES.has(candidate.role))
+      const actions = collectDescendants(
+        node,
+        candidate => ACTION_ROLES.has(candidate.role) && candidate.focusable,
       )
-      const name = truncateForModel(containerName(node), 120)
+      const name = sectionDisplayName(node, 'dialog')
       dialogs.push({
+        id: sectionIdForPath('dialog', node.path),
+        role: node.role,
         ...(name ? { name } : {}),
         bounds: cloneBounds(node.bounds),
-        path: clonePath(node.path),
+        fieldCount: fields.length,
         actionCount: actions.length,
-        actions: actions.slice(0, maxActionsPerContainer).map(toActionModel),
       })
     }
 
     if (node.role === 'list') {
-      const items = sortByBounds(collectDescendants(node, candidate => candidate.role === 'listitem'))
-      const preview = items
-        .map(item => truncateForModel(listItemName(item), 80))
-        .filter((value): value is string => !!value)
-        .slice(0, maxItemsPerList)
-      const name = truncateForModel(containerName(node), 120)
+      const items = collectDescendants(node, candidate => candidate.role === 'listitem')
+      const name = sectionDisplayName(node, 'list')
       lists.push({
+        id: sectionIdForPath('list', node.path),
+        role: node.role,
         ...(name ? { name } : {}),
         bounds: cloneBounds(node.bounds),
-        path: clonePath(node.path),
         itemCount: items.length,
-        itemsPreview: preview,
       })
     }
 
@@ -625,49 +857,188 @@ export function buildPageModel(
 
   walk(root)
 
-  return {
+  const compact = buildCompactUiIndex(root, { maxNodes: 200 })
+  const primaryActions = compact.nodes
+    .filter(node => node.focusable && ACTION_ROLES.has(node.role))
+    .slice(0, maxPrimaryActions)
+    .map(node => primaryAction({
+      role: node.role,
+      name: node.name,
+      state: node.state,
+      bounds: node.bounds,
+      path: node.path,
+      children: [],
+      focusable: node.focusable,
+    }))
+
+  const baseModel = {
     viewport: {
       width: root.bounds.width,
       height: root.bounds.height,
     },
-    landmarks: sortByBounds(landmarks),
-    forms: sortByBounds(forms),
-    dialogs: sortByBounds(dialogs),
-    lists: sortByBounds(lists),
+    summary: {
+      landmarkCount: landmarks.length,
+      formCount: forms.length,
+      dialogCount: dialogs.length,
+      listCount: lists.length,
+      focusableCount: countFocusableNodes(root),
+    },
+    primaryActions,
+    landmarks: sortByBounds(landmarks).slice(0, maxSectionsPerKind),
+    forms: sortByBounds(forms).slice(0, maxSectionsPerKind),
+    dialogs: sortByBounds(dialogs).slice(0, maxSectionsPerKind),
+    lists: sortByBounds(lists).slice(0, maxSectionsPerKind),
+  }
+
+  return {
+    ...baseModel,
+    archetypes: inferPageArchetypes(baseModel),
+  }
+}
+
+function headingModels(node: A11yNode, maxHeadings: number, includeBounds: boolean): PageHeadingModel[] {
+  const headings = sortByBounds(
+    collectDescendants(node, candidate => candidate.role === 'heading' && !!sanitizeInlineName(candidate.name, 80)),
+  )
+  return headings.slice(0, maxHeadings).map(heading => ({
+    id: nodeIdForPath(heading.path),
+    name: sanitizeInlineName(heading.name, 80)!,
+    ...(includeBounds ? { bounds: cloneBounds(heading.bounds) } : {}),
+  }))
+}
+
+function nestedListSummaries(node: A11yNode, maxLists: number, selfPath: number[]): PageListModel[] {
+  const nestedLists = sortByBounds(
+    collectDescendants(node, candidate => candidate.role === 'list' && pathKey(candidate.path) !== pathKey(selfPath)),
+  )
+  return nestedLists.slice(0, maxLists).map(list => ({
+    id: sectionIdForPath('list', list.path),
+    role: list.role,
+    ...(sectionDisplayName(list, 'list') ? { name: sectionDisplayName(list, 'list') } : {}),
+    bounds: cloneBounds(list.bounds),
+    itemCount: collectDescendants(list, candidate => candidate.role === 'listitem').length,
+  }))
+}
+
+function sectionKindForNode(node: A11yNode): PageSectionKind | null {
+  if (node.role === 'form') return 'form'
+  if (DIALOG_ROLES.has(node.role)) return 'dialog'
+  if (node.role === 'list') return 'list'
+  if (LANDMARK_ROLES.has(node.role)) return 'landmark'
+  return null
+}
+
+/**
+ * Expand a page-model section by stable ID into richer, on-demand details.
+ */
+export function expandPageSection(
+  root: A11yNode,
+  id: string,
+  options?: {
+    maxHeadings?: number
+    maxFields?: number
+    maxActions?: number
+    maxLists?: number
+    maxItems?: number
+    maxTextPreview?: number
+    includeBounds?: boolean
+  },
+): PageSectionDetail | null {
+  const parsed = parseSectionId(id)
+  if (!parsed) return null
+  const node = findNodeByPath(root, parsed.path)
+  if (!node) return null
+  const actualKind = sectionKindForNode(node)
+  if (actualKind !== parsed.kind) return null
+
+  const maxHeadings = options?.maxHeadings ?? 6
+  const maxFields = options?.maxFields ?? 18
+  const maxActions = options?.maxActions ?? 12
+  const maxLists = options?.maxLists ?? 8
+  const maxItems = options?.maxItems ?? 20
+  const maxTextPreview = options?.maxTextPreview ?? 6
+  const includeBounds = options?.includeBounds ?? false
+
+  const headingsAll = sortByBounds(
+    collectDescendants(node, candidate => candidate.role === 'heading' && !!sanitizeInlineName(candidate.name, 80)),
+  )
+  const fieldsAll = sortByBounds(
+    collectDescendants(node, candidate => FORM_FIELD_ROLES.has(candidate.role)),
+  )
+  const actionsAll = sortByBounds(
+    collectDescendants(node, candidate => ACTION_ROLES.has(candidate.role) && candidate.focusable),
+  )
+  const nestedListsAll = sortByBounds(
+    collectDescendants(node, candidate => candidate.role === 'list' && pathKey(candidate.path) !== pathKey(node.path)),
+  )
+  const itemsAll = actualKind === 'list'
+    ? sortByBounds(collectDescendants(node, candidate => candidate.role === 'listitem'))
+    : []
+
+  const name = sectionDisplayName(node, actualKind)
+  return {
+    id: sectionIdForPath(actualKind, node.path),
+    kind: actualKind,
+    role: node.role,
+    ...(name ? { name } : {}),
+    bounds: cloneBounds(node.bounds),
+    summary: {
+      headingCount: headingsAll.length,
+      fieldCount: fieldsAll.length,
+      actionCount: actionsAll.length,
+      listCount: nestedListsAll.length,
+      itemCount: itemsAll.length,
+    },
+    headings: headingModels(node, maxHeadings, includeBounds),
+    fields: fieldsAll.slice(0, maxFields).map(field => toFieldModel(field, includeBounds)),
+    actions: actionsAll.slice(0, maxActions).map(action => toActionModel(action, includeBounds)),
+    lists: nestedListSummaries(node, maxLists, node.path),
+    items: itemsAll.slice(0, maxItems).map(item => ({
+      id: nodeIdForPath(item.path),
+      ...(listItemName(item) ? { name: listItemName(item) } : {}),
+      ...(includeBounds ? { bounds: cloneBounds(item.bounds) } : {}),
+    })),
+    textPreview: actualKind === 'form' ? [] : textPreview(node, maxTextPreview),
   }
 }
 
 export function summarizePageModel(model: PageModel, maxLines = 10): string {
   const lines: string[] = []
 
-  if (model.landmarks.length > 0) {
-    const landmarks = model.landmarks
-      .slice(0, 5)
-      .map(landmark => landmark.name ? `${landmark.role} "${truncateUiText(landmark.name, 36)}"` : landmark.role)
-      .join(', ')
-    lines.push(`landmarks: ${landmarks}`)
+  if (model.archetypes.length > 0) {
+    lines.push(`archetypes: ${model.archetypes.join(', ')}`)
+  }
+
+  lines.push(
+    `summary: ${model.summary.landmarkCount} landmarks, ${model.summary.formCount} forms, ${model.summary.dialogCount} dialogs, ${model.summary.listCount} lists, ${model.summary.focusableCount} focusable`,
+  )
+
+  for (const landmark of model.landmarks.slice(0, 3)) {
+    const name = landmark.name ? ` "${truncateUiText(landmark.name, 32)}"` : ''
+    lines.push(`${landmark.id} ${landmark.role}${name}`)
   }
 
   for (const form of model.forms.slice(0, 3)) {
     const name = form.name ? ` "${truncateUiText(form.name, 40)}"` : ''
-    lines.push(`form${name}: ${form.fieldCount} fields, ${form.actionCount} actions`)
+    lines.push(`${form.id} form${name}: ${form.fieldCount} fields, ${form.actionCount} actions`)
   }
 
   for (const dialog of model.dialogs.slice(0, 2)) {
     const name = dialog.name ? ` "${truncateUiText(dialog.name, 40)}"` : ''
-    lines.push(`dialog${name}: ${dialog.actionCount} actions`)
+    lines.push(`${dialog.id} dialog${name}: ${dialog.fieldCount} fields, ${dialog.actionCount} actions`)
   }
 
   for (const list of model.lists.slice(0, 3)) {
     const name = list.name ? ` "${truncateUiText(list.name, 40)}"` : ''
-    const preview = list.itemsPreview.length > 0
-      ? ` [${list.itemsPreview.map(item => `"${truncateUiText(item, 24)}"`).join(', ')}]`
-      : ''
-    lines.push(`list${name}: ${list.itemCount} items${preview}`)
+    lines.push(`${list.id} list${name}: ${list.itemCount} items`)
   }
 
-  if (lines.length === 0) {
-    return `viewport ${model.viewport.width}x${model.viewport.height}; no common page structures detected`
+  if (model.primaryActions.length > 0) {
+    const actions = model.primaryActions
+      .slice(0, 4)
+      .map(action => action.name ? `${action.id} "${truncateUiText(action.name, 24)}"` : action.id)
+      .join(', ')
+    lines.push(`primary actions: ${actions}`)
   }
 
   return lines.slice(0, maxLines).join('\n')
@@ -678,8 +1049,8 @@ function pathKey(path: number[]): string {
 }
 
 function compactNodeLabel(node: CompactUiNode): string {
-  if (node.name) return `${node.role} "${truncateUiText(node.name, 40)}"`
-  return `${node.role} @ ${JSON.stringify(node.path)}`
+  if (node.name) return `${node.id} ${node.role} "${truncateUiText(node.name, 40)}"`
+  return `${node.id} ${node.role}`
 }
 
 function formatStateValue(value: boolean | undefined): string {
@@ -730,8 +1101,8 @@ export function buildUiDelta(
   const beforeCompact = buildCompactUiIndex(before, { maxNodes }).nodes
   const afterCompact = buildCompactUiIndex(after, { maxNodes }).nodes
 
-  const beforeMap = new Map(beforeCompact.map(node => [pathKey(node.path), node]))
-  const afterMap = new Map(afterCompact.map(node => [pathKey(node.path), node]))
+  const beforeMap = new Map(beforeCompact.map(node => [node.id, node]))
+  const afterMap = new Map(afterCompact.map(node => [node.id, node]))
 
   const added: CompactUiNode[] = []
   const removed: CompactUiNode[] = []
@@ -754,8 +1125,8 @@ export function buildUiDelta(
   const beforePage = buildPageModel(before)
   const afterPage = buildPageModel(after)
 
-  const beforeDialogs = new Map(beforePage.dialogs.map(dialog => [pageContainerKey(dialog), dialog]))
-  const afterDialogs = new Map(afterPage.dialogs.map(dialog => [pageContainerKey(dialog), dialog]))
+  const beforeDialogs = new Map(beforePage.dialogs.map(dialog => [dialog.id, dialog]))
+  const afterDialogs = new Map(afterPage.dialogs.map(dialog => [dialog.id, dialog]))
   const dialogsOpened = [...afterDialogs.entries()]
     .filter(([key]) => !beforeDialogs.has(key))
     .map(([, value]) => value)
@@ -763,8 +1134,8 @@ export function buildUiDelta(
     .filter(([key]) => !afterDialogs.has(key))
     .map(([, value]) => value)
 
-  const beforeForms = new Map(beforePage.forms.map(form => [pageContainerKey(form), form]))
-  const afterForms = new Map(afterPage.forms.map(form => [pageContainerKey(form), form]))
+  const beforeForms = new Map(beforePage.forms.map(form => [form.id, form]))
+  const afterForms = new Map(afterPage.forms.map(form => [form.id, form]))
   const formsAppeared = [...afterForms.entries()]
     .filter(([key]) => !beforeForms.has(key))
     .map(([, value]) => value)
@@ -772,15 +1143,15 @@ export function buildUiDelta(
     .filter(([key]) => !afterForms.has(key))
     .map(([, value]) => value)
 
-  const beforeLists = new Map(beforePage.lists.map(list => [pathKey(list.path), list]))
-  const afterLists = new Map(afterPage.lists.map(list => [pathKey(list.path), list]))
+  const beforeLists = new Map(beforePage.lists.map(list => [list.id, list]))
+  const afterLists = new Map(afterPage.lists.map(list => [list.id, list]))
   const listCountsChanged: UiListCountChange[] = []
   for (const [key, afterList] of afterLists) {
     const beforeList = beforeLists.get(key)
     if (beforeList && beforeList.itemCount !== afterList.itemCount) {
       listCountsChanged.push({
+        id: afterList.id,
         ...(afterList.name ? { name: afterList.name } : {}),
-        path: clonePath(afterList.path),
         beforeCount: beforeList.itemCount,
         afterCount: afterList.itemCount,
       })
@@ -816,23 +1187,23 @@ export function summarizeUiDelta(delta: UiDelta, maxLines = 14): string {
   const lines: string[] = []
 
   for (const dialog of delta.dialogsOpened.slice(0, 2)) {
-    lines.push(`+ dialog${dialog.name ? ` "${truncateUiText(dialog.name, 40)}"` : ''} opened`)
+    lines.push(`+ ${dialog.id} dialog${dialog.name ? ` "${truncateUiText(dialog.name, 40)}"` : ''} opened`)
   }
 
   for (const dialog of delta.dialogsClosed.slice(0, 2)) {
-    lines.push(`- dialog${dialog.name ? ` "${truncateUiText(dialog.name, 40)}"` : ''} closed`)
+    lines.push(`- ${dialog.id} dialog${dialog.name ? ` "${truncateUiText(dialog.name, 40)}"` : ''} closed`)
   }
 
   for (const form of delta.formsAppeared.slice(0, 2)) {
-    lines.push(`+ form${form.name ? ` "${truncateUiText(form.name, 40)}"` : ''} appeared (${form.fieldCount} fields)`)
+    lines.push(`+ ${form.id} form${form.name ? ` "${truncateUiText(form.name, 40)}"` : ''} appeared (${form.fieldCount} fields)`)
   }
 
   for (const form of delta.formsRemoved.slice(0, 2)) {
-    lines.push(`- form${form.name ? ` "${truncateUiText(form.name, 40)}"` : ''} removed`)
+    lines.push(`- ${form.id} form${form.name ? ` "${truncateUiText(form.name, 40)}"` : ''} removed`)
   }
 
   for (const list of delta.listCountsChanged.slice(0, 3)) {
-    lines.push(`~ list${list.name ? ` "${truncateUiText(list.name, 40)}"` : ''} items ${list.beforeCount} -> ${list.afterCount}`)
+    lines.push(`~ ${list.id} list${list.name ? ` "${truncateUiText(list.name, 40)}"` : ''} items ${list.beforeCount} -> ${list.afterCount}`)
   }
 
   for (const update of delta.updated.slice(0, 5)) {

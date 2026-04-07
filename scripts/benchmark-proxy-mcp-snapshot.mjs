@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Compare payload sizes: @geometra/proxy extractGeometry + MCP compact snapshot
+ * Compare payload sizes: @geometra/proxy extractGeometry + MCP page model / compact snapshot
  * vs raw HTML vs Playwright ariaSnapshot({ mode: 'ai' }).
  *
  * Run from repo root after:
@@ -10,7 +10,7 @@
  */
 import { chromium } from 'playwright'
 import { extractGeometry } from '../packages/proxy/dist/extractor.js'
-import { buildA11yTree, buildCompactUiIndex } from '../mcp/dist/session.js'
+import { buildA11yTree, buildCompactUiIndex, buildPageModel } from '../mcp/dist/session.js'
 
 const VIEWPORT = { width: 1280, height: 720 }
 const URLS = ['https://example.com', 'https://news.ycombinator.com']
@@ -42,6 +42,7 @@ async function measure(url) {
 
   const a11y = buildA11yTree(structuredClone(geom.tree), structuredClone(geom.layout))
   const { nodes, truncated } = buildCompactUiIndex(a11y, { maxNodes: 400 })
+  const pageModel = buildPageModel(a11y)
   const mcpCompactObj = {
     view: 'compact',
     viewport: { width: a11y.bounds.width, height: a11y.bounds.height },
@@ -49,6 +50,7 @@ async function measure(url) {
     truncated,
   }
   const mcpCompact = bytes(mcpCompactObj)
+  const mcpPageModel = bytes(pageModel)
   const mcpFullPretty = bytes(JSON.stringify(a11y, null, 2))
 
   const htmlB = bytes(html)
@@ -61,9 +63,11 @@ async function measure(url) {
     htmlBytes: htmlB,
     ariaAiBytes: ariaB,
     geometraFullBytes: geometraFull,
+    mcpPageModelBytes: mcpPageModel,
     mcpCompactBytes: mcpCompact,
     mcpFullPrettyBytes: mcpFullPretty,
     truncated,
+    pageModelVsAria: ariaB != null ? (mcpPageModel / ariaB).toFixed(3) : null,
     compactVsAria: ariaB != null ? (mcpCompact / ariaB).toFixed(3) : null,
     compactVsHtml: (mcpCompact / htmlB).toFixed(3),
     fullGeometraVsCompact: (geometraFull / mcpCompact).toFixed(3),
@@ -72,7 +76,7 @@ async function measure(url) {
 }
 
 function main() {
-  console.log('Geometra proxy + MCP compact vs Playwright (same viewport, 2s settle after domcontentloaded)\n')
+  console.log('Geometra proxy + MCP page model / compact vs Playwright (same viewport, 2s settle after domcontentloaded)\n')
 }
 
 async function run() {
@@ -82,12 +86,12 @@ async function run() {
     rows.push(await measure(u))
   }
 
-  console.log('| URL | HTML B | Playwright aria AI B | Geometra full layout+tree B | MCP compact snapshot B | MCP full a11y pretty B | compact / aria | compact / full GEOM |')
-  console.log('|---|--:|--:|--:|--:|--:|--:|--:|')
+  console.log('| URL | HTML B | Playwright aria AI B | Geometra full layout+tree B | MCP page model B | MCP compact snapshot B | MCP full a11y pretty B | page model / aria | compact / aria | compact / full GEOM |')
+  console.log('|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|')
   for (const r of rows) {
     const shortUrl = r.url.replace('https://', '')
     console.log(
-      `| ${shortUrl} | ${r.htmlBytes} | ${r.ariaAiBytes ?? 'n/a'} | ${r.geometraFullBytes} | ${r.mcpCompactBytes} | ${r.mcpFullPrettyBytes} | ${r.compactVsAria ?? 'n/a'} | ${r.fullGeometraVsCompact} |`,
+      `| ${shortUrl} | ${r.htmlBytes} | ${r.ariaAiBytes ?? 'n/a'} | ${r.geometraFullBytes} | ${r.mcpPageModelBytes} | ${r.mcpCompactBytes} | ${r.mcpFullPrettyBytes} | ${r.pageModelVsAria ?? 'n/a'} | ${r.compactVsAria ?? 'n/a'} | ${r.fullGeometraVsCompact} |`,
     )
   }
 
@@ -95,8 +99,12 @@ async function run() {
   for (const r of rows) {
     console.log(`  ${r.url}`)
     console.log(
-      `    MCP compact: ~${approxTokens(r.mcpCompactBytes)}  |  aria AI: ~${r.ariaAiBytes != null ? approxTokens(r.ariaAiBytes) : 'n/a'}  |  Geometra full raw: ~${approxTokens(r.geometraFullBytes)}`,
+      `    MCP page model: ~${approxTokens(r.mcpPageModelBytes)}  |  MCP compact: ~${approxTokens(r.mcpCompactBytes)}  |  aria AI: ~${r.ariaAiBytes != null ? approxTokens(r.ariaAiBytes) : 'n/a'}  |  Geometra full raw: ~${approxTokens(r.geometraFullBytes)}`,
     )
+    if (r.ariaAiBytes != null && r.mcpPageModelBytes < r.ariaAiBytes) {
+      const saved = approxTokens(r.ariaAiBytes - r.mcpPageModelBytes)
+      console.log(`    → MCP page model smaller than aria AI by ~${saved} tokens (${((1 - r.mcpPageModelBytes / r.ariaAiBytes) * 100).toFixed(1)}%)`)
+    }
     if (r.ariaAiBytes != null && r.mcpCompactBytes < r.ariaAiBytes) {
       const saved = approxTokens(r.ariaAiBytes - r.mcpCompactBytes)
       console.log(`    → MCP compact smaller than aria AI by ~${saved} tokens (${((1 - r.mcpCompactBytes / r.ariaAiBytes) * 100).toFixed(1)}%)`)

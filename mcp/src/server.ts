@@ -14,8 +14,10 @@ import {
   buildA11yTree,
   buildCompactUiIndex,
   buildPageModel,
+  expandPageSection,
   buildUiDelta,
   hasUiDelta,
+  nodeIdForPath,
   summarizeCompactIndex,
   summarizePageModel,
   summarizeUiDelta,
@@ -51,23 +53,24 @@ Call this first before using any other geometra tools. The peer must be listenin
   // ── query ────────────────────────────────────────────────────
   server.tool(
     'geometra_query',
-    `Find elements in the current Geometra UI by role, name, or text content. Returns matching elements with their exact pixel bounds {x, y, width, height}, role, name, and tree path.
+    `Find elements in the current Geometra UI by stable id, role, name, or text content. Returns matching elements with their exact pixel bounds {x, y, width, height}, role, name, and tree path.
 
 This is the Geometra equivalent of Playwright's locator — but instant, structured, and with no browser. Use the returned bounds to click elements or assert on layout.`,
     {
+      id: z.string().optional().describe('Stable node id from geometra_snapshot or geometra_expand_section'),
       role: z.string().optional().describe('ARIA role to match (e.g. "button", "textbox", "text", "heading", "listitem")'),
       name: z.string().optional().describe('Accessible name to match (exact or substring)'),
       text: z.string().optional().describe('Text content to search for (substring match)'),
     },
-    async ({ role, name, text }) => {
+    async ({ id, role, name, text }) => {
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
 
       const a11y = buildA11yTree(session.tree, session.layout)
-      const matches = findNodes(a11y, { role, name, text })
+      const matches = findNodes(a11y, { id, role, name, text })
 
       if (matches.length === 0) {
-        return ok(`No elements found matching ${JSON.stringify({ role, name, text })}`)
+        return ok(`No elements found matching ${JSON.stringify({ id, role, name, text })}`)
       }
 
       const result = matches.map(formatNode)
@@ -78,42 +81,68 @@ This is the Geometra equivalent of Playwright's locator — but instant, structu
   // ── page model ────────────────────────────────────────────────
   server.tool(
     'geometra_page_model',
-    `Get a higher-level webpage model instead of a raw node dump. Extracts common structures such as landmarks, forms, dialogs, and lists, with short previews of fields/actions/items.
+    `Get a higher-level webpage summary instead of a raw node dump. Returns stable section ids, page archetypes, summary counts, top-level landmarks/forms/dialogs/lists, and a few primary actions.
 
-Use this first on normal HTML pages when you want to understand the page shape with fewer tokens than a full snapshot.`,
+Use this first on normal HTML pages when you want to understand the page shape with fewer tokens than a full snapshot. Then call geometra_expand_section on a returned section id when you need details.`,
     {
-      maxFieldsPerForm: z
+      maxPrimaryActions: z
         .number()
         .int()
         .min(1)
-        .max(40)
+        .max(12)
         .optional()
-        .default(12)
-        .describe('Cap returned fields per form (default 12).'),
-      maxActionsPerContainer: z
+        .default(6)
+        .describe('Cap top-level primary actions (default 6).'),
+      maxSectionsPerKind: z
         .number()
         .int()
         .min(1)
-        .max(20)
+        .max(16)
         .optional()
         .default(8)
-        .describe('Cap returned actions per form/dialog (default 8).'),
-      maxItemsPerList: z
-        .number()
-        .int()
-        .min(1)
-        .max(20)
-        .optional()
-        .default(5)
-        .describe('Cap list item preview strings (default 5).'),
+        .describe('Cap returned landmarks/forms/dialogs/lists per kind (default 8).'),
     },
-    async ({ maxFieldsPerForm, maxActionsPerContainer, maxItemsPerList }) => {
+    async ({ maxPrimaryActions, maxSectionsPerKind }) => {
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
 
       const a11y = buildA11yTree(session.tree, session.layout)
-      const model = buildPageModel(a11y, { maxFieldsPerForm, maxActionsPerContainer, maxItemsPerList })
+      const model = buildPageModel(a11y, { maxPrimaryActions, maxSectionsPerKind })
       return ok(JSON.stringify(model))
+    }
+  )
+
+  server.tool(
+    'geometra_expand_section',
+    `Expand one section from geometra_page_model by stable id. Returns richer on-demand details such as headings, fields, actions, nested lists, list items, and text preview.
+
+Use this after geometra_page_model when you know which form/dialog/list/landmark you want to inspect more closely. Per-item bounds are omitted by default to save tokens; set includeBounds=true if you need them immediately.`,
+    {
+      id: z.string().describe('Section id from geometra_page_model, e.g. fm:1.0 or ls:2.1'),
+      maxHeadings: z.number().int().min(1).max(20).optional().default(6).describe('Cap heading rows'),
+      maxFields: z.number().int().min(1).max(40).optional().default(18).describe('Cap field rows'),
+      maxActions: z.number().int().min(1).max(30).optional().default(12).describe('Cap action rows'),
+      maxLists: z.number().int().min(0).max(20).optional().default(8).describe('Cap nested lists'),
+      maxItems: z.number().int().min(0).max(50).optional().default(20).describe('Cap list items'),
+      maxTextPreview: z.number().int().min(0).max(20).optional().default(6).describe('Cap text preview lines'),
+      includeBounds: z.boolean().optional().default(false).describe('Include bounds for fields/actions/headings/items'),
+    },
+    async ({ id, maxHeadings, maxFields, maxActions, maxLists, maxItems, maxTextPreview, includeBounds }) => {
+      const session = getSession()
+      if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
+
+      const a11y = buildA11yTree(session.tree, session.layout)
+      const detail = expandPageSection(a11y, id, {
+        maxHeadings,
+        maxFields,
+        maxActions,
+        maxLists,
+        maxItems,
+        maxTextPreview,
+        includeBounds,
+      })
+      if (!detail) return err(`No expandable section found for id ${id}`)
+      return ok(JSON.stringify(detail))
     }
   )
 
@@ -305,7 +334,7 @@ Custom React/Vue dropdowns are not supported — open them with geometra_click a
     'geometra_snapshot',
     `Get the current UI as JSON. Default **compact** view: flat list of viewport-visible actionable nodes (links, buttons, inputs, headings, landmarks, text leaves, focusable elements) with bounds and tree paths — far fewer tokens than a full nested tree. Use **full** for complete nested a11y + every wrapper when debugging layout.
 
-JSON is minified in compact view to save tokens. For a webpage-shaped overview (forms, dialogs, lists, landmarks), use geometra_page_model.`,
+JSON is minified in compact view to save tokens. For a summary-first overview, use geometra_page_model, then geometra_expand_section for just the part you want.`,
     {
       view: z
         .enum(['compact', 'full'])
@@ -409,15 +438,16 @@ function err(text: string) {
   return { content: [{ type: 'text' as const, text }], isError: true }
 }
 
-function findNodes(node: A11yNode, filter: { role?: string; name?: string; text?: string }): A11yNode[] {
+function findNodes(node: A11yNode, filter: { id?: string; role?: string; name?: string; text?: string }): A11yNode[] {
   const matches: A11yNode[] = []
 
   function walk(n: A11yNode) {
     let match = true
+    if (filter.id && nodeIdForPath(n.path) !== filter.id) match = false
     if (filter.role && n.role !== filter.role) match = false
     if (filter.name && (!n.name || !n.name.includes(filter.name))) match = false
     if (filter.text && (!n.name || !n.name.includes(filter.text))) match = false
-    if (match && (filter.role || filter.name || filter.text)) matches.push(n)
+    if (match && (filter.id || filter.role || filter.name || filter.text)) matches.push(n)
     for (const child of n.children) walk(child)
   }
 
@@ -427,6 +457,7 @@ function findNodes(node: A11yNode, filter: { role?: string; name?: string; text?
 
 function formatNode(node: A11yNode): Record<string, unknown> {
   return {
+    id: nodeIdForPath(node.path),
     role: node.role,
     name: node.name,
     bounds: node.bounds,

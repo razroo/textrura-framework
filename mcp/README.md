@@ -17,8 +17,9 @@ Geometra proxy:       Headless Chromium → DOM geometry → same WebSocket as n
 | Tool | Description |
 |---|---|
 | `geometra_connect` | Connect to a running Geometra server |
-| `geometra_query` | Find elements by role, name, or text content |
-| `geometra_page_model` | Higher-level webpage model: landmarks, forms, dialogs, lists, short previews |
+| `geometra_query` | Find elements by stable id, role, name, or text content |
+| `geometra_page_model` | Summary-first webpage model: archetypes, stable section ids, counts, top-level sections, primary actions |
+| `geometra_expand_section` | Expand one form/dialog/list/landmark from `geometra_page_model` on demand |
 | `geometra_click` | Click an element by coordinates |
 | `geometra_type` | Type text into the focused element |
 | `geometra_key` | Send special keys (Enter, Tab, Escape, arrows) |
@@ -94,7 +95,7 @@ Then in Claude Code (either backend):
 ```
 > Connect to my Geometra app at ws://localhost:3100 and tell me what's on screen
 
-> Give me the page model first, then find the main form
+> Give me the page model first, then expand the main form
 
 > Click the "Submit" button
 
@@ -136,7 +137,10 @@ Agent:  geometra_connect({ url: "ws://127.0.0.1:3200" })
         → Connected. UI includes textbox "Email", button "Save", …
 
 Agent:  geometra_page_model({})
-        → {"viewport":{"width":1024,"height":768},"landmarks":[...],"forms":[...],"dialogs":[],"lists":[]}
+        → {"viewport":{"width":1024,"height":768},"archetypes":["shell","form"],"summary":{...},"forms":[{"id":"fm:1.0","fieldCount":3,"actionCount":1}], ...}
+
+Agent:  geometra_expand_section({ id: "fm:1.0" })
+        → {"id":"fm:1.0","kind":"form","fields":[{"id":"n:1.0.0","name":"Email"}, ...], "actions":[...]}
 
 Agent:  geometra_query({ role: "textbox", name: "Email" })
         → bounds for the email field (viewport coordinates)
@@ -156,9 +160,10 @@ Agent:  geometra_query({ role: "button", name: "Save" })
 2. It receives the computed layout (`{ x, y, width, height }` for every node) and the UI tree (`kind`, `semantic`, `props`, `handlers`, `children`).
 3. It builds an accessibility tree from that data — roles, names, focusable state, bounds.
 4. **`geometra_snapshot`** defaults to a **compact** flat list of viewport-visible actionable nodes (minified JSON) to reduce LLM tokens; use `view: "full"` for the complete nested tree.
-5. **`geometra_page_model`** extracts higher-level webpage structure (landmarks, forms, dialogs, lists) so agents can reason about normal HTML pages without pulling a full tree first.
-6. After interactions, action tools return a **semantic delta** when possible (dialogs opened/closed, forms appeared/removed, list counts changed, named/focusable nodes added/removed/updated). If nothing meaningful changed, they fall back to a short current-UI overview.
-7. Tools expose query, click, type, snapshot, and page-model operations over this structured data.
-8. After each interaction, the peer sends updated geometry (full `frame` or `patch`) — the MCP tools interpret that into compact summaries.
+5. **`geometra_page_model`** is summary-first: page archetypes, stable section ids, counts, top-level landmarks/forms/dialogs/lists, and a few primary actions. It is designed to be cheaper than dumping full previews for every section.
+6. **`geometra_expand_section`** fetches richer details only for the section you care about (fields, actions, headings, nested lists, list items, text preview).
+7. After interactions, action tools return a **semantic delta** when possible (dialogs opened/closed, forms appeared/removed, list counts changed, named/focusable nodes added/removed/updated). If nothing meaningful changed, they fall back to a short current-UI overview.
+8. Tools expose query, click, type, snapshot, page-model, and section-expansion operations over this structured data.
+9. After each interaction, the peer sends updated geometry (full `frame` or `patch`) — the MCP tools interpret that into compact summaries.
 
 With a **native** Geometra server, layout comes from Textura/Yoga. With **`@geometra/proxy`**, layout comes from the browser’s computed DOM geometry; the MCP layer is the same.

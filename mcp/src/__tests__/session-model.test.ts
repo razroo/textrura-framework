@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildPageModel,
+  expandPageSection,
   buildUiDelta,
   hasUiDelta,
   summarizeUiDelta,
@@ -30,7 +31,7 @@ function node(
 }
 
 describe('buildPageModel', () => {
-  it('extracts landmarks, forms, and lists from a typical webpage tree', () => {
+  it('builds a summary-first page model with stable section ids', () => {
     const tree = node('group', undefined, { x: 0, y: 0, width: 1024, height: 768 }, {
       children: [
         node('navigation', 'Primary nav', { x: 0, y: 0, width: 220, height: 80 }, { path: [0] }),
@@ -63,20 +64,93 @@ describe('buildPageModel', () => {
     const model = buildPageModel(tree)
 
     expect(model.viewport).toEqual({ width: 1024, height: 768 })
-    expect(model.landmarks.map(item => item.role)).toEqual(['navigation', 'main', 'form'])
+    expect(model.archetypes).toEqual(expect.arrayContaining(['shell', 'form', 'results']))
+    expect(model.summary).toEqual({
+      landmarkCount: 3,
+      formCount: 1,
+      dialogCount: 0,
+      listCount: 1,
+      focusableCount: 1,
+    })
+    expect(model.landmarks.map(item => item.id)).toEqual(['lm:0', 'lm:1', 'lm:1.0'])
     expect(model.forms).toHaveLength(1)
     expect(model.forms[0]).toMatchObject({
+      id: 'fm:1.0',
       name: 'Job application',
       fieldCount: 2,
       actionCount: 1,
     })
-    expect(model.forms[0]?.fields.map(field => field.name)).toEqual(['Full name', 'Email'])
-    expect(model.forms[0]?.actions.map(action => action.name)).toEqual(['Submit application'])
     expect(model.lists[0]).toMatchObject({
+      id: 'ls:1.1',
       name: 'Open roles',
       itemCount: 2,
-      itemsPreview: ['Designer', 'Engineer'],
     })
+    expect(model.primaryActions).toEqual([
+      expect.objectContaining({
+        id: 'n:1.0.2',
+        role: 'button',
+        name: 'Submit application',
+      }),
+    ])
+  })
+
+  it('expands a section by id on demand', () => {
+    const tree = node('group', undefined, { x: 0, y: 0, width: 1024, height: 768 }, {
+      children: [
+        node('main', undefined, { x: 0, y: 0, width: 1024, height: 768 }, {
+          path: [0],
+          children: [
+            node('form', 'Job application', { x: 40, y: 120, width: 520, height: 280 }, {
+              path: [0, 0],
+              children: [
+                node('heading', 'Application', { x: 60, y: 132, width: 200, height: 24 }, { path: [0, 0, 0] }),
+                node('textbox', 'Full name*', { x: 60, y: 160, width: 300, height: 36 }, { path: [0, 0, 1] }),
+                node('textbox', 'Email:', { x: 60, y: 208, width: 300, height: 36 }, { path: [0, 0, 2] }),
+                node('button', 'Submit application', { x: 60, y: 264, width: 180, height: 40 }, {
+                  path: [0, 0, 3],
+                  focusable: true,
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+    })
+
+    const detail = expandPageSection(tree, 'fm:0.0')
+
+    expect(detail).toMatchObject({
+      id: 'fm:0.0',
+      kind: 'form',
+      role: 'form',
+      name: 'Application',
+      summary: {
+        headingCount: 1,
+        fieldCount: 2,
+        actionCount: 1,
+      },
+    })
+    expect(detail?.fields.map(field => field.name)).toEqual(['Full name', 'Email'])
+    expect(detail?.actions.map(action => action.id)).toEqual(['n:0.0.3'])
+    expect(detail?.fields[0]).not.toHaveProperty('bounds')
+  })
+
+  it('drops noisy container names and falls back to unnamed summaries', () => {
+    const tree = node('group', undefined, { x: 0, y: 0, width: 800, height: 600 }, {
+      children: [
+        node(
+          'form',
+          'First Name* Last Name* Email* Phone* Country* Location* Resume* LinkedIn*',
+          { x: 20, y: 20, width: 500, height: 400 },
+          { path: [0] },
+        ),
+      ],
+    })
+
+    const model = buildPageModel(tree)
+
+    expect(model.forms[0]?.id).toBe('fm:0')
+    expect(model.forms[0]?.name).toBeUndefined()
   })
 })
 
@@ -139,17 +213,18 @@ describe('buildUiDelta', () => {
 
     expect(hasUiDelta(delta)).toBe(true)
     expect(delta.dialogsOpened).toHaveLength(1)
+    expect(delta.dialogsOpened[0]?.id).toBe('dg:0.2')
     expect(delta.dialogsOpened[0]?.name).toBe('Save complete')
     expect(delta.listCountsChanged).toEqual([
-      { name: 'Results', path: [0, 1], beforeCount: 2, afterCount: 3 },
+      { id: 'ls:0.1', name: 'Results', beforeCount: 2, afterCount: 3 },
     ])
     expect(delta.updated.some(update =>
       update.after.name === 'Save' && update.changes.some(change => change.includes('disabled')),
     )).toBe(true)
 
     const summary = summarizeUiDelta(delta)
-    expect(summary).toContain('+ dialog "Save complete" opened')
-    expect(summary).toContain('~ list "Results" items 2 -> 3')
-    expect(summary).toContain('~ button "Save": disabled unset -> true')
+    expect(summary).toContain('+ dg:0.2 dialog "Save complete" opened')
+    expect(summary).toContain('~ ls:0.1 list "Results" items 2 -> 3')
+    expect(summary).toContain('~ n:0.0 button "Save": disabled unset -> true')
   })
 })
