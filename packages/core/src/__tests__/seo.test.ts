@@ -673,6 +673,15 @@ describe('toSemanticHTML', () => {
     expect(toSemanticHTML(el)).toContain('<p>Degenerate</p>')
   })
 
+  it('does not promote bold text to headings when resolved px is positive but below the h4 tier (tiny scientific-notation px)', () => {
+    const el = box({ width: 200, height: 50 }, [
+      text({ text: 'Micro', font: 'bold 3e-5px sans-serif', lineHeight: 18 }),
+    ])
+    const html = toSemanticHTML(el)
+    expect(html).toContain('<p>Micro</p>')
+    expect(html).not.toMatch(/<h[1-6]>Micro/)
+  })
+
   it('does not infer headings when the first font-size resolves to zero effective px', () => {
     const el = box({ width: 200, height: 80 }, [
       text({ text: 'Zero px', font: 'bold 0px sans-serif', lineHeight: 18 }),
