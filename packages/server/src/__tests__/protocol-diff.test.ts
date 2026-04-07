@@ -495,6 +495,17 @@ describe('coalescePatches', () => {
     expect(coalescePatches([{ path: cyclic, x: 1 }, { path: [1], y: 2 }])).toEqual([{ path: [1], y: 2 }])
   })
 
+  it('skips TypedArray paths (Array.isArray is false) without throwing; finite array patches still merge', () => {
+    const typed = new Uint32Array([0, 1])
+    expect(Array.isArray(typed)).toBe(false)
+    expect(() =>
+      coalescePatches([{ path: typed as unknown as number[], x: 1 }, { path: [2], y: 3 }]),
+    ).not.toThrow()
+    expect(
+      coalescePatches([{ path: typed as unknown as number[], x: 1 }, { path: [2], y: 3 }]),
+    ).toEqual([{ path: [2], y: 3 }])
+  })
+
   it('ignores unknown patch keys; merged results only carry path and finite geometry fields', () => {
     const merged = coalescePatches([
       { path: [0], x: 1, rotation: 45, meta: { id: 'a' } } as unknown as LayoutPatch,
