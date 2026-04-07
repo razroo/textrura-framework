@@ -291,6 +291,22 @@ describe('streamText', () => {
     expect(streamingRuns).toEqual([true, false])
   })
 
+  it('second consecutive done() does not notify text signal subscribers again when buffer already synced', () => {
+    const s = streamText()
+    let runs = 0
+    effect(() => {
+      void s.signal.value
+      runs++
+    })
+    expect(runs).toBe(1)
+    s.append('x')
+    s.done()
+    expect(runs).toBe(2)
+    s.done()
+    expect(runs).toBe(2)
+    expect(s.value).toBe('x')
+  })
+
   it('set() then append() coalesces the combined buffer in one microtask update', async () => {
     const s = streamText()
     s.set('hello ')
