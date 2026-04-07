@@ -56,6 +56,13 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 10, height: 10, children })).toBe(false)
   })
 
+  it('accepts holey/sparse children arrays (Array.isArray only; parallel walks skip missing indices)', () => {
+    const holey = [, ,] as unknown as ComputedLayout['children']
+    expect(holey.length).toBe(2)
+    expect(0 in holey).toBe(false)
+    expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 1, height: 1, children: holey })).toBe(true)
+  })
+
   it('accepts extreme finite coordinates and subnormal positive width/height (still Number.isFinite)', () => {
     const children = [] as const
     expect(
