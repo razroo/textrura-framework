@@ -37,12 +37,24 @@ function resolveFrameBytes(data: BinaryFrameBytes): {
  * UTF-8 payload length fits the view — use {@link decodeBinaryFrameJson} for full validation.
  * Accepts a root `ArrayBuffer` / `SharedArrayBuffer` or any `ArrayBufferView` (e.g. `Uint8Array` subarray,
  * `DataView`, other typed arrays) so callers can probe frames embedded in a larger store without copying.
- * `null` / `undefined` yield `false`.
+ * `null` / `undefined` yield `false`. Plain objects that are not real `ArrayBufferView` instances also yield
+ * `false` (no numeric coercion).
  */
 export function isBinaryFrameBuffer(data: BinaryFrameBytes): boolean {
   if (data == null) return false
   const { buffer, byteOffset, byteLength } = resolveFrameBytes(data)
-  if (byteLength < HEADER_BYTES) return false
+  // Mistyped non-view objects can yield undefined fields; `undefined < 9` is false in JS, so guard explicitly.
+  if (
+    buffer == null ||
+    typeof byteOffset !== 'number' ||
+    !Number.isFinite(byteOffset) ||
+    byteOffset < 0 ||
+    typeof byteLength !== 'number' ||
+    !Number.isFinite(byteLength) ||
+    byteLength < HEADER_BYTES
+  ) {
+    return false
+  }
   const u8 = new Uint8Array(buffer, byteOffset, byteLength)
   return (
     u8[0] === 0x47 &&

@@ -36,11 +36,23 @@ function resolveFrameBytes(data: BinaryFrameBytes): {
  * so callers can probe
  * frames embedded in a larger buffer without copying.
  * `null` / `undefined` yield `false` (mistyped JS callers) instead of throwing from buffer resolution.
+ * Plain objects that are not real `ArrayBufferView` instances also yield `false` (no numeric coercion).
  */
 export function isBinaryFrameArrayBuffer(data: BinaryFrameBytes): boolean {
   if (data == null) return false
   const { buffer, byteOffset, byteLength } = resolveFrameBytes(data)
-  if (byteLength < HEADER_BYTES) return false
+  // Mistyped non-view objects can yield undefined fields; `undefined < 9` is false in JS, so guard explicitly.
+  if (
+    buffer == null ||
+    typeof byteOffset !== 'number' ||
+    !Number.isFinite(byteOffset) ||
+    byteOffset < 0 ||
+    typeof byteLength !== 'number' ||
+    !Number.isFinite(byteLength) ||
+    byteLength < HEADER_BYTES
+  ) {
+    return false
+  }
   const u8 = new Uint8Array(buffer, byteOffset, byteLength)
   return (
     u8[0] === 0x47 &&

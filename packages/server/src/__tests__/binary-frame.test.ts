@@ -40,6 +40,27 @@ describe('isBinaryFrameBuffer', () => {
     expect(isBinaryFrameBuffer(undefined as unknown as Buffer)).toBe(false)
   })
 
+  it('returns false for plain objects or fake views with non-finite byte layout (undefined < 9 is not a length check)', () => {
+    expect(isBinaryFrameBuffer({} as unknown as Buffer)).toBe(false)
+    const ab = new ArrayBuffer(16)
+    expect(
+      isBinaryFrameBuffer({ buffer: ab, byteOffset: 0, byteLength: undefined } as unknown as Uint8Array),
+    ).toBe(false)
+    expect(
+      isBinaryFrameBuffer({ buffer: ab, byteOffset: undefined, byteLength: 16 } as unknown as Uint8Array),
+    ).toBe(false)
+    expect(
+      isBinaryFrameBuffer({ buffer: ab, byteOffset: 0, byteLength: Number.NaN } as unknown as Uint8Array),
+    ).toBe(false)
+    expect(
+      isBinaryFrameBuffer({ buffer: ab, byteOffset: 0, byteLength: Number.POSITIVE_INFINITY } as unknown as Uint8Array),
+    ).toBe(false)
+    expect(
+      isBinaryFrameBuffer({ buffer: ab, byteOffset: -1, byteLength: 16 } as unknown as Uint8Array),
+    ).toBe(false)
+    expect(isBinaryFrameBuffer({ buffer: null, byteOffset: 0, byteLength: 20 } as unknown as Uint8Array)).toBe(false)
+  })
+
   it('returns false when a root SharedArrayBuffer is shorter than the v1 header', () => {
     if (typeof SharedArrayBuffer === 'undefined') return
     expect(isBinaryFrameBuffer(new SharedArrayBuffer(8))).toBe(false)
