@@ -610,6 +610,13 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(10, 20, 3, 2n as unknown as number)).toEqual({ ox: 7, oy: 20 })
   })
 
+  it('coerces boolean scroll offsets to 0 without throwing (finiteNumberOrZero; corrupt serialized scroll props)', () => {
+    expect(() => scrollSafeChildOffsets(10, 20, true as unknown as number, 4)).not.toThrow()
+    expect(scrollSafeChildOffsets(10, 20, true as unknown as number, 4)).toEqual({ ox: 10, oy: 16 })
+    expect(() => scrollSafeChildOffsets(10, 20, 3, false as unknown as number)).not.toThrow()
+    expect(scrollSafeChildOffsets(10, 20, 3, false as unknown as number)).toEqual({ ox: 7, oy: 20 })
+  })
+
   it('returns null when abs minus scroll overflows to non-finite (hit-test / selection parity)', () => {
     const max = Number.MAX_VALUE
     expect(max - -max).toBe(Infinity)
@@ -690,6 +697,11 @@ describe('finiteNumberOrZero', () => {
     expect(finiteNumberOrZero('1' as unknown as number)).toBe(0)
     expect(() => finiteNumberOrZero(1n as unknown as number)).not.toThrow()
     expect(finiteNumberOrZero(1n as unknown as number)).toBe(0)
+  })
+
+  it('maps boolean values to 0 (typeof guard; corrupt JSON / mistaken host props)', () => {
+    expect(finiteNumberOrZero(true as unknown as number)).toBe(0)
+    expect(finiteNumberOrZero(false as unknown as number)).toBe(0)
   })
 
   it('maps double overflow (e.g. MAX_VALUE * 2) to 0 so scroll math cannot become non-finite', () => {
