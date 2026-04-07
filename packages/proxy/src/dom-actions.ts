@@ -1,12 +1,296 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
-import type { Page } from 'playwright'
+import type { Frame, Locator, Page } from 'playwright'
 
 function delay(ms: number): Promise<void> {
   return new Promise(r => setTimeout(r, ms))
 }
 
 export type FileAttachStrategy = 'auto' | 'chooser' | 'hidden' | 'drop'
+
+const LABELED_CONTROL_SELECTOR =
+  'input, select, textarea, button, [role="combobox"], [role="textbox"], [aria-haspopup="listbox"], [contenteditable="true"]'
+
+const OPTION_PICKER_SELECTOR =
+  '[role="option"], [role="menuitem"], [role="treeitem"], button, li, [data-value], [aria-selected], [aria-checked]'
+
+async function firstVisible(locator: Locator): Promise<Locator | null> {
+  try {
+    const first = locator.first()
+    if (await first.isVisible()) return first
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+
+async function locatorIsEditable(locator: Locator): Promise<boolean> {
+  try {
+    return await locator.evaluate((el) => {
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return true
+      return el instanceof HTMLElement && el.isContentEditable
+    })
+  } catch {
+    return false
+  }
+}
+
+async function locatorAnchorY(locator: Locator): Promise<number | undefined> {
+  const bounds = await locator.boundingBox()
+  return bounds ? bounds.y + bounds.height / 2 : undefined
+}
+
+async function findLabeledControl(frame: Frame, fieldLabel: string, exact: boolean): Promise<Locator | null> {
+  const directCandidates = [
+    frame.getByLabel(fieldLabel, { exact }),
+    frame.getByRole('combobox', { name: fieldLabel, exact }),
+    frame.getByRole('textbox', { name: fieldLabel, exact }),
+    frame.getByRole('button', { name: fieldLabel, exact }),
+  ]
+
+  for (const candidate of directCandidates) {
+    const visible = await firstVisible(candidate)
+    if (visible) return visible
+  }
+
+  const fallbackCandidates = frame.locator(LABELED_CONTROL_SELECTOR)
+  const count = await fallbackCandidates.count()
+  if (count === 0) return null
+
+  const bestIndex = await fallbackCandidates.evaluateAll((elements, payload) => {
+    function normalize(value: string): string {
+      return value.replace(/\s+/g, ' ').trim().toLowerCase()
+    }
+
+    function matches(candidate: string | undefined): boolean {
+      if (!candidate) return false
+      const normalizedCandidate = normalize(candidate)
+      const normalizedExpected = normalize(payload.fieldLabel)
+      if (!normalizedCandidate || !normalizedExpected) return false
+      return payload.exact ? normalizedCandidate === normalizedExpected : normalizedCandidate.includes(normalizedExpected)
+    }
+
+    function visible(el: Element): el is HTMLElement {
+      if (!(el instanceof HTMLElement)) return false
+      const rect = el.getBoundingClientRect()
+      if (rect.width <= 0 || rect.height <= 0) return false
+      const style = getComputedStyle(el)
+      return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0'
+    }
+
+    function referencedText(ids: string | null): string | undefined {
+      if (!ids) return undefined
+      const text = ids
+        .split(/\s+/)
+        .map(id => document.getElementById(id)?.textContent?.trim() ?? '')
+        .filter(Boolean)
+        .join(' ')
+        .trim()
+      return text || undefined
+    }
+
+    function explicitLabelText(el: Element): string | undefined {
+      const aria = el.getAttribute('aria-label')?.trim()
+      if (aria) return aria
+      const labelledBy = referencedText(el.getAttribute('aria-labelledby'))
+      if (labelledBy) return labelledBy
+      if (
+        (el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) &&
+        el.labels &&
+        el.labels.length > 0
+      ) {
+        return el.labels[0]?.textContent?.trim() || undefined
+      }
+      if (el instanceof HTMLElement && el.id) {
+        const label = document.querySelector(`label[for="${CSS.escape(el.id)}"]`)
+        const text = label?.textContent?.trim()
+        if (text) return text
+      }
+      return undefined
+    }
+
+    function controlPriority(el: Element): number {
+      if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) return 0
+      const role = el.getAttribute('role')
+      if (role === 'combobox' || role === 'textbox') return 4
+      if (el.getAttribute('aria-haspopup') === 'listbox') return 8
+      if (el.tagName.toLowerCase() === 'button') return 12
+      return 24
+    }
+
+    const labelNodes = Array.from(document.querySelectorAll('label, legend')).filter((el): el is HTMLElement => visible(el))
+
+    let best: { index: number; score: number } | null = null
+    for (let i = 0; i < elements.length; i++) {
+      const el = elements[i]
+      if (!(el instanceof Element)) continue
+      if (!visible(el)) continue
+
+      const explicit = explicitLabelText(el)
+      if (matches(explicit)) {
+        const score = controlPriority(el)
+        if (!best || score < best.score) best = { index: i, score }
+        continue
+      }
+
+      const rect = el.getBoundingClientRect()
+      for (const labelNode of labelNodes) {
+        const labelText = labelNode.textContent?.trim()
+        if (!matches(labelText)) continue
+
+        const labelRect = labelNode.getBoundingClientRect()
+        const horizontalOverlap = Math.min(rect.right, labelRect.right) - Math.max(rect.left, labelRect.left)
+        const horizontalDistance =
+          horizontalOverlap >= 0
+            ? 0
+            : Math.min(Math.abs(rect.left - labelRect.right), Math.abs(labelRect.left - rect.right))
+        const verticalDistance =
+          rect.top >= labelRect.bottom - 12
+            ? rect.top - labelRect.bottom
+            : 200 + Math.abs(rect.top - labelRect.top)
+        const score = 100 + verticalDistance * 3 + horizontalDistance + controlPriority(el)
+        if (!best || score < best.score) best = { index: i, score }
+      }
+    }
+
+    return best?.index ?? -1
+  }, { fieldLabel, exact })
+
+  return bestIndex >= 0 ? fallbackCandidates.nth(bestIndex) : null
+}
+
+async function openDropdownControl(
+  page: Page,
+  fieldLabel: string,
+  exact: boolean,
+): Promise<{ locator: Locator; editable: boolean; anchorY?: number }> {
+  for (const frame of page.frames()) {
+    const locator = await findLabeledControl(frame, fieldLabel, exact)
+    if (!locator) continue
+    await locator.scrollIntoViewIfNeeded()
+    const anchorY = await locatorAnchorY(locator)
+    const editable = await locatorIsEditable(locator)
+    await locator.click()
+    return { locator, editable, anchorY }
+  }
+
+  throw new Error(`listboxPick: no visible combobox/dropdown matching field "${fieldLabel}"`)
+}
+
+async function typeIntoEditableLocator(page: Page, locator: Locator, text: string): Promise<void> {
+  try {
+    await locator.fill(text)
+    return
+  } catch {
+    /* fall through */
+  }
+
+  await locator.click()
+  await page.keyboard.type(text)
+}
+
+async function typeIntoActiveEditableElement(page: Page, text: string): Promise<boolean> {
+  for (const frame of page.frames()) {
+    const editableFocused = await frame.evaluate(() => {
+      const active = document.activeElement
+      if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) {
+        active.value = ''
+        active.dispatchEvent(new Event('input', { bubbles: true }))
+        return true
+      }
+      if (active instanceof HTMLElement && active.isContentEditable) {
+        active.textContent = ''
+        return true
+      }
+      return false
+    })
+
+    if (editableFocused) {
+      await page.keyboard.type(text)
+      return true
+    }
+  }
+
+  return false
+}
+
+async function clickVisibleOptionCandidate(
+  page: Page,
+  label: string,
+  exact: boolean,
+  anchorY?: number,
+): Promise<boolean> {
+  const roleOption = await firstVisible(page.getByRole('option', { name: label, exact }))
+  if (roleOption) {
+    await roleOption.click()
+    return true
+  }
+
+  for (const frame of page.frames()) {
+    const candidates = frame.locator(OPTION_PICKER_SELECTOR)
+    const count = await candidates.count()
+    if (count === 0) continue
+
+    const bestIndex = await candidates.evaluateAll((elements, payload) => {
+      function normalize(value: string): string {
+        return value.replace(/\s+/g, ' ').trim().toLowerCase()
+      }
+
+      function matches(candidate: string | undefined): boolean {
+        if (!candidate) return false
+        const normalizedCandidate = normalize(candidate)
+        const normalizedExpected = normalize(payload.label)
+        if (!normalizedCandidate || !normalizedExpected) return false
+        return payload.exact ? normalizedCandidate === normalizedExpected : normalizedCandidate.includes(normalizedExpected)
+      }
+
+      function visible(el: Element): el is HTMLElement {
+        if (!(el instanceof HTMLElement)) return false
+        const rect = el.getBoundingClientRect()
+        if (rect.width <= 0 || rect.height <= 0) return false
+        const style = getComputedStyle(el)
+        return style.display !== 'none' && style.visibility !== 'hidden'
+      }
+
+      function popupWeight(el: HTMLElement): number {
+        return el.closest(
+          '[role="listbox"], [role="menu"], [role="dialog"], [aria-modal="true"], [data-radix-popper-content-wrapper], [class*="menu"], [class*="option"], [class*="select"], [class*="dropdown"]',
+        )
+          ? 0
+          : 220
+      }
+
+      let best: { index: number; score: number } | null = null
+      for (let i = 0; i < elements.length; i++) {
+        const el = elements[i]
+        if (!(el instanceof Element)) continue
+        if (!visible(el)) continue
+
+        const candidateText = el.getAttribute('aria-label')?.trim() || el.textContent?.trim() || ''
+        if (!matches(candidateText)) continue
+
+        const rect = el.getBoundingClientRect()
+        const centerY = rect.top + rect.height / 2
+        const upwardPenalty =
+          payload.anchorY === null || centerY >= payload.anchorY - 16
+            ? 0
+            : 140
+        const proximity = payload.anchorY === null ? rect.top : Math.abs(centerY - payload.anchorY)
+        const score = popupWeight(el) + upwardPenalty + proximity
+        if (!best || score < best.score) best = { index: i, score }
+      }
+
+      return best?.index ?? -1
+    }, { label, exact, anchorY: anchorY ?? null })
+
+    if (bestIndex >= 0) {
+      await candidates.nth(bestIndex).click()
+      return true
+    }
+  }
+
+  return false
+}
 
 /**
  * Resolve and validate paths on the machine running the proxy (not the agent host).
@@ -190,15 +474,33 @@ export async function selectNativeOption(page: Page, x: number, y: number, opt: 
 export async function pickListboxOption(
   page: Page,
   label: string,
-  opts?: { exact?: boolean; openX?: number; openY?: number },
+  opts?: { exact?: boolean; openX?: number; openY?: number; fieldLabel?: string; query?: string },
 ): Promise<void> {
-  if (opts?.openX !== undefined && opts?.openY !== undefined) {
+  let anchorY: number | undefined
+
+  if (opts?.fieldLabel) {
+    const opened = await openDropdownControl(page, opts.fieldLabel, opts?.exact ?? false)
+    anchorY = opened.anchorY
+    const query = opts.query ?? label
+    if (query && opened.editable) {
+      await typeIntoEditableLocator(page, opened.locator, query)
+      await delay(80)
+    } else if (query && await typeIntoActiveEditableElement(page, query)) {
+      await delay(80)
+    }
+  } else if (opts?.openX !== undefined && opts?.openY !== undefined) {
     await page.mouse.click(opts.openX, opts.openY)
+    anchorY = opts.openY
     await delay(120)
   }
-  const opt = page.getByRole('option', { name: label, exact: opts?.exact ?? false }).first()
-  await opt.waitFor({ state: 'visible', timeout: 8000 })
-  await opt.click()
+
+  const deadline = Date.now() + 3000
+  while (Date.now() < deadline) {
+    if (await clickVisibleOptionCandidate(page, label, opts?.exact ?? false, anchorY)) return
+    await delay(120)
+  }
+
+  throw new Error(`listboxPick: no visible option matching "${label}"`)
 }
 
 export interface SetCheckedPayload {

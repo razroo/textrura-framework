@@ -1,6 +1,6 @@
 {
   "name": "@geometra/renderer-webgpu",
-  "version": "1.19.5",
+  "version": "1.19.6",
   "description": "WebGPU renderer scaffold for Geometra",
   "license": "MIT",
   "type": "module",

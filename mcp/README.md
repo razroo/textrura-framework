@@ -26,7 +26,7 @@ Geometra proxy:       Chromium → DOM geometry → same WebSocket as native →
 | `geometra_type` | Type text into the focused element |
 | `geometra_key` | Send special keys (Enter, Tab, Escape, arrows) |
 | `geometra_upload_files` | Attach files: auto / hidden input / native chooser / synthetic drop (`@geometra/proxy` only) |
-| `geometra_pick_listbox_option` | Pick `role=option` (React Select, Headless UI, etc.; `@geometra/proxy` only) |
+| `geometra_pick_listbox_option` | Pick an option from a custom dropdown/searchable combobox; can open by field label (`@geometra/proxy` only) |
 | `geometra_select_option` | Choose an option on a native `<select>` (`@geometra/proxy` only) |
 | `geometra_set_checked` | Set a checkbox or radio by label instead of coordinate clicks (`@geometra/proxy` only) |
 | `geometra_wheel` | Mouse wheel / scroll (`@geometra/proxy` only) |

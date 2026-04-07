@@ -29,7 +29,7 @@ import type { A11yNode, Session, UpdateWaitResult } from './session.js'
 
 export function createServer(): McpServer {
   const server = new McpServer(
-    { name: 'geometra', version: '1.19.5' },
+    { name: 'geometra', version: '1.19.6' },
     { capabilities: { tools: {} } },
   )
 
@@ -307,16 +307,18 @@ Strategies: **auto** (default) tries chooser click if x,y given, else hidden \`i
 
   server.tool(
     'geometra_pick_listbox_option',
-    `Pick a visible \`role=option\` (Headless UI, React Select, Radix, etc.). Requires \`@geometra/proxy\`.
+    `Pick an option from a custom dropdown / listbox / searchable combobox (Headless UI, React Select, Radix, Ashby-style custom selects, etc.). Requires \`@geometra/proxy\`.
 
-Optional openX,openY clicks the combobox first if the list is not open. Uses substring name match unless exact=true.`,
+Pass \`fieldLabel\` to open a labeled dropdown semantically instead of relying on coordinates. If the opened control is editable, MCP types \`query\` (or the option label by default) before selecting. Uses substring name match unless exact=true.`,
     {
       label: z.string().describe('Accessible name of the option (visible text or aria-label)'),
       exact: z.boolean().optional().describe('Exact name match'),
       openX: z.number().optional().describe('Click to open dropdown'),
       openY: z.number().optional().describe('Click to open dropdown'),
+      fieldLabel: z.string().optional().describe('Field label of the dropdown/combobox to open semantically (e.g. "Location")'),
+      query: z.string().optional().describe('Optional text to type into a searchable combobox before selecting'),
     },
-    async ({ label, exact, openX, openY }) => {
+    async ({ label, exact, openX, openY, fieldLabel, query }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
@@ -324,6 +326,8 @@ Optional openX,openY clicks the combobox first if the list is not open. Uses sub
         const wait = await sendListboxPick(session, label, {
           exact,
           open: openX !== undefined && openY !== undefined ? { x: openX, y: openY } : undefined,
+          fieldLabel,
+          query,
         })
         const summary = postActionSummary(session, before, wait)
         return ok(`Picked listbox option "${label}".\n${summary}`)

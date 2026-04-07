@@ -18,12 +18,16 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
     if (alt) return alt.trim() || undefined
     const title = el.getAttribute('title')
     if (title) return title.trim() || undefined
-    const ph = el.getAttribute('placeholder')
-    if (ph) return ph.trim() || undefined
-    if (el instanceof HTMLInputElement && el.labels && el.labels.length > 0) {
+    if (
+      (el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) &&
+      el.labels &&
+      el.labels.length > 0
+    ) {
       const t = el.labels[0]!.textContent?.trim()
       if (t) return t
     }
+    const ph = el.getAttribute('placeholder')
+    if (ph) return ph.trim() || undefined
     const tc = el.textContent?.trim()
     if (tc && tc.length > 0) {
       return tc.length > 100 ? tc.slice(0, 100) : tc

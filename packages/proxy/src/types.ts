@@ -78,6 +78,8 @@ export type ClientListboxPickMessage = {
   exact?: boolean
   openX?: number
   openY?: number
+  fieldLabel?: string
+  query?: string
   protocolVersion?: number
 }
 

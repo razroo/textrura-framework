@@ -92,4 +92,24 @@ describe('extractGeometry', () => {
 
     await page.close()
   })
+
+  it('prefers explicit field labels over placeholder text for form controls', async () => {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } })
+    await page.setContent(`
+      <label for="location-input">Location</label>
+      <input id="location-input" placeholder="Start typing..." />
+    `)
+
+    const snapshot = await extractGeometry(page)
+    const nodes = flattenSnapshot(snapshot.tree, snapshot.layout)
+    const input = nodes.find(node =>
+      node.tree.semantic?.role === 'textbox' &&
+      node.tree.semantic?.ariaLabel === 'Location',
+    )
+
+    expect(input).toBeDefined()
+    expect(input?.tree.semantic?.ariaLabel).toBe('Location')
+
+    await page.close()
+  })
 })

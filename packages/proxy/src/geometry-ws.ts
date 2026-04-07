@@ -157,6 +157,8 @@ async function handleClientMessage(
         exact: msg.exact,
         openX: msg.openX,
         openY: msg.openY,
+        fieldLabel: msg.fieldLabel,
+        query: msg.query,
       })
       onViewportOrInput('input')
       return
@@ -220,10 +222,36 @@ export function startGeometryWebSocket(options: {
   let prevTreeJson: string | null = null
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
+  let ackTimer: ReturnType<typeof setTimeout> | null = null
   let extracting = false
   let pendingExtract = false
+  const pendingInputAcks = new Set<WebSocket>()
 
-  function broadcastSnapshot(snap: GeometrySnapshot) {
+  function clearAckTimer() {
+    if (ackTimer !== null) {
+      clearTimeout(ackTimer)
+      ackTimer = null
+    }
+  }
+
+  function clearPendingInputAcks() {
+    pendingInputAcks.clear()
+    clearAckTimer()
+  }
+
+  function sendPendingInputAcks() {
+    if (pendingInputAcks.size === 0) return
+    const text = JSON.stringify({ type: 'ack', protocolVersion: PROXY_PROTOCOL_VERSION })
+    for (const ws of pendingInputAcks) {
+      if (ws.readyState === ws.OPEN) {
+        ws.send(text)
+      }
+    }
+    pendingInputAcks.clear()
+    clearAckTimer()
+  }
+
+  function broadcastSnapshot(snap: GeometrySnapshot): boolean {
     const treeChanged = prevTreeJson !== snap.treeJson
 
     let outbound:
@@ -243,7 +271,7 @@ export function startGeometryWebSocket(options: {
       const rawPatches = diffLayout(prevLayout, snap.layout)
       const patches = coalescePatches(rawPatches)
       if (patches.length === 0) {
-        return
+        return false
       }
       if (patches.length > 20) {
         outbound = {
@@ -265,12 +293,14 @@ export function startGeometryWebSocket(options: {
         ws.send(text)
       }
     }
+    clearPendingInputAcks()
+    return true
   }
 
-  async function runExtract(): Promise<void> {
+  async function runExtract(): Promise<boolean> {
     try {
       const snap = await extractGeometry(options.page)
-      broadcastSnapshot(snap)
+      return broadcastSnapshot(snap)
     } catch (err) {
       options.onError?.(err)
       const errMsg = {
@@ -282,31 +312,57 @@ export function startGeometryWebSocket(options: {
       for (const ws of clients) {
         if (ws.readyState === ws.OPEN) ws.send(errText)
       }
+      clearPendingInputAcks()
+      return false
     }
   }
 
-  async function runExtractQueued(): Promise<void> {
+  async function runExtractQueued(): Promise<boolean> {
     if (extracting) {
       pendingExtract = true
-      return
+      return false
     }
     extracting = true
+    let changed = false
     try {
-      await runExtract()
+      changed = (await runExtract()) || changed
       while (pendingExtract) {
         pendingExtract = false
-        await runExtract()
+        changed = (await runExtract()) || changed
       }
     } finally {
       extracting = false
     }
+    return changed
+  }
+
+  function schedulePendingAck() {
+    if (pendingInputAcks.size === 0) return
+    clearAckTimer()
+    ackTimer = setTimeout(() => {
+      ackTimer = null
+      if (extracting || debounceTimer !== null) {
+        schedulePendingAck()
+        return
+      }
+      void runExtractQueued()
+        .then(changed => {
+          if (!changed) sendPendingInputAcks()
+        })
+        .catch(err => options.onError?.(err))
+    }, 120)
   }
 
   function scheduleExtract() {
+    clearAckTimer()
     if (debounceTimer !== null) clearTimeout(debounceTimer)
     debounceTimer = setTimeout(() => {
       debounceTimer = null
       void runExtractQueued()
+        .then(changed => {
+          if (!changed) schedulePendingAck()
+        })
+        .catch(err => options.onError?.(err))
     }, debounceMs)
   }
 
@@ -345,6 +401,7 @@ export function startGeometryWebSocket(options: {
           if (kind === 'resize') {
             void runExtractQueued()
           } else {
+            pendingInputAcks.add(ws)
             scheduleExtract()
           }
         },
@@ -353,6 +410,7 @@ export function startGeometryWebSocket(options: {
     })
     ws.on('close', () => {
       clients.delete(ws)
+      pendingInputAcks.delete(ws)
     })
   })
 
@@ -363,6 +421,7 @@ export function startGeometryWebSocket(options: {
         clearTimeout(debounceTimer)
         debounceTimer = null
       }
+      clearAckTimer()
       await runExtractQueued()
     },
     close: () =>

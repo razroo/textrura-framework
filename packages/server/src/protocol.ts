@@ -127,7 +127,8 @@ export type ClientMessage =
       controlType?: 'checkbox' | 'radio'
     })
   /**
-   * ARIA listbox / `role=option` (Headless UI, React Select, etc.). Implemented by `@geometra/proxy`.
+   * Custom dropdown / listbox / searchable combobox. Implemented by `@geometra/proxy`.
+   * Can optionally open a control by field label and type a search query before picking.
    */
   | (VersionedMessage & {
       type: 'listboxPick'
@@ -135,6 +136,8 @@ export type ClientMessage =
       exact?: boolean
       openX?: number
       openY?: number
+      fieldLabel?: string
+      query?: string
     })
   /** Mouse wheel / scroll delta at optional viewport coordinates. */
   | (VersionedMessage & {

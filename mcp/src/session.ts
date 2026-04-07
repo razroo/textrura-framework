@@ -171,7 +171,7 @@ export interface Session {
 }
 
 export interface UpdateWaitResult {
-  status: 'updated' | 'timed_out'
+  status: 'updated' | 'acknowledged' | 'timed_out'
   timeoutMs: number
 }
 
@@ -402,7 +402,7 @@ export function sendFileUpload(
 export function sendListboxPick(
   session: Session,
   label: string,
-  opts?: { exact?: boolean; open?: { x: number; y: number } },
+  opts?: { exact?: boolean; open?: { x: number; y: number }; fieldLabel?: string; query?: string },
 ): Promise<UpdateWaitResult> {
   const payload: Record<string, unknown> = { type: 'listboxPick', label }
   if (opts?.exact !== undefined) payload.exact = opts.exact
@@ -410,6 +410,8 @@ export function sendListboxPick(
     payload.openX = opts.open.x
     payload.openY = opts.open.y
   }
+  if (opts?.fieldLabel) payload.fieldLabel = opts.fieldLabel
+  if (opts?.query) payload.query = opts.query
   return sendAndWaitForUpdate(session, payload)
 }
 
@@ -1474,6 +1476,9 @@ function waitForNextUpdate(session: Session): Promise<UpdateWaitResult> {
           applyPatches(session.layout, msg.patches)
           cleanup()
           resolve({ status: 'updated', timeoutMs: ACTION_UPDATE_TIMEOUT_MS })
+        } else if (msg.type === 'ack') {
+          cleanup()
+          resolve({ status: 'acknowledged', timeoutMs: ACTION_UPDATE_TIMEOUT_MS })
         }
       } catch { /* ignore */ }
     }
