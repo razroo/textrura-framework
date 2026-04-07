@@ -98,6 +98,18 @@ export interface LayoutPatch {
   height?: number
 }
 
+/**
+ * True when two layout scalars are unchanged for diffing.
+ *
+ * Uses `===` for ordinary numbers (so `+0` and `-0` still compare equal like `!==` would).
+ * Treats `NaN` as equal to `NaN` so corrupt snapshots that repeat non-finite geometry do not emit
+ * perpetual patches (`NaN !== NaN` in JS would otherwise always look "changed").
+ */
+function sameLayoutScalar(a: number, b: number): boolean {
+  if (Number.isNaN(a) && Number.isNaN(b)) return true
+  return a === b
+}
+
 /** Only finite primitive numbers merge; `null`, `NaN`, `±Infinity`, and non-numbers are ignored per field. */
 function isFinitePatchNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
@@ -157,6 +169,9 @@ export function coalescePatches(patches: LayoutPatch[]): LayoutPatch[] {
  *
  * Non-array `children` on either side (corrupt snapshots / bad deserialization) is treated as `[]` for
  * subtree pairing so patch generation does not throw; root `x`/`y`/`width`/`height` are still compared.
+ *
+ * `NaN` on a field compares equal to `NaN` on the same field (no patch) so repeated corrupt geometry
+ * does not spam patches; changing a field from `NaN` to a finite number (or vice versa) still diffs.
  */
 export function diffLayout(
   prev: ComputedLayout,
@@ -170,10 +185,22 @@ export function diffLayout(
   const patch: LayoutPatch = { path }
   let changed = false
 
-  if (prev.x !== next.x) { patch.x = next.x; changed = true }
-  if (prev.y !== next.y) { patch.y = next.y; changed = true }
-  if (prev.width !== next.width) { patch.width = next.width; changed = true }
-  if (prev.height !== next.height) { patch.height = next.height; changed = true }
+  if (!sameLayoutScalar(prev.x, next.x)) {
+    patch.x = next.x
+    changed = true
+  }
+  if (!sameLayoutScalar(prev.y, next.y)) {
+    patch.y = next.y
+    changed = true
+  }
+  if (!sameLayoutScalar(prev.width, next.width)) {
+    patch.width = next.width
+    changed = true
+  }
+  if (!sameLayoutScalar(prev.height, next.height)) {
+    patch.height = next.height
+    changed = true
+  }
 
   if (changed) patches.push(patch)
 

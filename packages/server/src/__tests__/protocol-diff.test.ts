@@ -86,6 +86,40 @@ describe('diffLayout', () => {
     expect(diffLayout(layout, layout)).toEqual([])
   })
 
+  it('treats NaN equal to NaN per field (no spurious patches; NaN !== NaN would otherwise always differ)', () => {
+    const prev: TestLayout = {
+      x: Number.NaN,
+      y: 0,
+      width: 10,
+      height: 10,
+      children: [
+        { x: 1, y: Number.NaN, width: 5, height: 5, children: [] },
+        { x: 0, y: 0, width: Number.NaN, height: 8, children: [] },
+      ],
+    }
+    const next: TestLayout = {
+      x: Number.NaN,
+      y: 0,
+      width: 10,
+      height: 10,
+      children: [
+        { x: 1, y: Number.NaN, width: 5, height: 5, children: [] },
+        { x: 0, y: 0, width: Number.NaN, height: 8, children: [] },
+      ],
+    }
+    expect(diffLayout(prev, next)).toEqual([])
+  })
+
+  it('still emits a patch when NaN on a field changes to a finite number (or finite to NaN)', () => {
+    const prev: TestLayout = { x: Number.NaN, y: 0, width: 10, height: 10, children: [] }
+    const next: TestLayout = { x: 3, y: 0, width: 10, height: 10, children: [] }
+    expect(diffLayout(prev, next)).toEqual([{ path: [], x: 3 }])
+
+    const back: TestLayout = { x: 3, y: 0, width: 10, height: 10, children: [] }
+    const toNan: TestLayout = { x: Number.NaN, y: 0, width: 10, height: 10, children: [] }
+    expect(diffLayout(back, toNan)).toEqual([{ path: [], x: Number.NaN }])
+  })
+
   it('skips walking a child subtree when both sides reuse the same child reference', () => {
     const shared: TestLayout = { x: 0, y: 0, width: 50, height: 20, children: [] }
     const prev: TestLayout = { x: 0, y: 0, width: 100, height: 100, children: [shared] }
