@@ -8,9 +8,53 @@
 
 https://github.com/user-attachments/assets/1610d856-3c7d-4fce-be42-1c43306e6520
 
-The client is the server. The server is the client. Geometra is a DOM-free frontend framework built on the [Textura](packages/textura) layout engine where client and server are interchangeable — the same JSON geometry protocol powers both. Human and AI interaction is native to both sides. No browser layout engine. No DOM. Just computed geometry piped straight to render targets.
+## Why Singularity Tech?
 
-AI agents interact with the server directly via the same JSON protocol the client uses — no browser middleman, no scraping, no hacks. Agents move 1000x faster because they skip the entire rendering pipeline. Multiple client/server instances can run inside a single client. This is singularity tech.
+The boundary between client and server dissolves. The same geometry protocol that renders pixels on a canvas also feeds data to AI agents. Humans and AI agents are first-class citizens on both sides of the wire.
+
+- **Client = Server** — the same JSON geometry protocol runs on both; either side can compute, either side can render
+- **AI-native** — agents interact with the server directly, no browser needed, no scraping — 1000x faster than DOM-based frameworks
+- **Multi-instance** — run multiple client/server pairs inside a single client for parallel AI agent workloads
+- **No DOM API calls** — zero style recalculation, zero reflow, zero composite
+- **WASM layout** — Yoga runs at near-native speed
+- **Server-computed** — clients never pay layout cost, just paint pre-computed coordinates
+- **Geometry diffs** — updates send only changed `{ x, y, w, h }`, not full re-renders
+- **No framework runtime on client** — the thin client is a paint loop, not a reconciler
+
+### "Server is client" — what does that actually mean?
+
+If you come from a backend/API background, this phrasing can be confusing. **Geometra does not replace your REST or GraphQL API.** Your business logic, data layer, and API endpoints stay exactly where they are.
+
+Here, "server" and "client" refer to the **rendering pipeline**, not the API layer:
+
+```
+Traditional web app:
+  API Server (business logic) → Browser (layout + paint)
+
+Geometra:
+  API Server (business logic) → Geometra Server (layout computation) → Thin Client (paint only)
+                                       ↑
+                               AI agents connect here too
+```
+
+The **Geometra server** is a layout computation process. It takes your UI tree, runs Yoga WASM flexbox, and outputs pure geometry (`{ x, y, width, height }`). The **thin client** receives that geometry over WebSocket and paints it — no layout engine, no DOM, just pixels.
+
+The key insight: because layout output is just JSON coordinates, an AI agent can consume it directly — same protocol, no browser needed. And because either side can run the layout engine, you can compute layout on the client (local mode) or server (streamed mode) using the same code.
+
+Your app still calls your API for data. Geometra handles what happens *after* you have the data: turning it into pixels.
+
+### Benchmark Comparison
+
+| Metric | Geometra | React (DOM) | SSR (Next.js etc.) |
+|---|---|---|---|
+| Layout engine | Yoga WASM (near-native) | Browser layout (style recalc + reflow) | Server HTML → browser reparse + layout |
+| Client runtime | ~2KB paint loop | ~40-100KB+ framework runtime | ~40-100KB+ hydration runtime |
+| AI agent access | Direct JSON protocol, no browser | Requires headless browser or scraping | Requires headless browser or scraping |
+| Update payload | Geometry diff: `{ x, y, w, h }` | Virtual DOM diff → DOM mutations | Full page or partial HTML |
+| Layout computation | Server or client (same code) | Client only | Server (HTML) → client (re-layout) |
+| DOM dependency | None | Full DOM API | Full DOM API (hydration) |
+| Multi-instance | Multiple server/client pairs in one process | One app per page | One app per request |
+| Time to interactive | Instant (geometry is pre-computed) | After hydration + layout | After HTML parse + hydration + layout |
 
 - Dashboard: https://razroo.github.io/geometra-demo/
 - Agent Demo: https://razroo.github.io/geometra-demo/agent-demo.html
@@ -357,19 +401,6 @@ bun run demo:build
 bun run test      # default fast suite
 bun run test:all  # full suite including slow exhaustive cases
 ```
-
-## Why Singularity Tech?
-
-The boundary between client and server dissolves. The same geometry protocol that renders pixels on a canvas also feeds data to AI agents. Humans and AI agents are first-class citizens on both sides of the wire.
-
-- **Client = Server** — the same JSON geometry protocol runs on both; either side can compute, either side can render
-- **AI-native** — agents interact with the server directly, no browser needed, no scraping — 1000x faster than DOM-based frameworks
-- **Multi-instance** — run multiple client/server pairs inside a single client for parallel AI agent workloads
-- **No DOM API calls** — zero style recalculation, zero reflow, zero composite
-- **WASM layout** — Yoga runs at near-native speed
-- **Server-computed** — clients never pay layout cost, just paint pre-computed coordinates
-- **Geometry diffs** — updates send only changed `{ x, y, w, h }`, not full re-renders
-- **No framework runtime on client** — the thin client is a paint loop, not a reconciler
 
 ## License
 
