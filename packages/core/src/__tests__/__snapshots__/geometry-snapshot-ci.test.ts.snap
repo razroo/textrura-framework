@@ -309,6 +309,39 @@ exports[`geometry snapshot CI > stable ltr document: inner flex row with non-ltr
 }
 `;
 
+exports[`geometry snapshot CI > stable ltr document: inner flex row-reverse with dir rtl mirrors two text children (rounded) 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [],
+          "height": 56,
+          "width": 11,
+          "x": 0,
+          "y": 0,
+        },
+        {
+          "children": [],
+          "height": 56,
+          "width": 11,
+          "x": 19,
+          "y": 0,
+        },
+      ],
+      "height": 56,
+      "width": 176,
+      "x": 12,
+      "y": 12,
+    },
+  ],
+  "height": 80,
+  "width": 200,
+  "x": 0,
+  "y": 0,
+}
+`;
+
 exports[`geometry snapshot CI > stable ltr row with dir auto on Latin and Hebrew text (rounded) 1`] = `
 {
   "children": [
