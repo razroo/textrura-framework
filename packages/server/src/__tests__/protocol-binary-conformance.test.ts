@@ -43,4 +43,12 @@ describe('protocol binary conformance', () => {
     expect(decodeBinaryFrameJson(view)).toBe(asText)
     expect(decodeBinaryFrameJsonClient(view)).toBe(asText)
   })
+
+  it('server and client reject the same truncated v1 header (declared payload longer than the view) with matching errors', () => {
+    const headerOnly = new Uint8Array(9)
+    headerOnly.set([0x47, 0x45, 0x4f, 0x4d, 1], 0)
+    new DataView(headerOnly.buffer).setUint32(5, 1, true)
+    expect(() => decodeBinaryFrameJson(headerOnly)).toThrow('Truncated binary frame payload')
+    expect(() => decodeBinaryFrameJsonClient(headerOnly)).toThrow('Truncated binary frame payload')
+  })
 })
