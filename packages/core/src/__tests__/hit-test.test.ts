@@ -204,6 +204,78 @@ describe('dispatchHit', () => {
       expect(parentFired).toBe(true)
     })
 
+    it('skips null or undefined layout.children slots without throwing (JSON holes / null entries)', () => {
+      let c0Fired = false
+      let c1Fired = false
+      let parentFired = false
+      const child0 = box({
+        width: 40,
+        height: 40,
+        onClick: () => {
+          c0Fired = true
+        },
+      })
+      const child1 = box({
+        width: 40,
+        height: 40,
+        onClick: () => {
+          c1Fired = true
+        },
+      })
+      const parent = box(
+        {
+          width: 100,
+          height: 100,
+          onClick: () => {
+            parentFired = true
+          },
+        },
+        [child0, child1],
+      )
+      const withNullSlot = {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }, null as never],
+      }
+      const withUndefinedSlot = {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        children: [{ x: 0, y: 0, width: 40, height: 40, children: [] }, undefined as never],
+      }
+
+      for (const layout of [withNullSlot, withUndefinedSlot]) {
+        c0Fired = false
+        c1Fired = false
+        parentFired = false
+        expect(() => dispatchHit(parent, layout, 'onClick', 10, 10)).not.toThrow()
+        expect(dispatchHit(parent, layout, 'onClick', 10, 10).handled).toBe(true)
+        expect(c0Fired).toBe(true)
+        expect(c1Fired).toBe(false)
+        expect(parentFired).toBe(false)
+
+        c0Fired = false
+        c1Fired = false
+        parentFired = false
+        expect(() => dispatchHit(parent, layout, 'onClick', 45, 10)).not.toThrow()
+        expect(dispatchHit(parent, layout, 'onClick', 45, 10).handled).toBe(true)
+        expect(c0Fired).toBe(false)
+        expect(c1Fired).toBe(false)
+        expect(parentFired).toBe(true)
+
+        expect(() => hitPathAtPoint(parent, layout, 10, 10)).not.toThrow()
+        expect(hitPathAtPoint(parent, layout, 10, 10)).toEqual([0])
+        expect(hitPathAtPoint(parent, layout, 45, 10)).toEqual([])
+
+        expect(() => hasInteractiveHitAtPoint(parent, layout, 10, 10)).not.toThrow()
+        expect(hasInteractiveHitAtPoint(parent, layout, 10, 10)).toBe(true)
+        expect(hasInteractiveHitAtPoint(parent, layout, 45, 10)).toBe(true)
+      }
+    })
+
     it('hitPathAtPoint returns [] (leaf parent) when only the child layout is corrupt', () => {
       const child = box({ width: 50, height: 50 })
       const parent = box({ width: 100, height: 100, children: [child] })
