@@ -67,6 +67,20 @@ describe('isBinaryFrameBuffer', () => {
     new Uint8Array(sab).set(headerOnly)
     expect(isBinaryFrameBuffer(sab)).toBe(true)
   })
+
+  it('returns false when the view byteLength is below the 9-byte v1 header (embedded / sliced buffers)', () => {
+    const headerOnly = new Uint8Array(9)
+    headerOnly.set([0x47, 0x45, 0x4f, 0x4d, 1], 0)
+    new DataView(headerOnly.buffer).setUint32(5, 0, true)
+    const eight = headerOnly.subarray(0, 8)
+    expect(eight.byteLength).toBe(8)
+    expect(isBinaryFrameBuffer(eight)).toBe(false)
+    expect(() => decodeBinaryFrameJson(eight)).toThrow('Not a GEOM binary frame')
+
+    const emptyView = new Uint8Array(headerOnly.buffer, 0, 0)
+    expect(isBinaryFrameBuffer(emptyView)).toBe(false)
+    expect(() => decodeBinaryFrameJson(emptyView)).toThrow('Not a GEOM binary frame')
+  })
 })
 
 describe('binary frame envelope', () => {
@@ -257,5 +271,65 @@ describe('binary frame envelope', () => {
     const i8 = new Int8Array(frame.buffer, frame.byteOffset, frame.byteLength)
     expect(isBinaryFrameBuffer(i8)).toBe(true)
     expect(decodeBinaryFrameJson(i8)).toBe(json)
+  })
+
+  it('decodes a v1 frame when the same bytes are exposed as other ArrayBufferView kinds (@geometra/client parity)', () => {
+    const json = '{"type":"patch","patches":[]}'
+    const frame = new Uint8Array(encodeBinaryFrameJson(json))
+
+    const len16 = Math.ceil(frame.byteLength / 2) * 2
+    const buf16 = new ArrayBuffer(len16)
+    new Uint8Array(buf16).set(frame)
+    const u16 = new Uint16Array(buf16)
+    expect(isBinaryFrameBuffer(u16)).toBe(true)
+    expect(decodeBinaryFrameJson(u16)).toBe(json)
+
+    const len32 = Math.ceil(frame.byteLength / 4) * 4
+    const buf32 = new ArrayBuffer(len32)
+    new Uint8Array(buf32).set(frame)
+    const u32 = new Uint32Array(buf32)
+    expect(isBinaryFrameBuffer(u32)).toBe(true)
+    expect(decodeBinaryFrameJson(u32)).toBe(json)
+
+    const i16 = new Int16Array(buf16)
+    expect(isBinaryFrameBuffer(i16)).toBe(true)
+    expect(decodeBinaryFrameJson(i16)).toBe(json)
+
+    const i32 = new Int32Array(buf32)
+    expect(isBinaryFrameBuffer(i32)).toBe(true)
+    expect(decodeBinaryFrameJson(i32)).toBe(json)
+
+    const len64 = Math.ceil(frame.byteLength / 8) * 8
+    const buf64 = new ArrayBuffer(len64)
+    new Uint8Array(buf64).set(frame)
+    const i64 = new BigInt64Array(buf64)
+    expect(isBinaryFrameBuffer(i64)).toBe(true)
+    expect(decodeBinaryFrameJson(i64)).toBe(json)
+    const u64 = new BigUint64Array(buf64)
+    expect(isBinaryFrameBuffer(u64)).toBe(true)
+    expect(decodeBinaryFrameJson(u64)).toBe(json)
+
+    const len32f = Math.ceil(frame.byteLength / 4) * 4
+    const buf32f = new ArrayBuffer(len32f)
+    new Uint8Array(buf32f).set(frame)
+    const f32 = new Float32Array(buf32f)
+    expect(isBinaryFrameBuffer(f32)).toBe(true)
+    expect(decodeBinaryFrameJson(f32)).toBe(json)
+
+    const len64f = Math.ceil(frame.byteLength / 8) * 8
+    const buf64f = new ArrayBuffer(len64f)
+    new Uint8Array(buf64f).set(frame)
+    const f64 = new Float64Array(buf64f)
+    expect(isBinaryFrameBuffer(f64)).toBe(true)
+    expect(decodeBinaryFrameJson(f64)).toBe(json)
+
+    if (typeof Float16Array !== 'undefined') {
+      const len16h = Math.ceil(frame.byteLength / 2) * 2
+      const buf16h = new ArrayBuffer(len16h)
+      new Uint8Array(buf16h).set(frame)
+      const f16 = new Float16Array(buf16h)
+      expect(isBinaryFrameBuffer(f16)).toBe(true)
+      expect(decodeBinaryFrameJson(f16)).toBe(json)
+    }
   })
 })
