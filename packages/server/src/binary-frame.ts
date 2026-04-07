@@ -33,12 +33,36 @@ function resolveFrameBytes(data: BinaryFrameBytes): {
 }
 
 /**
+ * True when `[byteOffset, byteOffset + byteLength)` lies within `buffer.byteLength` so
+ * `Uint8Array` / `DataView` construction cannot throw `RangeError`.
+ * Rejects non-integer offsets/lengths (typed array lengths must be integers).
+ */
+function binaryFrameBytesFitBuffer(
+  buffer: ArrayBufferLike,
+  byteOffset: number,
+  byteLength: number,
+): boolean {
+  if (!Number.isInteger(byteOffset) || byteOffset < 0) return false
+  if (!Number.isInteger(byteLength) || byteLength < 0) return false
+  try {
+    const bufLen = buffer.byteLength
+    if (typeof bufLen !== 'number' || !Number.isFinite(bufLen) || bufLen < 0) return false
+    if (byteOffset > bufLen) return false
+    return byteLength <= bufLen - byteOffset
+  } catch {
+    return false
+  }
+}
+
+/**
  * True if data looks like a v1 binary envelope (GEOM + version 1). Does not verify that the declared
  * UTF-8 payload length fits the view — use {@link decodeBinaryFrameJson} for full validation.
  * Accepts a root `ArrayBuffer` / `SharedArrayBuffer` or any `ArrayBufferView` (e.g. `Uint8Array` subarray,
  * `DataView`, other typed arrays) so callers can probe frames embedded in a larger store without copying.
  * `null` / `undefined` yield `false`. Plain objects that are not real `ArrayBufferView` instances also yield
  * `false` (no numeric coercion).
+ * Inconsistent `(buffer, byteOffset, byteLength)` tuples that would make `Uint8Array` throw `RangeError`
+ * yield `false` instead of throwing.
  */
 export function isBinaryFrameBuffer(data: BinaryFrameBytes): boolean {
   if (data == null) return false
@@ -55,6 +79,7 @@ export function isBinaryFrameBuffer(data: BinaryFrameBytes): boolean {
   ) {
     return false
   }
+  if (!binaryFrameBytesFitBuffer(buffer, byteOffset, byteLength)) return false
   const u8 = new Uint8Array(buffer, byteOffset, byteLength)
   return (
     u8[0] === 0x47 &&
