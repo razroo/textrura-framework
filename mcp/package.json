@@ -1,0 +1,41 @@
+{
+  "name": "@geometra/mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Geometra — interact with running Geometra apps via the geometry protocol, no browser needed",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/razroo/geometra",
+    "directory": "mcp"
+  },
+  "bin": {
+    "geometra-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "node --loader ts-node/esm src/index.ts"
+  },
+  "keywords": [
+    "geometra",
+    "mcp",
+    "geometry-protocol",
+    "ai-agent",
+    "dom-free",
+    "ui-testing"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "ws": "^8.18.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.0",
+    "typescript": "^6.0.0"
+  }
+}
