@@ -741,6 +741,37 @@ describe('dispatchHit', () => {
     expect(getCursorAtPoint(root, layout, max, 50)).toBeNull()
   })
 
+  it('root offset plus layout origin overflow to non-finite abs is a miss (IEEE MAX_VALUE + MAX_VALUE)', () => {
+    const max = Number.MAX_VALUE
+    expect(max + max).toBe(Infinity)
+
+    let fired = false
+    const el = box({
+      width: 10,
+      height: 10,
+      cursor: 'pointer',
+      onClick: () => {
+        fired = true
+      },
+    })
+    const layout = { x: max, y: 0, width: 10, height: 10, children: [] as const }
+
+    expect(() => dispatchHit(el, layout, 'onClick', 0, 0, undefined, max, 0)).not.toThrow()
+    expect(dispatchHit(el, layout, 'onClick', 0, 0, undefined, max, 0).handled).toBe(false)
+    expect(fired).toBe(false)
+
+    expect(hitPathAtPoint(el, layout, 0, 0, max, 0)).toBeNull()
+    expect(hasInteractiveHitAtPoint(el, layout, 0, 0, max, 0)).toBe(false)
+    expect(getCursorAtPoint(el, layout, 0, 0, max, 0)).toBeNull()
+
+    const layoutY = { x: 0, y: max, width: 10, height: 10, children: [] as const }
+    expect(() => dispatchHit(el, layoutY, 'onClick', 0, 0, undefined, 0, max)).not.toThrow()
+    expect(dispatchHit(el, layoutY, 'onClick', 0, 0, undefined, 0, max).handled).toBe(false)
+    expect(hitPathAtPoint(el, layoutY, 0, 0, 0, max)).toBeNull()
+    expect(hasInteractiveHitAtPoint(el, layoutY, 0, 0, 0, max)).toBe(false)
+    expect(getCursorAtPoint(el, layoutY, 0, 0, 0, max)).toBeNull()
+  })
+
   it('corrupt earlier sibling layout does not throw and still allows hits on later siblings', () => {
     let innerFired = false
     const inner = box({
