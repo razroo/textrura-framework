@@ -1,0 +1,47 @@
+{
+  "name": "@geometra/proxy",
+  "version": "1.17.0",
+  "description": "Headless browser proxy — stream live DOM geometry as Geometra WebSocket frames for MCP and clients",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/razroo/geometra",
+    "directory": "packages/proxy"
+  },
+  "keywords": [
+    "geometra",
+    "playwright",
+    "websocket",
+    "mcp",
+    "geometry-protocol"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "geometra-proxy": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit -p tsconfig.build.json",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "playwright": "^1.54.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.13",
+    "typescript": "^6.0.0"
+  }
+}

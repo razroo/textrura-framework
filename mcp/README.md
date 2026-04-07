@@ -1,14 +1,15 @@
 # @geometra/mcp
 
-MCP server for [Geometra](https://github.com/razroo/geometra) — interact with running Geometra apps via the geometry protocol. No browser, no Playwright, no screenshots.
+MCP server for [Geometra](https://github.com/razroo/geometra) — interact with running Geometra apps via the geometry protocol over WebSocket. For **native** Geometra apps there is no browser in the loop. For **any existing website**, pair this MCP server with [`@geometra/proxy`](../packages/proxy/README.md) (headless Chromium) so the same tools speak the same GEOM v1 wire format.
 
 ## What this does
 
-Connects Claude Code, Codex, or any MCP-compatible AI agent to a running Geometra server over WebSocket. The agent gets structured `{ x, y, width, height }` geometry and semantic metadata for every UI element — not pixels, not DOM, not component descriptions.
+Connects Claude Code, Codex, or any MCP-compatible AI agent to a WebSocket endpoint that streams `frame` / `patch` messages. The agent gets structured `{ x, y, width, height }` geometry and semantic metadata for every UI node — not screenshots, not a vision model.
 
 ```
-Playwright:  Launch Chromium → render → screenshot → vision model → "I see a button"
-Geometra:    WebSocket → JSON → { role: "button", name: "Submit", bounds: {x:200, y:300, w:80, h:40} }
+Playwright + vision:  screenshot → model → guess coordinates → click → repeat
+Native Geometra:      WebSocket → JSON geometry (no browser on the agent path)
+Geometra proxy:       Headless Chromium → DOM geometry → same WebSocket as native → MCP tools unchanged
 ```
 
 ## Tools
@@ -58,14 +59,32 @@ claude mcp add geometra -- node ./dist/index.js
 
 ## Usage
 
-Start a Geometra app:
+### Native Geometra server
 
 ```bash
 cd demos/server-client
 npm run server  # starts on ws://localhost:3100
 ```
 
-Then in Claude Code:
+### Any web app (Geometra proxy)
+
+In one terminal, serve or open a page (example uses the repo sample):
+
+```bash
+cd demos/proxy-mcp-sample
+python3 -m http.server 8080
+```
+
+In another terminal (from repo root after `npm install` / `bun install` and `bun run build`):
+
+```bash
+npx geometra-proxy http://localhost:8080 --port 3200
+# Requires Chromium: npx playwright install chromium
+```
+
+Point MCP at `ws://127.0.0.1:3200` instead of a native Geometra server. The proxy translates clicks and keyboard messages into Playwright actions and streams updated geometry.
+
+Then in Claude Code (either backend):
 
 ```
 > Connect to my Geometra app at ws://localhost:3100 and tell me what's on screen
@@ -77,7 +96,7 @@ Then in Claude Code:
 > Take a snapshot and check if the dialog is visible
 ```
 
-## Example: agent testing a signup form
+## Example: agent testing a signup form (native server)
 
 ```
 Agent:  geometra_connect({ url: "ws://localhost:3100" })
@@ -99,14 +118,34 @@ Agent:  geometra_click({ x: 160, y: 372 })
         → Clicked. Success message visible.
 ```
 
-No browser. No screenshots. No vision model. JSON in, JSON out.
+No screenshots and no vision model in the loop. JSON in, JSON out.
+
+## Example: static HTML via `@geometra/proxy`
+
+With `python3 -m http.server 8080` in `demos/proxy-mcp-sample` and `npx geometra-proxy http://localhost:8080 --port 3200` running:
+
+```
+Agent:  geometra_connect({ url: "ws://127.0.0.1:3200" })
+        → Connected. UI includes textbox "Email", button "Save", …
+
+Agent:  geometra_query({ role: "textbox", name: "Email" })
+        → bounds for the email field (viewport coordinates)
+
+Agent:  geometra_click({ x: <center-x>, y: <center-y> })
+        → Focuses the input
+
+Agent:  geometra_type({ text: "hello@example.com" })
+
+Agent:  geometra_query({ role: "button", name: "Save" })
+        → Click center to submit the sample form; status text updates in the DOM
+```
 
 ## How it works
 
-1. The MCP server connects to a Geometra WebSocket server
-2. It receives the computed layout (`{ x, y, width, height }` for every element) and the UI tree (element types, props, handlers, semantic metadata)
-3. It builds an accessibility tree from the raw data — roles, names, focusable state, bounds
-4. Tools expose query, click, type, and snapshot operations over this structured data
-5. After each interaction, the server sends updated geometry — the MCP server returns the new state
+1. The MCP server connects to a WebSocket peer that speaks GEOM v1 (`frame` with `layout` + `tree`, optional `patch` updates).
+2. It receives the computed layout (`{ x, y, width, height }` for every node) and the UI tree (`kind`, `semantic`, `props`, `handlers`, `children`).
+3. It builds an accessibility tree from that data — roles, names, focusable state, bounds.
+4. Tools expose query, click, type, and snapshot operations over this structured data.
+5. After each interaction, the peer sends updated geometry (full `frame` or `patch`) — the MCP tools return the new state.
 
-The Geometra server does all layout computation. The MCP server is a thin bridge that translates between MCP tool calls and the WebSocket geometry protocol.
+With a **native** Geometra server, layout comes from Textura/Yoga. With **`@geometra/proxy`**, layout comes from the browser’s computed DOM geometry; the MCP layer is the same.

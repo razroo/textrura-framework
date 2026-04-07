@@ -15,6 +15,7 @@ const packages = [
   '@geometra/ui',
   '@geometra/router',
   '@geometra/tw',
+  '@geometra/proxy',
 ]
 
 async function run() {

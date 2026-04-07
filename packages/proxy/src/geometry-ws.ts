@@ -1,0 +1,309 @@
+import type { Page } from 'playwright'
+import { WebSocketServer, type WebSocket } from 'ws'
+import { coalescePatches, diffLayout } from './diff-layout.js'
+import { extractGeometry } from './extractor.js'
+import type { ClientKeyMessage, GeometrySnapshot, LayoutSnapshot, ParsedClientMessage } from './types.js'
+import {
+  isClickEventMessage,
+  isCompositionMessage,
+  isKeyMessage,
+  isResizeMessage,
+  PROXY_PROTOCOL_VERSION,
+} from './types.js'
+
+function isProtocolCompatible(peerVersion: number | undefined): boolean {
+  if (peerVersion === undefined) return true
+  if (typeof peerVersion !== 'number' || !Number.isFinite(peerVersion)) return false
+  return peerVersion <= PROXY_PROTOCOL_VERSION
+}
+
+function cloneLayout(layout: LayoutSnapshot): LayoutSnapshot {
+  return structuredClone(layout)
+}
+
+function normalizePlaywrightKey(key: string): string {
+  if (key === ' ') return 'Space'
+  return key
+}
+
+async function applyKeyPhase(page: Page, msg: ClientKeyMessage): Promise<void> {
+  if (msg.eventType !== 'onKeyDown' && msg.eventType !== 'onKeyUp') return
+  const k = normalizePlaywrightKey(msg.key)
+  /**
+   * `geometra_key` sends a single `onKeyDown` with `code === key` (e.g. Enter).
+   * `geometra_type` sends `onKeyDown` / `onKeyUp` pairs with `code` like `KeyA` and `key` like `a`.
+   */
+  const singleShotSpecial = msg.code === msg.key
+
+  if (msg.eventType === 'onKeyDown') {
+    if (msg.shiftKey) await page.keyboard.down('Shift')
+    if (msg.ctrlKey) await page.keyboard.down('Control')
+    if (msg.metaKey) await page.keyboard.down('Meta')
+    if (msg.altKey) await page.keyboard.down('Alt')
+    if (singleShotSpecial) {
+      await page.keyboard.press(k)
+      if (msg.altKey) await page.keyboard.up('Alt')
+      if (msg.metaKey) await page.keyboard.up('Meta')
+      if (msg.ctrlKey) await page.keyboard.up('Control')
+      if (msg.shiftKey) await page.keyboard.up('Shift')
+    } else {
+      await page.keyboard.down(k)
+    }
+    return
+  }
+
+  if (singleShotSpecial) {
+    return
+  }
+  await page.keyboard.up(k)
+  if (msg.altKey) await page.keyboard.up('Alt')
+  if (msg.metaKey) await page.keyboard.up('Meta')
+  if (msg.ctrlKey) await page.keyboard.up('Control')
+  if (msg.shiftKey) await page.keyboard.up('Shift')
+}
+
+async function handleClientMessage(
+  page: Page,
+  ws: WebSocket,
+  raw: unknown,
+  onViewportOrInput: (kind: 'resize' | 'input') => void,
+): Promise<void> {
+  let msg: ParsedClientMessage
+  try {
+    msg = JSON.parse(String(raw)) as ParsedClientMessage
+  } catch {
+    return
+  }
+  if (typeof msg !== 'object' || msg === null || typeof msg.type !== 'string') return
+  const pv = 'protocolVersion' in msg ? msg.protocolVersion : undefined
+  if (!isProtocolCompatible(pv)) {
+    ws.send(
+      JSON.stringify({
+        type: 'error',
+        message: `Client protocol ${String(pv)} is newer than proxy protocol ${PROXY_PROTOCOL_VERSION}`,
+        protocolVersion: PROXY_PROTOCOL_VERSION,
+      }),
+    )
+    return
+  }
+
+  if (isResizeMessage(msg)) {
+    const w = Math.max(1, Math.floor(msg.width))
+    const h = Math.max(1, Math.floor(msg.height))
+    await page.setViewportSize({ width: w, height: h })
+    onViewportOrInput('resize')
+    return
+  }
+
+  if (isClickEventMessage(msg)) {
+    const x = msg.x
+    const y = msg.y
+    if (typeof x === 'number' && typeof y === 'number' && Number.isFinite(x) && Number.isFinite(y)) {
+      await page.mouse.click(x, y)
+      onViewportOrInput('input')
+    }
+    return
+  }
+
+  if (isKeyMessage(msg)) {
+    await applyKeyPhase(page, msg)
+    onViewportOrInput('input')
+    return
+  }
+
+  if (isCompositionMessage(msg)) {
+    const data = typeof msg.data === 'string' ? msg.data : ''
+    if (msg.eventType === 'onCompositionUpdate' || msg.eventType === 'onCompositionEnd') {
+      await page.keyboard.insertText(data)
+      onViewportOrInput('input')
+    }
+  }
+}
+
+export interface GeometryWsHub {
+  /** Run extraction and broadcast (debounced observer calls this). */
+  scheduleExtract: () => void
+  /** Wait until any in-flight extract + broadcast finishes. */
+  flushExtract: () => Promise<void>
+  close: () => Promise<void>
+}
+
+export function startGeometryWebSocket(options: {
+  port: number
+  page: Page
+  /** DOM mutation debounce (ms). */
+  debounceMs?: number
+  onListening?: (port: number) => void
+  onError?: (err: unknown) => void
+}): GeometryWsHub {
+  const debounceMs = options.debounceMs ?? 50
+  const clients = new Set<WebSocket>()
+  const wss = new WebSocketServer({ port: options.port })
+
+  let prevLayout: LayoutSnapshot | null = null
+  let prevTreeJson: string | null = null
+
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null
+  let extracting = false
+  let pendingExtract = false
+
+  function broadcastSnapshot(snap: GeometrySnapshot) {
+    const treeChanged = prevTreeJson !== snap.treeJson
+
+    let outbound:
+      | { type: 'frame'; layout: LayoutSnapshot; tree: GeometrySnapshot['tree']; protocolVersion: number }
+      | { type: 'patch'; patches: ReturnType<typeof diffLayout>; protocolVersion: number }
+
+    if (!prevLayout || treeChanged) {
+      outbound = {
+        type: 'frame',
+        layout: snap.layout,
+        tree: snap.tree,
+        protocolVersion: PROXY_PROTOCOL_VERSION,
+      }
+      prevLayout = cloneLayout(snap.layout)
+      prevTreeJson = snap.treeJson
+    } else {
+      const rawPatches = diffLayout(prevLayout, snap.layout)
+      const patches = coalescePatches(rawPatches)
+      if (patches.length === 0) {
+        return
+      }
+      if (patches.length > 20) {
+        outbound = {
+          type: 'frame',
+          layout: snap.layout,
+          tree: snap.tree,
+          protocolVersion: PROXY_PROTOCOL_VERSION,
+        }
+      } else {
+        outbound = { type: 'patch', patches, protocolVersion: PROXY_PROTOCOL_VERSION }
+      }
+      prevLayout = cloneLayout(snap.layout)
+      prevTreeJson = snap.treeJson
+    }
+
+    const text = JSON.stringify(outbound)
+    for (const ws of clients) {
+      if (ws.readyState === ws.OPEN) {
+        ws.send(text)
+      }
+    }
+  }
+
+  async function runExtract(): Promise<void> {
+    try {
+      const snap = await extractGeometry(options.page)
+      broadcastSnapshot(snap)
+    } catch (err) {
+      options.onError?.(err)
+      const errMsg = {
+        type: 'error',
+        message: err instanceof Error ? err.message : String(err),
+        protocolVersion: PROXY_PROTOCOL_VERSION,
+      }
+      const errText = JSON.stringify(errMsg)
+      for (const ws of clients) {
+        if (ws.readyState === ws.OPEN) ws.send(errText)
+      }
+    }
+  }
+
+  async function runExtractQueued(): Promise<void> {
+    if (extracting) {
+      pendingExtract = true
+      return
+    }
+    extracting = true
+    try {
+      await runExtract()
+      while (pendingExtract) {
+        pendingExtract = false
+        await runExtract()
+      }
+    } finally {
+      extracting = false
+    }
+  }
+
+  function scheduleExtract() {
+    if (debounceTimer !== null) clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      void runExtractQueued()
+    }, debounceMs)
+  }
+
+  wss.on('listening', () => {
+    const addr = wss.address()
+    const p = typeof addr === 'object' && addr ? addr.port : options.port
+    options.onListening?.(p)
+  })
+
+  wss.on('connection', (ws) => {
+    clients.add(ws)
+    if (prevLayout && prevTreeJson !== null) {
+      const snap: GeometrySnapshot = {
+        layout: prevLayout,
+        tree: JSON.parse(prevTreeJson) as GeometrySnapshot['tree'],
+        treeJson: prevTreeJson,
+      }
+      const text = JSON.stringify({
+        type: 'frame',
+        layout: snap.layout,
+        tree: snap.tree,
+        protocolVersion: PROXY_PROTOCOL_VERSION,
+      })
+      if (ws.readyState === ws.OPEN) ws.send(text)
+    }
+    ws.on('message', (raw) => {
+      void handleClientMessage(options.page, ws, raw, kind => {
+        if (kind === 'resize') {
+          void runExtractQueued()
+        } else {
+          scheduleExtract()
+        }
+      }).catch(err => options.onError?.(err))
+    })
+    ws.on('close', () => {
+      clients.delete(ws)
+    })
+  })
+
+  return {
+    scheduleExtract,
+    flushExtract: async () => {
+      if (debounceTimer !== null) {
+        clearTimeout(debounceTimer)
+        debounceTimer = null
+      }
+      await runExtractQueued()
+    },
+    close: () =>
+      new Promise((resolve, reject) => {
+        for (const ws of clients) {
+          ws.close()
+        }
+        clients.clear()
+        wss.close(err => (err ? reject(err) : resolve()))
+      }),
+  }
+}
+
+export async function installDomObserver(page: Page, scheduleExtract: () => void): Promise<void> {
+  await page.exposeFunction('__geometraProxyNotify', () => {
+    scheduleExtract()
+  })
+  await page.evaluate(() => {
+    const w = window as unknown as { __geometraProxyNotify?: () => Promise<void> }
+    const observer = new MutationObserver(() => {
+      void w.__geometraProxyNotify?.()
+    })
+    observer.observe(document.documentElement, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      characterData: true,
+    })
+  })
+}

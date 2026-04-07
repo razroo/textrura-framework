@@ -36,6 +36,7 @@ jobs:
         @geometra/tw
         @geometra/agent
         @geometra/cli
+        @geometra/proxy
     steps:
       - uses: actions/checkout@v6
 

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Geometra proxy + MCP sample</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 28rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      label {
+        display: block;
+        margin-top: 1rem;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        margin-top: 0.25rem;
+        padding: 0.5rem;
+      }
+      button {
+        margin-top: 1.25rem;
+        padding: 0.5rem 1rem;
+      }
+      #status {
+        margin-top: 1.5rem;
+        padding: 0.75rem;
+        background: #f4f4f5;
+        border-radius: 6px;
+        min-height: 1.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Sample form</h1>
+      <p>Use with <code>geometra-proxy</code> and <code>@geometra/mcp</code> (see repo <code>mcp/README.md</code>).</p>
+      <form id="f" action="#" onsubmit="return false">
+        <label for="email">Email</label>
+        <input id="email" type="email" name="email" placeholder="you@example.com" autocomplete="off" />
+        <label for="note">Note</label>
+        <input id="note" type="text" name="note" placeholder="Short note" autocomplete="off" />
+        <button type="submit" id="go">Save</button>
+      </form>
+      <p id="status" role="status" aria-live="polite"></p>
+    </main>
+    <script>
+      const status = document.getElementById('status')
+      document.getElementById('go').addEventListener('click', () => {
+        const email = document.getElementById('email').value.trim()
+        const note = document.getElementById('note').value.trim()
+        status.textContent = email
+          ? 'Saved: ' + email + (note ? ' — ' + note : '')
+          : 'Enter an email, then click Save again.'
+      })
+    </script>
+  </body>
+</html>
