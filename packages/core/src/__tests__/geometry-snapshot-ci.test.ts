@@ -253,6 +253,46 @@ describe('geometry snapshot CI', () => {
     expect(roundLayout(layout)).toMatchSnapshot()
   })
 
+  it('stable row with justifyContent flex-end and two fixed-width text children (rounded)', async () => {
+    await init()
+    const item = { font: '16px sans-serif', lineHeight: 20, width: 24, height: 20 } as const
+    const tree = box(
+      {
+        width: 200,
+        height: 80,
+        padding: 12,
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        gap: 8,
+      },
+      [text({ text: 'A', ...item }), text({ text: 'B', ...item })],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 80 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
+
+  it('stable rtl root row with justifyContent flex-end and two fixed-width text children (rounded)', async () => {
+    await init()
+    const item = { font: '16px sans-serif', lineHeight: 20, width: 24, height: 20 } as const
+    const tree = box(
+      {
+        width: 200,
+        height: 80,
+        padding: 12,
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        gap: 8,
+      },
+      [text({ text: 'A', ...item }), text({ text: 'B', ...item })],
+    )
+    const layout = computeLayout(toLayoutTree(tree), {
+      width: 200,
+      height: 80,
+      direction: 'rtl',
+    })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
+
   it('stable rtl row with space-between and two text children (rounded)', async () => {
     await init()
     const tree = box(
