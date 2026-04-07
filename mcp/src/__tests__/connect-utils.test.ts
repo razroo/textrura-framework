@@ -115,6 +115,46 @@ describe('proxy ready helpers', () => {
     }
   })
 
+  it('falls back to the packaged sibling proxy dist when package exports are stale', () => {
+    const tempRoot = mkdtempSync(path.join(tmpdir(), 'geometra-proxy-stale-exports-'))
+
+    try {
+      const proxyDir = path.join(tempRoot, 'node_modules', '@geometra', 'proxy')
+      const mcpDistDir = path.join(tempRoot, 'node_modules', '@geometra', 'mcp', 'dist')
+      const proxyDistDir = path.join(proxyDir, 'dist')
+      const probePath = path.join(mcpDistDir, 'proxy-spawn.cjs')
+
+      mkdirSync(proxyDistDir, { recursive: true })
+      mkdirSync(mcpDistDir, { recursive: true })
+
+      writeFileSync(
+        path.join(proxyDir, 'package.json'),
+        JSON.stringify(
+          {
+            name: '@geometra/proxy',
+            type: 'module',
+            exports: {
+              '.': {
+                import: './dist/index.js',
+              },
+            },
+          },
+          null,
+          2,
+        ),
+      )
+      writeFileSync(path.join(proxyDistDir, 'index.js'), 'export {};\n')
+      writeFileSync(probePath, 'module.exports = {};\n')
+
+      const customRequire = createRequire(probePath)
+      const scriptPath = resolveProxyScriptPathWith(customRequire, mcpDistDir)
+
+      expect(scriptPath).toBe(path.join(proxyDistDir, 'index.js'))
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true })
+    }
+  })
+
   it('parses structured proxy ready JSON', () => {
     const wsUrl = parseProxyReadySignalLine(
       '{"type":"geometra-proxy-ready","wsUrl":"ws://127.0.0.1:41237","pageUrl":"https://example.com"}',

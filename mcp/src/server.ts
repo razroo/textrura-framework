@@ -28,7 +28,7 @@ import type { A11yNode, Session, UpdateWaitResult } from './session.js'
 
 export function createServer(): McpServer {
   const server = new McpServer(
-    { name: 'geometra', version: '1.19.2' },
+    { name: 'geometra', version: '1.19.3' },
     { capabilities: { tools: {} } },
   )
 

@@ -14,7 +14,7 @@ export function resolveProxyScriptPath(): string {
   return resolveProxyScriptPathWith(require)
 }
 
-export function resolveProxyScriptPathWith(customRequire: NodeRequire): string {
+export function resolveProxyScriptPathWith(customRequire: NodeRequire, moduleDir = MODULE_DIR): string {
   const errors: string[] = []
 
   try {
@@ -30,7 +30,13 @@ export function resolveProxyScriptPathWith(customRequire: NodeRequire): string {
     errors.push(err instanceof Error ? err.message : String(err))
   }
 
-  const workspaceDist = path.resolve(MODULE_DIR, '../../packages/proxy/dist/index.js')
+  const packagedSiblingDist = path.resolve(moduleDir, '../../proxy/dist/index.js')
+  if (existsSync(packagedSiblingDist)) {
+    return packagedSiblingDist
+  }
+  errors.push(`Packaged sibling fallback not found at ${packagedSiblingDist}`)
+
+  const workspaceDist = path.resolve(moduleDir, '../../packages/proxy/dist/index.js')
   if (existsSync(workspaceDist)) {
     return workspaceDist
   }
