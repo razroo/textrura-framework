@@ -260,7 +260,7 @@ while true; do
     git push
   fi
 
-  i=$((i + 1))
+  let i+=1
 done
 
 echo "=== cursor-agent-loop: finished ${ITERATIONS} iteration(s) ===" >&2
