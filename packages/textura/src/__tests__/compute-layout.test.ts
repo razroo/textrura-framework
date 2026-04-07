@@ -1250,6 +1250,85 @@ describe('box layout', () => {
     expect(computeLayout(weird)).toEqual(computeLayout(baseline))
   })
 
+  it('non-finite gap, rowGap, and columnGap are ignored like omitting the prop (corrupt JSON / NaN / ±Infinity)', () => {
+    const gapChildren: LayoutNode[] = [
+      { width: 10, height: 10 },
+      { width: 10, height: 10 },
+    ]
+    const cleanRow: BoxNode = {
+      width: 100,
+      flexDirection: 'row',
+      children: gapChildren,
+    }
+    const junkRow: BoxNode = {
+      width: 100,
+      flexDirection: 'row',
+      gap: Number.NaN as never,
+      rowGap: Number.POSITIVE_INFINITY as never,
+      columnGap: Number.NEGATIVE_INFINITY as never,
+      children: gapChildren,
+    }
+    expect(computeLayout(junkRow)).toEqual(computeLayout(cleanRow))
+
+    const cleanCol: BoxNode = {
+      width: 40,
+      flexDirection: 'column',
+      children: gapChildren,
+    }
+    const junkCol: BoxNode = {
+      width: 40,
+      flexDirection: 'column',
+      gap: Number.NaN as never,
+      rowGap: Number.POSITIVE_INFINITY as never,
+      columnGap: Number.NEGATIVE_INFINITY as never,
+      children: gapChildren,
+    }
+    expect(computeLayout(junkCol)).toEqual(computeLayout(cleanCol))
+  })
+
+  it('non-finite flexGrow, flexShrink, and numeric flexBasis match omitting those props (Yoga-stable)', () => {
+    const rowBaseline: BoxNode = {
+      width: 300,
+      flexDirection: 'row',
+      children: [
+        { width: 100, height: 50, flexGrow: 0 },
+        { height: 50 },
+      ],
+    }
+    const rowWeird: BoxNode = {
+      width: 300,
+      flexDirection: 'row',
+      children: [
+        { width: 100, height: 50, flexGrow: 0 },
+        {
+          height: 50,
+          flexGrow: Number.NaN as never,
+          flexShrink: Number.POSITIVE_INFINITY as never,
+          flexBasis: Number.NEGATIVE_INFINITY as never,
+        },
+      ],
+    }
+    expect(computeLayout(rowWeird)).toEqual(computeLayout(rowBaseline))
+
+    const shrinkBaseline: BoxNode = {
+      width: 100,
+      flexDirection: 'row',
+      children: [
+        { width: 80, height: 20, flexShrink: 1 },
+        { width: 80, height: 20, flexShrink: 0 },
+      ],
+    }
+    const shrinkWeird: BoxNode = {
+      width: 100,
+      flexDirection: 'row',
+      children: [
+        { width: 80, height: 20, flexShrink: Number.NaN as never },
+        { width: 80, height: 20, flexShrink: 0 },
+      ],
+    }
+    expect(computeLayout(shrinkWeird)).toEqual(computeLayout(shrinkBaseline))
+  })
+
   it('flexGrow distributes space', () => {
     const tree: BoxNode = {
       width: 300,

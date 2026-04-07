@@ -98,6 +98,11 @@ function isOwnEnumKey<T extends Record<string, unknown>>(map: T, key: unknown): 
   return typeof key === 'string' && Object.hasOwn(map, key)
 }
 
+/** Finite primitive numbers only — safe for Yoga gap/setter paths; rejects NaN, ±Infinity, and non-numbers. */
+function isFiniteYogaScalar(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
 function applyFlexProps(node: Node, props: FlexProps): void {
   const flexDirection = props.flexDirection
   if (flexDirection !== undefined && isOwnEnumKey(FLEX_DIRECTION_MAP, flexDirection)) {
@@ -172,10 +177,12 @@ function applyFlexProps(node: Node, props: FlexProps): void {
     node.setBorder(Edge.Bottom, props.borderBottom)
   if (props.borderLeft !== undefined) node.setBorder(Edge.Left, props.borderLeft)
 
-  // Gap
-  if (props.gap !== undefined) node.setGap(Gutter.All, props.gap)
-  if (props.rowGap !== undefined) node.setGap(Gutter.Row, props.rowGap)
-  if (props.columnGap !== undefined) node.setGap(Gutter.Column, props.columnGap)
+  // Gap (non-finite values are ignored like omitting the prop; Yoga otherwise threads NaN/±∞ into layout)
+  if (props.gap !== undefined && isFiniteYogaScalar(props.gap)) node.setGap(Gutter.All, props.gap)
+  if (props.rowGap !== undefined && isFiniteYogaScalar(props.rowGap))
+    node.setGap(Gutter.Row, props.rowGap)
+  if (props.columnGap !== undefined && isFiniteYogaScalar(props.columnGap))
+    node.setGap(Gutter.Column, props.columnGap)
 
   // Position
   if (props.position !== undefined)
