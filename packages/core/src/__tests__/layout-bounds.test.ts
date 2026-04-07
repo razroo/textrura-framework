@@ -46,6 +46,14 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 10, height: 10, children })).toBe(false)
   })
 
+  it('rejects Arguments objects as children (array-like length/indices; Array.isArray is false)', () => {
+    const children = (function () {
+      return arguments
+    })({ x: 0, y: 0, width: 1, height: 1, children: [] }) as unknown as ComputedLayout['children']
+    expect(Array.isArray(children)).toBe(false)
+    expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 10, height: 10, children })).toBe(false)
+  })
+
   it('accepts extreme finite coordinates and subnormal positive width/height (still Number.isFinite)', () => {
     const children = [] as const
     expect(
