@@ -190,6 +190,21 @@ describe('text', () => {
     expect(p.pointerEvents).toBe('none')
     expect(p.zIndex).toBe(5)
   })
+
+  it('does not lift on* callbacks onto handlers (text leaves are not pointer targets; box() owns handler extraction)', () => {
+    const noop = () => {}
+    const el = text({
+      text: 'x',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      onClick: noop,
+      onKeyDown: noop,
+    } as never)
+    expect((el as { handlers?: unknown }).handlers).toBeUndefined()
+    const p = el.props as Record<string, unknown>
+    expect(p.onClick).toBe(noop)
+    expect(p.onKeyDown).toBe(noop)
+  })
 })
 
 describe('image', () => {
