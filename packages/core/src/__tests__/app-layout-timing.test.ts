@@ -726,6 +726,20 @@ describe('createApp root width/height sanitization', () => {
     expect(zeroLayout.height).toBe(negZeroLayout.height)
   })
 
+  it('omits both root width and height when each axis is invalid (unconstrained computeLayout; still finite geometry)', async () => {
+    const render = vi.fn()
+    const renderer: Renderer = { render, destroy: vi.fn() }
+
+    await createApp(() => box({ width: 40, height: 20 }, []), renderer, {
+      width: Number.NaN,
+      height: '50' as unknown as number,
+    })
+    expect(render).toHaveBeenCalledTimes(1)
+    const layout = render.mock.calls[0]![0] as { width: number; height: number }
+    expect(Number.isFinite(layout.width)).toBe(true)
+    expect(Number.isFinite(layout.height)).toBe(true)
+  })
+
   it('omits NaN, ±Infinity, negative, and non-number root extents so computeLayout stays finite', async () => {
     const render = vi.fn()
     const renderer: Renderer = { render, destroy: vi.fn() }
