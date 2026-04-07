@@ -64,4 +64,18 @@ describe('route ranking', () => {
     expect(comparePatternSpecificity('/a', '/b')).toBe(0)
     expect(comparePatternSpecificity('/x/:id', '/y/:slug')).toBe(0)
   })
+
+  it('scores non-string patterns as 0 without throwing (dynamic tables / bad deserialization)', () => {
+    expect(scorePathPattern(null as never)).toBe(0)
+    expect(scorePathPattern(undefined as never)).toBe(0)
+    expect(scorePathPattern(0 as never)).toBe(0)
+    expect(scorePathPattern({} as never)).toBe(0)
+    expect(scorePathPattern(Object('/x') as never)).toBe(0)
+  })
+
+  it('comparePatternSpecificity ranks real patterns above non-string peers without throwing', () => {
+    expect(comparePatternSpecificity('/users/settings', null as never)).toBeLessThan(0)
+    expect(comparePatternSpecificity(null as never, '/users/settings')).toBeGreaterThan(0)
+    expect(comparePatternSpecificity(undefined as never, undefined as never)).toBe(0)
+  })
 })

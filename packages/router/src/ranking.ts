@@ -7,6 +7,7 @@ function trimSlashes(value: string): string {
 }
 
 function parseRankedSegments(pattern: string): RankedSegment[] {
+  if (typeof pattern !== 'string') return []
   const trimmed = trimSlashes(pattern)
   if (trimmed === '') return []
 
@@ -43,6 +44,9 @@ function scoreSegment(segment: RankedSegment): number {
  * segments, then splats (any segment whose first character is `*`, including named splats like `*rest`).
  * Empty segments produced by doubled slashes (e.g. `/a//b`) count as extra
  * static segments so ranking depth stays aligned with {@link matchPath} segment lists.
+ *
+ * Non-string runtime values (bad casts, loose deserialization) score as **0**, same as an empty pattern,
+ * so dynamic route tables cannot throw while ranking.
  */
 export function scorePathPattern(pattern: string): number {
   const segments = parseRankedSegments(pattern)
@@ -53,6 +57,8 @@ export function scorePathPattern(pattern: string): number {
  * Comparator for sorting patterns from most specific to least: higher {@link scorePathPattern} wins;
  * on a tie, the deeper pattern (more segments) wins. Return value follows `Array.prototype.sort` —
  * negative when `a` should sort before `b` (i.e. `a` is more specific).
+ *
+ * Non-string arguments are treated like empty patterns via {@link scorePathPattern} / internal segment parsing.
  */
 export function comparePatternSpecificity(a: string, b: string): number {
   const scoreA = scorePathPattern(a)
