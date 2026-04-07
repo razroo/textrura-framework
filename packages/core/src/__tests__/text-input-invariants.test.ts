@@ -45,9 +45,13 @@ describe('text-input invariants', () => {
     }
 
     const inserts = ['a', 'Z', ' ', '\n', 'に']
+    /** Replacement payloads for {@link replaceInputSelection} (incl. empty delete + multiline splice). */
+    const replacements = ['', 'x', 'ab', 'a\nb', 'line1\nline2\n', '\n\n', inserts[4]!]
+
+    const rd = (): 'ltr' | 'rtl' => (rand() > 0.85 ? 'rtl' : 'ltr')
 
     for (let i = 0; i < 750; i++) {
-      const op = Math.floor(rand() * 9)
+      const op = Math.floor(rand() * 10)
       switch (op) {
         case 0:
           state = insertInputText(state, inserts[Math.floor(rand() * inserts.length)]!)
@@ -59,10 +63,10 @@ describe('text-input invariants', () => {
           state = deleteInput(state)
           break
         case 3:
-          state = moveInputCaret(state, 'left', rand() > 0.65)
+          state = moveInputCaret(state, 'left', rand() > 0.65, undefined, rd())
           break
         case 4:
-          state = moveInputCaret(state, 'right', rand() > 0.65)
+          state = moveInputCaret(state, 'right', rand() > 0.65, undefined, rd())
           break
         case 5:
           state = moveInputCaret(state, 'up', rand() > 0.65)
@@ -71,10 +75,17 @@ describe('text-input invariants', () => {
           state = moveInputCaret(state, 'down', rand() > 0.65)
           break
         case 7:
-          state = moveInputCaretByWord(state, rand() > 0.5 ? 'left' : 'right', rand() > 0.7)
+          state = moveInputCaretByWord(state, rand() > 0.5 ? 'left' : 'right', rand() > 0.7, rd())
           break
         case 8:
-          state = moveInputCaretToLineBoundary(state, rand() > 0.5 ? 'start' : 'end', rand() > 0.7)
+          state = moveInputCaretToLineBoundary(state, rand() > 0.5 ? 'start' : 'end', rand() > 0.7, rd())
+          break
+        case 9:
+          state = replaceInputSelection(
+            state.nodes,
+            state.selection,
+            replacements[Math.floor(rand() * replacements.length)]!,
+          )
           break
       }
       assertStateInvariants(state)
