@@ -92,6 +92,13 @@ describe('isBinaryFrameArrayBuffer', () => {
     ).toBe(false)
   })
 
+  it('returns false for non-integer byteOffset on fake views (Uint8Array ctor would throw)', () => {
+    const ab = new ArrayBuffer(32)
+    const fake = { buffer: ab, byteOffset: 0.5, byteLength: 16 } as unknown as Uint8Array
+    expect(isBinaryFrameArrayBuffer(fake)).toBe(false)
+    expect(() => decodeBinaryFrameJson(fake)).toThrow('Not a GEOM binary frame')
+  })
+
   it('returns false when a root SharedArrayBuffer is shorter than the v1 header', () => {
     if (typeof SharedArrayBuffer === 'undefined') return
     expect(isBinaryFrameArrayBuffer(new SharedArrayBuffer(8))).toBe(false)
