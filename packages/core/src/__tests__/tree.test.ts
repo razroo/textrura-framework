@@ -408,6 +408,30 @@ describe('toLayoutTree', () => {
     const bogus = box({ width: 10, height: 10, dir: 'sideways-lr' as never })
     expect(toLayoutTree(bogus, true)).not.toHaveProperty('dir')
     expect(toLayoutTree(bogus, false)).toHaveProperty('dir', 'sideways-lr')
+
+    const nullText = text({
+      text: 'x',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      width: 10,
+      height: 18,
+      dir: null as never,
+    })
+    expect(toLayoutTree(nullText, true)).not.toHaveProperty('dir')
+    expect(toLayoutTree(nullText, false)).toHaveProperty('dir', null)
+
+    const imgBogus = image({ src: '/a.png', width: 8, height: 8, dir: 'sideways-lr' as never })
+    expect(toLayoutTree(imgBogus, true)).not.toHaveProperty('dir')
+    expect(toLayoutTree(imgBogus, false)).toHaveProperty('dir', 'sideways-lr')
+
+    const s3Null = scene3d({
+      width: 80,
+      height: 80,
+      dir: null as never,
+      objects: [sphere({ radius: 1 })],
+    })
+    expect(toLayoutTree(s3Null, true)).not.toHaveProperty('dir')
+    expect(toLayoutTree(s3Null, false)).toHaveProperty('dir', null)
   })
 
   it('omits dir on root text, image, and scene3d layout snapshots', () => {
