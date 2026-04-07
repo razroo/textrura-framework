@@ -2361,6 +2361,40 @@ describe('dispatchHit', () => {
     expect(log).toEqual(['top'])
   })
 
+  it('overlapping siblings: bigint z-index is treated as 0 (typeof guard; parity with finiteNumberOrZero)', () => {
+    const log: string[] = []
+    const first = box({
+      width: 50,
+      height: 50,
+      zIndex: 10n as never,
+      onClick: () => {
+        log.push('first')
+      },
+    })
+    const second = box({
+      width: 50,
+      height: 50,
+      zIndex: 5n as never,
+      onClick: () => {
+        log.push('second')
+      },
+    })
+    const root = box({ width: 100, height: 100 }, [first, second])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['second'])
+  })
+
   it('overlapping siblings: positive infinity z-index is treated as 0 and loses to higher finite z-index', () => {
     const log: string[] = []
     const infZ = box({
