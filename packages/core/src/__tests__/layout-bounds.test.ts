@@ -646,6 +646,13 @@ describe('scrollSafeChildOffsets', () => {
     expect(Object.is(r!.ox, -0)).toBe(true)
     expect(r!.oy).toBe(10)
   })
+
+  it('preserves IEEE −0 on oy when absY is −0 and scroll is 0 (symmetric with absX −0)', () => {
+    const r = scrollSafeChildOffsets(10, -0, 0, 0)
+    expect(r).not.toBeNull()
+    expect(r!.ox).toBe(10)
+    expect(Object.is(r!.oy, -0)).toBe(true)
+  })
 })
 
 describe('finiteNumberOrZero', () => {
