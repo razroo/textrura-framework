@@ -1556,7 +1556,7 @@ export async function setCheckedControl(page: Page, label: string, opts?: SetChe
           return el instanceof HTMLElement ? el : null
         }
 
-        const selector = 'input[type=\"checkbox\"], input[type=\"radio\"], [role=\"checkbox\"], [role=\"radio\"], [role=\"switch\"]'
+        const selector = 'input[type="checkbox"], input[type="radio"], [role="checkbox"], [role="radio"], [role="switch"]'
         const candidates = Array.from(document.querySelectorAll(selector)).filter(
           (el): el is HTMLElement => el instanceof HTMLElement && visible(el),
         )

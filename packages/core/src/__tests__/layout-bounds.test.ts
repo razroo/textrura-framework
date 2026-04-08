@@ -57,7 +57,7 @@ describe('layoutBoundsAreFinite', () => {
   })
 
   it('accepts holey/sparse children arrays (Array.isArray only; parallel walks skip missing indices)', () => {
-    const holey = [, ,] as unknown as ComputedLayout['children']
+    const holey = new Array(2) as unknown as ComputedLayout['children']
     expect(holey.length).toBe(2)
     expect(0 in holey).toBe(false)
     expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 1, height: 1, children: holey })).toBe(true)
