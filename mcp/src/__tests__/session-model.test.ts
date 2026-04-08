@@ -144,7 +144,13 @@ describe('buildPageModel', () => {
       summary: {
         headingCount: 1,
         fieldCount: 2,
+        requiredFieldCount: 2,
+        invalidFieldCount: 1,
         actionCount: 1,
+      },
+      page: {
+        fields: { offset: 0, returned: 2, total: 2, hasMore: false },
+        actions: { offset: 0, returned: 1, total: 1, hasMore: false },
       },
     })
     expect(detail?.fields.map(field => field.name)).toEqual(['Full name', 'Email'])
@@ -152,8 +158,109 @@ describe('buildPageModel', () => {
     expect(detail?.fields[0]?.state).toEqual({ required: true })
     expect(detail?.fields[1]?.state).toEqual({ invalid: true, required: true })
     expect(detail?.fields[1]?.validation).toEqual({ error: 'Please enter a valid email address.' })
+    expect(detail?.fields[1]?.visibility).toMatchObject({ intersectsViewport: true, fullyVisible: true })
+    expect(detail?.actions[0]?.scrollHint).toMatchObject({ status: 'visible' })
     expect(detail?.actions.map(action => action.id)).toEqual(['n:0.0.3'])
     expect(detail?.fields[0]).not.toHaveProperty('bounds')
+  })
+
+  it('paginates long sections and carries context on repeated answers', () => {
+    const tree = node('group', undefined, { x: 0, y: 0, width: 900, height: 700 }, {
+      children: [
+        node('form', 'Application', { x: 20, y: -120, width: 760, height: 1800 }, {
+          path: [0],
+          children: [
+            node('heading', 'Application', { x: 40, y: 40, width: 240, height: 28 }, { path: [0, 0] }),
+            node('textbox', 'Full name', { x: 48, y: 120, width: 320, height: 36 }, {
+              path: [0, 1],
+              state: { required: true },
+            }),
+            node('textbox', 'Email', { x: 48, y: 176, width: 320, height: 36 }, {
+              path: [0, 2],
+              state: { required: true, invalid: true },
+              validation: { error: 'Enter a valid email.' },
+            }),
+            node('textbox', 'Phone', { x: 48, y: 232, width: 320, height: 36 }, {
+              path: [0, 3],
+              state: { required: true },
+            }),
+            node('group', undefined, { x: 40, y: 980, width: 520, height: 96 }, {
+              path: [0, 4],
+              children: [
+                node('text', 'Are you legally authorized to work here?', { x: 48, y: 980, width: 340, height: 24 }, {
+                  path: [0, 4, 0],
+                }),
+                node('button', 'Yes', { x: 48, y: 1020, width: 88, height: 40 }, {
+                  path: [0, 4, 1],
+                  focusable: true,
+                }),
+                node('button', 'No', { x: 148, y: 1020, width: 88, height: 40 }, {
+                  path: [0, 4, 2],
+                  focusable: true,
+                }),
+              ],
+            }),
+            node('group', undefined, { x: 40, y: 1120, width: 520, height: 96 }, {
+              path: [0, 5],
+              children: [
+                node('text', 'Will you require sponsorship?', { x: 48, y: 1120, width: 260, height: 24 }, {
+                  path: [0, 5, 0],
+                }),
+                node('button', 'Yes', { x: 48, y: 1160, width: 88, height: 40 }, {
+                  path: [0, 5, 1],
+                  focusable: true,
+                }),
+                node('button', 'No', { x: 148, y: 1160, width: 88, height: 40 }, {
+                  path: [0, 5, 2],
+                  focusable: true,
+                }),
+              ],
+            }),
+            node('button', 'Submit application', { x: 48, y: 1540, width: 180, height: 40 }, {
+              path: [0, 6],
+              focusable: true,
+            }),
+          ],
+        }),
+      ],
+    })
+
+    const detail = expandPageSection(tree, 'fm:0', {
+      maxFields: 2,
+      fieldOffset: 1,
+      onlyRequiredFields: true,
+    })
+
+    expect(detail).toMatchObject({
+      summary: {
+        fieldCount: 3,
+        requiredFieldCount: 3,
+        invalidFieldCount: 1,
+        actionCount: 5,
+      },
+      page: {
+        fields: { offset: 1, returned: 2, total: 3, hasMore: false },
+        actions: { offset: 0, returned: 5, total: 5, hasMore: false },
+      },
+    })
+    expect(detail?.fields.map(field => field.name)).toEqual(['Email', 'Phone'])
+    expect(detail?.fields[0]?.scrollHint).toMatchObject({ status: 'visible' })
+    const authorizedYes = detail?.actions.find(action =>
+      action.name === 'Yes' && action.context?.prompt === 'Are you legally authorized to work here?',
+    )
+    const sponsorshipYes = detail?.actions.find(action =>
+      action.name === 'Yes' && action.context?.prompt === 'Will you require sponsorship?',
+    )
+    expect(authorizedYes).toMatchObject({
+      name: 'Yes',
+      context: { prompt: 'Are you legally authorized to work here?', section: 'Application' },
+      visibility: { fullyVisible: false, offscreenBelow: true },
+    })
+    expect(sponsorshipYes).toMatchObject({
+      name: 'Yes',
+      context: { prompt: 'Will you require sponsorship?', section: 'Application' },
+      visibility: { fullyVisible: false, offscreenBelow: true },
+    })
   })
 
   it('drops noisy container names and falls back to unnamed summaries', () => {

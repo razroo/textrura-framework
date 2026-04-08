@@ -38,6 +38,7 @@ interface NodeFilter {
   role?: string
   name?: string
   text?: string
+  contextText?: string
   value?: string
   checked?: NodeStateFilterValue
   disabled?: boolean
@@ -62,6 +63,28 @@ interface FieldStatePayload {
   error?: string
 }
 
+interface FormattedNodePayload extends Record<string, unknown> {
+  id: string
+  role: string
+  name?: string
+  value?: string
+  center: { x: number; y: number }
+  visibility: {
+    intersectsViewport: boolean
+    fullyVisible: boolean
+    offscreenAbove: boolean
+    offscreenBelow: boolean
+    offscreenLeft: boolean
+    offscreenRight: boolean
+  }
+  scrollHint: {
+    status: 'visible' | 'partial' | 'offscreen'
+    revealDeltaX: number
+    revealDeltaY: number
+  }
+  path: number[]
+}
+
 function checkedStateInput() {
   return z
     .union([z.boolean(), z.literal('mixed')])
@@ -83,6 +106,7 @@ function nodeFilterShape() {
     role: z.string().optional().describe('ARIA role to match'),
     name: z.string().optional().describe('Accessible name to match (exact or substring)'),
     text: z.string().optional().describe('Text content to search for (substring match)'),
+    contextText: z.string().optional().describe('Ancestor / prompt text to disambiguate repeated controls with the same visible name'),
     value: z.string().optional().describe('Displayed / current field value to match (substring match)'),
     checked: checkedStateInput(),
     disabled: z.boolean().optional().describe('Match disabled state'),
@@ -302,7 +326,7 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
 
 This is the Geometra equivalent of Playwright's locator — but instant, structured, and with no browser. Use the returned bounds to click elements or assert on layout.`,
     nodeFilterShape(),
-    async ({ id, role, name, text, value, checked, disabled, focused, selected, expanded, invalid, required, busy }) => {
+    async ({ id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, busy }) => {
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
 
@@ -312,6 +336,7 @@ This is the Geometra equivalent of Playwright's locator — but instant, structu
         role,
         name,
         text,
+        contextText,
         value,
         checked,
         disabled,
@@ -322,14 +347,14 @@ This is the Geometra equivalent of Playwright's locator — but instant, structu
         required,
         busy,
       }
-      if (!hasNodeFilter(filter)) return err('Provide at least one query filter (id, role, name, text, value, or state)')
+      if (!hasNodeFilter(filter)) return err('Provide at least one query filter (id, role, name, text, contextText, value, or state)')
       const matches = findNodes(a11y, filter)
 
       if (matches.length === 0) {
         return ok(`No elements found matching ${JSON.stringify(filter)}`)
       }
 
-      const result = matches.map(node => formatNode(node, a11y.bounds))
+      const result = sortA11yNodes(matches).map(node => formatNode(node, a11y, a11y.bounds))
       return ok(JSON.stringify(result, null, 2))
     }
   )
@@ -351,7 +376,7 @@ The filter matches the same fields as geometra_query. Set \`present: false\` to 
         .default(10_000)
         .describe('Maximum time to wait before returning an error (default 10000ms)'),
     },
-    async ({ id, role, name, text, value, checked, disabled, focused, selected, expanded, invalid, required, busy, present, timeoutMs }) => {
+    async ({ id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, present, timeoutMs }) => {
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
 
@@ -360,6 +385,7 @@ The filter matches the same fields as geometra_query. Set \`present: false\` to 
         role,
         name,
         text,
+        contextText,
         value,
         checked,
         disabled,
@@ -370,7 +396,7 @@ The filter matches the same fields as geometra_query. Set \`present: false\` to 
         required,
         busy,
       }
-      if (!hasNodeFilter(filter)) return err('Provide at least one wait filter (id, role, name, text, value, or state)')
+      if (!hasNodeFilter(filter)) return err('Provide at least one wait filter (id, role, name, text, contextText, value, or state)')
 
       const matchesCondition = () => {
         if (!session.tree || !session.layout) return false
@@ -395,7 +421,7 @@ The filter matches the same fields as geometra_query. Set \`present: false\` to 
       const after = sessionA11y(session)
       if (!after) return ok(`Condition satisfied after ${elapsedMs}ms for ${JSON.stringify(filter)}.`)
       const matches = findNodes(after, filter)
-      const result = matches.slice(0, 8).map(node => formatNode(node, after.bounds))
+      const result = sortA11yNodes(matches).slice(0, 8).map(node => formatNode(node, after, after.bounds))
       return ok(JSON.stringify(result, null, 2))
     }
   )
@@ -565,13 +591,34 @@ Use this after geometra_page_model when you know which form/dialog/list/landmark
       id: z.string().describe('Section id from geometra_page_model, e.g. fm:1.0 or ls:2.1'),
       maxHeadings: z.number().int().min(1).max(20).optional().default(6).describe('Cap heading rows'),
       maxFields: z.number().int().min(1).max(40).optional().default(18).describe('Cap field rows'),
+      fieldOffset: z.number().int().min(0).optional().default(0).describe('Field row offset for long forms'),
+      onlyRequiredFields: z.boolean().optional().default(false).describe('Only include required fields'),
+      onlyInvalidFields: z.boolean().optional().default(false).describe('Only include invalid fields'),
       maxActions: z.number().int().min(1).max(30).optional().default(12).describe('Cap action rows'),
+      actionOffset: z.number().int().min(0).optional().default(0).describe('Action row offset'),
       maxLists: z.number().int().min(0).max(20).optional().default(8).describe('Cap nested lists'),
+      listOffset: z.number().int().min(0).optional().default(0).describe('Nested-list offset'),
       maxItems: z.number().int().min(0).max(50).optional().default(20).describe('Cap list items'),
+      itemOffset: z.number().int().min(0).optional().default(0).describe('List-item offset'),
       maxTextPreview: z.number().int().min(0).max(20).optional().default(6).describe('Cap text preview lines'),
       includeBounds: z.boolean().optional().default(false).describe('Include bounds for fields/actions/headings/items'),
     },
-    async ({ id, maxHeadings, maxFields, maxActions, maxLists, maxItems, maxTextPreview, includeBounds }) => {
+    async ({
+      id,
+      maxHeadings,
+      maxFields,
+      fieldOffset,
+      onlyRequiredFields,
+      onlyInvalidFields,
+      maxActions,
+      actionOffset,
+      maxLists,
+      listOffset,
+      maxItems,
+      itemOffset,
+      maxTextPreview,
+      includeBounds,
+    }) => {
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
 
@@ -579,14 +626,114 @@ Use this after geometra_page_model when you know which form/dialog/list/landmark
       const detail = expandPageSection(a11y, id, {
         maxHeadings,
         maxFields,
+        fieldOffset,
+        onlyRequiredFields,
+        onlyInvalidFields,
         maxActions,
+        actionOffset,
         maxLists,
+        listOffset,
         maxItems,
+        itemOffset,
         maxTextPreview,
         includeBounds,
       })
       if (!detail) return err(`No expandable section found for id ${id}`)
       return ok(JSON.stringify(detail))
+    }
+  )
+
+  server.tool(
+    'geometra_reveal',
+    `Scroll until a matching node is revealed. This is the generic alternative to trial-and-error wheel calls on long forms.
+
+Use the same filters as geometra_query, plus an optional match index when repeated controls share the same visible label.`,
+    {
+      ...nodeFilterShape(),
+      index: z.number().int().min(0).optional().default(0).describe('Which matching node to reveal after sorting top-to-bottom'),
+      fullyVisible: z.boolean().optional().default(true).describe('Require the target to become fully visible (default true)'),
+      maxSteps: z.number().int().min(1).max(12).optional().default(6).describe('Maximum reveal attempts before returning an error'),
+      timeoutMs: z
+        .number()
+        .int()
+        .min(50)
+        .max(60_000)
+        .optional()
+        .default(2_500)
+        .describe('Per-scroll wait timeout (default 2500ms)'),
+    },
+    async ({ id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, index, fullyVisible, maxSteps, timeoutMs }) => {
+      const session = getSession()
+      if (!session) return err('Not connected. Call geometra_connect first.')
+      const matchIndex = index ?? 0
+      const requireFullyVisible = fullyVisible ?? true
+      const revealSteps = maxSteps ?? 6
+      const waitTimeout = timeoutMs ?? 2_500
+
+      const filter: NodeFilter = {
+        id,
+        role,
+        name,
+        text,
+        contextText,
+        value,
+        checked,
+        disabled,
+        focused,
+        selected,
+        expanded,
+        invalid,
+        required,
+        busy,
+      }
+      if (!hasNodeFilter(filter)) return err('Provide at least one reveal filter (id, role, name, text, contextText, value, or state)')
+
+      let attempts = 0
+      while (attempts <= revealSteps) {
+        const a11y = sessionA11y(session)
+        if (!a11y) return err('No UI tree available to reveal from')
+        const matches = sortA11yNodes(findNodes(a11y, filter))
+        if (matches.length === 0) {
+          return err(`No elements found matching ${JSON.stringify(filter)}`)
+        }
+        if (matchIndex >= matches.length) {
+          return err(`Requested reveal index ${matchIndex} but only ${matches.length} matching element(s) were found`)
+        }
+
+        const target = matches[matchIndex]!
+        const formatted = formatNode(target, a11y, a11y.bounds)
+        const visible = requireFullyVisible ? formatted.visibility.fullyVisible : formatted.visibility.intersectsViewport
+        if (visible) {
+          return ok(JSON.stringify({
+            revealed: true,
+            attempts,
+            target: formatted,
+          }, null, 2))
+        }
+
+        if (attempts === revealSteps) {
+          return err(JSON.stringify({
+            revealed: false,
+            attempts,
+            target: formatted,
+          }, null, 2))
+        }
+
+        const deltaX = clamp(formatted.scrollHint.revealDeltaX, -Math.round(a11y.bounds.width * 0.75), Math.round(a11y.bounds.width * 0.75))
+        let deltaY = clamp(formatted.scrollHint.revealDeltaY, -Math.round(a11y.bounds.height * 0.85), Math.round(a11y.bounds.height * 0.85))
+        if (deltaY === 0 && !formatted.visibility.fullyVisible) {
+          deltaY = formatted.visibility.offscreenAbove ? -Math.round(a11y.bounds.height * 0.4) : Math.round(a11y.bounds.height * 0.4)
+        }
+
+        await sendWheel(session, deltaY, {
+          deltaX,
+          x: formatted.center.x,
+          y: formatted.center.y,
+        }, waitTimeout)
+        attempts++
+      }
+
+      return err(`Failed to reveal ${JSON.stringify(filter)}`)
     }
   )
 
@@ -1344,6 +1491,7 @@ async function executeBatchAction(
         role: action.role,
         name: action.name,
         text: action.text,
+        contextText: action.contextText,
         value: action.value,
         checked: action.checked,
         disabled: action.disabled,
@@ -1394,7 +1542,7 @@ async function executeBatchAction(
       const matches = findNodes(after, filter)
       if (detail === 'verbose') {
         return {
-          summary: JSON.stringify(matches.slice(0, 8).map(node => formatNode(node, after.bounds)), null, 2),
+          summary: JSON.stringify(sortA11yNodes(matches).slice(0, 8).map(node => formatNode(node, after, after.bounds)), null, 2),
           compact: {
             present,
             elapsedMs,
@@ -1539,7 +1687,102 @@ function textMatches(haystack: string | undefined, needle: string | undefined): 
   return haystack.toLowerCase().includes(needle.toLowerCase())
 }
 
-function nodeMatchesFilter(node: A11yNode, filter: NodeFilter): boolean {
+function sortA11yNodes(nodes: A11yNode[]): A11yNode[] {
+  return [...nodes].sort((a, b) => {
+    if (a.bounds.y !== b.bounds.y) return a.bounds.y - b.bounds.y
+    if (a.bounds.x !== b.bounds.x) return a.bounds.x - b.bounds.x
+    return a.path.length - b.path.length
+  })
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
+}
+
+function pathStartsWith(path: number[], prefix: number[]): boolean {
+  if (prefix.length > path.length) return false
+  for (let index = 0; index < prefix.length; index++) {
+    if (path[index] !== prefix[index]) return false
+  }
+  return true
+}
+
+function namedAncestors(root: A11yNode, path: number[]): A11yNode[] {
+  const out: A11yNode[] = []
+  let current: A11yNode = root
+  for (const index of path) {
+    out.push(current)
+    if (!current.children[index]) break
+    current = current.children[index]!
+  }
+  return out
+}
+
+function collectDescendants(node: A11yNode, predicate: (candidate: A11yNode) => boolean): A11yNode[] {
+  const out: A11yNode[] = []
+  function walk(current: A11yNode) {
+    for (const child of current.children) {
+      if (predicate(child)) out.push(child)
+      walk(child)
+    }
+  }
+  walk(node)
+  return out
+}
+
+function promptContext(root: A11yNode, node: A11yNode): string | undefined {
+  const ancestors = namedAncestors(root, node.path)
+  const normalizedName = (node.name ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
+
+  for (let index = ancestors.length - 1; index >= 0; index--) {
+    const ancestor = ancestors[index]!
+    const grouped = collectDescendants(ancestor, candidate =>
+      candidate.role === 'button' || candidate.role === 'radio' || candidate.role === 'checkbox',
+    ).length >= 2
+    if (!grouped && ancestor.role !== 'group' && ancestor.role !== 'form' && ancestor.role !== 'dialog') continue
+
+    const best = collectDescendants(
+      ancestor,
+      candidate =>
+        (candidate.role === 'heading' || candidate.role === 'text') &&
+        !!truncateInlineText(candidate.name, 120) &&
+        !pathStartsWith(candidate.path, node.path),
+    )
+      .filter(candidate => candidate.bounds.y <= node.bounds.y + 8)
+      .map(candidate => {
+        const text = truncateInlineText(candidate.name, 120)
+        if (!text) return null
+        if (text.toLowerCase() === normalizedName) return null
+        const dy = Math.max(0, node.bounds.y - candidate.bounds.y)
+        const dx = Math.abs(node.bounds.x - candidate.bounds.x)
+        const headingBonus = candidate.role === 'heading' ? -32 : 0
+        return { text, score: dy * 4 + dx + headingBonus }
+      })
+      .filter((candidate): candidate is { text: string; score: number } => !!candidate)
+      .sort((a, b) => a.score - b.score)[0]
+    if (best?.text) return best.text
+  }
+
+  return undefined
+}
+
+function sectionContext(root: A11yNode, node: A11yNode): string | undefined {
+  const ancestors = namedAncestors(root, node.path)
+  for (let index = ancestors.length - 1; index >= 0; index--) {
+    const ancestor = ancestors[index]!
+    if (ancestor.role === 'form' || ancestor.role === 'dialog' || ancestor.role === 'main' || ancestor.role === 'navigation' || ancestor.role === 'region') {
+      const name = truncateInlineText(ancestor.name, 80)
+      if (name) return name
+    }
+  }
+  return undefined
+}
+
+function nodeContextText(root: A11yNode, node: A11yNode): string | undefined {
+  return [promptContext(root, node), sectionContext(root, node)].filter(Boolean).join(' | ') || undefined
+}
+
+function nodeMatchesFilter(node: A11yNode, filter: NodeFilter, contextText?: string): boolean {
   if (filter.id && nodeIdForPath(node.path) !== filter.id) return false
   if (filter.role && node.role !== filter.role) return false
   if (!textMatches(node.name, filter.name)) return false
@@ -1551,6 +1794,7 @@ function nodeMatchesFilter(node: A11yNode, filter: NodeFilter): boolean {
       filter.text,
     )
   ) return false
+  if (!textMatches(contextText, filter.contextText)) return false
   if (filter.checked !== undefined && node.state?.checked !== filter.checked) return false
   if (filter.disabled !== undefined && (node.state?.disabled ?? false) !== filter.disabled) return false
   if (filter.focused !== undefined && (node.state?.focused ?? false) !== filter.focused) return false
@@ -1566,7 +1810,8 @@ export function findNodes(node: A11yNode, filter: NodeFilter): A11yNode[] {
   const matches: A11yNode[] = []
 
   function walk(n: A11yNode) {
-    if (nodeMatchesFilter(n, filter) && hasNodeFilter(filter)) matches.push(n)
+    const contextText = filter.contextText ? nodeContextText(node, n) : undefined
+    if (nodeMatchesFilter(n, filter, contextText) && hasNodeFilter(filter)) matches.push(n)
     for (const child of n.children) walk(child)
   }
 
@@ -1588,8 +1833,9 @@ function summarizeFieldLabelState(session: Session, fieldLabel: string): string 
 
 function formatNode(
   node: A11yNode,
+  root: A11yNode,
   viewport: { width: number; height: number },
-): Record<string, unknown> {
+): FormattedNodePayload {
   const visibleLeft = Math.max(0, node.bounds.x)
   const visibleTop = Math.max(0, node.bounds.y)
   const visibleRight = Math.min(viewport.width, node.bounds.x + node.bounds.width)
@@ -1608,11 +1854,14 @@ function formatNode(
     : Math.round(Math.min(Math.max(node.bounds.y + node.bounds.height / 2, 0), viewport.height))
   const revealDeltaX = Math.round(node.bounds.x + node.bounds.width / 2 - viewport.width / 2)
   const revealDeltaY = Math.round(node.bounds.y + node.bounds.height / 2 - viewport.height / 2)
+  const prompt = promptContext(root, node)
+  const section = sectionContext(root, node)
   return {
     id: nodeIdForPath(node.path),
     role: node.role,
     name: node.name,
     ...(node.value ? { value: node.value } : {}),
+    ...(prompt || section ? { context: { ...(prompt ? { prompt } : {}), ...(section ? { section } : {}) } } : {}),
     bounds: node.bounds,
     visibleBounds: {
       x: visibleLeft,

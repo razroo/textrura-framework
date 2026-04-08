@@ -1616,7 +1616,46 @@ export async function setCheckedControl(page: Page, label: string, opts?: SetChe
 
 export async function wheelAt(page: Page, deltaX: number, deltaY: number, x?: number, y?: number): Promise<void> {
   if (x !== undefined && y !== undefined && Number.isFinite(x) && Number.isFinite(y)) {
+    const scrolled = await page.evaluate(({ deltaX, deltaY, x, y }) => {
+      function overflowAllows(styleValue: string): boolean {
+        return styleValue === 'auto' || styleValue === 'scroll' || styleValue === 'overlay'
+      }
+
+      function nearestScrollable(start: Element | null): HTMLElement | null {
+        let current = start instanceof HTMLElement ? start : null
+        while (current) {
+          const style = getComputedStyle(current)
+          const allowsY = overflowAllows(style.overflowY) && current.scrollHeight > current.clientHeight + 1
+          const allowsX = overflowAllows(style.overflowX) && current.scrollWidth > current.clientWidth + 1
+          if (allowsY || allowsX) return current
+          current = current.parentElement
+        }
+        return null
+      }
+
+      const target = document.elementFromPoint(x, y)
+      const container = nearestScrollable(target)
+      if (container) {
+        const beforeTop = container.scrollTop
+        const beforeLeft = container.scrollLeft
+        container.scrollBy(deltaX, deltaY)
+        return container.scrollTop !== beforeTop || container.scrollLeft !== beforeLeft
+      }
+
+      const beforeX = window.scrollX
+      const beforeY = window.scrollY
+      window.scrollBy(deltaX, deltaY)
+      return window.scrollX !== beforeX || window.scrollY !== beforeY
+    }, { deltaX, deltaY, x, y })
+
+    if (scrolled) return
+
     await page.mouse.move(x, y)
+    await page.mouse.wheel(deltaX, deltaY)
+    return
   }
-  await page.mouse.wheel(deltaX, deltaY)
+
+  await page.evaluate(({ deltaX, deltaY }) => {
+    window.scrollBy(deltaX, deltaY)
+  }, { deltaX, deltaY })
 }

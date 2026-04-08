@@ -5,6 +5,7 @@ function node(
   role: string,
   name: string | undefined,
   options?: {
+    bounds?: A11yNode['bounds']
     value?: string
     state?: A11yNode['state']
     validation?: A11yNode['validation']
@@ -20,7 +21,7 @@ function node(
     ...(options?.state ? { state: options.state } : {}),
     ...(options?.validation ? { validation: options.validation } : {}),
     ...(options?.meta ? { meta: options.meta } : {}),
-    bounds: { x: 0, y: 0, width: 120, height: 40 },
+    bounds: options?.bounds ?? { x: 0, y: 0, width: 120, height: 40 },
     path: options?.path ?? [],
     children: options?.children ?? [],
     focusable: role !== 'group',
@@ -232,5 +233,125 @@ describe('batch MCP result shaping', () => {
     })
     expect((final.invalidFields as unknown[]).length).toBe(4)
     expect((final.alerts as unknown[]).length).toBe(1)
+  })
+})
+
+describe('query and reveal tools', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('lets query disambiguate repeated controls by context text', async () => {
+    const handler = getToolHandler('geometra_query')
+
+    mockState.currentA11yRoot = node('group', undefined, {
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 900 },
+      children: [
+        node('form', 'Application', {
+          path: [0],
+          children: [
+            node('group', undefined, {
+              path: [0, 0],
+              children: [
+                node('text', 'Are you legally authorized to work here?', { path: [0, 0, 0] }),
+                node('button', 'Yes', { path: [0, 0, 1] }),
+                node('button', 'No', { path: [0, 0, 2] }),
+              ],
+            }),
+            node('group', undefined, {
+              path: [0, 1],
+              children: [
+                node('text', 'Will you require sponsorship?', { path: [0, 1, 0] }),
+                node('button', 'Yes', { path: [0, 1, 1] }),
+                node('button', 'No', { path: [0, 1, 2] }),
+              ],
+            }),
+          ],
+        }),
+      ],
+    })
+
+    const result = await handler({
+      role: 'button',
+      name: 'Yes',
+      contextText: 'sponsorship',
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Array<Record<string, unknown>>
+    expect(payload).toHaveLength(1)
+    expect(payload[0]).toMatchObject({
+      role: 'button',
+      name: 'Yes',
+      context: {
+        prompt: 'Will you require sponsorship?',
+        section: 'Application',
+      },
+    })
+  })
+
+  it('reveals an offscreen target with semantic scrolling instead of requiring manual wheels', async () => {
+    const handler = getToolHandler('geometra_reveal')
+
+    mockState.currentA11yRoot = node('group', undefined, {
+      bounds: { x: 0, y: 0, width: 1280, height: 800 },
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 0 },
+      children: [
+        node('form', 'Application', {
+          bounds: { x: 20, y: -200, width: 760, height: 1900 },
+          path: [0],
+          children: [
+            node('button', 'Submit application', {
+              bounds: { x: 60, y: 1540, width: 180, height: 40 },
+              path: [0, 0],
+            }),
+          ],
+        }),
+      ],
+    })
+
+    mockState.sendWheel.mockImplementationOnce(async () => {
+      mockState.currentA11yRoot = node('group', undefined, {
+        bounds: { x: 0, y: 0, width: 1280, height: 800 },
+        meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 1220 },
+        children: [
+          node('form', 'Application', {
+            bounds: { x: 20, y: -1420, width: 760, height: 1900 },
+            path: [0],
+            children: [
+              node('button', 'Submit application', {
+                bounds: { x: 60, y: 320, width: 180, height: 40 },
+                path: [0, 0],
+              }),
+            ],
+          }),
+        ],
+      })
+      return { status: 'updated' as const, timeoutMs: 2500 }
+    })
+
+    const result = await handler({
+      role: 'button',
+      name: 'Submit application',
+      maxSteps: 3,
+      fullyVisible: true,
+      timeoutMs: 2500,
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    expect(mockState.sendWheel).toHaveBeenCalledWith(
+      mockState.session,
+      expect.any(Number),
+      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+      2500,
+    )
+    expect(payload).toMatchObject({
+      revealed: true,
+      attempts: 1,
+      target: {
+        role: 'button',
+        name: 'Submit application',
+        visibility: { fullyVisible: true },
+      },
+    })
   })
 })

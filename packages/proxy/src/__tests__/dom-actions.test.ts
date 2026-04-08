@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { chromium, type Browser } from 'playwright'
-import { attachFiles, pickListboxOption, setFieldChoice, setFieldText } from '../dom-actions.ts'
+import { attachFiles, pickListboxOption, setFieldChoice, setFieldText, wheelAt } from '../dom-actions.ts'
 
 describe('pickListboxOption', () => {
   let browser: Browser
@@ -409,6 +409,71 @@ describe('setFieldChoice', () => {
     expect(await page.locator('#question-a input[value="no"]').isChecked()).toBe(false)
     expect(await page.locator('#question-b input[value="yes"]').isChecked()).toBe(false)
     expect(await page.locator('#question-b input[value="no"]').isChecked()).toBe(true)
+    await page.close()
+  })
+})
+
+describe('wheelAt', () => {
+  let browser: Browser
+
+  beforeAll(async () => {
+    browser = await chromium.launch({ headless: true })
+  })
+
+  afterAll(async () => {
+    await browser.close()
+  })
+
+  it('scrolls the page root when no target coordinates are provided', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 0; }
+        #spacer { height: 2200px; background: linear-gradient(#fff, #ddd); }
+        #inner { width: 260px; height: 120px; overflow: auto; margin: 24px; border: 1px solid #ccc; }
+        #inner-content { height: 600px; }
+      </style>
+      <div id="inner"><div id="inner-content"></div></div>
+      <div id="spacer"></div>
+    `)
+
+    await wheelAt(page, 0, 480)
+
+    const result = await page.evaluate(() => ({
+      pageY: window.scrollY,
+      innerY: (document.getElementById('inner') as HTMLElement).scrollTop,
+    }))
+
+    expect(result.pageY).toBeGreaterThan(0)
+    expect(result.innerY).toBe(0)
+    await page.close()
+  })
+
+  it('targets the nearest scroll container when coordinates are provided', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 0; }
+        #spacer { height: 1800px; background: linear-gradient(#fff, #ddd); }
+        #inner { width: 320px; height: 140px; overflow: auto; margin: 24px; border: 1px solid #ccc; }
+        #inner-content { height: 800px; }
+      </style>
+      <div id="inner"><div id="inner-content"></div></div>
+      <div id="spacer"></div>
+    `)
+
+    const box = await page.locator('#inner').boundingBox()
+    if (!box) throw new Error('expected #inner bounding box')
+
+    await wheelAt(page, 0, 260, Math.round(box.x + box.width / 2), Math.round(box.y + box.height / 2))
+
+    const result = await page.evaluate(() => ({
+      pageY: window.scrollY,
+      innerY: (document.getElementById('inner') as HTMLElement).scrollTop,
+    }))
+
+    expect(result.innerY).toBeGreaterThan(0)
+    expect(result.pageY).toBe(0)
     await page.close()
   })
 })

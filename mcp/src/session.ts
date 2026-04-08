@@ -49,6 +49,26 @@ export interface CompactUiContext {
   focusedNode?: CompactUiNode
 }
 
+export interface NodeContextModel {
+  prompt?: string
+  section?: string
+}
+
+export interface NodeVisibilityModel {
+  intersectsViewport: boolean
+  fullyVisible: boolean
+  offscreenAbove: boolean
+  offscreenBelow: boolean
+  offscreenLeft: boolean
+  offscreenRight: boolean
+}
+
+export interface NodeScrollHintModel {
+  status: 'visible' | 'partial' | 'offscreen'
+  revealDeltaX: number
+  revealDeltaY: number
+}
+
 export type PageSectionKind = 'landmark' | 'form' | 'dialog' | 'list'
 
 export type PageArchetype =
@@ -121,6 +141,9 @@ export interface PageFieldModel {
   value?: string
   state?: A11yNode['state']
   validation?: A11yNode['validation']
+  context?: NodeContextModel
+  visibility?: NodeVisibilityModel
+  scrollHint?: NodeScrollHintModel
   bounds?: { x: number; y: number; width: number; height: number }
 }
 
@@ -129,6 +152,9 @@ export interface PageActionModel {
   role: string
   name?: string
   state?: A11yNode['state']
+  context?: NodeContextModel
+  visibility?: NodeVisibilityModel
+  scrollHint?: NodeScrollHintModel
   bounds?: { x: number; y: number; width: number; height: number }
 }
 
@@ -147,9 +173,17 @@ export interface PageSectionDetail {
   summary: {
     headingCount: number
     fieldCount: number
+    requiredFieldCount: number
+    invalidFieldCount: number
     actionCount: number
     listCount: number
     itemCount: number
+  }
+  page: {
+    fields: { offset: number; returned: number; total: number; hasMore: boolean }
+    actions: { offset: number; returned: number; total: number; hasMore: boolean }
+    lists: { offset: number; returned: number; total: number; hasMore: boolean }
+    items: { offset: number; returned: number; total: number; hasMore: boolean }
   }
   headings: PageHeadingModel[]
   fields: PageFieldModel[]
@@ -1054,8 +1088,114 @@ function primaryAction(node: A11yNode): PagePrimaryAction {
   }
 }
 
-function toFieldModel(node: A11yNode, includeBounds = true): PageFieldModel {
+function buildVisibility(bounds: A11yNode['bounds'], viewport: { width: number; height: number }): NodeVisibilityModel {
+  const visibleLeft = Math.max(0, bounds.x)
+  const visibleTop = Math.max(0, bounds.y)
+  const visibleRight = Math.min(viewport.width, bounds.x + bounds.width)
+  const visibleBottom = Math.min(viewport.height, bounds.y + bounds.height)
+  const hasVisibleIntersection = visibleRight > visibleLeft && visibleBottom > visibleTop
+  const fullyVisible =
+    bounds.x >= 0 &&
+    bounds.y >= 0 &&
+    bounds.x + bounds.width <= viewport.width &&
+    bounds.y + bounds.height <= viewport.height
+  return {
+    intersectsViewport: hasVisibleIntersection,
+    fullyVisible,
+    offscreenAbove: bounds.y + bounds.height <= 0,
+    offscreenBelow: bounds.y >= viewport.height,
+    offscreenLeft: bounds.x + bounds.width <= 0,
+    offscreenRight: bounds.x >= viewport.width,
+  }
+}
+
+function buildScrollHint(bounds: A11yNode['bounds'], viewport: { width: number; height: number }): NodeScrollHintModel {
+  const visibility = buildVisibility(bounds, viewport)
+  return {
+    status: visibility.fullyVisible ? 'visible' : visibility.intersectsViewport ? 'partial' : 'offscreen',
+    revealDeltaX: Math.round(bounds.x + bounds.width / 2 - viewport.width / 2),
+    revealDeltaY: Math.round(bounds.y + bounds.height / 2 - viewport.height / 2),
+  }
+}
+
+function ancestorNodes(root: A11yNode, path: number[]): A11yNode[] {
+  const out: A11yNode[] = []
+  let current: A11yNode = root
+  for (const index of path) {
+    out.push(current)
+    if (!current.children[index]) break
+    current = current.children[index]!
+  }
+  return out
+}
+
+function countGroupedChoiceControls(node: A11yNode): number {
+  return collectDescendants(
+    node,
+    candidate => candidate.role === 'radio' || candidate.role === 'checkbox' || candidate.role === 'button',
+  ).length
+}
+
+function nearestPromptText(container: A11yNode, target: A11yNode): string | undefined {
+  const candidates = collectDescendants(
+    container,
+    candidate =>
+      (candidate.role === 'heading' || candidate.role === 'text') &&
+      !!sanitizeInlineName(candidate.name, 120) &&
+      pathKey(candidate.path) !== pathKey(target.path),
+  )
+
+  const normalizedTarget = normalizeUiText(target.name ?? '')
+  const best = candidates
+    .filter(candidate => candidate.bounds.y <= target.bounds.y + 8)
+    .map(candidate => {
+      const text = sanitizeInlineName(candidate.name, 120)
+      if (!text) return null
+      if (normalizeUiText(text) === normalizedTarget) return null
+      const dy = Math.max(0, target.bounds.y - candidate.bounds.y)
+      const dx = Math.abs(target.bounds.x - candidate.bounds.x)
+      const headingBonus = candidate.role === 'heading' ? -32 : 0
+      return { text, score: dy * 4 + dx + headingBonus }
+    })
+    .filter((candidate): candidate is { text: string; score: number } => !!candidate)
+    .sort((a, b) => a.score - b.score)[0]
+
+  return best?.text
+}
+
+function nodeContext(root: A11yNode, node: A11yNode): NodeContextModel | undefined {
+  const ancestors = ancestorNodes(root, node.path)
+  let prompt: string | undefined
+  for (let index = ancestors.length - 1; index >= 0; index--) {
+    const ancestor = ancestors[index]!
+    const grouped = countGroupedChoiceControls(ancestor) >= 2
+    if (grouped || ancestor.role === 'group' || ancestor.role === 'form' || ancestor.role === 'dialog') {
+      prompt = nearestPromptText(ancestor, node)
+      if (prompt) break
+    }
+  }
+
+  let section: string | undefined
+  for (let index = ancestors.length - 1; index >= 0; index--) {
+    const ancestor = ancestors[index]!
+    const kind = sectionKindForNode(ancestor)
+    if (!kind) continue
+    section = sectionDisplayName(ancestor, kind)
+    if (section) break
+  }
+
+  if (!prompt && !section) return undefined
+  return {
+    ...(prompt ? { prompt } : {}),
+    ...(section ? { section } : {}),
+  }
+}
+
+function toFieldModel(root: A11yNode, node: A11yNode, includeBounds = true): PageFieldModel {
   const value = sanitizeInlineName(node.value, 120)
+  const context = nodeContext(root, node)
+  const visibility = buildVisibility(node.bounds, root.bounds)
+  const scrollHint = buildScrollHint(node.bounds, root.bounds)
   return {
     id: nodeIdForPath(node.path),
     role: node.role,
@@ -1063,16 +1203,25 @@ function toFieldModel(node: A11yNode, includeBounds = true): PageFieldModel {
     ...(value ? { value } : {}),
     ...(cloneState(node.state) ? { state: cloneState(node.state) } : {}),
     ...(cloneValidation(node.validation) ? { validation: cloneValidation(node.validation) } : {}),
+    ...(context ? { context } : {}),
+    visibility,
+    scrollHint,
     ...(includeBounds ? { bounds: cloneBounds(node.bounds) } : {}),
   }
 }
 
-function toActionModel(node: A11yNode, includeBounds = true): PageActionModel {
+function toActionModel(root: A11yNode, node: A11yNode, includeBounds = true): PageActionModel {
+  const context = nodeContext(root, node)
+  const visibility = buildVisibility(node.bounds, root.bounds)
+  const scrollHint = buildScrollHint(node.bounds, root.bounds)
   return {
     id: nodeIdForPath(node.path),
     role: node.role,
     ...(sanitizeInlineName(node.name, 80) ? { name: sanitizeInlineName(node.name, 80) } : {}),
     ...(cloneState(node.state) ? { state: cloneState(node.state) } : {}),
+    ...(context ? { context } : {}),
+    visibility,
+    scrollHint,
     ...(includeBounds ? { bounds: cloneBounds(node.bounds) } : {}),
   }
 }
@@ -1263,9 +1412,15 @@ export function expandPageSection(
   options?: {
     maxHeadings?: number
     maxFields?: number
+    fieldOffset?: number
+    onlyRequiredFields?: boolean
+    onlyInvalidFields?: boolean
     maxActions?: number
+    actionOffset?: number
     maxLists?: number
+    listOffset?: number
     maxItems?: number
+    itemOffset?: number
     maxTextPreview?: number
     includeBounds?: boolean
   },
@@ -1279,9 +1434,15 @@ export function expandPageSection(
 
   const maxHeadings = options?.maxHeadings ?? 6
   const maxFields = options?.maxFields ?? 18
+  const fieldOffset = Math.max(0, options?.fieldOffset ?? 0)
+  const onlyRequiredFields = options?.onlyRequiredFields ?? false
+  const onlyInvalidFields = options?.onlyInvalidFields ?? false
   const maxActions = options?.maxActions ?? 12
+  const actionOffset = Math.max(0, options?.actionOffset ?? 0)
   const maxLists = options?.maxLists ?? 8
+  const listOffset = Math.max(0, options?.listOffset ?? 0)
   const maxItems = options?.maxItems ?? 20
+  const itemOffset = Math.max(0, options?.itemOffset ?? 0)
   const maxTextPreview = options?.maxTextPreview ?? 6
   const includeBounds = options?.includeBounds ?? false
 
@@ -1300,6 +1461,17 @@ export function expandPageSection(
   const itemsAll = actualKind === 'list'
     ? sortByBounds(collectDescendants(node, candidate => candidate.role === 'listitem'))
     : []
+  const requiredFieldCount = fieldsAll.filter(field => field.state?.required).length
+  const invalidFieldCount = fieldsAll.filter(field => field.state?.invalid).length
+  const filteredFields = fieldsAll.filter(field => {
+    if (onlyRequiredFields && !field.state?.required) return false
+    if (onlyInvalidFields && !field.state?.invalid) return false
+    return true
+  })
+  const pageFields = filteredFields.slice(fieldOffset, fieldOffset + maxFields)
+  const pageActions = actionsAll.slice(actionOffset, actionOffset + maxActions)
+  const pageLists = nestedListsAll.slice(listOffset, listOffset + maxLists)
+  const pageItems = itemsAll.slice(itemOffset, itemOffset + maxItems)
 
   const name = sectionDisplayName(node, actualKind)
   return {
@@ -1311,15 +1483,49 @@ export function expandPageSection(
     summary: {
       headingCount: headingsAll.length,
       fieldCount: fieldsAll.length,
+      requiredFieldCount,
+      invalidFieldCount,
       actionCount: actionsAll.length,
       listCount: nestedListsAll.length,
       itemCount: itemsAll.length,
     },
+    page: {
+      fields: {
+        offset: fieldOffset,
+        returned: pageFields.length,
+        total: filteredFields.length,
+        hasMore: fieldOffset + pageFields.length < filteredFields.length,
+      },
+      actions: {
+        offset: actionOffset,
+        returned: pageActions.length,
+        total: actionsAll.length,
+        hasMore: actionOffset + pageActions.length < actionsAll.length,
+      },
+      lists: {
+        offset: listOffset,
+        returned: pageLists.length,
+        total: nestedListsAll.length,
+        hasMore: listOffset + pageLists.length < nestedListsAll.length,
+      },
+      items: {
+        offset: itemOffset,
+        returned: pageItems.length,
+        total: itemsAll.length,
+        hasMore: itemOffset + pageItems.length < itemsAll.length,
+      },
+    },
     headings: headingModels(node, maxHeadings, includeBounds),
-    fields: fieldsAll.slice(0, maxFields).map(field => toFieldModel(field, includeBounds)),
-    actions: actionsAll.slice(0, maxActions).map(action => toActionModel(action, includeBounds)),
-    lists: nestedListSummaries(node, maxLists, node.path),
-    items: itemsAll.slice(0, maxItems).map(item => ({
+    fields: pageFields.map(field => toFieldModel(root, field, includeBounds)),
+    actions: pageActions.map(action => toActionModel(root, action, includeBounds)),
+    lists: pageLists.map(list => ({
+      id: sectionIdForPath('list', list.path),
+      role: list.role,
+      ...(sectionDisplayName(list, 'list') ? { name: sectionDisplayName(list, 'list') } : {}),
+      bounds: cloneBounds(list.bounds),
+      itemCount: collectDescendants(list, candidate => candidate.role === 'listitem').length,
+    })),
+    items: pageItems.map(item => ({
       id: nodeIdForPath(item.path),
       ...(listItemName(item) ? { name: listItemName(item) } : {}),
       ...(includeBounds ? { bounds: cloneBounds(item.bounds) } : {}),

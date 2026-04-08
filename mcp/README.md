@@ -19,12 +19,13 @@ Geometra proxy:       Chromium → DOM geometry → same WebSocket as native →
 | Tool | Description |
 |---|---|
 | `geometra_connect` | Connect with `url` (ws://…) **or** `pageUrl` (https://…) to auto-start geometra-proxy; `url: "https://…"` is auto-coerced onto the proxy path |
-| `geometra_query` | Find elements by stable id, role, name, text content, current value, or semantic state such as `invalid`, `required`, or `busy` |
+| `geometra_query` | Find elements by stable id, role, name, text content, ancestor/prompt context, current value, or semantic state such as `invalid`, `required`, or `busy` |
 | `geometra_wait_for` | Wait for a semantic condition instead of guessing sleeps (`busy`, `disabled`, alerts, values, etc.) |
 | `geometra_fill_fields` | Fill labeled text/choice/toggle/file fields in one MCP call; can return final-only status for the smallest responses |
 | `geometra_run_actions` | Execute a batch of high-level actions in one MCP round trip and get one consolidated result, with optional final-only output |
 | `geometra_page_model` | Summary-first webpage model: archetypes, stable section ids, counts, top-level sections, primary actions |
-| `geometra_expand_section` | Expand one form/dialog/list/landmark from `geometra_page_model` on demand |
+| `geometra_expand_section` | Expand one form/dialog/list/landmark from `geometra_page_model` on demand, with paging/filtering for long sections |
+| `geometra_reveal` | Scroll until a matching node is visible instead of guessing wheel deltas |
 | `geometra_click` | Click an element by coordinates |
 | `geometra_type` | Type text into the focused element |
 | `geometra_key` | Send special keys (Enter, Tab, Escape, arrows) |
@@ -310,8 +311,9 @@ For long application flows, prefer one of these patterns:
 
 1. `geometra_page_model`
 2. `geometra_expand_section`
-3. `geometra_fill_fields` for obvious field entry
-4. `geometra_run_actions` when you need mixed navigation + waits + field entry
+3. `geometra_reveal` for far-below-fold targets such as submit buttons
+4. `geometra_fill_fields` for obvious field entry
+5. `geometra_run_actions` when you need mixed navigation + waits + field entry
 
 Typical batch:
 
@@ -332,6 +334,13 @@ For the smallest long-form responses, prefer:
 
 1. `detail: "minimal"` for structured step metadata instead of narrated deltas
 2. `includeSteps: false` when you only need aggregate success/error counts plus the final validation/state payload
+
+For long single-page forms:
+
+1. Use `geometra_expand_section` with `fieldOffset` / `actionOffset` to page through large forms instead of taking a full snapshot.
+2. Add `onlyRequiredFields: true` or `onlyInvalidFields: true` when you want the actionable subset.
+3. Use `contextText` in `geometra_query` / `geometra_wait_for` to disambiguate repeated `Yes` / `No` controls by question text.
+4. Use `geometra_reveal` instead of manual wheel loops when the next target is offscreen.
 
 Typical field fill:
 

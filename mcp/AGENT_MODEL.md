@@ -173,8 +173,15 @@ For token-sensitive automation loops, add `includeSteps: false` so the response 
 - by `role`
 - by `name`
 - by `text`
+- by `contextText` when repeated controls share the same visible label
 
 Use it when you already know what you are looking for and want exact bounds.
+
+### 9. Reveal offscreen targets semantically
+
+Use `geometra_reveal` when the target is below the fold or inside a long form and you do not want to guess wheel deltas.
+
+This is the preferred path for “bring Submit into view”, “jump to the next required field”, and similar reveal operations.
 
 ## Recommended Agent Loop
 
@@ -184,9 +191,10 @@ For most DOM-heavy pages, the best order is:
 2. `geometra_page_model`
 3. `geometra_expand_section` for one important section if needed
 4. `geometra_query` or `geometra_wait_for`
-5. `geometra_fill_fields` when the task is straightforward field entry
-6. `geometra_run_actions` for predictable mixed flows, otherwise a single action tool (`geometra_click`, `geometra_type`, etc.)
-7. consume the returned semantic delta / terse state summary
+5. `geometra_reveal` when the target is offscreen
+6. `geometra_fill_fields` when the task is straightforward field entry
+7. `geometra_run_actions` for predictable mixed flows, otherwise a single action tool (`geometra_click`, `geometra_type`, etc.)
+8. consume the returned semantic delta / terse state summary
 
 Use `geometra_snapshot` compact when:
 
@@ -204,6 +212,13 @@ For the lowest-token batch pattern:
 2. `detail: "minimal"`
 3. `includeSteps: false`
 4. inspect the returned `final.invalidCount`, `final.alertCount`, and any sampled `invalidFields`
+
+For long forms with repeated controls:
+
+1. `geometra_expand_section` with `fieldOffset` / `actionOffset` to page through the section
+2. `onlyRequiredFields: true` or `onlyInvalidFields: true` when you want the actionable subset
+3. `geometra_query({ role, name, contextText })` to disambiguate repeated `Yes` / `No` answers
+4. `geometra_reveal(...)` before clicking a far-below-fold target like submit
 
 ## Headed vs Headless
 
