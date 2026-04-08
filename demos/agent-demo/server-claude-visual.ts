@@ -29,7 +29,12 @@ const inputCaret = signal(0)
 
 // ── UI builders (Claude can trigger these) ──────────────────────────────────
 
-const uiBuilders: Record<string, () => UIElement> = {
+const uiBuilders: {
+  telemetry: () => UIElement
+  dashboard: () => UIElement
+  crew: () => UIElement
+  timeline: () => UIElement
+} = {
   telemetry(): UIElement {
     const header = box(
       { flexDirection: 'row', gap: 8, paddingBottom: 6 },
@@ -214,8 +219,7 @@ Keep responses concise (2-3 sentences). If you just showed a panel, describe wha
     })) {
       if (message.type === 'assistant') {
         const textBlocks = message.message.content
-          .filter((block: { type: string }) => block.type === 'text')
-          .map((block: { type: string; text: string }) => block.text)
+          .flatMap(block => ('text' in block && typeof block.text === 'string' ? [block.text] : []))
           .join('')
         if (textBlocks.length > 0) {
           streaming.append(textBlocks)

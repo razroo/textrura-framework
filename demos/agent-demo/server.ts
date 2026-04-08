@@ -4,7 +4,7 @@
  */
 import { createAgentApp } from '../../packages/agent/src/index.js'
 
-const app = await createAgentApp({
+await createAgentApp({
   port: 3100,
   title: 'Geometra Agent',
   systemPrompt: 'Welcome! I\'m a demo agent powered by Geometra. Ask me anything.',

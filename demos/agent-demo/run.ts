@@ -8,7 +8,7 @@
  */
 import { signal, batch, streamText, effect, box, text, scene3d, sphere, line, ambientLight, directionalLight } from '../../packages/core/src/index.js'
 import type { UIElement } from '../../packages/core/src/index.js'
-import type { AgentState, AgentCallbacks, AgentStatus, AgentMessage } from '../../packages/agent/src/types.js'
+import type { AgentCallbacks, AgentStatus, AgentMessage } from '../../packages/agent/src/types.js'
 
 // ── Colors ──────────────────────────────────────────────────────────────────
 const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`
@@ -24,8 +24,6 @@ const status = signal<AgentStatus>('idle')
 const error = signal<string | null>(null)
 const streaming = streamText()
 const panels = signal<Map<string, UIElement>>(new Map())
-
-const state: AgentState = { messages, status, streamingText: streaming, error, panels }
 
 // ── Reactive observer — prints state changes to terminal ────────────────────
 let lastPrintedStreaming = ''

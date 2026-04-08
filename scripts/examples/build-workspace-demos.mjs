@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 
@@ -14,6 +14,7 @@ const directories = readdirSync(demosRoot, { withFileTypes: true })
 for (const dirname of directories) {
   const cwd = path.join(demosRoot, dirname)
   const manifestPath = path.join(cwd, 'package.json')
+  if (!existsSync(manifestPath)) continue
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
 
   if (!manifest.scripts?.build) continue
