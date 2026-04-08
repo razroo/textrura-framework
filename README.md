@@ -8,6 +8,168 @@
 
 https://github.com/user-attachments/assets/1610d856-3c7d-4fce-be42-1c43306e6520
 
+## MCP Server — AI UI Automation
+
+Geometra ships with [`@geometra/mcp`](mcp/README.md), an MCP server for AI agents that can:
+
+- connect directly to native Geometra apps over the geometry protocol
+- open and drive normal websites through `@geometra/proxy`
+- fill long forms semantically with `geometra_fill_fields`
+- query, wait on, and verify UI state without screenshots or vision models
+
+### Install
+
+<details>
+<summary>Claude Code</summary>
+
+**One-line install:**
+```bash
+claude mcp add geometra -- npx -y @geometra/mcp
+```
+
+**Uninstall:**
+```bash
+claude mcp remove geometra
+```
+
+Or manually add to `.mcp.json` (project-level) or `~/.claude/settings.json` (global):
+```json
+{
+  "mcpServers": {
+    "geometra": {
+      "command": "npx",
+      "args": ["-y", "@geometra/mcp"]
+    }
+  }
+}
+```
+
+To uninstall manually, remove the `geometra` entry from the config file.
+
+</details>
+
+<details>
+<summary>Claude Desktop</summary>
+
+Add to your Claude Desktop MCP config:
+
+```json
+{
+  "mcpServers": {
+    "geometra": {
+      "command": "npx",
+      "args": ["-y", "@geometra/mcp"]
+    }
+  }
+}
+```
+
+To uninstall, remove the `geometra` entry from the config file.
+
+</details>
+
+<details>
+<summary>OpenAI Codex</summary>
+
+Add to your Codex MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "geometra": {
+      "command": "npx",
+      "args": ["-y", "@geometra/mcp"]
+    }
+  }
+}
+```
+
+To uninstall, remove the `geometra` entry from the config file.
+
+</details>
+
+<details>
+<summary>Cursor</summary>
+
+Open Settings → MCP → Add new MCP server, or add to `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "geometra": {
+      "command": "npx",
+      "args": ["-y", "@geometra/mcp"]
+    }
+  }
+}
+```
+
+To uninstall, remove the entry from MCP settings.
+
+</details>
+
+<details>
+<summary>Windsurf</summary>
+
+Add to `~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "geometra": {
+      "command": "npx",
+      "args": ["-y", "@geometra/mcp"]
+    }
+  }
+}
+```
+
+To uninstall, remove the entry from the config file.
+
+</details>
+
+<details>
+<summary>VS Code / Copilot</summary>
+
+**One-line install:**
+```bash
+code --add-mcp '{"name":"geometra","command":"npx","args":["-y","@geometra/mcp"]}'
+```
+
+Or add to `.vscode/mcp.json`:
+```json
+{
+  "servers": {
+    "geometra": {
+      "command": "npx",
+      "args": ["-y", "@geometra/mcp"]
+    }
+  }
+}
+```
+
+To uninstall, remove the entry from MCP settings or delete the server from the MCP panel.
+
+</details>
+
+<details>
+<summary>Other MCP clients</summary>
+
+Any MCP client that supports stdio transport can use Geometra. The server config is:
+
+```json
+{
+  "command": "npx",
+  "args": ["-y", "@geometra/mcp"]
+}
+```
+
+To uninstall, remove the server entry from your client's MCP configuration.
+
+</details>
+
+See [mcp/README.md](mcp/README.md) for tool details, examples, and source installs from this repo.
+
 ## Why geometry, not components?
 
 Other agent-to-UI systems (json-render, A2UI, computer-use agents) send **component descriptions** or scrape rendered output. The agent still has to interpret what it sees. Geometra sends **pixel-exact geometry** — every element's position and size, computed on the server, streamed as flat JSON. Nothing to interpret. Nothing to scrape.

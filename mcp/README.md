@@ -39,26 +39,154 @@ Geometra proxy:       Chromium → DOM geometry → same WebSocket as native →
 
 ## Setup
 
-### Claude Code
+<details>
+<summary>Claude Code</summary>
 
+**One-line install:**
 ```bash
-claude mcp add geometra -- npx @geometra/mcp
+claude mcp add geometra -- npx -y @geometra/mcp
 ```
 
-### Claude Desktop
+**Uninstall:**
+```bash
+claude mcp remove geometra
+```
 
-Add to `claude_desktop_config.json`:
+Or manually add to `.mcp.json` (project-level) or `~/.claude/settings.json` (global):
+```json
+{
+  "mcpServers": {
+    "geometra": {
+      "command": "npx",
+      "args": ["-y", "@geometra/mcp"]
+    }
+  }
+}
+```
+
+To uninstall manually, remove the `geometra` entry from the config file.
+
+</details>
+
+<details>
+<summary>Claude Desktop</summary>
+
+Add to your Claude Desktop MCP config:
 
 ```json
 {
   "mcpServers": {
     "geometra": {
       "command": "npx",
-      "args": ["@geometra/mcp"]
+      "args": ["-y", "@geometra/mcp"]
     }
   }
 }
 ```
+
+To uninstall, remove the `geometra` entry from the config file.
+
+</details>
+
+<details>
+<summary>OpenAI Codex</summary>
+
+Add to your Codex MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "geometra": {
+      "command": "npx",
+      "args": ["-y", "@geometra/mcp"]
+    }
+  }
+}
+```
+
+To uninstall, remove the `geometra` entry from the config file.
+
+</details>
+
+<details>
+<summary>Cursor</summary>
+
+Open Settings → MCP → Add new MCP server, or add to `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "geometra": {
+      "command": "npx",
+      "args": ["-y", "@geometra/mcp"]
+    }
+  }
+}
+```
+
+To uninstall, remove the entry from MCP settings.
+
+</details>
+
+<details>
+<summary>Windsurf</summary>
+
+Add to `~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "geometra": {
+      "command": "npx",
+      "args": ["-y", "@geometra/mcp"]
+    }
+  }
+}
+```
+
+To uninstall, remove the entry from the config file.
+
+</details>
+
+<details>
+<summary>VS Code / Copilot</summary>
+
+**One-line install:**
+```bash
+code --add-mcp '{"name":"geometra","command":"npx","args":["-y","@geometra/mcp"]}'
+```
+
+Or add to `.vscode/mcp.json`:
+```json
+{
+  "servers": {
+    "geometra": {
+      "command": "npx",
+      "args": ["-y", "@geometra/mcp"]
+    }
+  }
+}
+```
+
+To uninstall, remove the entry from MCP settings or delete the server from the MCP panel.
+
+</details>
+
+<details>
+<summary>Other MCP clients</summary>
+
+Any MCP client that supports stdio transport can use Geometra. The server config is:
+
+```json
+{
+  "command": "npx",
+  "args": ["-y", "@geometra/mcp"]
+}
+```
+
+To uninstall, remove the server entry from your client's MCP configuration.
+
+</details>
 
 ### From source (this repo)
 
