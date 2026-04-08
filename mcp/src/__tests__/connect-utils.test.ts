@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -102,7 +102,28 @@ describe('proxy ready helpers', () => {
       const packageDir = path.join(scopeDir, 'proxy')
       const probePath = path.join(tempRoot, 'probe.cjs')
       mkdirSync(scopeDir, { recursive: true })
-      symlinkSync(path.resolve(process.cwd(), 'packages/proxy'), packageDir, 'dir')
+      mkdirSync(path.join(packageDir, 'src'), { recursive: true })
+      writeFileSync(
+        path.join(packageDir, 'package.json'),
+        JSON.stringify({
+          name: '@geometra/proxy',
+          version: '0.0.0-test',
+          type: 'module',
+        }),
+      )
+      writeFileSync(
+        path.join(packageDir, 'tsconfig.build.json'),
+        JSON.stringify({
+          extends: path.resolve(process.cwd(), 'tsconfig.base.json'),
+          compilerOptions: {
+            outDir: 'dist',
+            rootDir: 'src',
+            noEmit: false,
+          },
+          include: ['src'],
+        }),
+      )
+      writeFileSync(path.join(packageDir, 'src', 'index.ts'), 'console.log("proxy");\n')
       writeFileSync(probePath, 'module.exports = {}')
 
       const customRequire = createRequire(probePath)

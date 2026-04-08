@@ -1,5 +1,5 @@
-import { spawn, type ChildProcess } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
+import { existsSync, realpathSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -17,9 +17,29 @@ export function resolveProxyScriptPath(): string {
 export function resolveProxyScriptPathWith(customRequire: NodeRequire, moduleDir = MODULE_DIR): string {
   const errors: string[] = []
 
+  const packageDir = resolveProxyPackageDir(customRequire)
+  if (packageDir) {
+    const packagedDist = path.join(packageDir, 'dist/index.js')
+    if (existsSync(packagedDist)) return packagedDist
+
+    const builtLocalDist = buildLocalProxyDistIfPossible(packageDir, errors)
+    if (builtLocalDist) return builtLocalDist
+
+    errors.push(`Resolved @geometra/proxy package at ${packageDir}, but dist/index.js was missing`)
+  } else {
+    errors.push('Could not find @geometra/proxy/package.json via Node module search paths')
+  }
+
   try {
     const pkgJson = customRequire.resolve('@geometra/proxy/package.json')
-    return path.join(path.dirname(pkgJson), 'dist/index.js')
+    const exportPackageDir = path.dirname(pkgJson)
+    const packagedDist = path.join(exportPackageDir, 'dist/index.js')
+    if (existsSync(packagedDist)) return packagedDist
+
+    const builtLocalDist = buildLocalProxyDistIfPossible(exportPackageDir, errors)
+    if (builtLocalDist) return builtLocalDist
+
+    errors.push(`Resolved @geometra/proxy/package.json at ${pkgJson}, but dist/index.js was missing`)
   } catch (err) {
     errors.push(err instanceof Error ? err.message : String(err))
   }
@@ -45,6 +65,58 @@ export function resolveProxyScriptPathWith(customRequire: NodeRequire, moduleDir
   throw new Error(
     `Could not resolve @geometra/proxy. Install it with the MCP package: npm install @geometra/proxy. Resolution errors: ${errors.join(' | ')}`,
   )
+}
+
+function resolveProxyPackageDir(customRequire: NodeRequire): string | undefined {
+  const searchRoots = customRequire.resolve.paths('@geometra/proxy') ?? []
+  for (const searchRoot of searchRoots) {
+    const packageDir = path.join(searchRoot, '@geometra', 'proxy')
+    if (existsSync(path.join(packageDir, 'package.json'))) return packageDir
+  }
+  return undefined
+}
+
+function buildLocalProxyDistIfPossible(packageDir: string, errors: string[]): string | undefined {
+  const distEntry = path.join(packageDir, 'dist/index.js')
+  const sourceEntry = path.join(packageDir, 'src/index.ts')
+  const tsconfigPath = path.join(packageDir, 'tsconfig.build.json')
+
+  if (!existsSync(sourceEntry) || !existsSync(tsconfigPath)) {
+    return undefined
+  }
+
+  try {
+    const realPackageDir = realpathSync(packageDir)
+    const realTsconfigPath = path.join(realPackageDir, 'tsconfig.build.json')
+    const realDistDir = path.join(realPackageDir, 'dist')
+    const tscBin = require.resolve('typescript/bin/tsc')
+
+    rmSync(realDistDir, { recursive: true, force: true })
+    const result = spawnSync(process.execPath, [tscBin, '-p', realTsconfigPath], {
+      cwd: realPackageDir,
+      encoding: 'utf8',
+      stdio: 'pipe',
+    })
+
+    if (result.status !== 0) {
+      const detail = [result.stdout, result.stderr].filter(Boolean).join('\n').trim()
+      errors.push(
+        `Failed to build local @geometra/proxy at ${realPackageDir}: ${detail || `exit ${result.status ?? 'unknown'}`}`,
+      )
+      return undefined
+    }
+
+    if (existsSync(distEntry)) return distEntry
+
+    const realDistEntry = path.join(realPackageDir, 'dist/index.js')
+    if (existsSync(realDistEntry)) return realDistEntry
+
+    errors.push(`Built local @geometra/proxy at ${realPackageDir}, but dist/index.js is still missing`)
+  } catch (err) {
+    errors.push(err instanceof Error ? err.message : String(err))
+  }
+
+  return undefined
 }
 
 export interface SpawnProxyParams {
