@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { ElementHandle, Frame, Locator, Page } from 'playwright'
+import type { ClientFillField } from './types.js'
 
 function delay(ms: number): Promise<void> {
   return new Promise(r => setTimeout(r, ms))
@@ -1336,11 +1337,7 @@ export async function setFieldChoice(
   }
 }
 
-export type FormFieldFill =
-  | { kind: 'text'; fieldLabel: string; value: string; exact?: boolean }
-  | { kind: 'choice'; fieldLabel: string; value: string; query?: string; exact?: boolean }
-  | { kind: 'toggle'; label: string; checked?: boolean; exact?: boolean; controlType?: 'checkbox' | 'radio' }
-  | { kind: 'file'; fieldLabel: string; paths: string[]; exact?: boolean }
+export type FormFieldFill = ClientFillField
 
 export async function fillFields(page: Page, fields: FormFieldFill[]): Promise<void> {
   for (const field of fields) {

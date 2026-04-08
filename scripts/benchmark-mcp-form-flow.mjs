@@ -234,8 +234,10 @@ return {
 }
 
 async function runPlaywrightFlow(url) {
+  const launchStarted = performance.now()
   const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage({ viewport: VIEWPORT })
+  const launchMs = performance.now() - launchStarted
 
   try {
     const navigateInput = { url }
@@ -261,6 +263,7 @@ async function runPlaywrightFlow(url) {
     )
 
     return {
+      launchMs,
       steps: [navigateStep, snapshotStep, runCodeStep],
       semanticSteps: [snapshotStep, runCodeStep],
       runCodeResult: result,
@@ -377,6 +380,12 @@ async function main() {
     console.log('\nTotals')
     printTotals('Geometra end-to-end', geometraTotals)
     printTotals('Playwright-style end-to-end', playwrightTotals)
+    console.log(
+      `Playwright-style cold start: ${playwright.launchMs.toFixed(1)} ms browser launch + page setup (not counted in model-facing bytes/turns)`,
+    )
+    console.log(
+      `Playwright-style full runtime including launch: ${(playwright.launchMs + playwrightTotals.elapsedMs).toFixed(1)} ms`,
+    )
     printTotals('Geometra semantic-only', geometraSemanticTotals)
     printTotals('Playwright-style semantic-only', playwrightSemanticTotals)
 
@@ -394,6 +403,7 @@ async function main() {
     console.log(
       `Geometra fill_form output: ${geometra.steps[2].outputBytes} B (~${approxTokens(geometra.steps[2].outputBytes)} tokens), invalidCount=${geometra.fillPayload.final?.invalidCount ?? 'n/a'}`,
     )
+    console.log(`Geometra fill_form execution: ${geometra.fillPayload.execution ?? 'unknown'}`)
     console.log(
       `Playwright run_code input: ${playwright.steps[2].inputBytes} B (~${approxTokens(playwright.steps[2].inputBytes)} tokens), invalidCount=${playwright.runCodeResult.invalidCount}`,
     )

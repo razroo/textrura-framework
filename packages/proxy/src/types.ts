@@ -98,6 +98,19 @@ export type ClientSetFieldChoiceMessage = {
   protocolVersion?: number
 }
 
+export type ClientFillField =
+  | { kind: 'text'; fieldLabel: string; value: string; exact?: boolean }
+  | { kind: 'choice'; fieldLabel: string; value: string; query?: string; exact?: boolean }
+  | { kind: 'toggle'; label: string; checked?: boolean; exact?: boolean; controlType?: 'checkbox' | 'radio' }
+  | { kind: 'file'; fieldLabel: string; paths: string[]; exact?: boolean }
+
+export type ClientFillFieldsMessage = {
+  type: 'fillFields'
+  fields: ClientFillField[]
+  requestId?: string
+  protocolVersion?: number
+}
+
 export type ClientListboxPickMessage = {
   type: 'listboxPick'
   label: string
@@ -149,6 +162,7 @@ export type ParsedClientMessage =
   | ClientFileMessage
   | ClientSetFieldTextMessage
   | ClientSetFieldChoiceMessage
+  | ClientFillFieldsMessage
   | ClientListboxPickMessage
   | ClientSelectOptionMessage
   | ClientSetCheckedMessage
@@ -193,6 +207,10 @@ export function isSetFieldChoiceMessage(msg: ParsedClientMessage): msg is Client
     'value' in msg &&
     typeof (msg as ClientSetFieldChoiceMessage).value === 'string'
   )
+}
+
+export function isFillFieldsMessage(msg: ParsedClientMessage): msg is ClientFillFieldsMessage {
+  return msg.type === 'fillFields' && 'fields' in msg && Array.isArray((msg as ClientFillFieldsMessage).fields)
 }
 
 export function isSelectOptionMessage(msg: ParsedClientMessage): msg is ClientSelectOptionMessage {

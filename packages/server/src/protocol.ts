@@ -135,6 +135,19 @@ export type ClientMessage =
       exact?: boolean
     })
   /**
+   * Fill several labeled fields in one browser-side batch. Implemented by `@geometra/proxy`.
+   * This is the lowest-overhead semantic form-fill path because it avoids one request/ack cycle per field.
+   */
+  | (VersionedMessage & CorrelatedMessage & {
+      type: 'fillFields'
+      fields: Array<
+        | { kind: 'text'; fieldLabel: string; value: string; exact?: boolean }
+        | { kind: 'choice'; fieldLabel: string; value: string; query?: string; exact?: boolean }
+        | { kind: 'toggle'; label: string; checked?: boolean; exact?: boolean; controlType?: 'checkbox' | 'radio' }
+        | { kind: 'file'; fieldLabel: string; paths: string[]; exact?: boolean }
+      >
+    })
+  /**
    * Choose an option on a native `<select>` after focusing it (click `x`,`y` on the control).
    */
   | (VersionedMessage & CorrelatedMessage & {

@@ -382,6 +382,7 @@ export async function createServer(
           msg.type === 'file' ||
           msg.type === 'setFieldText' ||
           msg.type === 'setFieldChoice' ||
+          msg.type === 'fillFields' ||
           msg.type === 'selectOption' ||
           msg.type === 'setChecked' ||
           msg.type === 'listboxPick' ||

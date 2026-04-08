@@ -283,7 +283,19 @@ export interface UpdateWaitResult {
 let activeSession: Session | null = null
 const ACTION_UPDATE_TIMEOUT_MS = 2000
 const LISTBOX_UPDATE_TIMEOUT_MS = 4500
+const FILL_BATCH_BASE_TIMEOUT_MS = 2500
+const FILL_BATCH_TEXT_FIELD_TIMEOUT_MS = 250
+const FILL_BATCH_CHOICE_FIELD_TIMEOUT_MS = 450
+const FILL_BATCH_TOGGLE_FIELD_TIMEOUT_MS = 200
+const FILL_BATCH_FILE_FIELD_TIMEOUT_MS = 5000
+const FILL_BATCH_MAX_TIMEOUT_MS = 30_000
 let nextRequestSequence = 0
+
+export type ProxyFillField =
+  | { kind: 'text'; fieldLabel: string; value: string; exact?: boolean }
+  | { kind: 'choice'; fieldLabel: string; value: string; query?: string; exact?: boolean }
+  | { kind: 'toggle'; label: string; checked?: boolean; exact?: boolean; controlType?: 'checkbox' | 'radio' }
+  | { kind: 'file'; fieldLabel: string; paths: string[]; exact?: boolean }
 
 function shutdownPreviousSession(): void {
   const prev = activeSession
@@ -416,6 +428,27 @@ export function getSession(): Session | null {
 
 export function disconnect(): void {
   shutdownPreviousSession()
+}
+
+function estimateFillBatchTimeout(fields: ProxyFillField[]): number {
+  let total = FILL_BATCH_BASE_TIMEOUT_MS
+  for (const field of fields) {
+    switch (field.kind) {
+      case 'text':
+        total += FILL_BATCH_TEXT_FIELD_TIMEOUT_MS
+        break
+      case 'choice':
+        total += FILL_BATCH_CHOICE_FIELD_TIMEOUT_MS
+        break
+      case 'toggle':
+        total += FILL_BATCH_TOGGLE_FIELD_TIMEOUT_MS
+        break
+      case 'file':
+        total += FILL_BATCH_FILE_FIELD_TIMEOUT_MS
+        break
+    }
+  }
+  return Math.min(total, FILL_BATCH_MAX_TIMEOUT_MS)
 }
 
 export function waitForUiCondition(
@@ -591,6 +624,15 @@ export function sendFieldChoice(
   if (opts?.exact !== undefined) payload.exact = opts.exact
   if (opts?.query) payload.query = opts.query
   return sendAndWaitForUpdate(session, payload, timeoutMs)
+}
+
+/** Fill several semantic form fields in one proxy-side batch. */
+export function sendFillFields(
+  session: Session,
+  fields: ProxyFillField[],
+  timeoutMs = estimateFillBatchTimeout(fields),
+): Promise<UpdateWaitResult> {
+  return sendAndWaitForUpdate(session, { type: 'fillFields', fields }, timeoutMs)
 }
 
 /** ARIA `role=option` listbox (e.g. React Select). Optional click opens the list. */

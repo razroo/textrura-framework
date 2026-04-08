@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest'
 import { WebSocketServer } from 'ws'
-import { connect, disconnect, sendClick, sendListboxPick } from '../session.js'
+import { connect, disconnect, sendClick, sendFillFields, sendListboxPick } from '../session.js'
 
 describe('proxy-backed MCP actions', () => {
   afterAll(() => {
@@ -101,6 +101,67 @@ describe('proxy-backed MCP actions', () => {
     try {
       const session = await connect(`ws://127.0.0.1:${port}`)
       await expect(sendClick(session, 5, 5, 60)).resolves.toMatchObject({ status: 'updated', timeoutMs: 60 })
+    } finally {
+      disconnect()
+      await new Promise<void>((resolve, reject) => wss.close(err => (err ? reject(err) : resolve())))
+    }
+  })
+
+  it('sends batched fillFields messages and resolves from the resulting update', async () => {
+    const wss = new WebSocketServer({ port: 0 })
+    let seenMessage: { type?: string; fields?: unknown[] } | undefined
+    wss.on('connection', ws => {
+      ws.on('message', raw => {
+        const msg = JSON.parse(String(raw)) as { type?: string; fields?: unknown[] }
+
+        if (msg.type === 'resize') {
+          ws.send(JSON.stringify({
+            type: 'frame',
+            layout: { x: 0, y: 0, width: 1024, height: 768, children: [] },
+            tree: { kind: 'box', props: {}, semantic: { tag: 'body', role: 'group' }, children: [] },
+          }))
+          return
+        }
+
+        if (msg.type === 'fillFields') {
+          seenMessage = msg
+          ws.send(JSON.stringify({
+            type: 'frame',
+            layout: { x: 0, y: 0, width: 1024, height: 768, children: [] },
+            tree: {
+              kind: 'box',
+              props: {},
+              semantic: { tag: 'body', role: 'group', ariaLabel: 'Filled' },
+              children: [],
+            },
+          }))
+        }
+      })
+    })
+    const port = await new Promise<number>((resolve, reject) => {
+      wss.once('listening', () => {
+        const address = wss.address()
+        if (typeof address === 'object' && address) resolve(address.port)
+        else reject(new Error('Failed to resolve ephemeral WebSocket port'))
+      })
+      wss.once('error', reject)
+    })
+
+    try {
+      const session = await connect(`ws://127.0.0.1:${port}`)
+      await expect(
+        sendFillFields(session, [
+          { kind: 'text', fieldLabel: 'Full name', value: 'Taylor Applicant' },
+          { kind: 'choice', fieldLabel: 'Country', value: 'Germany' },
+        ], 80),
+      ).resolves.toMatchObject({ status: 'updated', timeoutMs: 80 })
+      expect(seenMessage).toMatchObject({
+        type: 'fillFields',
+        fields: [
+          { kind: 'text', fieldLabel: 'Full name', value: 'Taylor Applicant' },
+          { kind: 'choice', fieldLabel: 'Country', value: 'Germany' },
+        ],
+      })
     } finally {
       disconnect()
       await new Promise<void>((resolve, reject) => wss.close(err => (err ? reject(err) : resolve())))

@@ -7,6 +7,7 @@ import {
   disconnect,
   getSession,
   sendClick,
+  sendFillFields,
   sendType,
   sendKey,
   sendFileUpload,
@@ -552,6 +553,44 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
       const planned = planFormFill(schema, { valuesById, valuesByLabel })
       if (!planned.ok) return err(planned.error)
 
+      if (!includeSteps) {
+        let usedBatch = false
+        try {
+          const startRevision = session.updateRevision
+          const wait = await sendFillFields(session, planned.fields)
+          await waitForDeferredBatchUpdate(session, startRevision, wait)
+          await waitForBatchFieldReadback(session, planned.fields)
+          usedBatch = true
+        } catch (e) {
+          if (!canFallbackToSequentialFill(e)) {
+            const message = e instanceof Error ? e.message : String(e)
+            return err(message)
+          }
+        }
+
+        if (usedBatch) {
+          const after = sessionA11y(session)
+          const signals = after ? collectSessionSignals(after) : undefined
+          const invalidRemaining = signals?.invalidFields.length ?? 0
+          const payload = {
+            completed: true,
+            execution: 'batched',
+            formId: schema.formId,
+            requestedValueCount: entryCount,
+            fieldCount: planned.fields.length,
+            successCount: planned.fields.length,
+            errorCount: 0,
+            ...(signals ? { final: sessionSignalsPayload(signals, detail) } : {}),
+          }
+
+          if (failOnInvalid && invalidRemaining > 0) {
+            return err(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
+          }
+
+          return ok(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
+        }
+      }
+
       const steps: Array<Record<string, unknown>> = []
       let stoppedAt: number | undefined
 
@@ -579,6 +618,7 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
       const errorCount = steps.length - successCount
       const payload = {
         completed: stoppedAt === undefined && steps.length === planned.fields.length,
+        execution: 'sequential',
         formId: schema.formId,
         requestedValueCount: entryCount,
         fieldCount: planned.fields.length,
@@ -1625,6 +1665,58 @@ function planFormFill(
   }
 
   return { ok: true, fields: planned }
+}
+
+function canFallbackToSequentialFill(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return (
+    message.includes('Unsupported client message type "fillFields"') ||
+    message.includes('Client message type "fillFields" is not supported')
+  )
+}
+
+async function waitForDeferredBatchUpdate(
+  session: Session,
+  startRevision: number,
+  wait: UpdateWaitResult,
+): Promise<void> {
+  if (wait.status !== 'acknowledged' || session.updateRevision > startRevision) return
+  await waitForUiCondition(session, () => session.updateRevision > startRevision, 750)
+}
+
+async function waitForBatchFieldReadback(session: Session, fields: FillFieldInput[]): Promise<void> {
+  await waitForUiCondition(session, () => {
+    const a11y = sessionA11y(session)
+    if (!a11y) return false
+    return fields.every(field => batchFieldReadbackMatches(a11y, field))
+  }, 1500)
+}
+
+function batchFieldReadbackMatches(a11y: A11yNode, field: FillFieldInput): boolean {
+  switch (field.kind) {
+    case 'text': {
+      const matches = findNodes(a11y, { name: field.fieldLabel, role: 'textbox' })
+      return matches.some(match => normalizeLookupKey(match.value ?? '') === normalizeLookupKey(field.value))
+    }
+    case 'choice': {
+      const directMatches = [
+        ...findNodes(a11y, { name: field.fieldLabel, role: 'combobox' }),
+        ...findNodes(a11y, { name: field.fieldLabel, role: 'textbox' }),
+        ...findNodes(a11y, { name: field.fieldLabel, role: 'button' }),
+      ]
+      if (directMatches.length === 0) return true
+      return directMatches.some(match => normalizeLookupKey(match.value ?? '') === normalizeLookupKey(field.value))
+    }
+    case 'toggle':
+      return true
+    case 'file': {
+      const matches = [
+        ...findNodes(a11y, { name: field.fieldLabel, role: 'textbox' }),
+        ...findNodes(a11y, { name: field.fieldLabel, role: 'button' }),
+      ]
+      return matches.length === 0 || matches.some(match => Boolean(match.value && match.value.trim()))
+    }
+  }
 }
 
 async function executeBatchAction(

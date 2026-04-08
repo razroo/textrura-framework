@@ -47,6 +47,7 @@ const mockState = vi.hoisted(() => ({
   sendFileUpload: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 8000 })),
   sendFieldText: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 2000 })),
   sendFieldChoice: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 2000 })),
+  sendFillFields: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 6000 })),
   sendListboxPick: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 4500 })),
   sendSelectOption: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 2000 })),
   sendSetChecked: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 2000 })),
@@ -65,6 +66,7 @@ vi.mock('../session.js', () => ({
   sendFileUpload: mockState.sendFileUpload,
   sendFieldText: mockState.sendFieldText,
   sendFieldChoice: mockState.sendFieldChoice,
+  sendFillFields: mockState.sendFillFields,
   sendListboxPick: mockState.sendListboxPick,
   sendSelectOption: mockState.sendSelectOption,
   sendSetChecked: mockState.sendSetChecked,
@@ -360,6 +362,73 @@ describe('batch MCP result shaping', () => {
       valueLength: 220,
       readback: { role: 'textbox', valueLength: 220 },
     })
+  })
+
+  it('uses batched proxy fill for compact fill_form responses', async () => {
+    const handler = getToolHandler('geometra_fill_form')
+    mockState.formSchemas = [
+      {
+        formId: 'fm:0',
+        name: 'Application',
+        fieldCount: 3,
+        requiredCount: 2,
+        invalidCount: 0,
+        fields: [
+          { id: 'ff:0.0', kind: 'text', label: 'Full name', required: true },
+          { id: 'ff:0.1', kind: 'choice', label: 'Preferred location', required: true },
+          { id: 'ff:0.2', kind: 'toggle', label: 'Share my profile for future roles', controlType: 'checkbox' },
+        ],
+      },
+    ]
+    mockState.currentA11yRoot = node('group', undefined, {
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 640 },
+      children: [
+        node('textbox', 'Full name', { value: 'Taylor Applicant', path: [0] }),
+        node('combobox', 'Preferred location', { value: 'Berlin, Germany', path: [1] }),
+        node('checkbox', 'Share my profile for future roles', {
+          path: [2],
+          state: { checked: true },
+        }),
+      ],
+    })
+
+    const result = await handler({
+      valuesById: {
+        'ff:0.0': 'Taylor Applicant',
+        'ff:0.1': 'Berlin, Germany',
+        'ff:0.2': true,
+      },
+      includeSteps: false,
+      detail: 'minimal',
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+
+    expect(mockState.sendFillFields).toHaveBeenCalledWith(
+      mockState.session,
+      [
+        { kind: 'text', fieldLabel: 'Full name', value: 'Taylor Applicant' },
+        { kind: 'choice', fieldLabel: 'Preferred location', value: 'Berlin, Germany' },
+        {
+          kind: 'toggle',
+          label: 'Share my profile for future roles',
+          checked: true,
+          controlType: 'checkbox',
+        },
+      ],
+    )
+    expect(mockState.sendFieldText).not.toHaveBeenCalled()
+    expect(mockState.sendFieldChoice).not.toHaveBeenCalled()
+    expect(mockState.sendSetChecked).not.toHaveBeenCalled()
+    expect(payload).toMatchObject({
+      completed: true,
+      execution: 'batched',
+      formId: 'fm:0',
+      fieldCount: 3,
+      successCount: 3,
+      errorCount: 0,
+    })
+    expect(payload).not.toHaveProperty('steps')
   })
 })
 

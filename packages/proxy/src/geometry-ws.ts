@@ -2,6 +2,7 @@ import type { Page } from 'playwright'
 import { WebSocketServer, type WebSocket } from 'ws'
 import {
   attachFiles,
+  fillFields,
   pickListboxOption,
   resolveExistingFiles,
   setFieldChoice,
@@ -16,6 +17,7 @@ import type { ClientKeyMessage, GeometrySnapshot, LayoutSnapshot, ParsedClientMe
 import {
   isClickEventMessage,
   isCompositionMessage,
+  isFillFieldsMessage,
   isFileMessage,
   isKeyMessage,
   isListboxPickMessage,
@@ -182,6 +184,12 @@ async function handleClientMessage(
 
     if (isSetFieldChoiceMessage(msg)) {
       await setFieldChoice(page, msg.fieldLabel, msg.value, { exact: msg.exact, query: msg.query })
+      onViewportOrInput('input', requestId)
+      return
+    }
+
+    if (isFillFieldsMessage(msg)) {
+      await fillFields(page, msg.fields)
       onViewportOrInput('input', requestId)
       return
     }
