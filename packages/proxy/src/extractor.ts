@@ -79,6 +79,49 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
     return role === 'textbox' || role === 'combobox'
   }
 
+  function normalizedControlValue(value: string | undefined): string | undefined {
+    const trimmed = value?.replace(/\s+/g, ' ').trim()
+    if (!trimmed) return undefined
+    return trimmed.length > 240 ? trimmed.slice(0, 240) : trimmed
+  }
+
+  function controlValueText(el: Element): string | undefined {
+    if (el instanceof HTMLInputElement) {
+      if (el.type === 'password') return el.value ? '••••••••' : undefined
+      if (el.type === 'file') {
+        if (el.files && el.files.length > 0) {
+          return normalizedControlValue(Array.from(el.files).map(file => file.name).join(', '))
+        }
+        return undefined
+      }
+      if (!isTextLikeControl(el)) return undefined
+      return normalizedControlValue(el.value || el.getAttribute('aria-valuetext') || undefined)
+    }
+    if (el instanceof HTMLTextAreaElement) {
+      return normalizedControlValue(el.value || el.getAttribute('aria-valuetext') || undefined)
+    }
+    if (el instanceof HTMLSelectElement) {
+      return normalizedControlValue(
+        el.selectedOptions[0]?.textContent || el.value || el.getAttribute('aria-valuetext') || undefined,
+      )
+    }
+    if (el instanceof HTMLElement && el.isContentEditable) {
+      return normalizedControlValue(el.innerText || el.textContent || el.getAttribute('aria-valuetext') || undefined)
+    }
+
+    const role = el.getAttribute('role')
+    if (role === 'combobox' || role === 'textbox') {
+      return normalizedControlValue(
+        el.getAttribute('aria-valuetext') ||
+          (el as HTMLElement).innerText ||
+          el.textContent ||
+          undefined,
+      )
+    }
+
+    return undefined
+  }
+
   function pickMeaningfulControlRect(el: Element): DOMRect {
     const h = el as HTMLElement
     const rect = h.getBoundingClientRect()
@@ -182,6 +225,8 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
     if (role) semantic.role = role
     const al = el.getAttribute('aria-label')
     if (al) semantic.ariaLabel = al
+    const valueText = controlValueText(el)
+    if (valueText) semantic.valueText = valueText
     const h = el as HTMLElement
     if (h instanceof HTMLInputElement && h.disabled) semantic.ariaDisabled = true
     if (h instanceof HTMLButtonElement && h.disabled) semantic.ariaDisabled = true

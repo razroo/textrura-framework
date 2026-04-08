@@ -39,6 +39,10 @@ interface VersionedMessage {
   protocolVersion?: number
 }
 
+interface CorrelatedMessage {
+  requestId?: string
+}
+
 /**
  * Arbitrary JSON-serializable payload on the same WebSocket as layout frames.
  * Use namespaced `channel` strings (e.g. `geom.tracker.snapshot`) so clients and headless agents
@@ -56,7 +60,8 @@ export type ServerDataMessage = VersionedMessage & {
 export type ServerMessage =
   | (VersionedMessage & { type: 'frame'; layout: ComputedLayout; tree: UIElement })
   | (VersionedMessage & { type: 'patch'; patches: LayoutPatch[] })
-  | (VersionedMessage & { type: 'error'; message: string; code?: number })
+  | (VersionedMessage & CorrelatedMessage & { type: 'ack' })
+  | (VersionedMessage & CorrelatedMessage & { type: 'error'; message: string; code?: number })
   | ServerDataMessage
 
 /**
@@ -65,8 +70,8 @@ export type ServerMessage =
  * coordinates are null (e.g. JSON-serialized `NaN`), strings, or otherwise non-finite.
  */
 export type ClientMessage =
-  | (VersionedMessage & { type: 'event'; eventType: string; x: number; y: number })
-  | (VersionedMessage & {
+  | (VersionedMessage & CorrelatedMessage & { type: 'event'; eventType: string; x: number; y: number })
+  | (VersionedMessage & CorrelatedMessage & {
       type: 'key'
       eventType: 'onKeyDown' | 'onKeyUp'
       key: string
@@ -76,12 +81,12 @@ export type ClientMessage =
       metaKey: boolean
       altKey: boolean
     })
-  | (VersionedMessage & {
+  | (VersionedMessage & CorrelatedMessage & {
       type: 'composition'
       eventType: 'onCompositionStart' | 'onCompositionUpdate' | 'onCompositionEnd'
       data: string
     })
-  | (VersionedMessage & {
+  | (VersionedMessage & CorrelatedMessage & {
       type: 'resize'
       width: number
       height: number
@@ -96,7 +101,7 @@ export type ClientMessage =
    * With `x`/`y`, the proxy clicks first to trigger a native file chooser; without them,
    * it attaches to the first `input[type=file]` in any frame.
    */
-  | (VersionedMessage & {
+  | (VersionedMessage & CorrelatedMessage & {
       type: 'file'
       paths: string[]
       x?: number
@@ -108,7 +113,7 @@ export type ClientMessage =
   /**
    * Choose an option on a native `<select>` after focusing it (click `x`,`y` on the control).
    */
-  | (VersionedMessage & {
+  | (VersionedMessage & CorrelatedMessage & {
       type: 'selectOption'
       x: number
       y: number
@@ -119,7 +124,7 @@ export type ClientMessage =
   /**
    * Set a checkbox/radio by accessible label. Implemented by `@geometra/proxy`.
    */
-  | (VersionedMessage & {
+  | (VersionedMessage & CorrelatedMessage & {
       type: 'setChecked'
       label: string
       checked?: boolean
@@ -130,7 +135,7 @@ export type ClientMessage =
    * Custom dropdown / listbox / searchable combobox. Implemented by `@geometra/proxy`.
    * Can optionally open a control by field label and type a search query before picking.
    */
-  | (VersionedMessage & {
+  | (VersionedMessage & CorrelatedMessage & {
       type: 'listboxPick'
       label: string
       exact?: boolean
@@ -140,7 +145,7 @@ export type ClientMessage =
       query?: string
     })
   /** Mouse wheel / scroll delta at optional viewport coordinates. */
-  | (VersionedMessage & {
+  | (VersionedMessage & CorrelatedMessage & {
       type: 'wheel'
       deltaX?: number
       deltaY?: number

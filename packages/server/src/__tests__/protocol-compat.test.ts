@@ -88,4 +88,89 @@ describe('protocol compatibility', () => {
       server.close()
     })
   })
+
+  it('sends request-scoped ack for handled no-op actions', async () => {
+    const port = pickPort()
+    const server = await createServer(
+      () => box({ width: 40, height: 20, onClick: () => undefined }, []),
+      { port, width: 200, height: 100 },
+    )
+
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}`)
+      let sentClick = false
+      const timeout = setTimeout(() => reject(new Error('timed out waiting for request-scoped ack')), 5000)
+
+      ws.on('message', (raw) => {
+        const msg = JSON.parse(String(raw)) as { type: string; requestId?: string; message?: string }
+        if (msg.type === 'frame' && !sentClick) {
+          ws.send(JSON.stringify({
+            type: 'event',
+            eventType: 'onClick',
+            x: 10,
+            y: 10,
+            requestId: 'req-click',
+          }))
+          sentClick = true
+          return
+        }
+        if (msg.type === 'ack') {
+          clearTimeout(timeout)
+          expect(msg.requestId).toBe('req-click')
+          ws.close()
+          resolve()
+          return
+        }
+        if (msg.type === 'error') {
+          clearTimeout(timeout)
+          reject(new Error(`unexpected error: ${msg.message ?? 'unknown'}`))
+        }
+      })
+
+      ws.on('error', (err) => {
+        clearTimeout(timeout)
+        reject(err)
+      })
+    }).finally(() => {
+      server.close()
+    })
+  })
+
+  it('echoes requestId on proxy-only message errors', async () => {
+    const port = pickPort()
+    const server = await createServer(
+      () => box({ width: 40, height: 20 }, []),
+      { port, width: 200, height: 100 },
+    )
+
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}`)
+      const timeout = setTimeout(() => reject(new Error('timed out waiting for unsupported-message error')), 5000)
+
+      ws.on('open', () => {
+        ws.send(JSON.stringify({
+          type: 'wheel',
+          deltaY: 120,
+          requestId: 'req-wheel',
+        }))
+      })
+
+      ws.on('message', (raw) => {
+        const msg = JSON.parse(String(raw)) as { type: string; requestId?: string; message?: string }
+        if (msg.type !== 'error') return
+        clearTimeout(timeout)
+        expect(msg.requestId).toBe('req-wheel')
+        expect(msg.message).toContain('not supported on the native Textura server')
+        ws.close()
+        resolve()
+      })
+
+      ws.on('error', (err) => {
+        clearTimeout(timeout)
+        reject(err)
+      })
+    }).finally(() => {
+      server.close()
+    })
+  })
 })

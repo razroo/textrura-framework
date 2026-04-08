@@ -137,6 +137,12 @@ function clientPointerXYAreFinite(x: unknown, y: unknown): boolean {
   return typeof x === 'number' && Number.isFinite(x) && typeof y === 'number' && Number.isFinite(y)
 }
 
+function messageRequestId(message: ClientMessage): string | undefined {
+  return typeof (message as { requestId?: unknown }).requestId === 'string'
+    ? (message as { requestId: string }).requestId
+    : undefined
+}
+
 /**
  * Create a Textura server that computes layout and streams geometry to clients.
  *
@@ -170,7 +176,7 @@ export async function createServer(
   const backpressureBytes = Math.max(1024, options.backpressureBytes ?? 512 * 1024)
   const layoutDirectionOption = options.layoutDirection
 
-  function computeAndBroadcast(): void {
+  function computeAndBroadcast(): boolean {
     try {
       currentTree = view()
       const serializedTree = JSON.stringify(currentTree)
@@ -185,7 +191,7 @@ export async function createServer(
         const rawPatches = diffLayout(prevLayout, layout)
         const patches = coalescePatches(rawPatches)
         coalescedPatchDelta = Math.max(0, rawPatches.length - patches.length)
-        if (patches.length === 0) return
+        if (patches.length === 0) return true
         // Patch streams are only safe when the render tree is byte-for-byte stable.
         if (patches.length > 20) {
           msg = { type: 'frame', layout, tree: currentTree, protocolVersion: PROTOCOL_VERSION }
@@ -226,6 +232,7 @@ export async function createServer(
         coalescedPatchDelta,
         binaryOutboundFrames,
       })
+      return true
     } catch (err) {
       if (options.onError) {
         options.onError(err)
@@ -240,6 +247,7 @@ export async function createServer(
           client.send(data)
         }
       }
+      return false
     }
   }
 
@@ -289,40 +297,59 @@ export async function createServer(
     ws.on('message', (raw) => {
       try {
         const msg = JSON.parse(String(raw)) as ClientMessage
-        if (!isProtocolCompatible(msg.protocolVersion, PROTOCOL_VERSION)) {
+        const requestId = messageRequestId(msg)
+        const sendAck = () => {
+          if (!requestId) return
+          const ack: ServerMessage = {
+            type: 'ack',
+            requestId,
+            protocolVersion: PROTOCOL_VERSION,
+          }
+          ws.send(JSON.stringify(ack))
+        }
+        const sendError = (message: string, code?: number) => {
           const errorMsg: ServerMessage = {
             type: 'error',
-            message: `Client protocol ${msg.protocolVersion} is newer than server protocol ${PROTOCOL_VERSION}`,
+            message,
+            ...(code !== undefined ? { code } : {}),
+            ...(requestId ? { requestId } : {}),
             protocolVersion: PROTOCOL_VERSION,
           }
           ws.send(JSON.stringify(errorMsg))
+        }
+        if (!isProtocolCompatible(msg.protocolVersion, PROTOCOL_VERSION)) {
+          sendError(`Client protocol ${msg.protocolVersion} is newer than server protocol ${PROTOCOL_VERSION}`)
           return
         }
         if (options.onMessage) {
           const ctx = contexts.get(ws)
           if (!options.onMessage(msg, ctx)) {
-            const errorMsg: ServerMessage = {
-              type: 'error',
-              message: 'Forbidden',
-              code: CLOSE_FORBIDDEN,
-              protocolVersion: PROTOCOL_VERSION,
-            }
-            ws.send(JSON.stringify(errorMsg))
+            sendError('Forbidden', CLOSE_FORBIDDEN)
             return
           }
         }
-        if (msg.type === 'event' && currentTree && prevLayout) {
-          if (clientPointerXYAreFinite(msg.x, msg.y)) {
-            dispatchHit(
-              currentTree,
-              prevLayout,
-              msg.eventType as keyof EventHandlers,
-              msg.x,
-              msg.y,
-            )
-            computeAndBroadcast()
+        if (msg.type === 'event') {
+          if (!currentTree || !prevLayout) {
+            sendError('Cannot dispatch pointer events before the initial layout is ready')
+            return
           }
-        } else if (msg.type === 'key' && currentTree && prevLayout) {
+          if (!clientPointerXYAreFinite(msg.x, msg.y)) {
+            sendError('Pointer event coordinates must be finite numbers')
+            return
+          }
+          dispatchHit(
+            currentTree,
+            prevLayout,
+            msg.eventType as keyof EventHandlers,
+            msg.x,
+            msg.y,
+          )
+          if (computeAndBroadcast()) sendAck()
+        } else if (msg.type === 'key') {
+          if (!currentTree || !prevLayout) {
+            sendError('Cannot dispatch keyboard events before the initial layout is ready')
+            return
+          }
           dispatchKeyboardEvent(currentTree, prevLayout, msg.eventType, {
             key: msg.key,
             code: msg.code,
@@ -331,12 +358,16 @@ export async function createServer(
             metaKey: msg.metaKey,
             altKey: msg.altKey,
           })
-          computeAndBroadcast()
-        } else if (msg.type === 'composition' && currentTree && prevLayout) {
+          if (computeAndBroadcast()) sendAck()
+        } else if (msg.type === 'composition') {
+          if (!currentTree || !prevLayout) {
+            sendError('Cannot dispatch composition events before the initial layout is ready')
+            return
+          }
           dispatchCompositionEvent(currentTree, prevLayout, msg.eventType, {
             data: msg.data,
           })
-          computeAndBroadcast()
+          if (computeAndBroadcast()) sendAck()
         } else if (msg.type === 'resize') {
           if (msg.capabilities?.binaryFraming) {
             clientBinaryFraming.set(ws, true)
@@ -346,7 +377,7 @@ export async function createServer(
             height = Math.max(1, msg.height)
           }
           prevLayout = null
-          computeAndBroadcast()
+          if (computeAndBroadcast()) sendAck()
         } else if (
           msg.type === 'file' ||
           msg.type === 'selectOption' ||
@@ -354,12 +385,11 @@ export async function createServer(
           msg.type === 'listboxPick' ||
           msg.type === 'wheel'
         ) {
-          const errorMsg: ServerMessage = {
-            type: 'error',
-            message: `Client message type "${msg.type}" is not supported on the native Textura server (DOM-free layout). Use @geometra/proxy for DOM automation (files, listbox, select, checkbox/radio controls, wheel).`,
-            protocolVersion: PROTOCOL_VERSION,
-          }
-          ws.send(JSON.stringify(errorMsg))
+          sendError(
+            `Client message type "${msg.type}" is not supported on the native Textura server (DOM-free layout). Use @geometra/proxy for DOM automation (files, listbox, select, checkbox/radio controls, wheel).`,
+          )
+        } else {
+          sendError(`Unsupported client message type "${String((msg as { type?: unknown }).type ?? 'unknown')}"`)
         }
       } catch {
         // Ignore malformed messages

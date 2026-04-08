@@ -3,7 +3,7 @@ import baseConfig from './vitest.config'
 
 export default mergeConfig(baseConfig, defineConfig({
   test: {
-    include: ['packages/*/src/__tests__/**/*.test.ts'],
+    include: ['packages/*/src/__tests__/**/*.test.ts', 'mcp/src/__tests__/**/*.test.ts'],
     exclude: [
       'packages/core/src/__tests__/fonts.test.ts',
       'packages/core/src/__tests__/perf-smoke.test.ts',

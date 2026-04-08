@@ -16,6 +16,7 @@ function node(
   options?: {
     path?: number[]
     focusable?: boolean
+    value?: string
     state?: A11yNode['state']
     meta?: A11yNode['meta']
     children?: A11yNode[]
@@ -24,6 +25,7 @@ function node(
   return {
     role,
     ...(name ? { name } : {}),
+    ...(options?.value ? { value: options.value } : {}),
     ...(options?.state ? { state: options.state } : {}),
     ...(options?.meta ? { meta: options.meta } : {}),
     bounds,
@@ -107,8 +109,14 @@ describe('buildPageModel', () => {
               path: [0, 0],
               children: [
                 node('heading', 'Application', { x: 60, y: 132, width: 200, height: 24 }, { path: [0, 0, 0] }),
-                node('textbox', 'Full name*', { x: 60, y: 160, width: 300, height: 36 }, { path: [0, 0, 1] }),
-                node('textbox', 'Email:', { x: 60, y: 208, width: 300, height: 36 }, { path: [0, 0, 2] }),
+                node('textbox', 'Full name*', { x: 60, y: 160, width: 300, height: 36 }, {
+                  path: [0, 0, 1],
+                  value: 'Taylor Applicant',
+                }),
+                node('textbox', 'Email:', { x: 60, y: 208, width: 300, height: 36 }, {
+                  path: [0, 0, 2],
+                  value: 'taylor@example.com',
+                }),
                 node('button', 'Submit application', { x: 60, y: 264, width: 180, height: 40 }, {
                   path: [0, 0, 3],
                   focusable: true,
@@ -134,6 +142,7 @@ describe('buildPageModel', () => {
       },
     })
     expect(detail?.fields.map(field => field.name)).toEqual(['Full name', 'Email'])
+    expect(detail?.fields.map(field => field.value)).toEqual(['Taylor Applicant', 'taylor@example.com'])
     expect(detail?.actions.map(action => action.id)).toEqual(['n:0.0.3'])
     expect(detail?.fields[0]).not.toHaveProperty('bounds')
   })
@@ -331,5 +340,44 @@ describe('buildUiDelta', () => {
     expect(summary).toContain('~ viewport scroll (0,120) -> (0,420)')
     expect(summary).toContain('~ focus n:1.0 textbox "Full name" -> n:1.1 textbox "Country"')
     expect(summary).toContain('~ navigation "https://jobs.example.com/apply" -> "https://jobs.example.com/apply?step=details"')
+  })
+
+  it('includes control values in compact indexes and semantic deltas', () => {
+    const before = node('group', undefined, { x: 0, y: 0, width: 640, height: 480 }, {
+      children: [
+        node('textbox', 'Location', { x: 20, y: 40, width: 280, height: 36 }, {
+          path: [0],
+          focusable: true,
+          value: 'Austin',
+        }),
+      ],
+    })
+
+    const after = node('group', undefined, { x: 0, y: 0, width: 640, height: 480 }, {
+      children: [
+        node('textbox', 'Location', { x: 20, y: 40, width: 280, height: 36 }, {
+          path: [0],
+          focusable: true,
+          value: 'Austin, Texas, United States',
+        }),
+      ],
+    })
+
+    const compact = buildCompactUiIndex(after, { maxNodes: 10 })
+    expect(compact.nodes[0]).toMatchObject({
+      role: 'textbox',
+      name: 'Location',
+      value: 'Austin, Texas, United States',
+    })
+
+    const delta = buildUiDelta(before, after)
+    expect(delta.updated).toEqual([
+      expect.objectContaining({
+        changes: [
+          'value "Austin" -> "Austin, Texas, United States"',
+        ],
+      }),
+    ])
+    expect(summarizeUiDelta(delta)).toContain('value "Austin" -> "Austin, Texas, United States"')
   })
 })

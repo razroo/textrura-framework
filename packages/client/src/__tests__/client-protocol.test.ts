@@ -391,7 +391,7 @@ describe('applyServerMessage', () => {
     expect(state.layout!.children[0]!.width).toBe(10)
   })
 
-  it('when a path segment is missing, applies geometry fields to the last resolved node (often root)', () => {
+  it('ignores patches when a path segment is missing', () => {
     const { renderer } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
     applyServerMessage(state, renderer, {
@@ -407,11 +407,11 @@ describe('applyServerMessage', () => {
       protocolVersion: 1,
     })
 
-    expect(state.layout!.x).toBe(7)
-    expect(state.layout!.width).toBe(200)
+    expect(state.layout!.x).toBe(0)
+    expect(state.layout!.width).toBe(100)
   })
 
-  it('when an intermediate path exists but a deeper segment is missing, applies to the deepest resolved node', () => {
+  it('ignores patches when an intermediate path exists but a deeper segment is missing', () => {
     const { renderer } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
     const deepLayout = {
@@ -436,8 +436,8 @@ describe('applyServerMessage', () => {
     })
 
     expect(state.layout!.x).toBe(0)
-    expect(state.layout!.children[0]!.x).toBe(99)
-    expect(state.layout!.children[0]!.width).toBe(55)
+    expect(state.layout!.children[0]!.x).toBe(1)
+    expect(state.layout!.children[0]!.width).toBe(10)
   })
 
   it('handles duplicate frames idempotently and applies duplicate patches deterministically', () => {

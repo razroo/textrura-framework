@@ -39,6 +39,12 @@ interface ServerPatch {
   protocolVersion?: number
 }
 
+interface ServerAck {
+  type: 'ack'
+  requestId?: string
+  protocolVersion?: number
+}
+
 interface ServerError {
   type: 'error'
   message: string
@@ -52,7 +58,7 @@ interface ServerData {
   protocolVersion?: number
 }
 
-type ServerMessage = ServerFrame | ServerPatch | ServerError | ServerData
+type ServerMessage = ServerFrame | ServerPatch | ServerAck | ServerError | ServerData
 
 /**
  * JSON-serializable plain data (no Date, Map, undefined in objects, etc.).
@@ -149,6 +155,9 @@ function isWellFormedGeomV1Message(msg: Record<string, unknown>): boolean {
   if (t === 'patch') {
     return isWellFormedPatchList(msg.patches)
   }
+  if (t === 'ack') {
+    return msg.requestId === undefined || typeof msg.requestId === 'string'
+  }
   if (t === 'error') {
     return typeof msg.message === 'string'
   }
@@ -174,7 +183,7 @@ export interface ServerMessageDecodeMeta {
 
 /** Per-message frame budget: decode, state apply, and renderer work (see {@link TexturaClientOptions.onFrameMetrics}). */
 export interface ClientFrameMetrics {
-  /** Server message discriminant (`frame`, `patch`, `error`, or `data`). */
+  /** Server message discriminant (`frame`, `patch`, `ack`, `error`, or `data`). */
   messageType: ServerMessage['type']
   /** Same as {@link ServerMessageDecodeMeta.decodeMs} for this message. */
   decodeMs: number
@@ -247,11 +256,16 @@ export interface TexturaClient {
 function applyPatches(layout: ComputedLayout, patches: ServerPatch['patches']): void {
   for (const patch of patches) {
     let node = layout
+    let validPath = true
     for (const idx of patch.path) {
       const child = node.children[idx]
-      if (!child) break
+      if (!child) {
+        validPath = false
+        break
+      }
       node = child
     }
+    if (!validPath) continue
     if (patch.x !== undefined) node.x = patch.x
     if (patch.y !== undefined) node.y = patch.y
     if (patch.width !== undefined) node.width = patch.width
@@ -343,7 +357,7 @@ export function applyServerMessage(
     const t = record.type
     onError?.(
       new Error(
-        `Invalid server message: expected type frame, patch, error, or data (channel+JSON payload); got ${String(t)}`,
+        `Invalid server message: expected type frame, patch, ack, error, or data (channel+JSON payload); got ${String(t)}`,
       ),
     )
     return
@@ -369,6 +383,8 @@ export function applyServerMessage(
     renderer.render(state.layout, state.tree)
     renderMs = performance.now() - renderStart
     didRender = true
+  } else if (msg.type === 'ack') {
+    /* request-scoped acknowledgement; no render */
   } else if (msg.type === 'error') {
     onError?.(new Error(msg.message))
   } else if (msg.type === 'data') {

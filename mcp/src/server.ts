@@ -24,12 +24,35 @@ import {
   summarizeCompactIndex,
   summarizePageModel,
   summarizeUiDelta,
+  waitForUiCondition,
 } from './session.js'
 import type { A11yNode, Session, UpdateWaitResult } from './session.js'
 
+type NodeStateFilterValue = boolean | 'mixed'
+
+interface NodeFilter {
+  id?: string
+  role?: string
+  name?: string
+  text?: string
+  value?: string
+  checked?: NodeStateFilterValue
+  disabled?: boolean
+  focused?: boolean
+  selected?: boolean
+  expanded?: boolean
+}
+
+function checkedStateInput() {
+  return z
+    .union([z.boolean(), z.literal('mixed')])
+    .optional()
+    .describe('Match checked state (`true`, `false`, or `mixed`)')
+}
+
 export function createServer(): McpServer {
   const server = new McpServer(
-    { name: 'geometra', version: '1.19.8' },
+    { name: 'geometra', version: '1.19.9' },
     { capabilities: { tools: {} } },
   )
 
@@ -111,7 +134,7 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
   // ── query ────────────────────────────────────────────────────
   server.tool(
     'geometra_query',
-    `Find elements in the current Geometra UI by stable id, role, name, or text content. Returns matching elements with their exact pixel bounds {x, y, width, height}, visible in-viewport bounds, an on-screen center point, visibility / scroll-reveal hints, role, name, and tree path.
+    `Find elements in the current Geometra UI by stable id, role, name, text content, current value, or semantic state. Returns matching elements with their exact pixel bounds {x, y, width, height}, visible in-viewport bounds, an on-screen center point, visibility / scroll-reveal hints, role, name, value, state, and tree path.
 
 This is the Geometra equivalent of Playwright's locator — but instant, structured, and with no browser. Use the returned bounds to click elements or assert on layout.`,
     {
@@ -119,19 +142,88 @@ This is the Geometra equivalent of Playwright's locator — but instant, structu
       role: z.string().optional().describe('ARIA role to match (e.g. "button", "textbox", "text", "heading", "listitem")'),
       name: z.string().optional().describe('Accessible name to match (exact or substring)'),
       text: z.string().optional().describe('Text content to search for (substring match)'),
+      value: z.string().optional().describe('Displayed / current field value to match (substring match)'),
+      checked: checkedStateInput(),
+      disabled: z.boolean().optional().describe('Match disabled state'),
+      focused: z.boolean().optional().describe('Match focused state'),
+      selected: z.boolean().optional().describe('Match selected state'),
+      expanded: z.boolean().optional().describe('Match expanded state'),
     },
-    async ({ id, role, name, text }) => {
+    async ({ id, role, name, text, value, checked, disabled, focused, selected, expanded }) => {
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
 
       const a11y = buildA11yTree(session.tree, session.layout)
-      const matches = findNodes(a11y, { id, role, name, text })
+      const filter: NodeFilter = { id, role, name, text, value, checked, disabled, focused, selected, expanded }
+      if (!hasNodeFilter(filter)) return err('Provide at least one query filter (id, role, name, text, value, or state)')
+      const matches = findNodes(a11y, filter)
 
       if (matches.length === 0) {
-        return ok(`No elements found matching ${JSON.stringify({ id, role, name, text })}`)
+        return ok(`No elements found matching ${JSON.stringify(filter)}`)
       }
 
       const result = matches.map(node => formatNode(node, a11y.bounds))
+      return ok(JSON.stringify(result, null, 2))
+    }
+  )
+
+  server.tool(
+    'geometra_wait_for',
+    `Wait for a semantic UI condition without guessing sleep durations. Use this for slow SPA transitions, resume parsing, custom validation alerts, disabled submit buttons, and value/state confirmation before submit.
+
+The filter matches the same fields as geometra_query. Set \`present: false\` to wait for something to disappear (for example an alert or a "Parsing…" status).`,
+    {
+      id: z.string().optional().describe('Stable node id from geometra_snapshot or geometra_expand_section'),
+      role: z.string().optional().describe('ARIA role to match'),
+      name: z.string().optional().describe('Accessible name to match (exact or substring)'),
+      text: z.string().optional().describe('Text content to search for (substring match)'),
+      value: z.string().optional().describe('Displayed / current field value to match (substring match)'),
+      checked: checkedStateInput(),
+      disabled: z.boolean().optional().describe('Match disabled state'),
+      focused: z.boolean().optional().describe('Match focused state'),
+      selected: z.boolean().optional().describe('Match selected state'),
+      expanded: z.boolean().optional().describe('Match expanded state'),
+      present: z.boolean().optional().default(true).describe('Wait for a matching node to exist (default true) or disappear'),
+      timeoutMs: z
+        .number()
+        .int()
+        .min(50)
+        .max(60_000)
+        .optional()
+        .default(10_000)
+        .describe('Maximum time to wait before returning an error (default 10000ms)'),
+    },
+    async ({ id, role, name, text, value, checked, disabled, focused, selected, expanded, present, timeoutMs }) => {
+      const session = getSession()
+      if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
+
+      const filter: NodeFilter = { id, role, name, text, value, checked, disabled, focused, selected, expanded }
+      if (!hasNodeFilter(filter)) return err('Provide at least one wait filter (id, role, name, text, value, or state)')
+
+      const matchesCondition = () => {
+        if (!session.tree || !session.layout) return false
+        const a11y = buildA11yTree(session.tree, session.layout)
+        const matches = findNodes(a11y, filter)
+        return present ? matches.length > 0 : matches.length === 0
+      }
+
+      const startedAt = Date.now()
+      const matched = await waitForUiCondition(session, matchesCondition, timeoutMs)
+      const elapsedMs = Date.now() - startedAt
+      if (!matched) {
+        return err(
+          `Timed out after ${timeoutMs}ms waiting for ${present ? 'presence' : 'absence'} of ${JSON.stringify(filter)}.\nCurrent UI:\n${compactSessionSummary(session)}`,
+        )
+      }
+
+      if (!present) {
+        return ok(`Condition satisfied after ${elapsedMs}ms: no nodes matched ${JSON.stringify(filter)}.`)
+      }
+
+      const after = sessionA11y(session)
+      if (!after) return ok(`Condition satisfied after ${elapsedMs}ms for ${JSON.stringify(filter)}.`)
+      const matches = findNodes(after, filter)
+      const result = matches.slice(0, 8).map(node => formatNode(node, after.bounds))
       return ok(JSON.stringify(result, null, 2))
     }
   )
@@ -213,13 +305,20 @@ After clicking, returns a compact semantic delta when possible (dialogs/forms/li
     {
       x: z.number().describe('X coordinate to click (use center of element bounds from geometra_query)'),
       y: z.number().describe('Y coordinate to click'),
+      timeoutMs: z
+        .number()
+        .int()
+        .min(50)
+        .max(60_000)
+        .optional()
+        .describe('Optional action wait timeout (use a longer value for slow submits or route transitions)'),
     },
-    async ({ x, y }) => {
+    async ({ x, y, timeoutMs }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
 
-      const wait = await sendClick(session, x, y)
+      const wait = await sendClick(session, x, y, timeoutMs)
 
       const summary = postActionSummary(session, before, wait)
       return ok(`Clicked at (${x}, ${y}).\n${summary}`)
@@ -234,13 +333,20 @@ After clicking, returns a compact semantic delta when possible (dialogs/forms/li
 Each character is sent as a key event through the geometry protocol. Returns a compact semantic delta when possible, otherwise a short current-UI overview.`,
     {
       text: z.string().describe('Text to type into the focused element'),
+      timeoutMs: z
+        .number()
+        .int()
+        .min(50)
+        .max(60_000)
+        .optional()
+        .describe('Optional action wait timeout'),
     },
-    async ({ text }) => {
+    async ({ text, timeoutMs }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
 
-      const wait = await sendType(session, text)
+      const wait = await sendType(session, text, timeoutMs)
 
       const summary = postActionSummary(session, before, wait)
       return ok(`Typed "${text}".\n${summary}`)
@@ -257,13 +363,20 @@ Each character is sent as a key event through the geometry protocol. Returns a c
       ctrl: z.boolean().optional().describe('Hold Ctrl'),
       meta: z.boolean().optional().describe('Hold Meta/Cmd'),
       alt: z.boolean().optional().describe('Hold Alt'),
+      timeoutMs: z
+        .number()
+        .int()
+        .min(50)
+        .max(60_000)
+        .optional()
+        .describe('Optional action wait timeout'),
     },
-    async ({ key, shift, ctrl, meta, alt }) => {
+    async ({ key, shift, ctrl, meta, alt, timeoutMs }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
 
-      const wait = await sendKey(session, key, { shift, ctrl, meta, alt })
+      const wait = await sendKey(session, key, { shift, ctrl, meta, alt }, timeoutMs)
 
       const summary = postActionSummary(session, before, wait)
       return ok(`Pressed ${formatKeyCombo(key, { shift, ctrl, meta, alt })}.\n${summary}`)
@@ -286,8 +399,15 @@ Strategies: **auto** (default) tries chooser click if x,y given, else hidden \`i
         .describe('Upload strategy (default auto)'),
       dropX: z.number().optional().describe('Drop target X (viewport) for strategy drop'),
       dropY: z.number().optional().describe('Drop target Y (viewport) for strategy drop'),
+      timeoutMs: z
+        .number()
+        .int()
+        .min(50)
+        .max(60_000)
+        .optional()
+        .describe('Optional action wait timeout (resume parsing / SPA upload flows often need longer than a normal click)'),
     },
-    async ({ paths, x, y, strategy, dropX, dropY }) => {
+    async ({ paths, x, y, strategy, dropX, dropY, timeoutMs }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
@@ -296,7 +416,7 @@ Strategies: **auto** (default) tries chooser click if x,y given, else hidden \`i
           click: x !== undefined && y !== undefined ? { x, y } : undefined,
           strategy,
           drop: dropX !== undefined && dropY !== undefined ? { x: dropX, y: dropY } : undefined,
-        })
+        }, timeoutMs ?? 8_000)
         const summary = postActionSummary(session, before, wait)
         return ok(`Uploaded ${paths.length} file(s).\n${summary}`)
       } catch (e) {
@@ -317,8 +437,15 @@ Pass \`fieldLabel\` to open a labeled dropdown semantically instead of relying o
       openY: z.number().optional().describe('Click to open dropdown'),
       fieldLabel: z.string().optional().describe('Field label of the dropdown/combobox to open semantically (e.g. "Location")'),
       query: z.string().optional().describe('Optional text to type into a searchable combobox before selecting'),
+      timeoutMs: z
+        .number()
+        .int()
+        .min(50)
+        .max(60_000)
+        .optional()
+        .describe('Optional action wait timeout for slow dropdowns / remote search results'),
     },
-    async ({ label, exact, openX, openY, fieldLabel, query }) => {
+    async ({ label, exact, openX, openY, fieldLabel, query, timeoutMs }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
@@ -328,9 +455,14 @@ Pass \`fieldLabel\` to open a labeled dropdown semantically instead of relying o
           open: openX !== undefined && openY !== undefined ? { x: openX, y: openY } : undefined,
           fieldLabel,
           query,
-        })
+        }, timeoutMs)
         const summary = postActionSummary(session, before, wait)
-        return ok(`Picked listbox option "${label}".\n${summary}`)
+        const fieldSummary = fieldLabel ? summarizeFieldLabelState(session, fieldLabel) : undefined
+        return ok([
+          `Picked listbox option "${label}".`,
+          fieldSummary,
+          summary,
+        ].filter(Boolean).join('\n'))
       } catch (e) {
         return err((e as Error).message)
       }
@@ -349,8 +481,15 @@ Custom React/Vue dropdowns are not supported — open them with geometra_click a
       value: z.string().optional().describe('Option value= attribute'),
       label: z.string().optional().describe('Visible option label (substring match)'),
       index: z.number().int().min(0).optional().describe('Zero-based option index'),
+      timeoutMs: z
+        .number()
+        .int()
+        .min(50)
+        .max(60_000)
+        .optional()
+        .describe('Optional action wait timeout'),
     },
-    async ({ x, y, value, label, index }) => {
+    async ({ x, y, value, label, index, timeoutMs }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       if (value === undefined && label === undefined && index === undefined) {
@@ -358,7 +497,7 @@ Custom React/Vue dropdowns are not supported — open them with geometra_click a
       }
       const before = sessionA11y(session)
       try {
-        const wait = await sendSelectOption(session, x, y, { value, label, index })
+        const wait = await sendSelectOption(session, x, y, { value, label, index }, timeoutMs)
         const summary = postActionSummary(session, before, wait)
         return ok(`Selected option.\n${summary}`)
       } catch (e) {
@@ -377,13 +516,20 @@ Prefer this over raw coordinate clicks for custom forms that keep the real input
       checked: z.boolean().optional().default(true).describe('Desired checked state (radios only support true)'),
       exact: z.boolean().optional().describe('Exact label match'),
       controlType: z.enum(['checkbox', 'radio']).optional().describe('Limit matching to checkbox or radio'),
+      timeoutMs: z
+        .number()
+        .int()
+        .min(50)
+        .max(60_000)
+        .optional()
+        .describe('Optional action wait timeout'),
     },
-    async ({ label, checked, exact, controlType }) => {
+    async ({ label, checked, exact, controlType, timeoutMs }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
       try {
-        const wait = await sendSetChecked(session, label, { checked, exact, controlType })
+        const wait = await sendSetChecked(session, label, { checked, exact, controlType }, timeoutMs)
         const summary = postActionSummary(session, before, wait)
         return ok(`Set ${controlType ?? 'checkbox/radio'} "${label}" to ${String(checked ?? true)}.\n${summary}`)
       } catch (e) {
@@ -401,13 +547,20 @@ Prefer this over raw coordinate clicks for custom forms that keep the real input
       deltaX: z.number().optional().describe('Horizontal scroll delta'),
       x: z.number().optional().describe('Move pointer to X before scrolling'),
       y: z.number().optional().describe('Move pointer to Y before scrolling'),
+      timeoutMs: z
+        .number()
+        .int()
+        .min(50)
+        .max(60_000)
+        .optional()
+        .describe('Optional action wait timeout'),
     },
-    async ({ deltaY, deltaX, x, y }) => {
+    async ({ deltaY, deltaX, x, y, timeoutMs }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
       try {
-        const wait = await sendWheel(session, deltaY, { deltaX, x, y })
+        const wait = await sendWheel(session, deltaY, { deltaX, x, y }, timeoutMs)
         const summary = postActionSummary(session, before, wait)
         return ok(`Wheel delta (${deltaX ?? 0}, ${deltaY}).\n${summary}`)
       } catch (e) {
@@ -511,7 +664,7 @@ function postActionSummary(session: Session, before: A11yNode | null, wait?: Upd
   const after = sessionA11y(session)
   const notes: string[] = []
   if (wait?.status === 'acknowledged') {
-    notes.push('Proxy acknowledged the action quickly; waiting logic did not need to rely on a full frame/patch round-trip.')
+    notes.push('The peer acknowledged the action quickly; waiting logic did not need to rely on a full frame/patch round-trip.')
   }
   if (wait?.status === 'timed_out') {
     notes.push(
@@ -549,21 +702,61 @@ function err(text: string) {
   return { content: [{ type: 'text' as const, text }], isError: true }
 }
 
-function findNodes(node: A11yNode, filter: { id?: string; role?: string; name?: string; text?: string }): A11yNode[] {
+function hasNodeFilter(filter: NodeFilter): boolean {
+  return Object.values(filter).some(value => value !== undefined)
+}
+
+function textMatches(haystack: string | undefined, needle: string | undefined): boolean {
+  if (!needle) return true
+  if (!haystack) return false
+  return haystack.toLowerCase().includes(needle.toLowerCase())
+}
+
+function nodeMatchesFilter(node: A11yNode, filter: NodeFilter): boolean {
+  if (filter.id && nodeIdForPath(node.path) !== filter.id) return false
+  if (filter.role && node.role !== filter.role) return false
+  if (!textMatches(node.name, filter.name)) return false
+  if (!textMatches(node.value, filter.value)) return false
+  if (filter.text && !textMatches(`${node.name ?? ''} ${node.value ?? ''}`.trim(), filter.text)) return false
+  if (filter.checked !== undefined && node.state?.checked !== filter.checked) return false
+  if (filter.disabled !== undefined && (node.state?.disabled ?? false) !== filter.disabled) return false
+  if (filter.focused !== undefined && (node.state?.focused ?? false) !== filter.focused) return false
+  if (filter.selected !== undefined && (node.state?.selected ?? false) !== filter.selected) return false
+  if (filter.expanded !== undefined && (node.state?.expanded ?? false) !== filter.expanded) return false
+  return true
+}
+
+export function findNodes(node: A11yNode, filter: NodeFilter): A11yNode[] {
   const matches: A11yNode[] = []
 
   function walk(n: A11yNode) {
-    let match = true
-    if (filter.id && nodeIdForPath(n.path) !== filter.id) match = false
-    if (filter.role && n.role !== filter.role) match = false
-    if (filter.name && (!n.name || !n.name.includes(filter.name))) match = false
-    if (filter.text && (!n.name || !n.name.includes(filter.text))) match = false
-    if (match && (filter.id || filter.role || filter.name || filter.text)) matches.push(n)
+    if (nodeMatchesFilter(n, filter) && hasNodeFilter(filter)) matches.push(n)
     for (const child of n.children) walk(child)
   }
 
   walk(node)
   return matches
+}
+
+function summarizeFieldLabelState(session: Session, fieldLabel: string): string | undefined {
+  const a11y = sessionA11y(session)
+  if (!a11y) return undefined
+  const matches = findNodes(a11y, {
+    name: fieldLabel,
+    role: 'combobox',
+  })
+  if (matches.length === 0) {
+    matches.push(...findNodes(a11y, { name: fieldLabel, role: 'textbox' }))
+  }
+  if (matches.length === 0) {
+    matches.push(...findNodes(a11y, { name: fieldLabel, role: 'button' }))
+  }
+  const match = matches[0]
+  if (!match) return undefined
+  const parts = [`Field "${fieldLabel}"`]
+  if (match.value) parts.push(`value=${JSON.stringify(match.value)}`)
+  if (match.state && Object.keys(match.state).length > 0) parts.push(`state=${JSON.stringify(match.state)}`)
+  return parts.join(' ')
 }
 
 function formatNode(
@@ -592,6 +785,7 @@ function formatNode(
     id: nodeIdForPath(node.path),
     role: node.role,
     name: node.name,
+    ...(node.value ? { value: node.value } : {}),
     bounds: node.bounds,
     visibleBounds: {
       x: visibleLeft,

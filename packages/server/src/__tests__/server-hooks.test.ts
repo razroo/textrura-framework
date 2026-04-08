@@ -265,7 +265,7 @@ describe('server message hooks', () => {
     expect(clickDispatched).toBe(false)
   })
 
-  it('ignores pointer events when x/y are not finite numbers (no layout broadcast; finite clicks still work)', async () => {
+  it('rejects invalid pointer coordinates without broadcasting layout, and finite clicks still work', async () => {
     const port = pickPort()
     /** Mutate props on click so serialized tree changes and the server always sends a follow-up frame. */
     const viewState = { bump: 0 }
@@ -293,7 +293,7 @@ describe('server message hooks', () => {
       let phase = 0
 
       ws.on('message', (raw) => {
-        const msg = JSON.parse(String(raw)) as { type: string }
+        const msg = JSON.parse(String(raw)) as { type: string; message?: string }
         messages.push(msg)
 
         if (phase === 0 && messages.length === 1 && msg.type === 'frame') {
@@ -308,7 +308,11 @@ describe('server message hooks', () => {
           )
           setTimeout(() => {
             try {
-              expect(messages.length).toBe(1)
+              expect(messages).toHaveLength(2)
+              expect(messages[1]).toMatchObject({
+                type: 'error',
+                message: 'Pointer event coordinates must be finite numbers',
+              })
             } catch (e) {
               clearTimeout(timeout)
               reject(e)
@@ -325,7 +329,7 @@ describe('server message hooks', () => {
           }, 100)
         }
 
-        if (phase === 1 && messages.length === 2) {
+        if (phase === 1 && messages.length === 3) {
           phase = 2
           ws.send(
             JSON.stringify({
@@ -337,7 +341,11 @@ describe('server message hooks', () => {
           )
           setTimeout(() => {
             try {
-              expect(messages.length).toBe(2)
+              expect(messages).toHaveLength(4)
+              expect(messages[3]).toMatchObject({
+                type: 'error',
+                message: 'Pointer event coordinates must be finite numbers',
+              })
             } catch (e) {
               clearTimeout(timeout)
               reject(e)
@@ -358,9 +366,11 @@ describe('server message hooks', () => {
       server.close()
     })
 
-    expect(messages).toHaveLength(2)
+    expect(messages).toHaveLength(4)
     expect(messages[0]!.type).toBe('frame')
-    expect(messages[1]!.type).toBe('frame')
+    expect(messages[1]!.type).toBe('error')
+    expect(messages[2]!.type).toBe('frame')
+    expect(messages[3]!.type).toBe('error')
   })
 
   it('works without any hooks (backward-compatible)', async () => {

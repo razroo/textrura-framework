@@ -10,6 +10,7 @@ import { spawnGeometraProxy } from './proxy-spawn.js'
 export interface A11yNode {
   role: string
   name?: string
+  value?: string
   state?: { disabled?: boolean; expanded?: boolean; selected?: boolean; checked?: boolean | 'mixed'; focused?: boolean }
   meta?: { pageUrl?: string; scrollX?: number; scrollY?: number }
   bounds: { x: number; y: number; width: number; height: number }
@@ -23,6 +24,7 @@ export interface CompactUiNode {
   id: string
   role: string
   name?: string
+  value?: string
   state?: A11yNode['state']
   pinned?: boolean
   bounds: { x: number; y: number; width: number; height: number }
@@ -106,6 +108,7 @@ export interface PageFieldModel {
   id: string
   role: string
   name?: string
+  value?: string
   state?: A11yNode['state']
   bounds?: { x: number; y: number; width: number; height: number }
 }
@@ -343,22 +346,67 @@ export function disconnect(): void {
   shutdownPreviousSession()
 }
 
+export function waitForUiCondition(
+  session: Session,
+  predicate: () => boolean,
+  timeoutMs: number,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const check = () => {
+      let matched = false
+      try {
+        matched = predicate()
+      } catch {
+        matched = false
+      }
+      if (matched) {
+        cleanup()
+        resolve(true)
+      }
+    }
+
+    const timeout = setTimeout(() => {
+      cleanup()
+      resolve(false)
+    }, timeoutMs)
+
+    const onMessage = () => {
+      check()
+    }
+
+    const onClose = () => {
+      cleanup()
+      resolve(false)
+    }
+
+    function cleanup() {
+      clearTimeout(timeout)
+      session.ws.off('message', onMessage)
+      session.ws.off('close', onClose)
+    }
+
+    session.ws.on('message', onMessage)
+    session.ws.on('close', onClose)
+    check()
+  })
+}
+
 /**
  * Send a click event at (x, y) and wait for the next frame/patch response.
  */
-export function sendClick(session: Session, x: number, y: number): Promise<UpdateWaitResult> {
+export function sendClick(session: Session, x: number, y: number, timeoutMs?: number): Promise<UpdateWaitResult> {
   return sendAndWaitForUpdate(session, {
     type: 'event',
     eventType: 'onClick',
     x,
     y,
-  })
+  }, timeoutMs)
 }
 
 /**
  * Send a sequence of key events to type text into the focused element.
  */
-export function sendType(session: Session, text: string): Promise<UpdateWaitResult> {
+export function sendType(session: Session, text: string, timeoutMs?: number): Promise<UpdateWaitResult> {
   return new Promise((resolve, reject) => {
     if (session.ws.readyState !== WebSocket.OPEN) {
       reject(new Error('Not connected'))
@@ -382,7 +430,7 @@ export function sendType(session: Session, text: string): Promise<UpdateWaitResu
     }
 
     // Wait briefly for server to process and send update
-    waitForNextUpdate(session).then(resolve).catch(reject)
+    waitForNextUpdate(session, timeoutMs).then(resolve).catch(reject)
   })
 }
 
@@ -393,6 +441,7 @@ export function sendKey(
   session: Session,
   key: string,
   modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; alt?: boolean },
+  timeoutMs?: number,
 ): Promise<UpdateWaitResult> {
   return sendAndWaitForUpdate(session, {
     type: 'key',
@@ -403,7 +452,7 @@ export function sendKey(
     ctrlKey: modifiers?.ctrl ?? false,
     metaKey: modifiers?.meta ?? false,
     altKey: modifiers?.alt ?? false,
-  })
+  }, timeoutMs)
 }
 
 /**
@@ -418,6 +467,7 @@ export function sendFileUpload(
     strategy?: 'auto' | 'chooser' | 'hidden' | 'drop'
     drop?: { x: number; y: number }
   },
+  timeoutMs?: number,
 ): Promise<UpdateWaitResult> {
   const payload: Record<string, unknown> = { type: 'file', paths }
   if (opts?.click) {
@@ -429,7 +479,7 @@ export function sendFileUpload(
     payload.dropX = opts.drop.x
     payload.dropY = opts.drop.y
   }
-  return sendAndWaitForUpdate(session, payload)
+  return sendAndWaitForUpdate(session, payload, timeoutMs)
 }
 
 /** ARIA `role=option` listbox (e.g. React Select). Optional click opens the list. */
@@ -437,6 +487,7 @@ export function sendListboxPick(
   session: Session,
   label: string,
   opts?: { exact?: boolean; open?: { x: number; y: number }; fieldLabel?: string; query?: string },
+  timeoutMs = LISTBOX_UPDATE_TIMEOUT_MS,
 ): Promise<UpdateWaitResult> {
   const payload: Record<string, unknown> = { type: 'listboxPick', label }
   if (opts?.exact !== undefined) payload.exact = opts.exact
@@ -446,7 +497,7 @@ export function sendListboxPick(
   }
   if (opts?.fieldLabel) payload.fieldLabel = opts.fieldLabel
   if (opts?.query) payload.query = opts.query
-  return sendAndWaitForUpdate(session, payload, LISTBOX_UPDATE_TIMEOUT_MS)
+  return sendAndWaitForUpdate(session, payload, timeoutMs)
 }
 
 /** Native `<select>` only: click the control center, then pick by value, label text, or zero-based index. */
@@ -455,13 +506,14 @@ export function sendSelectOption(
   x: number,
   y: number,
   option: { value?: string; label?: string; index?: number },
+  timeoutMs?: number,
 ): Promise<UpdateWaitResult> {
   return sendAndWaitForUpdate(session, {
     type: 'selectOption',
     x,
     y,
     ...option,
-  })
+  }, timeoutMs)
 }
 
 /** Set a checkbox/radio by label instead of relying on coordinate clicks. */
@@ -469,12 +521,13 @@ export function sendSetChecked(
   session: Session,
   label: string,
   opts?: { checked?: boolean; exact?: boolean; controlType?: 'checkbox' | 'radio' },
+  timeoutMs?: number,
 ): Promise<UpdateWaitResult> {
   const payload: Record<string, unknown> = { type: 'setChecked', label }
   if (opts?.checked !== undefined) payload.checked = opts.checked
   if (opts?.exact !== undefined) payload.exact = opts.exact
   if (opts?.controlType) payload.controlType = opts.controlType
-  return sendAndWaitForUpdate(session, payload)
+  return sendAndWaitForUpdate(session, payload, timeoutMs)
 }
 
 /** Mouse wheel / scroll. Optional `x`,`y` move pointer before scrolling. */
@@ -482,6 +535,7 @@ export function sendWheel(
   session: Session,
   deltaY: number,
   opts?: { deltaX?: number; x?: number; y?: number },
+  timeoutMs?: number,
 ): Promise<UpdateWaitResult> {
   return sendAndWaitForUpdate(session, {
     type: 'wheel',
@@ -489,7 +543,7 @@ export function sendWheel(
     deltaX: opts?.deltaX ?? 0,
     ...(opts?.x !== undefined ? { x: opts.x } : {}),
     ...(opts?.y !== undefined ? { y: opts.y } : {}),
-  })
+  }, timeoutMs)
 }
 
 /**
@@ -679,10 +733,12 @@ function intersectsViewportWithMargin(
 
 function compactNodeFromA11y(node: A11yNode, pinned = false): CompactUiNode {
   const name = sanitizeInlineName(node.name, 240)
+  const value = sanitizeInlineName(node.value, 180)
   return {
     id: nodeIdForPath(node.path),
     role: node.role,
     ...(name ? { name } : {}),
+    ...(value ? { value } : {}),
     ...(node.state && Object.keys(node.state).length > 0 ? { state: node.state } : {}),
     ...(pinned ? { pinned: true } : {}),
     bounds: { ...node.bounds },
@@ -788,11 +844,12 @@ export function summarizeCompactIndex(nodes: CompactUiNode[], maxLines = 80): st
   const slice = nodes.slice(0, maxLines)
   for (const n of slice) {
     const nm = n.name ? ` "${truncateUiText(n.name, 48)}"` : ''
+    const val = n.value ? ` value=${JSON.stringify(truncateUiText(n.value, 40))}` : ''
     const st = n.state && Object.keys(n.state).length ? ` ${JSON.stringify(n.state)}` : ''
     const foc = n.focusable ? ' *' : ''
     const pin = n.pinned ? ' [pinned]' : ''
     const b = n.bounds
-    lines.push(`${n.id} ${n.role}${nm}${pin} (${b.x},${b.y} ${b.width}x${b.height})${st}${foc}`)
+    lines.push(`${n.id} ${n.role}${nm}${pin}${val} (${b.x},${b.y} ${b.width}x${b.height})${st}${foc}`)
   }
   if (nodes.length > maxLines) {
     lines.push(`… and ${nodes.length - maxLines} more (use geometra_snapshot with a higher maxNodes or geometra_query)`)
@@ -937,10 +994,12 @@ function primaryAction(node: A11yNode): PagePrimaryAction {
 }
 
 function toFieldModel(node: A11yNode, includeBounds = true): PageFieldModel {
+  const value = sanitizeInlineName(node.value, 120)
   return {
     id: nodeIdForPath(node.path),
     role: node.role,
     ...(fieldLabel(node) ? { name: fieldLabel(node) } : {}),
+    ...(value ? { value } : {}),
     ...(cloneState(node.state) ? { state: cloneState(node.state) } : {}),
     ...(includeBounds ? { bounds: cloneBounds(node.bounds) } : {}),
   }
@@ -1254,7 +1313,11 @@ function pathKey(path: number[]): string {
 }
 
 function compactNodeLabel(node: CompactUiNode): string {
-  if (node.name) return `${node.id} ${node.role} "${truncateUiText(node.name, 40)}"`
+  if (node.name) {
+    const value = node.value ? ` value=${JSON.stringify(truncateUiText(node.value, 28))}` : ''
+    return `${node.id} ${node.role} "${truncateUiText(node.name, 40)}"${value}`
+  }
+  if (node.value) return `${node.id} ${node.role} value=${JSON.stringify(truncateUiText(node.value, 28))}`
   return `${node.id} ${node.role}`
 }
 
@@ -1268,6 +1331,9 @@ function diffCompactNodes(before: CompactUiNode, after: CompactUiNode): string[]
   if (before.role !== after.role) changes.push(`role ${before.role} -> ${after.role}`)
   if ((before.name ?? '') !== (after.name ?? '')) {
     changes.push(`name ${JSON.stringify(truncateUiText(before.name ?? 'unset', 32))} -> ${JSON.stringify(truncateUiText(after.name ?? 'unset', 32))}`)
+  }
+  if ((before.value ?? '') !== (after.value ?? '')) {
+    changes.push(`value ${JSON.stringify(truncateUiText(before.value ?? 'unset', 32))} -> ${JSON.stringify(truncateUiText(after.value ?? 'unset', 32))}`)
   }
 
   const beforeState = before.state ?? {}
@@ -1529,6 +1595,7 @@ function walkNode(element: Record<string, unknown>, layout: Record<string, unkno
 
   const role = inferRole(kind, semantic, handlers)
   const name = inferName(kind, semantic, props)
+  const value = inferValue(semantic, props)
   const focusable = !!(handlers?.onClick || handlers?.onKeyDown || handlers?.onKeyUp ||
     handlers?.onCompositionStart || handlers?.onCompositionUpdate || handlers?.onCompositionEnd)
 
@@ -1567,6 +1634,7 @@ function walkNode(element: Record<string, unknown>, layout: Record<string, unkno
   return {
     role,
     ...(name ? { name } : {}),
+    ...(value ? { value } : {}),
     ...(Object.keys(state).length > 0 ? { state } : {}),
     ...(Object.keys(meta).length > 0 ? { meta } : {}),
     bounds,
@@ -1608,14 +1676,27 @@ function inferName(kind: string | undefined, semantic: Record<string, unknown> |
   return semantic?.alt as string | undefined
 }
 
+function inferValue(
+  semantic: Record<string, unknown> | undefined,
+  props: Record<string, unknown> | undefined,
+): string | undefined {
+  const direct = semantic?.valueText ?? props?.value
+  return typeof direct === 'string' && direct.trim().length > 0 ? direct : undefined
+}
+
 function applyPatches(layout: Record<string, unknown>, patches: Array<{ path: number[]; x?: number; y?: number; width?: number; height?: number }>): void {
   for (const patch of patches) {
     let node = layout
+    let validPath = true
     for (const idx of patch.path) {
       const children = node.children as Record<string, unknown>[] | undefined
-      if (!children?.[idx]) break
+      if (!children?.[idx]) {
+        validPath = false
+        break
+      }
       node = children[idx]
     }
+    if (!validPath) continue
     if (patch.x !== undefined) node.x = patch.x
     if (patch.y !== undefined) node.y = patch.y
     if (patch.width !== undefined) node.width = patch.width
@@ -1653,7 +1734,7 @@ function waitForNextUpdate(
         const messageRequestId = typeof msg.requestId === 'string' ? msg.requestId : undefined
 
         if (requestId) {
-          if (msg.type === 'error' && messageRequestId === requestId) {
+          if (msg.type === 'error' && (messageRequestId === requestId || messageRequestId === undefined)) {
             cleanup()
             reject(new Error(typeof msg.message === 'string' ? msg.message : 'Geometra server error'))
             return
@@ -1689,6 +1770,10 @@ function waitForNextUpdate(
     // Expose timeout explicitly so action handlers can tell the user the result is ambiguous.
     const timeout = setTimeout(() => {
       cleanup()
+      if (requestId && session.updateRevision > startRevision) {
+        resolve({ status: 'updated', timeoutMs })
+        return
+      }
       resolve({ status: 'timed_out', timeoutMs })
     }, timeoutMs)
 
