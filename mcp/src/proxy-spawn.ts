@@ -2,12 +2,18 @@ import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { existsSync, realpathSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const require = createRequire(import.meta.url)
 const READY_SIGNAL_TYPE = 'geometra-proxy-ready'
 const READY_TIMEOUT_MS = 45_000
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url))
+
+export interface EmbeddedProxyRuntime {
+  wsUrl: string
+  closed: boolean
+  close: () => Promise<void>
+}
 
 /** Resolve bundled @geometra/proxy CLI entry (dist/index.js). */
 export function resolveProxyScriptPath(): string {
@@ -15,8 +21,20 @@ export function resolveProxyScriptPath(): string {
 }
 
 export function resolveProxyScriptPathWith(customRequire: NodeRequire, moduleDir = MODULE_DIR): string {
+  return resolveProxyDistPathWith(customRequire, moduleDir, 'index.js')
+}
+
+export function resolveProxyRuntimePath(): string {
+  return resolveProxyRuntimePathWith(require)
+}
+
+export function resolveProxyRuntimePathWith(customRequire: NodeRequire, moduleDir = MODULE_DIR): string {
+  return resolveProxyDistPathWith(customRequire, moduleDir, 'runtime.js')
+}
+
+function resolveProxyDistPathWith(customRequire: NodeRequire, moduleDir: string, entryFile: string): string {
   const errors: string[] = []
-  const workspaceDist = path.resolve(moduleDir, '../../packages/proxy/dist/index.js')
+  const workspaceDist = path.resolve(moduleDir, `../../packages/proxy/dist/${entryFile}`)
   const bundledDependencyDir = path.resolve(moduleDir, '../node_modules/@geometra/proxy')
 
   const packageDir = resolveProxyPackageDir(customRequire)
@@ -25,13 +43,13 @@ export function resolveProxyScriptPathWith(customRequire: NodeRequire, moduleDir
       return workspaceDist
     }
 
-    const packagedDist = path.join(packageDir, 'dist/index.js')
+    const packagedDist = path.join(packageDir, 'dist', entryFile)
     if (existsSync(packagedDist)) return packagedDist
 
-    const builtLocalDist = buildLocalProxyDistIfPossible(packageDir, errors)
+    const builtLocalDist = buildLocalProxyDistIfPossible(packageDir, entryFile, errors)
     if (builtLocalDist) return builtLocalDist
 
-    errors.push(`Resolved @geometra/proxy package at ${packageDir}, but dist/index.js was missing`)
+    errors.push(`Resolved @geometra/proxy package at ${packageDir}, but dist/${entryFile} was missing`)
   } else {
     errors.push('Could not find @geometra/proxy/package.json via Node module search paths')
   }
@@ -39,24 +57,26 @@ export function resolveProxyScriptPathWith(customRequire: NodeRequire, moduleDir
   try {
     const pkgJson = customRequire.resolve('@geometra/proxy/package.json')
     const exportPackageDir = path.dirname(pkgJson)
-    const packagedDist = path.join(exportPackageDir, 'dist/index.js')
+    const packagedDist = path.join(exportPackageDir, 'dist', entryFile)
     if (existsSync(packagedDist)) return packagedDist
 
-    const builtLocalDist = buildLocalProxyDistIfPossible(exportPackageDir, errors)
+    const builtLocalDist = buildLocalProxyDistIfPossible(exportPackageDir, entryFile, errors)
     if (builtLocalDist) return builtLocalDist
 
-    errors.push(`Resolved @geometra/proxy/package.json at ${pkgJson}, but dist/index.js was missing`)
+    errors.push(`Resolved @geometra/proxy/package.json at ${pkgJson}, but dist/${entryFile} was missing`)
   } catch (err) {
     errors.push(err instanceof Error ? err.message : String(err))
   }
 
-  try {
+  if (entryFile === 'index.js') {
+    try {
     return customRequire.resolve('@geometra/proxy')
-  } catch (err) {
-    errors.push(err instanceof Error ? err.message : String(err))
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : String(err))
+    }
   }
 
-  const packagedSiblingDist = path.resolve(moduleDir, '../../proxy/dist/index.js')
+  const packagedSiblingDist = path.resolve(moduleDir, `../../proxy/dist/${entryFile}`)
   if (existsSync(packagedSiblingDist)) {
     return packagedSiblingDist
   }
@@ -68,7 +88,7 @@ export function resolveProxyScriptPathWith(customRequire: NodeRequire, moduleDir
   errors.push(`Workspace fallback not found at ${workspaceDist}`)
 
   throw new Error(
-    `Could not resolve @geometra/proxy. Install it with the MCP package: npm install @geometra/proxy. Resolution errors: ${errors.join(' | ')}`,
+    `Could not resolve @geometra/proxy dist/${entryFile}. Install it with the MCP package: npm install @geometra/proxy. Resolution errors: ${errors.join(' | ')}`,
   )
 }
 
@@ -89,8 +109,8 @@ function shouldPreferWorkspaceDist(packageDir: string, bundledDependencyDir: str
   }
 }
 
-function buildLocalProxyDistIfPossible(packageDir: string, errors: string[]): string | undefined {
-  const distEntry = path.join(packageDir, 'dist/index.js')
+function buildLocalProxyDistIfPossible(packageDir: string, entryFile: string, errors: string[]): string | undefined {
+  const distEntry = path.join(packageDir, 'dist', entryFile)
   const sourceEntry = path.join(packageDir, 'src/index.ts')
   const tsconfigPath = path.join(packageDir, 'tsconfig.build.json')
 
@@ -121,10 +141,10 @@ function buildLocalProxyDistIfPossible(packageDir: string, errors: string[]): st
 
     if (existsSync(distEntry)) return distEntry
 
-    const realDistEntry = path.join(realPackageDir, 'dist/index.js')
+    const realDistEntry = path.join(realPackageDir, 'dist', entryFile)
     if (existsSync(realDistEntry)) return realDistEntry
 
-    errors.push(`Built local @geometra/proxy at ${realPackageDir}, but dist/index.js is still missing`)
+    errors.push(`Built local @geometra/proxy at ${realPackageDir}, but dist/${entryFile} is still missing`)
   } catch (err) {
     errors.push(err instanceof Error ? err.message : String(err))
   }
@@ -139,6 +159,35 @@ export interface SpawnProxyParams {
   width?: number
   height?: number
   slowMo?: number
+}
+
+export async function startEmbeddedGeometraProxy(
+  opts: SpawnProxyParams,
+): Promise<{ runtime: EmbeddedProxyRuntime; wsUrl: string }> {
+  const runtimePath = resolveProxyRuntimePath()
+  const runtimeModule = await import(pathToFileURL(runtimePath).href) as {
+    launchProxyRuntime?: (options: {
+      url: string
+      port: number
+      width?: number
+      height?: number
+      headed?: boolean
+      slowMo?: number
+    }) => Promise<EmbeddedProxyRuntime>
+  }
+  if (typeof runtimeModule.launchProxyRuntime !== 'function') {
+    throw new Error(`Resolved ${runtimePath}, but it did not export launchProxyRuntime()`)
+  }
+
+  const runtime = await runtimeModule.launchProxyRuntime({
+    url: opts.pageUrl,
+    port: opts.port,
+    width: opts.width,
+    height: opts.height,
+    headed: opts.headless !== true,
+    slowMo: opts.slowMo,
+  })
+  return { runtime, wsUrl: runtime.wsUrl }
 }
 
 export function parseProxyReadySignalLine(line: string): string | undefined {

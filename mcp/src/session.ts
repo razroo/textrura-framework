@@ -1,6 +1,6 @@
 import type { ChildProcess } from 'node:child_process'
 import WebSocket from 'ws'
-import { spawnGeometraProxy } from './proxy-spawn.js'
+import { spawnGeometraProxy, startEmbeddedGeometraProxy, type EmbeddedProxyRuntime } from './proxy-spawn.js'
 
 /**
  * Parsed accessibility node from the UI tree + computed layout.
@@ -286,6 +286,7 @@ export interface Session {
   updateRevision: number
   /** Present when this session owns a child geometra-proxy process (pageUrl connect). */
   proxyChild?: ChildProcess
+  proxyRuntime?: EmbeddedProxyRuntime
   proxyReusable?: boolean
   cachedA11y?: A11yNode | null
   cachedA11yRevision?: number
@@ -302,6 +303,17 @@ let activeSession: Session | null = null
 let reusableProxy:
   | {
       child: ChildProcess
+      runtime?: undefined
+      wsUrl: string
+      headless: boolean
+      slowMo: number
+      width: number
+      height: number
+      pageUrl?: string
+    }
+  | {
+      child?: undefined
+      runtime: EmbeddedProxyRuntime
       wsUrl: string
       headless: boolean
       slowMo: number
@@ -336,19 +348,45 @@ function invalidateSessionCaches(session: Session): void {
 }
 
 function clearReusableProxyIfExited(): void {
-  if (!reusableProxy?.child.killed && reusableProxy?.child.exitCode === null && reusableProxy?.child.signalCode === null) {
+  if (!reusableProxy) return
+  if (reusableProxy.child) {
+    if (!reusableProxy.child.killed && reusableProxy.child.exitCode === null && reusableProxy.child.signalCode === null) {
+      return
+    }
+    reusableProxy = null
     return
   }
+  if (!reusableProxy.runtime.closed) return
   reusableProxy = null
 }
 
 function setReusableProxy(
-  child: ChildProcess,
+  proxy: { child: ChildProcess } | { runtime: EmbeddedProxyRuntime },
   wsUrl: string,
   opts: { headless?: boolean; slowMo?: number; width?: number; height?: number; pageUrl?: string },
 ): void {
+  if ('child' in proxy) {
+    const child = proxy.child
+    reusableProxy = {
+      child,
+      wsUrl,
+      headless: opts.headless === true,
+      slowMo: opts.slowMo ?? 0,
+      width: opts.width ?? 1280,
+      height: opts.height ?? 720,
+      pageUrl: opts.pageUrl,
+    }
+    const clear = () => {
+      if (reusableProxy?.child === child) reusableProxy = null
+    }
+    child.once('exit', clear)
+    child.once('close', clear)
+    child.once('error', clear)
+    return
+  }
+
   reusableProxy = {
-    child,
+    runtime: proxy.runtime,
     wsUrl,
     headless: opts.headless === true,
     slowMo: opts.slowMo ?? 0,
@@ -356,12 +394,6 @@ function setReusableProxy(
     height: opts.height ?? 720,
     pageUrl: opts.pageUrl,
   }
-  const clear = () => {
-    if (reusableProxy?.child === child) reusableProxy = null
-  }
-  child.once('exit', clear)
-  child.once('close', clear)
-  child.once('error', clear)
 }
 
 function closeReusableProxy(): void {
@@ -369,17 +401,25 @@ function closeReusableProxy(): void {
   const proxy = reusableProxy
   reusableProxy = null
   if (!proxy) return
-  try {
-    proxy.child.kill('SIGTERM')
-  } catch {
-    /* ignore */
+  if (proxy.child) {
+    try {
+      proxy.child.kill('SIGTERM')
+    } catch {
+      /* ignore */
+    }
+    return
   }
+  void proxy.runtime.close().catch(() => {})
 }
 
 function rememberReusableProxyPageUrl(session: Session): void {
   const pageUrl = session.cachedA11y?.meta?.pageUrl
   if (!pageUrl) return
   if (session.proxyChild && reusableProxy?.child === session.proxyChild) {
+    reusableProxy.pageUrl = pageUrl
+    return
+  }
+  if (session.proxyRuntime && reusableProxy?.runtime === session.proxyRuntime) {
     reusableProxy.pageUrl = pageUrl
   }
 }
@@ -403,6 +443,14 @@ function shutdownPreviousSession(opts?: { closeProxy?: boolean }): void {
     } catch {
       /* ignore */
     }
+    return
+  }
+  if (prev.proxyRuntime) {
+    const shouldKeepProxy = prev.proxyReusable && opts?.closeProxy === false
+    rememberReusableProxyPageUrl(prev)
+    if (shouldKeepProxy) return
+    if (reusableProxy?.runtime === prev.proxyRuntime) reusableProxy = null
+    void prev.proxyRuntime.close().catch(() => {})
   }
 }
 
@@ -496,6 +544,9 @@ export function connect(
             /* ignore */
           }
         }
+        if (session.proxyRuntime && !session.proxyReusable) {
+          void session.proxyRuntime.close().catch(() => {})
+        }
       }
       if (!resolved) {
         resolved = true
@@ -528,7 +579,10 @@ export async function connectThroughProxy(options: {
     reusableProxy.headless === desiredHeadless &&
     reusableProxy.slowMo === desiredSlowMo
   ) {
-    const session = activeSession?.proxyChild === reusableProxy.child
+    const session = (
+      (reusableProxy.child && activeSession?.proxyChild === reusableProxy.child) ||
+      (reusableProxy.runtime && activeSession?.proxyRuntime === reusableProxy.runtime)
+    )
       ? activeSession
       : await connect(reusableProxy.wsUrl, {
           skipInitialResize: true,
@@ -540,6 +594,7 @@ export async function connectThroughProxy(options: {
       throw new Error('Failed to attach to reusable proxy session')
     }
     session.proxyChild = reusableProxy.child
+    session.proxyRuntime = reusableProxy.runtime
     session.proxyReusable = true
     const desiredWidth = options.width ?? reusableProxy.width
     const desiredHeight = options.height ?? reusableProxy.height
@@ -556,7 +611,10 @@ export async function connectThroughProxy(options: {
       const currentUrl = session.cachedA11y?.meta?.pageUrl ?? reusableProxy.pageUrl
       if (currentUrl !== options.pageUrl) {
         await sendNavigate(session, options.pageUrl, 15_000)
-        if (reusableProxy?.child === session.proxyChild) {
+        if (
+          (session.proxyChild && reusableProxy?.child === session.proxyChild) ||
+          (session.proxyRuntime && reusableProxy?.runtime === session.proxyRuntime)
+        ) {
           reusableProxy.pageUrl = options.pageUrl
         }
       }
@@ -565,23 +623,23 @@ export async function connectThroughProxy(options: {
   }
 
   closeReusableProxy()
-  const { child, wsUrl } = await spawnGeometraProxy({
-    pageUrl: options.pageUrl,
-    port: options.port ?? 0,
-    headless: options.headless,
-    width: options.width,
-    height: options.height,
-    slowMo: options.slowMo,
-  })
   try {
+    const { runtime, wsUrl } = await startEmbeddedGeometraProxy({
+      pageUrl: options.pageUrl,
+      port: options.port ?? 0,
+      headless: options.headless,
+      width: options.width,
+      height: options.height,
+      slowMo: options.slowMo,
+    })
     const session = await connect(wsUrl, {
       skipInitialResize: true,
       closePreviousProxy: false,
       awaitInitialFrame: options.awaitInitialFrame,
     })
-    session.proxyChild = child
+    session.proxyRuntime = runtime
     session.proxyReusable = true
-    setReusableProxy(child, wsUrl, {
+    setReusableProxy({ runtime }, wsUrl, {
       headless: options.headless,
       slowMo: options.slowMo,
       width: options.width,
@@ -590,12 +648,38 @@ export async function connectThroughProxy(options: {
     })
     return session
   } catch (e) {
+    const { child, wsUrl } = await spawnGeometraProxy({
+      pageUrl: options.pageUrl,
+      port: options.port ?? 0,
+      headless: options.headless,
+      width: options.width,
+      height: options.height,
+      slowMo: options.slowMo,
+    })
     try {
-      child.kill('SIGTERM')
-    } catch {
-      /* ignore */
+      const session = await connect(wsUrl, {
+        skipInitialResize: true,
+        closePreviousProxy: false,
+        awaitInitialFrame: options.awaitInitialFrame,
+      })
+      session.proxyChild = child
+      session.proxyReusable = true
+      setReusableProxy({ child }, wsUrl, {
+        headless: options.headless,
+        slowMo: options.slowMo,
+        width: options.width,
+        height: options.height,
+        pageUrl: options.pageUrl,
+      })
+      return session
+    } catch (fallbackError) {
+      try {
+        child.kill('SIGTERM')
+      } catch {
+        /* ignore */
+      }
+      throw fallbackError instanceof Error ? fallbackError : e
     }
-    throw e
   }
 }
 

@@ -1,6 +1,5 @@
 #!/usr/bin/env node
-import { chromium } from 'playwright'
-import { installDomObserver, startGeometryWebSocket } from './geometry-ws.js'
+import { formatProxyFatalError, launchProxyRuntime, parseHttpPageUrl } from './runtime.js'
 
 const READY_SIGNAL_TYPE = 'geometra-proxy-ready'
 
@@ -32,21 +31,6 @@ function envRequestsReadyJson(): boolean {
   return v === '1' || v === 'true' || v === 'yes'
 }
 
-function parseHttpPageUrl(raw: string): string {
-  let parsed: URL
-  try {
-    parsed = new URL(raw)
-  } catch {
-    throw new Error(`Invalid URL: ${raw}`)
-  }
-
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error(`Unsupported URL protocol: ${parsed.protocol}. geometra-proxy only opens http:// or https:// pages.`)
-  }
-
-  return parsed.toString()
-}
-
 function parsePortArg(raw: string | undefined): number {
   const n = Number(raw ?? '')
   if (Number.isInteger(n) && n >= 0 && n <= 65535) return n
@@ -63,14 +47,6 @@ function parsePositiveIntArg(flag: string, raw: string | undefined, fallback: nu
 function emitReadySignal(wsUrl: string, pageUrl: string): void {
   if (!envRequestsReadyJson()) return
   process.stdout.write(`${JSON.stringify({ type: READY_SIGNAL_TYPE, wsUrl, pageUrl })}\n`)
-}
-
-function formatProxyFatalError(err: unknown): string {
-  const base = err instanceof Error ? err.message : String(err)
-  if (/Executable doesn't exist|playwright install chromium|browserType\.launch/i.test(base)) {
-    return `${base}\nInstall Chromium with: npx playwright install chromium`
-  }
-  return base
 }
 
 function parseArgs(argv: string[]): {
@@ -128,75 +104,35 @@ async function main(): Promise<void> {
   }
   const url = parseHttpPageUrl(rawUrl)
 
-  const launchOpts: Parameters<typeof chromium.launch>[0] = { headless: !headed }
-  if (slowMo > 0) launchOpts.slowMo = slowMo
-
-  const browser = await chromium.launch(launchOpts)
-  const page = await browser.newPage({ viewport: { width, height } })
-
-  let listeningWsUrl = port === 0 ? '' : `ws://127.0.0.1:${port}`
-  let resolveListening: ((wsUrl: string) => void) | undefined
-  let rejectListening: ((err: Error) => void) | undefined
-  const listeningPromise = new Promise<string>((resolve, reject) => {
-    resolveListening = resolve
-    rejectListening = reject
-  })
-
   const mode = headed ? 'headed (visible window)' : 'headless'
   const pace = slowMo > 0 ? `, slowMo ${slowMo}ms` : ''
   console.error(`[geometra-proxy] Chromium ${mode}${pace}`)
   console.error(`[geometra-proxy] Loading ${url} …`)
-
-  const hub = startGeometryWebSocket({
+  const runtime = await launchProxyRuntime({
+    url,
     port,
-    page,
+    width,
+    height,
+    headed,
+    slowMo,
     debounceMs: 50,
-    onListening(p) {
-      listeningWsUrl = `ws://127.0.0.1:${p}`
-      resolveListening?.(listeningWsUrl)
-      resolveListening = undefined
-      rejectListening = undefined
-      console.error(`[geometra-proxy] WebSocket listening on ${listeningWsUrl}`)
+    onListening(wsUrl) {
+      console.error(`[geometra-proxy] WebSocket listening on ${wsUrl}`)
     },
     onError(err) {
       const message = formatProxyFatalError(err)
       console.error('[geometra-proxy] error:', message)
-      if (!listeningWsUrl) {
-        rejectListening?.(new Error(message))
-        rejectListening = undefined
-        resolveListening = undefined
-      }
     },
   })
-
-  const navigation = page.goto(url, { waitUntil: 'domcontentloaded' })
-  const wsUrl = await listeningPromise
-  await navigation
+  const wsUrl = runtime.wsUrl
   console.error(`[geometra-proxy] Ready. Connect MCP with geometra_connect({ url: "${wsUrl}" })`)
   emitReadySignal(wsUrl, url)
-  await hub.flushExtract()
-  await installDomObserver(page, hub.scheduleExtract)
-  page.on('domcontentloaded', () => {
-    void installDomObserver(page, hub.scheduleExtract)
-      .then(() => {
-        hub.scheduleExtract()
-      })
-      .catch(err => {
-        const message = formatProxyFatalError(err)
-        console.error('[geometra-proxy] observer reinstall failed:', message)
-      })
-  })
 
   let shuttingDown = false
   const shutdown = async () => {
     if (shuttingDown) return
     shuttingDown = true
-    try {
-      await hub.close()
-    } catch {
-      /* ignore */
-    }
-    await browser.close()
+    await runtime.close()
     process.exit(0)
   }
 

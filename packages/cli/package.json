@@ -1,6 +1,6 @@
 {
   "name": "@geometra/cli",
-  "version": "1.19.16",
+  "version": "1.19.17",
   "description": "CLI to view any Geometra-powered site in the terminal",
   "license": "MIT",
   "type": "module",

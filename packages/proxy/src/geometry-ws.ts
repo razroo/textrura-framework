@@ -97,6 +97,7 @@ async function handleClientMessage(
   ws: WebSocket,
   raw: unknown,
   fieldLookupCache: ReturnType<typeof createFillLookupCache>,
+  waitForBeforeInput: () => Promise<void>,
   onViewportOrInput: (kind: 'resize' | 'input', requestId?: string, result?: unknown) => void,
   onHandlerError: (err: unknown) => void,
 ): Promise<void> {
@@ -140,6 +141,8 @@ async function handleClientMessage(
       onViewportOrInput('resize', requestId)
       return
     }
+
+    await waitForBeforeInput()
 
     if (isNavigateMessage(msg)) {
       clearFillLookupCache(fieldLookupCache)
@@ -304,6 +307,8 @@ export function startGeometryWebSocket(options: {
   page: Page
   /** DOM mutation debounce (ms). */
   debounceMs?: number
+  /** Optional promise that must resolve before extracts or input actions run. */
+  beforeInput?: Promise<unknown>
   onListening?: (port: number) => void
   onError?: (err: unknown) => void
 }): GeometryWsHub {
@@ -320,6 +325,12 @@ export function startGeometryWebSocket(options: {
   let actionQueue: Promise<void> = Promise.resolve()
   let pendingInputAcks: PendingInputAck[] = []
   const fieldLookupCache = createFillLookupCache()
+  const beforeInput = options.beforeInput?.then(() => undefined)
+
+  async function waitForBeforeInput(): Promise<void> {
+    if (!beforeInput) return
+    await beforeInput
+  }
 
   options.page.on('framenavigated', frame => {
     if (frame === options.page.mainFrame()) {
@@ -413,6 +424,7 @@ export function startGeometryWebSocket(options: {
 
   async function runExtract(): Promise<boolean> {
     try {
+      await waitForBeforeInput()
       const snap = await extractGeometryWithRecovery(options.page)
       return broadcastSnapshot(snap)
     } catch (err) {
@@ -487,6 +499,7 @@ export function startGeometryWebSocket(options: {
             ws,
             raw,
             fieldLookupCache,
+            waitForBeforeInput,
             (kind, requestId, result) => {
               if (kind === 'resize') {
                 void runExtractQueued()
