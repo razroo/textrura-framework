@@ -1,12 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import WebSocket from 'ws'
 import { box } from '@geometra/core'
-import { createServer } from '../server.js'
+import { createStandaloneTestServer } from './test-helpers.js'
 import { CLOSE_AUTH_FAILED } from '../protocol.js'
-
-function pickPort(): number {
-  return 41000 + Math.floor(Math.random() * 2000)
-}
 
 function connectAndCollect(url: string): Promise<{ messages: Array<{ type: string; message?: string; code?: number }>; ws: WebSocket; closeCode?: number }> {
   return new Promise((resolve, reject) => {
@@ -32,12 +28,10 @@ function connectAndCollect(url: string): Promise<{ messages: Array<{ type: strin
 
 describe('server connection hooks', () => {
   it('onConnection accepts when returning a truthy value', async () => {
-    const port = pickPort()
     let receivedCtx: unknown = null
-    const server = await createServer(
+    const { server, port } = await createStandaloneTestServer(
       () => box({ width: 40, height: 20 }, []),
       {
-        port,
         width: 200,
         height: 100,
         onConnection: () => ({ role: 'admin' }),
@@ -73,11 +67,9 @@ describe('server connection hooks', () => {
   })
 
   it('onConnection rejects when returning null', async () => {
-    const port = pickPort()
-    const server = await createServer(
+    const { server, port } = await createStandaloneTestServer(
       () => box({ width: 40, height: 20 }, []),
       {
-        port,
         width: 200,
         height: 100,
         onConnection: () => null,
@@ -93,11 +85,9 @@ describe('server connection hooks', () => {
   })
 
   it('onConnection rejects when returning undefined (same nullish gate as null)', async () => {
-    const port = pickPort()
-    const server = await createServer(
+    const { server, port } = await createStandaloneTestServer(
       () => box({ width: 40, height: 20 }, []),
       {
-        port,
         width: 200,
         height: 100,
         onConnection: () => undefined,
@@ -113,11 +103,9 @@ describe('server connection hooks', () => {
   })
 
   it('onConnection rejects when throwing', async () => {
-    const port = pickPort()
-    const server = await createServer(
+    const { server, port } = await createStandaloneTestServer(
       () => box({ width: 40, height: 20 }, []),
       {
-        port,
         width: 200,
         height: 100,
         onConnection: () => { throw new Error('bad token') },
@@ -133,11 +121,9 @@ describe('server connection hooks', () => {
   })
 
   it('onConnection supports async handlers', async () => {
-    const port = pickPort()
-    const server = await createServer(
+    const { server, port } = await createStandaloneTestServer(
       () => box({ width: 40, height: 20 }, []),
       {
-        port,
         width: 200,
         height: 100,
         onConnection: async () => {
@@ -172,15 +158,13 @@ describe('server connection hooks', () => {
 
 describe('server message hooks', () => {
   it('onMessage allows events when returning true', async () => {
-    const port = pickPort()
     let clickDispatched = false
-    const server = await createServer(
+    const { server, port } = await createStandaloneTestServer(
       () => box({
         width: 40, height: 20,
         onClick: () => { clickDispatched = true },
       }, []),
       {
-        port,
         width: 200,
         height: 100,
         onConnection: () => ({ role: 'operator' }),
@@ -218,15 +202,13 @@ describe('server message hooks', () => {
   })
 
   it('onMessage rejects events when returning false', async () => {
-    const port = pickPort()
     let clickDispatched = false
-    const server = await createServer(
+    const { server, port } = await createStandaloneTestServer(
       () => box({
         width: 40, height: 20,
         onClick: () => { clickDispatched = true },
       }, []),
       {
-        port,
         width: 200,
         height: 100,
         onConnection: () => ({ role: 'readonly' }),
@@ -266,10 +248,9 @@ describe('server message hooks', () => {
   })
 
   it('rejects invalid pointer coordinates without broadcasting layout, and finite clicks still work', async () => {
-    const port = pickPort()
     /** Mutate props on click so serialized tree changes and the server always sends a follow-up frame. */
     const viewState = { bump: 0 }
-    const server = await createServer(
+    const { server, port } = await createStandaloneTestServer(
       () =>
         box(
           {
@@ -281,7 +262,7 @@ describe('server message hooks', () => {
           },
           [],
         ),
-      { port, width: 200, height: 100 },
+      { width: 200, height: 100 },
     )
 
     const messages: Array<{ type: string }> = []
@@ -374,10 +355,9 @@ describe('server message hooks', () => {
   })
 
   it('works without any hooks (backward-compatible)', async () => {
-    const port = pickPort()
-    const server = await createServer(
+    const { server, port } = await createStandaloneTestServer(
       () => box({ width: 40, height: 20 }, []),
-      { port, width: 200, height: 100 },
+      { width: 200, height: 100 },
     )
 
     await new Promise<void>((resolve, reject) => {
@@ -403,15 +383,13 @@ describe('server message hooks', () => {
   })
 
   it('ignores invalid layoutDirection (Symbol) and derives Yoga direction from the root like createApp', async () => {
-    const port = pickPort()
-    const server = await createServer(
+    const { server, port } = await createStandaloneTestServer(
       () =>
         box({ width: 100, height: 40, flexDirection: 'row', dir: 'rtl' }, [
           box({ width: 30, height: 20 }),
           box({ width: 30, height: 20 }),
         ]),
       {
-        port,
         width: 200,
         height: 100,
         layoutDirection: Symbol('bad') as never,

@@ -1,18 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import WebSocket from 'ws'
 import { box } from '@geometra/core'
-import { createServer } from '../server.js'
-
-function pickPort(): number {
-  return 39000 + Math.floor(Math.random() * 2000)
-}
+import { createStandaloneTestServer } from './test-helpers.js'
 
 describe('protocol compatibility', () => {
   it('accepts unversioned client messages as v1-compatible', async () => {
-    const port = pickPort()
-    const server = await createServer(
+    const { server, port } = await createStandaloneTestServer(
       () => box({ width: 40, height: 20 }, []),
-      { port, width: 200, height: 100 },
+      { width: 200, height: 100 },
     )
 
     await new Promise<void>((resolve, reject) => {
@@ -51,10 +46,9 @@ describe('protocol compatibility', () => {
   })
 
   it('returns explicit error for newer client protocol versions', async () => {
-    const port = pickPort()
-    const server = await createServer(
+    const { server, port } = await createStandaloneTestServer(
       () => box({ width: 40, height: 20 }, []),
-      { port, width: 200, height: 100 },
+      { width: 200, height: 100 },
     )
 
     await new Promise<void>((resolve, reject) => {
@@ -90,10 +84,9 @@ describe('protocol compatibility', () => {
   })
 
   it('sends request-scoped ack for handled no-op actions', async () => {
-    const port = pickPort()
-    const server = await createServer(
+    const { server, port } = await createStandaloneTestServer(
       () => box({ width: 40, height: 20, onClick: () => undefined }, []),
-      { port, width: 200, height: 100 },
+      { width: 200, height: 100 },
     )
 
     await new Promise<void>((resolve, reject) => {
@@ -137,10 +130,9 @@ describe('protocol compatibility', () => {
   })
 
   it('echoes requestId on proxy-only message errors', async () => {
-    const port = pickPort()
-    const server = await createServer(
+    const { server, port } = await createStandaloneTestServer(
       () => box({ width: 40, height: 20 }, []),
-      { port, width: 200, height: 100 },
+      { width: 200, height: 100 },
     )
 
     await new Promise<void>((resolve, reject) => {

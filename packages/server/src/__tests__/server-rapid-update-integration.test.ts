@@ -3,11 +3,7 @@ import WebSocket from 'ws'
 import { box, signal, text } from '@geometra/core'
 import type { ComputedLayout } from 'textura'
 import type { UIElement } from '@geometra/core'
-import { createServer } from '../server.js'
-
-function pickPort(): number {
-  return 42000 + Math.floor(Math.random() * 2000)
-}
+import { createStandaloneTestServer } from './test-helpers.js'
 
 async function waitFor(
   predicate: () => boolean,
@@ -63,11 +59,10 @@ function replayJsonMessages(
 
 describe('server transport integration (1.4)', () => {
   it('preserves final geometry after a burst of synchronous server.update() calls', async () => {
-    const port = pickPort()
     const bump = signal(0)
-    const server = await createServer(
+    const { server, port } = await createStandaloneTestServer(
       () => box({ width: 800 + bump.value, height: 600, padding: bump.value % 7 }, []),
-      { port, width: 400, height: 300 },
+      { width: 400, height: 300 },
     )
 
     const rawMessages: string[] = []
@@ -109,11 +104,10 @@ describe('server transport integration (1.4)', () => {
   }, 25000)
 
   it('sends a fresh full frame to a new client after the previous client disconnected (resync)', async () => {
-    const port = pickPort()
     const bump = signal(0)
-    const server = await createServer(
+    const { server, port } = await createStandaloneTestServer(
       () => box({ width: 900 + bump.value, height: 400 }, []),
-      { port, width: 200, height: 150 },
+      { width: 200, height: 150 },
     )
 
     const firstClientMsgs: string[] = []
@@ -171,9 +165,8 @@ describe('server transport integration (1.4)', () => {
   }, 25000)
 
   it('sends a full frame when only tree content changes and geometry is stable', async () => {
-    const port = pickPort()
     const label = signal('alpha')
-    const server = await createServer(
+    const { server, port } = await createStandaloneTestServer(
       () =>
         box({ width: 160, height: 60, padding: 8 }, [
           text({
@@ -185,7 +178,7 @@ describe('server transport integration (1.4)', () => {
             color: '#fff',
           }),
         ]),
-      { port, width: 240, height: 120 },
+      { width: 240, height: 120 },
     )
 
     const rawMessages: string[] = []

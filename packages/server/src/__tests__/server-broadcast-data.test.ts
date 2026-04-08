@@ -1,17 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import WebSocket from 'ws'
 import { box } from '@geometra/core'
-import { createServer } from '../server.js'
-
-function pickPort(): number {
-  return 43000 + Math.floor(Math.random() * 2000)
-}
+import { createStandaloneTestServer } from './test-helpers.js'
 
 describe('server broadcastData', () => {
   it('sends data frames to connected clients', async () => {
-    const port = pickPort()
-    const server = await createServer(() => box({ width: 40, height: 20 }, []), {
-      port,
+    const { server, port } = await createStandaloneTestServer(() => box({ width: 40, height: 20 }, []), {
       width: 200,
       height: 100,
     })

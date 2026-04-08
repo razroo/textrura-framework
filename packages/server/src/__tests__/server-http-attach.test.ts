@@ -3,23 +3,16 @@ import { describe, it, expect } from 'vitest'
 import WebSocket from 'ws'
 import { box } from '@geometra/core'
 import { createServer, DEFAULT_GEOMETRA_WS_PATH } from '../server.js'
-
-function pickPort(): number {
-  return 42000 + Math.floor(Math.random() * 2000)
-}
+import { listenHttpServer } from './test-helpers.js'
 
 describe('createServer http attach', () => {
   it('accepts WebSocket upgrades on wsPath when bound to http.Server', async () => {
-    const port = pickPort()
     const httpServer = http.createServer((_req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/plain' })
       res.end('http-ok')
     })
 
-    await new Promise<void>((resolve, reject) => {
-      httpServer.listen(port, () => resolve())
-      httpServer.on('error', reject)
-    })
+    const port = await listenHttpServer(httpServer)
 
     const geometra = await createServer(() => box({ width: 40, height: 20 }, []), {
       httpServer,
@@ -59,14 +52,10 @@ describe('createServer http attach', () => {
   })
 
   it('honors a custom wsPath', async () => {
-    const port = pickPort()
     const customPath = '/custom-ws'
     const httpServer = http.createServer()
 
-    await new Promise<void>((resolve, reject) => {
-      httpServer.listen(port, () => resolve())
-      httpServer.on('error', reject)
-    })
+    const port = await listenHttpServer(httpServer)
 
     const geometra = await createServer(() => box({ width: 10, height: 10 }, []), {
       httpServer,
@@ -96,13 +85,9 @@ describe('createServer http attach', () => {
   })
 
   it('matches WebSocket upgrades when wsPath and request path differ only by trailing slash', async () => {
-    const port = pickPort()
     const httpServer = http.createServer()
 
-    await new Promise<void>((resolve, reject) => {
-      httpServer.listen(port, () => resolve())
-      httpServer.on('error', reject)
-    })
+    const port = await listenHttpServer(httpServer)
 
     const geometra = await createServer(() => box({ width: 10, height: 10 }, []), {
       httpServer,
