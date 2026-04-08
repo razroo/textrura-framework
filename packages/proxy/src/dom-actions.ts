@@ -805,8 +805,87 @@ export function resolveExistingFiles(rawPaths: unknown[]): string[] {
   return paths
 }
 
-async function attachHiddenInAllFrames(page: Page, paths: string[]): Promise<boolean> {
+async function findLabeledFileInput(frame: Frame, fieldLabel: string, exact: boolean): Promise<Locator | null> {
+  const direct = frame.getByLabel(fieldLabel, { exact })
+  const directCount = await direct.count()
+  for (let i = 0; i < directCount; i++) {
+    const candidate = direct.nth(i)
+    const isFileInput = await candidate.evaluate(el => el instanceof HTMLInputElement && el.type === 'file').catch(() => false)
+    if (isFileInput) return candidate
+  }
+
+  const loc = frame.locator('input[type="file"]')
+  const count = await loc.count()
+  if (count === 0) return null
+
+  const bestIndex = await loc.evaluateAll((elements, payload) => {
+    function normalize(value: string): string {
+      return value.replace(/\s+/g, ' ').trim().toLowerCase()
+    }
+
+    function matches(candidate: string | undefined): boolean {
+      if (!candidate) return false
+      const normalizedCandidate = normalize(candidate)
+      const normalizedExpected = normalize(payload.fieldLabel)
+      if (!normalizedCandidate || !normalizedExpected) return false
+      return payload.exact ? normalizedCandidate === normalizedExpected : normalizedCandidate.includes(normalizedExpected)
+    }
+
+    function referencedText(ids: string | null): string | undefined {
+      if (!ids) return undefined
+      const text = ids
+        .split(/\s+/)
+        .map(id => document.getElementById(id)?.textContent?.trim() ?? '')
+        .filter(Boolean)
+        .join(' ')
+        .trim()
+      return text || undefined
+    }
+
+    function explicitLabelText(el: Element): string | undefined {
+      const aria = el.getAttribute('aria-label')?.trim()
+      if (aria) return aria
+      const labelledBy = referencedText(el.getAttribute('aria-labelledby'))
+      if (labelledBy) return labelledBy
+      if (el instanceof HTMLInputElement && el.labels && el.labels.length > 0) {
+        return el.labels[0]?.textContent?.trim() || undefined
+      }
+      if (el instanceof HTMLElement && el.id) {
+        const label = document.querySelector(`label[for="${CSS.escape(el.id)}"]`)
+        const text = label?.textContent?.trim()
+        if (text) return text
+      }
+      return undefined
+    }
+
+    for (let i = 0; i < elements.length; i++) {
+      const el = elements[i]
+      if (!(el instanceof HTMLInputElement) || el.type !== 'file') continue
+      if (matches(explicitLabelText(el))) return i
+    }
+    return -1
+  }, { fieldLabel, exact })
+
+  return bestIndex >= 0 ? loc.nth(bestIndex) : null
+}
+
+async function attachHiddenInAllFrames(
+  page: Page,
+  paths: string[],
+  opts?: { fieldLabel?: string; exact?: boolean },
+): Promise<boolean> {
   for (const frame of page.frames()) {
+    if (opts?.fieldLabel) {
+      const labeled = await findLabeledFileInput(frame, opts.fieldLabel, opts.exact ?? false)
+      if (!labeled) continue
+      try {
+        await labeled.setInputFiles(paths)
+        return true
+      } catch {
+        /* try next frame */
+      }
+      continue
+    }
     const loc = frame.locator('input[type="file"]')
     const n = await loc.count()
     for (let i = 0; i < n; i++) {
@@ -865,6 +944,8 @@ export async function attachFiles(
   opts?: {
     clickX?: number
     clickY?: number
+    fieldLabel?: string
+    exact?: boolean
     strategy?: FileAttachStrategy
     dropX?: number
     dropY?: number
@@ -873,6 +954,8 @@ export async function attachFiles(
   const strategy = opts?.strategy ?? 'auto'
   const clickX = opts?.clickX
   const clickY = opts?.clickY
+  const fieldLabel = opts?.fieldLabel
+  const exact = opts?.exact ?? false
   const dropX = opts?.dropX
   const dropY = opts?.dropY
 
@@ -885,9 +968,15 @@ export async function attachFiles(
   }
 
   if (strategy === 'hidden' || strategy === 'auto') {
-    if (await attachHiddenInAllFrames(page, paths)) return
+    if (await attachHiddenInAllFrames(page, paths, { fieldLabel, exact })) return
     if (strategy === 'hidden') {
+      if (fieldLabel) {
+        throw new Error(`file: hidden strategy could not find input[type=file] for field "${fieldLabel}"`)
+      }
       throw new Error('file: hidden strategy could not set any input[type=file]')
+    }
+    if (fieldLabel) {
+      throw new Error(`file: no input[type=file] matching field "${fieldLabel}"`)
     }
   }
 
@@ -910,6 +999,369 @@ export async function attachFiles(
   throw new Error(
     'file: no input[type=file] in any frame; pass x,y (chooser), dropX/dropY (drop), or strategy hidden',
   )
+}
+
+async function findLabeledEditableField(page: Page, fieldLabel: string, exact: boolean): Promise<Locator | null> {
+  for (const frame of page.frames()) {
+    const candidates = [
+      frame.getByLabel(fieldLabel, { exact }),
+      frame.getByRole('textbox', { name: fieldLabel, exact }),
+      frame.getByRole('combobox', { name: fieldLabel, exact }),
+    ]
+    for (const candidate of candidates) {
+      const visible = await firstVisible(candidate, { minWidth: 1, minHeight: 1 })
+      if (!visible) continue
+      if (await locatorIsEditable(visible)) return visible
+    }
+
+    const fallback = await findLabeledControl(frame, fieldLabel, exact)
+    if (fallback && await locatorIsEditable(fallback)) return fallback
+  }
+
+  return null
+}
+
+async function locatorCurrentValue(locator: Locator): Promise<string | null> {
+  try {
+    return await locator.evaluate((el) => {
+      function normalized(value: string | null | undefined): string | null {
+        const trimmed = value?.replace(/\s+/g, ' ').trim()
+        return trimmed ? trimmed : null
+      }
+
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+        return normalized(el.value || el.getAttribute('aria-valuetext') || el.getAttribute('aria-label'))
+      }
+      if (el instanceof HTMLSelectElement) {
+        return normalized(el.selectedOptions[0]?.textContent || el.value || el.getAttribute('aria-valuetext'))
+      }
+      if (el instanceof HTMLElement && el.isContentEditable) {
+        return normalized(el.innerText || el.textContent || el.getAttribute('aria-valuetext'))
+      }
+      if (el instanceof HTMLElement) {
+        return normalized(el.getAttribute('aria-valuetext') || el.innerText || el.textContent || el.getAttribute('aria-label'))
+      }
+      return null
+    })
+  } catch {
+    return null
+  }
+}
+
+function normalizedFieldValue(value: string): string {
+  return value.replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+function fieldValueMatches(actual: string | null | undefined, expected: string): boolean {
+  if (!actual) return false
+  const normalizedActual = normalizedFieldValue(actual)
+  const normalizedExpected = normalizedFieldValue(expected)
+  if (!normalizedActual || !normalizedExpected) return false
+  return normalizedActual === normalizedExpected || normalizedActual.includes(normalizedExpected)
+}
+
+async function setLocatorTextValue(locator: Locator, value: string): Promise<boolean> {
+  try {
+    return await locator.evaluate((el, nextValue) => {
+      function dispatch(target: HTMLElement): void {
+        target.dispatchEvent(new Event('input', { bubbles: true }))
+        target.dispatchEvent(new Event('change', { bubbles: true }))
+      }
+
+      function setInputLikeValue(target: HTMLInputElement | HTMLTextAreaElement, next: string): void {
+        const proto = target instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype
+        const descriptor = Object.getOwnPropertyDescriptor(proto, 'value')
+        if (descriptor?.set) {
+          descriptor.set.call(target, next)
+        } else {
+          target.value = next
+        }
+      }
+
+      if (el instanceof HTMLInputElement) {
+        if (['checkbox', 'radio', 'file', 'button', 'submit', 'reset', 'hidden'].includes(el.type)) return false
+        el.focus()
+        setInputLikeValue(el, nextValue)
+        dispatch(el)
+        return true
+      }
+
+      if (el instanceof HTMLTextAreaElement) {
+        el.focus()
+        setInputLikeValue(el, nextValue)
+        dispatch(el)
+        return true
+      }
+
+      if (el instanceof HTMLElement && (el.isContentEditable || el.getAttribute('role') === 'textbox' || el.getAttribute('role') === 'combobox')) {
+        el.focus()
+        el.textContent = nextValue
+        dispatch(el)
+        return true
+      }
+
+      return false
+    }, value)
+  } catch {
+    return false
+  }
+}
+
+export async function setFieldText(
+  page: Page,
+  fieldLabel: string,
+  value: string,
+  opts?: { exact?: boolean },
+): Promise<void> {
+  const exact = opts?.exact ?? false
+  const locator = await findLabeledEditableField(page, fieldLabel, exact)
+  if (!locator) {
+    throw new Error(`setFieldText: no visible editable field matching "${fieldLabel}"`)
+  }
+
+  await locator.scrollIntoViewIfNeeded()
+  const applied = await setLocatorTextValue(locator, value)
+  if (!applied) {
+    try {
+      await locator.fill(value)
+    } catch {
+      await locator.click()
+      await typeIntoEditableLocator(page, locator, value)
+    }
+  }
+
+  const current = await locatorCurrentValue(locator)
+  if (fieldValueMatches(current, value)) return
+
+  const displayed = await locatorDisplayedValues(locator)
+  if (displayed.some(candidate => fieldValueMatches(candidate, value))) return
+
+  throw new Error(`setFieldText: set "${fieldLabel}" but could not confirm value ${JSON.stringify(value)}`)
+}
+
+async function setNativeSelectByLabel(locator: Locator, value: string, exact: boolean): Promise<boolean> {
+  try {
+    return await locator.evaluate((el, payload) => {
+      if (!(el instanceof HTMLSelectElement)) return false
+      const normalize = (input: string | undefined | null) => input?.replace(/\s+/g, ' ').trim().toLowerCase() ?? ''
+      const expected = normalize(payload.value)
+      if (!expected) return false
+
+      const option = Array.from(el.options).find((candidate) => {
+        const label = normalize(candidate.textContent)
+        const rawValue = normalize(candidate.value)
+        if (payload.exact) return label === expected || rawValue === expected
+        return label.includes(expected) || rawValue.includes(expected)
+      })
+
+      if (!option) return false
+      el.value = option.value
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+      el.dispatchEvent(new Event('change', { bubbles: true }))
+      return true
+    }, { value, exact })
+  } catch {
+    return false
+  }
+}
+
+async function chooseValueFromLabeledGroup(
+  page: Page,
+  fieldLabel: string,
+  value: string,
+  exact: boolean,
+): Promise<boolean> {
+  for (const frame of page.frames()) {
+    const matched = await frame.evaluate((payload) => {
+      function normalize(input: string | undefined | null): string {
+        return (input ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
+      }
+
+      function visible(el: Element): el is HTMLElement {
+        if (!(el instanceof HTMLElement)) return false
+        const rect = el.getBoundingClientRect()
+        if (rect.width <= 0 || rect.height <= 0) return false
+        const style = getComputedStyle(el)
+        return style.display !== 'none' && style.visibility !== 'hidden'
+      }
+
+      function matches(candidate: string | undefined | null): boolean {
+        const normalizedCandidate = normalize(candidate)
+        const normalizedExpected = normalize(payload.fieldLabel)
+        if (!normalizedCandidate || !normalizedExpected) return false
+        return payload.exact ? normalizedCandidate === normalizedExpected : normalizedCandidate.includes(normalizedExpected)
+      }
+
+      function matchesChoice(candidate: string | undefined | null): boolean {
+        const normalizedCandidate = normalize(candidate)
+        const normalizedExpected = normalize(payload.value)
+        if (!normalizedCandidate || !normalizedExpected) return false
+        return payload.exact ? normalizedCandidate === normalizedExpected : normalizedCandidate.includes(normalizedExpected)
+      }
+
+      function referencedText(ids: string | null): string | undefined {
+        if (!ids) return undefined
+        const text = ids
+          .split(/\s+/)
+          .map(id => document.getElementById(id)?.textContent?.trim() ?? '')
+          .filter(Boolean)
+          .join(' ')
+          .trim()
+        return text || undefined
+      }
+
+      function explicitLabelText(el: Element): string | undefined {
+        const aria = el.getAttribute('aria-label')?.trim()
+        if (aria) return aria
+        const labelledBy = referencedText(el.getAttribute('aria-labelledby'))
+        if (labelledBy) return labelledBy
+        if (el instanceof HTMLInputElement && el.labels && el.labels.length > 0) {
+          return el.labels[0]?.textContent?.trim() || undefined
+        }
+        return undefined
+      }
+
+      function choiceLabel(el: Element): string | undefined {
+        if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
+          return explicitLabelText(el)
+        }
+        if (el instanceof HTMLLabelElement) return el.textContent?.trim() || undefined
+        const aria = el.getAttribute('aria-label')?.trim()
+        if (aria) return aria
+        const labelledBy = referencedText(el.getAttribute('aria-labelledby'))
+        if (labelledBy) return labelledBy
+        return el.textContent?.trim() || undefined
+      }
+
+      function hasGroupedChoices(container: Element): boolean {
+        const count = container.querySelectorAll('input[type="radio"], input[type="checkbox"], [role="radio"], [role="checkbox"], button').length
+        return count >= 2
+      }
+
+      const candidates: Array<{ root: HTMLElement; score: number }> = []
+      const explicitGroups = Array.from(document.querySelectorAll('fieldset, [role="radiogroup"], [role="group"]'))
+        .filter((el): el is HTMLElement => visible(el) && hasGroupedChoices(el))
+      for (const group of explicitGroups) {
+        const legend = group.querySelector('legend')?.textContent?.trim()
+        const groupName = explicitLabelText(group) || legend || group.textContent?.trim()
+        if (matches(groupName)) {
+          const rect = group.getBoundingClientRect()
+          candidates.push({ root: group, score: rect.width * rect.height })
+        }
+      }
+
+      const labelNodes = Array.from(document.querySelectorAll('label, legend, h1, h2, h3, h4, h5, h6, p, span, div'))
+        .filter((el): el is HTMLElement => visible(el) && matches(el.textContent))
+      for (const labelNode of labelNodes) {
+        let current: HTMLElement | null = labelNode.parentElement
+        for (let depth = 0; current && depth < 5; depth++) {
+          if (visible(current) && hasGroupedChoices(current)) {
+            const rect = current.getBoundingClientRect()
+            candidates.push({ root: current, score: rect.width * rect.height + depth * 1000 })
+            break
+          }
+          current = current.parentElement
+        }
+      }
+
+      candidates.sort((a, b) => a.score - b.score)
+
+      for (const candidate of candidates) {
+        const options = Array.from(
+          candidate.root.querySelectorAll('input[type="radio"], input[type="checkbox"], [role="radio"], [role="checkbox"], label, button'),
+        )
+
+        for (const option of options) {
+          if (!visible(option)) continue
+          if (!matchesChoice(choiceLabel(option))) continue
+
+          if (option instanceof HTMLInputElement) {
+            option.click()
+            return option.checked
+          }
+          if (option instanceof HTMLLabelElement) {
+            option.click()
+            const control = option.control
+            if (control instanceof HTMLInputElement) return control.checked
+            return true
+          }
+          option.click()
+          if (option.getAttribute('role') === 'radio' || option.getAttribute('role') === 'checkbox') {
+            return option.getAttribute('aria-checked') === 'true' || option.getAttribute('aria-selected') === 'true'
+          }
+          return true
+        }
+      }
+
+      return false
+    }, { fieldLabel, value, exact })
+
+    if (matched) return true
+  }
+
+  return false
+}
+
+export async function setFieldChoice(
+  page: Page,
+  fieldLabel: string,
+  value: string,
+  opts?: { exact?: boolean; query?: string },
+): Promise<void> {
+  const exact = opts?.exact ?? false
+
+  for (const frame of page.frames()) {
+    const locator = await findLabeledControl(frame, fieldLabel, exact)
+    if (!locator) continue
+
+    await locator.scrollIntoViewIfNeeded()
+    if (await setNativeSelectByLabel(locator, value, exact)) {
+      const displayed = await locatorDisplayedValues(locator)
+      if (displayed.some(candidate => displayedValueMatchesSelection(candidate, value, exact))) return
+      throw new Error(`setFieldChoice: selected "${value}" for field "${fieldLabel}" but could not confirm it`)
+    }
+    break
+  }
+
+  try {
+    await pickListboxOption(page, value, {
+      fieldLabel,
+      exact,
+      query: opts?.query,
+    })
+    return
+  } catch (listboxError) {
+    if (await chooseValueFromLabeledGroup(page, fieldLabel, value, exact)) return
+    throw listboxError
+  }
+}
+
+export type FormFieldFill =
+  | { kind: 'text'; fieldLabel: string; value: string; exact?: boolean }
+  | { kind: 'choice'; fieldLabel: string; value: string; query?: string; exact?: boolean }
+  | { kind: 'toggle'; label: string; checked?: boolean; exact?: boolean; controlType?: 'checkbox' | 'radio' }
+  | { kind: 'file'; fieldLabel: string; paths: string[]; exact?: boolean }
+
+export async function fillFields(page: Page, fields: FormFieldFill[]): Promise<void> {
+  for (const field of fields) {
+    if (field.kind === 'text') {
+      await setFieldText(page, field.fieldLabel, field.value, { exact: field.exact })
+      continue
+    }
+    if (field.kind === 'choice') {
+      await setFieldChoice(page, field.fieldLabel, field.value, { exact: field.exact, query: field.query })
+      continue
+    }
+    if (field.kind === 'toggle') {
+      await setCheckedControl(page, field.label, {
+        checked: field.checked,
+        exact: field.exact,
+        controlType: field.controlType,
+      })
+      continue
+    }
+    await attachFiles(page, field.paths, { fieldLabel: field.fieldLabel, exact: field.exact })
+  }
 }
 
 export interface SelectOptionPayload {

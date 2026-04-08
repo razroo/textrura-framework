@@ -11,7 +11,17 @@ export interface A11yNode {
   role: string
   name?: string
   value?: string
-  state?: { disabled?: boolean; expanded?: boolean; selected?: boolean; checked?: boolean | 'mixed'; focused?: boolean }
+  state?: {
+    disabled?: boolean
+    expanded?: boolean
+    selected?: boolean
+    checked?: boolean | 'mixed'
+    focused?: boolean
+    invalid?: boolean
+    required?: boolean
+    busy?: boolean
+  }
+  validation?: { description?: string; error?: string }
   meta?: { pageUrl?: string; scrollX?: number; scrollY?: number }
   bounds: { x: number; y: number; width: number; height: number }
   path: number[]
@@ -110,6 +120,7 @@ export interface PageFieldModel {
   name?: string
   value?: string
   state?: A11yNode['state']
+  validation?: A11yNode['validation']
   bounds?: { x: number; y: number; width: number; height: number }
 }
 
@@ -464,6 +475,8 @@ export function sendFileUpload(
   paths: string[],
   opts?: {
     click?: { x: number; y: number }
+    fieldLabel?: string
+    exact?: boolean
     strategy?: 'auto' | 'chooser' | 'hidden' | 'drop'
     drop?: { x: number; y: number }
   },
@@ -474,11 +487,48 @@ export function sendFileUpload(
     payload.x = opts.click.x
     payload.y = opts.click.y
   }
+  if (opts?.fieldLabel) payload.fieldLabel = opts.fieldLabel
+  if (opts?.exact !== undefined) payload.exact = opts.exact
   if (opts?.strategy) payload.strategy = opts.strategy
   if (opts?.drop) {
     payload.dropX = opts.drop.x
     payload.dropY = opts.drop.y
   }
+  return sendAndWaitForUpdate(session, payload, timeoutMs)
+}
+
+/** Set a labeled text-like field (`input`, `textarea`, contenteditable, ARIA textbox) semantically. */
+export function sendFieldText(
+  session: Session,
+  fieldLabel: string,
+  value: string,
+  opts?: { exact?: boolean },
+  timeoutMs?: number,
+): Promise<UpdateWaitResult> {
+  const payload: Record<string, unknown> = {
+    type: 'setFieldText',
+    fieldLabel,
+    value,
+  }
+  if (opts?.exact !== undefined) payload.exact = opts.exact
+  return sendAndWaitForUpdate(session, payload, timeoutMs)
+}
+
+/** Choose a value for a labeled choice field (select, custom combobox, or radio-style group). */
+export function sendFieldChoice(
+  session: Session,
+  fieldLabel: string,
+  value: string,
+  opts?: { exact?: boolean; query?: string },
+  timeoutMs = LISTBOX_UPDATE_TIMEOUT_MS,
+): Promise<UpdateWaitResult> {
+  const payload: Record<string, unknown> = {
+    type: 'setFieldChoice',
+    fieldLabel,
+    value,
+  }
+  if (opts?.exact !== undefined) payload.exact = opts.exact
+  if (opts?.query) payload.query = opts.query
   return sendAndWaitForUpdate(session, payload, timeoutMs)
 }
 
@@ -869,6 +919,17 @@ function cloneState(state: A11yNode['state'] | undefined): A11yNode['state'] | u
   if (state.selected !== undefined) next.selected = state.selected
   if (state.checked !== undefined) next.checked = state.checked
   if (state.focused !== undefined) next.focused = state.focused
+  if (state.invalid !== undefined) next.invalid = state.invalid
+  if (state.required !== undefined) next.required = state.required
+  if (state.busy !== undefined) next.busy = state.busy
+  return Object.keys(next).length > 0 ? next : undefined
+}
+
+function cloneValidation(validation: A11yNode['validation'] | undefined): A11yNode['validation'] | undefined {
+  if (!validation) return undefined
+  const next: A11yNode['validation'] = {}
+  if (validation.description) next.description = validation.description
+  if (validation.error) next.error = validation.error
   return Object.keys(next).length > 0 ? next : undefined
 }
 
@@ -1001,6 +1062,7 @@ function toFieldModel(node: A11yNode, includeBounds = true): PageFieldModel {
     ...(fieldLabel(node) ? { name: fieldLabel(node) } : {}),
     ...(value ? { value } : {}),
     ...(cloneState(node.state) ? { state: cloneState(node.state) } : {}),
+    ...(cloneValidation(node.validation) ? { validation: cloneValidation(node.validation) } : {}),
     ...(includeBounds ? { bounds: cloneBounds(node.bounds) } : {}),
   }
 }
@@ -1338,7 +1400,7 @@ function diffCompactNodes(before: CompactUiNode, after: CompactUiNode): string[]
 
   const beforeState = before.state ?? {}
   const afterState = after.state ?? {}
-  for (const key of ['disabled', 'expanded', 'selected', 'checked', 'focused'] as const) {
+  for (const key of ['disabled', 'expanded', 'selected', 'checked', 'focused', 'invalid', 'required', 'busy'] as const) {
     if (beforeState[key] !== afterState[key]) {
       changes.push(`${key} ${formatStateValue(beforeState[key])} -> ${formatStateValue(afterState[key])}`)
     }
@@ -1613,6 +1675,17 @@ function walkNode(element: Record<string, unknown>, layout: Record<string, unkno
   const checked = normalizeCheckedState(semantic?.ariaChecked)
   if (checked !== undefined) state.checked = checked
   if (semantic?.focused !== undefined) state.focused = !!semantic.focused
+  if (semantic?.ariaInvalid !== undefined) state.invalid = !!semantic.ariaInvalid
+  if (semantic?.ariaRequired !== undefined) state.required = !!semantic.ariaRequired
+  if (semantic?.ariaBusy !== undefined) state.busy = !!semantic.ariaBusy
+
+  const validation: A11yNode['validation'] = {}
+  if (typeof semantic?.validationDescription === 'string' && semantic.validationDescription.trim().length > 0) {
+    validation.description = semantic.validationDescription
+  }
+  if (typeof semantic?.validationError === 'string' && semantic.validationError.trim().length > 0) {
+    validation.error = semantic.validationError
+  }
 
   const meta: A11yNode['meta'] = {}
   if (typeof semantic?.pageUrl === 'string') meta.pageUrl = semantic.pageUrl
@@ -1636,6 +1709,7 @@ function walkNode(element: Record<string, unknown>, layout: Record<string, unkno
     ...(name ? { name } : {}),
     ...(value ? { value } : {}),
     ...(Object.keys(state).length > 0 ? { state } : {}),
+    ...(Object.keys(validation).length > 0 ? { validation } : {}),
     ...(Object.keys(meta).length > 0 ? { meta } : {}),
     bounds,
     path,

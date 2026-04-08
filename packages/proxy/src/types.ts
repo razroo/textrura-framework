@@ -70,9 +70,30 @@ export type ClientFileMessage = {
   paths: string[]
   x?: number
   y?: number
+  fieldLabel?: string
+  exact?: boolean
   strategy?: 'auto' | 'chooser' | 'hidden' | 'drop'
   dropX?: number
   dropY?: number
+  requestId?: string
+  protocolVersion?: number
+}
+
+export type ClientSetFieldTextMessage = {
+  type: 'setFieldText'
+  fieldLabel: string
+  value: string
+  exact?: boolean
+  requestId?: string
+  protocolVersion?: number
+}
+
+export type ClientSetFieldChoiceMessage = {
+  type: 'setFieldChoice'
+  fieldLabel: string
+  value: string
+  query?: string
+  exact?: boolean
   requestId?: string
   protocolVersion?: number
 }
@@ -126,6 +147,8 @@ export type ParsedClientMessage =
   | ClientResizeMessage
   | ClientCompositionMessage
   | ClientFileMessage
+  | ClientSetFieldTextMessage
+  | ClientSetFieldChoiceMessage
   | ClientListboxPickMessage
   | ClientSelectOptionMessage
   | ClientSetCheckedMessage
@@ -150,6 +173,26 @@ export function isCompositionMessage(msg: ParsedClientMessage): msg is ClientCom
 
 export function isFileMessage(msg: ParsedClientMessage): msg is ClientFileMessage {
   return msg.type === 'file' && 'paths' in msg && Array.isArray((msg as ClientFileMessage).paths)
+}
+
+export function isSetFieldTextMessage(msg: ParsedClientMessage): msg is ClientSetFieldTextMessage {
+  return (
+    msg.type === 'setFieldText' &&
+    'fieldLabel' in msg &&
+    typeof (msg as ClientSetFieldTextMessage).fieldLabel === 'string' &&
+    'value' in msg &&
+    typeof (msg as ClientSetFieldTextMessage).value === 'string'
+  )
+}
+
+export function isSetFieldChoiceMessage(msg: ParsedClientMessage): msg is ClientSetFieldChoiceMessage {
+  return (
+    msg.type === 'setFieldChoice' &&
+    'fieldLabel' in msg &&
+    typeof (msg as ClientSetFieldChoiceMessage).fieldLabel === 'string' &&
+    'value' in msg &&
+    typeof (msg as ClientSetFieldChoiceMessage).value === 'string'
+  )
 }
 
 export function isSelectOptionMessage(msg: ParsedClientMessage): msg is ClientSelectOptionMessage {

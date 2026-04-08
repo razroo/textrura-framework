@@ -19,13 +19,16 @@ Geometra proxy:       Chromium → DOM geometry → same WebSocket as native →
 | Tool | Description |
 |---|---|
 | `geometra_connect` | Connect with `url` (ws://…) **or** `pageUrl` (https://…) to auto-start geometra-proxy; `url: "https://…"` is auto-coerced onto the proxy path |
-| `geometra_query` | Find elements by stable id, role, name, or text content |
+| `geometra_query` | Find elements by stable id, role, name, text content, current value, or semantic state such as `invalid`, `required`, or `busy` |
+| `geometra_wait_for` | Wait for a semantic condition instead of guessing sleeps (`busy`, `disabled`, alerts, values, etc.) |
+| `geometra_fill_fields` | Fill labeled text/choice/toggle/file fields in one MCP call |
+| `geometra_run_actions` | Execute a batch of high-level actions in one MCP round trip and get one consolidated result |
 | `geometra_page_model` | Summary-first webpage model: archetypes, stable section ids, counts, top-level sections, primary actions |
 | `geometra_expand_section` | Expand one form/dialog/list/landmark from `geometra_page_model` on demand |
 | `geometra_click` | Click an element by coordinates |
 | `geometra_type` | Type text into the focused element |
 | `geometra_key` | Send special keys (Enter, Tab, Escape, arrows) |
-| `geometra_upload_files` | Attach files: auto / hidden input / native chooser / synthetic drop (`@geometra/proxy` only) |
+| `geometra_upload_files` | Attach files: labeled field / auto / hidden input / native chooser / synthetic drop (`@geometra/proxy` only) |
 | `geometra_pick_listbox_option` | Pick an option from a custom dropdown/searchable combobox; can open by field label (`@geometra/proxy` only) |
 | `geometra_select_option` | Choose an option on a native `<select>` (`@geometra/proxy` only) |
 | `geometra_set_checked` | Set a checkbox or radio by label instead of coordinate clicks (`@geometra/proxy` only) |
@@ -172,5 +175,44 @@ Agent:  geometra_query({ role: "button", name: "Save" })
 7. After interactions, action tools return a **semantic delta** when possible (dialogs opened/closed, forms appeared/removed, list counts changed, named/focusable nodes added/removed/updated). If nothing meaningful changed, they fall back to a short current-UI overview.
 8. Tools expose query, click, type, snapshot, page-model, and section-expansion operations over this structured data.
 9. After each interaction, the peer sends updated geometry (full `frame` or `patch`) — the MCP tools interpret that into compact summaries.
+
+## Long Forms
+
+For long application flows, prefer one of these patterns:
+
+1. `geometra_page_model`
+2. `geometra_expand_section`
+3. `geometra_fill_fields` for obvious field entry
+4. `geometra_run_actions` when you need mixed navigation + waits + field entry
+
+Typical batch:
+
+```json
+{
+  "actions": [
+    { "type": "click", "x": 412, "y": 228 },
+    { "type": "type", "text": "Taylor Applicant" },
+    { "type": "upload_files", "paths": ["/Users/you/resume.pdf"], "fieldLabel": "Resume" },
+    { "type": "wait_for", "text": "Parsing your resume", "present": false, "timeoutMs": 10000 }
+  ]
+}
+```
+
+Single action tools now default to terse summaries. Pass `detail: "verbose"` when you need a fuller current-UI fallback for debugging.
+
+Typical field fill:
+
+```json
+{
+  "fields": [
+    { "kind": "text", "fieldLabel": "Full name", "value": "Taylor Applicant" },
+    { "kind": "text", "fieldLabel": "Email", "value": "taylor@example.com" },
+    { "kind": "choice", "fieldLabel": "Country", "value": "Germany" },
+    { "kind": "choice", "fieldLabel": "Will you require sponsorship?", "value": "No" },
+    { "kind": "file", "fieldLabel": "Resume", "paths": ["/Users/you/resume.pdf"] }
+  ],
+  "failOnInvalid": true
+}
+```
 
 With a **native** Geometra server, layout comes from Textura/Yoga. With **`@geometra/proxy`**, layout comes from the browser’s computed DOM geometry; the MCP layer is the same.

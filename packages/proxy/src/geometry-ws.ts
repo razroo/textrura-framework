@@ -4,6 +4,8 @@ import {
   attachFiles,
   pickListboxOption,
   resolveExistingFiles,
+  setFieldChoice,
+  setFieldText,
   selectNativeOption,
   setCheckedControl,
   wheelAt,
@@ -18,6 +20,8 @@ import {
   isKeyMessage,
   isListboxPickMessage,
   isResizeMessage,
+  isSetFieldChoiceMessage,
+  isSetFieldTextMessage,
   isSetCheckedMessage,
   isSelectOptionMessage,
   isWheelMessage,
@@ -160,10 +164,24 @@ async function handleClientMessage(
       await attachFiles(page, paths, {
         clickX: msg.x,
         clickY: msg.y,
+        fieldLabel: msg.fieldLabel,
+        exact: msg.exact,
         strategy: msg.strategy,
         dropX: msg.dropX,
         dropY: msg.dropY,
       })
+      onViewportOrInput('input', requestId)
+      return
+    }
+
+    if (isSetFieldTextMessage(msg)) {
+      await setFieldText(page, msg.fieldLabel, msg.value, { exact: msg.exact })
+      onViewportOrInput('input', requestId)
+      return
+    }
+
+    if (isSetFieldChoiceMessage(msg)) {
+      await setFieldChoice(page, msg.fieldLabel, msg.value, { exact: msg.exact, query: msg.query })
       onViewportOrInput('input', requestId)
       return
     }

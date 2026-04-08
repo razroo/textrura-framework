@@ -142,7 +142,26 @@ After clicks, typing, wheel events, uploads, etc., the MCP tries to return **wha
 
 That keeps multi-step flows smaller than repeatedly asking for a full fresh snapshot.
 
-### 6. Query only when you know the target
+### 6. Use field-native fills when the task is obviously a form
+
+`geometra_fill_fields` is the preferred primitive when the next step is “fill this form”, not “drive these exact controls”.
+
+Use it for labeled:
+
+- text fields
+- selects / comboboxes / radio-style questions (`fieldLabel + answer`)
+- individually labeled checkboxes / radios
+- labeled file uploads
+
+This keeps the agent at the field-intent level and avoids repeated control-specific micro-decisions.
+
+### 7. Batch obvious multi-step flows
+
+`geometra_run_actions` exists for longer predictable workflows where you need to mix navigation, waits, and field entry in one MCP round trip.
+
+It complements `page_model` / `expand_section`; it does not replace them.
+
+### 8. Query only when you know the target
 
 `geometra_query` is the precise lookup step:
 
@@ -160,9 +179,10 @@ For most DOM-heavy pages, the best order is:
 1. `geometra_connect`
 2. `geometra_page_model`
 3. `geometra_expand_section` for one important section if needed
-4. `geometra_query`
-5. action tool (`geometra_click`, `geometra_type`, etc.)
-6. consume the returned semantic delta
+4. `geometra_query` or `geometra_wait_for`
+5. `geometra_fill_fields` when the task is straightforward field entry
+6. `geometra_run_actions` for predictable mixed flows, otherwise a single action tool (`geometra_click`, `geometra_type`, etc.)
+7. consume the returned semantic delta / terse state summary
 
 Use `geometra_snapshot` compact when:
 
@@ -171,6 +191,8 @@ Use `geometra_snapshot` compact when:
 - you want a cheap global fallback
 
 Use `geometra_snapshot({ view: "full" })` only for deeper debugging.
+
+Action tools default to terse summaries. Use `detail: "verbose"` when you need a fuller fallback view for debugging.
 
 ## Headed vs Headless
 

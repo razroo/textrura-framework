@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildA11yTree,
   buildCompactUiIndex,
   buildPageModel,
   expandPageSection,
@@ -18,6 +19,7 @@ function node(
     focusable?: boolean
     value?: string
     state?: A11yNode['state']
+    validation?: A11yNode['validation']
     meta?: A11yNode['meta']
     children?: A11yNode[]
   },
@@ -27,6 +29,7 @@ function node(
     ...(name ? { name } : {}),
     ...(options?.value ? { value: options.value } : {}),
     ...(options?.state ? { state: options.state } : {}),
+    ...(options?.validation ? { validation: options.validation } : {}),
     ...(options?.meta ? { meta: options.meta } : {}),
     bounds,
     path: options?.path ?? [],
@@ -112,10 +115,13 @@ describe('buildPageModel', () => {
                 node('textbox', 'Full name*', { x: 60, y: 160, width: 300, height: 36 }, {
                   path: [0, 0, 1],
                   value: 'Taylor Applicant',
+                  state: { required: true },
                 }),
                 node('textbox', 'Email:', { x: 60, y: 208, width: 300, height: 36 }, {
                   path: [0, 0, 2],
                   value: 'taylor@example.com',
+                  state: { invalid: true, required: true },
+                  validation: { error: 'Please enter a valid email address.' },
                 }),
                 node('button', 'Submit application', { x: 60, y: 264, width: 180, height: 40 }, {
                   path: [0, 0, 3],
@@ -143,6 +149,9 @@ describe('buildPageModel', () => {
     })
     expect(detail?.fields.map(field => field.name)).toEqual(['Full name', 'Email'])
     expect(detail?.fields.map(field => field.value)).toEqual(['Taylor Applicant', 'taylor@example.com'])
+    expect(detail?.fields[0]?.state).toEqual({ required: true })
+    expect(detail?.fields[1]?.state).toEqual({ invalid: true, required: true })
+    expect(detail?.fields[1]?.validation).toEqual({ error: 'Please enter a valid email address.' })
     expect(detail?.actions.map(action => action.id)).toEqual(['n:0.0.3'])
     expect(detail?.fields[0]).not.toHaveProperty('bounds')
   })
@@ -379,5 +388,58 @@ describe('buildUiDelta', () => {
       }),
     ])
     expect(summarizeUiDelta(delta)).toContain('value "Austin" -> "Austin, Texas, United States"')
+  })
+})
+
+describe('buildA11yTree', () => {
+  it('maps required, invalid, busy, and validation text from raw semantic nodes', () => {
+    const tree = {
+      kind: 'box',
+      props: {},
+      semantic: {},
+      children: [
+        {
+          kind: 'box',
+          props: { value: '' },
+          semantic: {
+            role: 'textbox',
+            ariaLabel: 'Email',
+            ariaRequired: true,
+            ariaInvalid: true,
+            ariaBusy: true,
+            validationDescription: 'We will contact you about this role.',
+            validationError: 'Please enter a valid email address.',
+          },
+          handlers: { onClick: true, onKeyDown: true },
+        },
+      ],
+    } as Record<string, unknown>
+
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 800,
+      height: 600,
+      children: [
+        {
+          x: 24,
+          y: 40,
+          width: 320,
+          height: 36,
+          children: [],
+        },
+      ],
+    } as Record<string, unknown>
+
+    const a11y = buildA11yTree(tree, layout)
+    expect(a11y.children[0]).toMatchObject({
+      role: 'textbox',
+      name: 'Email',
+      state: { required: true, invalid: true, busy: true },
+      validation: {
+        description: 'We will contact you about this role.',
+        error: 'Please enter a valid email address.',
+      },
+    })
   })
 })

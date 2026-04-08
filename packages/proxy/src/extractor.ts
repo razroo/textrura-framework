@@ -85,6 +85,64 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
     return trimmed.length > 240 ? trimmed.slice(0, 240) : trimmed
   }
 
+  function referencedText(ids: string | null): string | undefined {
+    if (!ids) return undefined
+    const text = ids
+      .split(/\s+/)
+      .map(id => document.getElementById(id)?.textContent?.trim() ?? '')
+      .filter(Boolean)
+      .join(' ')
+    return normalizedControlValue(text)
+  }
+
+  function controlRequired(el: Element): boolean {
+    const ariaRequired = el.getAttribute('aria-required')
+    if (ariaRequired === 'true') return true
+    if (ariaRequired === 'false') return false
+    return (
+      (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) &&
+      el.required
+    )
+  }
+
+  function controlInvalid(el: Element): boolean {
+    const ariaInvalid = el.getAttribute('aria-invalid')
+    if (ariaInvalid && ariaInvalid !== 'false') return true
+    if (ariaInvalid === 'false') return false
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
+      try {
+        if (el.willValidate) return !el.checkValidity()
+      } catch {
+        return false
+      }
+    }
+    return false
+  }
+
+  function controlBusy(el: Element): boolean {
+    return el.getAttribute('aria-busy') === 'true'
+  }
+
+  function looksLikeValidationText(value: string): boolean {
+    return /\b(required|invalid|must|please|enter|select|choose|upload|missing|error)\b/i.test(value)
+  }
+
+  function controlErrorText(el: Element): string | undefined {
+    const err = referencedText(el.getAttribute('aria-errormessage'))
+    if (err) return err
+    if (!controlInvalid(el)) return undefined
+    const described = referencedText(el.getAttribute('aria-describedby'))
+    if (described && looksLikeValidationText(described)) return described
+    return undefined
+  }
+
+  function controlDescriptionText(el: Element): string | undefined {
+    const described = referencedText(el.getAttribute('aria-describedby'))
+    if (!described) return undefined
+    const error = controlErrorText(el)
+    return described === error ? undefined : described
+  }
+
   function controlValueText(el: Element): string | undefined {
     if (el instanceof HTMLInputElement) {
       if (el.type === 'password') return el.value ? '••••••••' : undefined
@@ -227,6 +285,13 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
     if (al) semantic.ariaLabel = al
     const valueText = controlValueText(el)
     if (valueText) semantic.valueText = valueText
+    if (controlRequired(el)) semantic.ariaRequired = true
+    if (controlInvalid(el)) semantic.ariaInvalid = true
+    if (controlBusy(el)) semantic.ariaBusy = true
+    const validationDescription = controlDescriptionText(el)
+    if (validationDescription) semantic.validationDescription = validationDescription
+    const validationError = controlErrorText(el)
+    if (validationError) semantic.validationError = validationError
     const h = el as HTMLElement
     if (h instanceof HTMLInputElement && h.disabled) semantic.ariaDisabled = true
     if (h instanceof HTMLButtonElement && h.disabled) semantic.ariaDisabled = true

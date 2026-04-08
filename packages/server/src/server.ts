@@ -380,13 +380,15 @@ export async function createServer(
           if (computeAndBroadcast()) sendAck()
         } else if (
           msg.type === 'file' ||
+          msg.type === 'setFieldText' ||
+          msg.type === 'setFieldChoice' ||
           msg.type === 'selectOption' ||
           msg.type === 'setChecked' ||
           msg.type === 'listboxPick' ||
           msg.type === 'wheel'
         ) {
           sendError(
-            `Client message type "${msg.type}" is not supported on the native Textura server (DOM-free layout). Use @geometra/proxy for DOM automation (files, listbox, select, checkbox/radio controls, wheel).`,
+            `Client message type "${msg.type}" is not supported on the native Textura server (DOM-free layout). Use @geometra/proxy for DOM automation (files, labeled form fills, listbox, select, checkbox/radio controls, wheel).`,
           )
         } else {
           sendError(`Unsupported client message type "${String((msg as { type?: unknown }).type ?? 'unknown')}"`)

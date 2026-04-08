@@ -98,17 +98,41 @@ export type ClientMessage =
    * the native Textura server responds with `error` — not applicable to DOM-free apps.
    *
    * `paths` are absolute paths on the machine that runs the browser (the proxy process).
-   * With `x`/`y`, the proxy clicks first to trigger a native file chooser; without them,
-   * it attaches to the first `input[type=file]` in any frame.
+   * With `x`/`y`, the proxy clicks first to trigger a native file chooser; with `fieldLabel`,
+   * it prefers a matching labeled file input; otherwise it attaches to the first `input[type=file]`
+   * in any frame.
    */
   | (VersionedMessage & CorrelatedMessage & {
       type: 'file'
       paths: string[]
       x?: number
       y?: number
+      fieldLabel?: string
+      exact?: boolean
       strategy?: 'auto' | 'chooser' | 'hidden' | 'drop'
       dropX?: number
       dropY?: number
+    })
+  /**
+   * Set a labeled text-like field (`<input>`, `<textarea>`, contenteditable, ARIA textbox).
+   * Implemented by `@geometra/proxy`.
+   */
+  | (VersionedMessage & CorrelatedMessage & {
+      type: 'setFieldText'
+      fieldLabel: string
+      value: string
+      exact?: boolean
+    })
+  /**
+   * Choose a value for a labeled choice control (native `<select>`, custom combobox/listbox, or radio-style group).
+   * Implemented by `@geometra/proxy`.
+   */
+  | (VersionedMessage & CorrelatedMessage & {
+      type: 'setFieldChoice'
+      fieldLabel: string
+      value: string
+      query?: string
+      exact?: boolean
     })
   /**
    * Choose an option on a native `<select>` after focusing it (click `x`,`y` on the control).

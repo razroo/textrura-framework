@@ -1,6 +1,9 @@
+import { writeFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { chromium, type Browser } from 'playwright'
-import { pickListboxOption } from '../dom-actions.ts'
+import { attachFiles, pickListboxOption, setFieldChoice, setFieldText } from '../dom-actions.ts'
 
 describe('pickListboxOption', () => {
   let browser: Browser
@@ -273,6 +276,139 @@ describe('pickListboxOption', () => {
 
     expect(await page.locator('#trigger-a').textContent()).toBe('Canada')
     expect(await page.locator('#trigger-b').textContent()).toBe('Choose country')
+    await page.close()
+  })
+})
+
+describe('attachFiles', () => {
+  let browser: Browser
+
+  beforeAll(async () => {
+    browser = await chromium.launch({ headless: true })
+  })
+
+  afterAll(async () => {
+    await browser.close()
+  })
+
+  it('targets a labeled file input instead of the first matching control', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    const tempFile = join(tmpdir(), `geometra-upload-${Date.now()}.txt`)
+    await writeFile(tempFile, 'resume')
+
+    await page.setContent(`
+      <div style="display:grid;gap:16px;width:420px;margin:24px;font-family:sans-serif;">
+        <div>
+          <label for="resume-input">Resume</label>
+          <input id="resume-input" type="file" />
+        </div>
+        <div>
+          <label for="cover-input">Cover Letter</label>
+          <input id="cover-input" type="file" />
+        </div>
+      </div>
+    `)
+
+    try {
+      await attachFiles(page, [tempFile], {
+        fieldLabel: 'Resume',
+      })
+
+      const result = await page.evaluate(() => ({
+        resume: (document.getElementById('resume-input') as HTMLInputElement).files?.length ?? 0,
+        cover: (document.getElementById('cover-input') as HTMLInputElement).files?.length ?? 0,
+      }))
+
+      expect(result).toEqual({ resume: 1, cover: 0 })
+    } finally {
+      await rm(tempFile, { force: true })
+      await page.close()
+    }
+  })
+})
+
+describe('setFieldText', () => {
+  let browser: Browser
+
+  beforeAll(async () => {
+    browser = await chromium.launch({ headless: true })
+  })
+
+  afterAll(async () => {
+    await browser.close()
+  })
+
+  it('fills a labeled text field semantically', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <div style="display:grid;gap:12px;width:320px;margin:24px;font-family:sans-serif;">
+        <label for="full-name">Full name</label>
+        <input id="full-name" />
+      </div>
+    `)
+
+    await setFieldText(page, 'Full name', 'Taylor Applicant')
+
+    expect(await page.locator('#full-name').inputValue()).toBe('Taylor Applicant')
+    await page.close()
+  })
+})
+
+describe('setFieldChoice', () => {
+  let browser: Browser
+
+  beforeAll(async () => {
+    browser = await chromium.launch({ headless: true })
+  })
+
+  afterAll(async () => {
+    await browser.close()
+  })
+
+  it('selects a native select by field label', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <div style="display:grid;gap:12px;width:320px;margin:24px;font-family:sans-serif;">
+        <label for="country">Country</label>
+        <select id="country">
+          <option value="">Choose</option>
+          <option value="de">Germany</option>
+          <option value="us">United States</option>
+        </select>
+      </div>
+    `)
+
+    await setFieldChoice(page, 'Country', 'Germany')
+
+    expect(await page.locator('#country').inputValue()).toBe('de')
+    await page.close()
+  })
+
+  it('chooses repeated yes/no answers by question label', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 900 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; }
+        fieldset { margin-bottom: 18px; }
+      </style>
+      <fieldset id="question-a">
+        <legend>Are you legally authorized to work here?</legend>
+        <label><input type="radio" name="auth" value="yes" /> Yes</label>
+        <label><input type="radio" name="auth" value="no" /> No</label>
+      </fieldset>
+      <fieldset id="question-b">
+        <legend>Will you require sponsorship?</legend>
+        <label><input type="radio" name="sponsor" value="yes" /> Yes</label>
+        <label><input type="radio" name="sponsor" value="no" /> No</label>
+      </fieldset>
+    `)
+
+    await setFieldChoice(page, 'Will you require sponsorship?', 'No')
+
+    expect(await page.locator('#question-a input[value="yes"]').isChecked()).toBe(false)
+    expect(await page.locator('#question-a input[value="no"]').isChecked()).toBe(false)
+    expect(await page.locator('#question-b input[value="yes"]').isChecked()).toBe(false)
+    expect(await page.locator('#question-b input[value="no"]').isChecked()).toBe(true)
     await page.close()
   })
 })

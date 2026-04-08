@@ -10,6 +10,8 @@ import {
   sendType,
   sendKey,
   sendFileUpload,
+  sendFieldText,
+  sendFieldChoice,
   sendListboxPick,
   sendSelectOption,
   sendSetChecked,
@@ -29,6 +31,7 @@ import {
 import type { A11yNode, Session, UpdateWaitResult } from './session.js'
 
 type NodeStateFilterValue = boolean | 'mixed'
+type ResponseDetail = 'minimal' | 'verbose'
 
 interface NodeFilter {
   id?: string
@@ -41,6 +44,9 @@ interface NodeFilter {
   focused?: boolean
   selected?: boolean
   expanded?: boolean
+  invalid?: boolean
+  required?: boolean
+  busy?: boolean
 }
 
 function checkedStateInput() {
@@ -50,9 +56,154 @@ function checkedStateInput() {
     .describe('Match checked state (`true`, `false`, or `mixed`)')
 }
 
+function detailInput() {
+  return z
+    .enum(['minimal', 'verbose'])
+    .optional()
+    .default('minimal')
+    .describe('`minimal` (default) returns terse action summaries. Use `verbose` for a fuller current-UI fallback.')
+}
+
+function nodeFilterShape() {
+  return {
+    id: z.string().optional().describe('Stable node id from geometra_snapshot or geometra_expand_section'),
+    role: z.string().optional().describe('ARIA role to match'),
+    name: z.string().optional().describe('Accessible name to match (exact or substring)'),
+    text: z.string().optional().describe('Text content to search for (substring match)'),
+    value: z.string().optional().describe('Displayed / current field value to match (substring match)'),
+    checked: checkedStateInput(),
+    disabled: z.boolean().optional().describe('Match disabled state'),
+    focused: z.boolean().optional().describe('Match focused state'),
+    selected: z.boolean().optional().describe('Match selected state'),
+    expanded: z.boolean().optional().describe('Match expanded state'),
+    invalid: z.boolean().optional().describe('Match invalid / failed-validation state'),
+    required: z.boolean().optional().describe('Match required-field state'),
+    busy: z.boolean().optional().describe('Match busy / in-progress state'),
+  }
+}
+
+const timeoutMsInput = z.number().int().min(50).max(60_000).optional()
+
+const fillFieldSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('text'),
+    fieldLabel: z.string().describe('Visible field label / accessible name'),
+    value: z.string().describe('Text value to set'),
+    exact: z.boolean().optional().describe('Exact label match'),
+    timeoutMs: timeoutMsInput.describe('Optional action wait timeout'),
+  }),
+  z.object({
+    kind: z.literal('choice'),
+    fieldLabel: z.string().describe('Visible field label / accessible name'),
+    value: z.string().describe('Desired option value / answer label'),
+    query: z.string().optional().describe('Optional search text for searchable comboboxes'),
+    exact: z.boolean().optional().describe('Exact label match'),
+    timeoutMs: timeoutMsInput.describe('Optional action wait timeout'),
+  }),
+  z.object({
+    kind: z.literal('toggle'),
+    label: z.string().describe('Visible checkbox/radio label to set'),
+    checked: z.boolean().optional().default(true).describe('Desired checked state (default true)'),
+    exact: z.boolean().optional().describe('Exact label match'),
+    controlType: z.enum(['checkbox', 'radio']).optional().describe('Limit matching to checkbox or radio'),
+    timeoutMs: timeoutMsInput.describe('Optional action wait timeout'),
+  }),
+  z.object({
+    kind: z.literal('file'),
+    fieldLabel: z.string().describe('Visible file-field label / accessible name'),
+    paths: z.array(z.string()).min(1).describe('Absolute paths on the proxy machine'),
+    exact: z.boolean().optional().describe('Exact label match'),
+    timeoutMs: timeoutMsInput.describe('Optional action wait timeout'),
+  }),
+])
+
+type FillFieldInput = z.infer<typeof fillFieldSchema>
+
+const batchActionSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('click'),
+    x: z.number(),
+    y: z.number(),
+    timeoutMs: timeoutMsInput,
+  }),
+  z.object({
+    type: z.literal('type'),
+    text: z.string(),
+    timeoutMs: timeoutMsInput,
+  }),
+  z.object({
+    type: z.literal('key'),
+    key: z.string(),
+    shift: z.boolean().optional(),
+    ctrl: z.boolean().optional(),
+    meta: z.boolean().optional(),
+    alt: z.boolean().optional(),
+    timeoutMs: timeoutMsInput,
+  }),
+  z.object({
+    type: z.literal('upload_files'),
+    paths: z.array(z.string()).min(1),
+    x: z.number().optional(),
+    y: z.number().optional(),
+    fieldLabel: z.string().optional(),
+    exact: z.boolean().optional(),
+    strategy: z.enum(['auto', 'chooser', 'hidden', 'drop']).optional(),
+    dropX: z.number().optional(),
+    dropY: z.number().optional(),
+    timeoutMs: timeoutMsInput,
+  }),
+  z.object({
+    type: z.literal('pick_listbox_option'),
+    label: z.string(),
+    exact: z.boolean().optional(),
+    openX: z.number().optional(),
+    openY: z.number().optional(),
+    fieldLabel: z.string().optional(),
+    query: z.string().optional(),
+    timeoutMs: timeoutMsInput,
+  }),
+  z.object({
+    type: z.literal('select_option'),
+    x: z.number(),
+    y: z.number(),
+    value: z.string().optional(),
+    label: z.string().optional(),
+    index: z.number().int().min(0).optional(),
+    timeoutMs: timeoutMsInput,
+  }),
+  z.object({
+    type: z.literal('set_checked'),
+    label: z.string(),
+    checked: z.boolean().optional(),
+    exact: z.boolean().optional(),
+    controlType: z.enum(['checkbox', 'radio']).optional(),
+    timeoutMs: timeoutMsInput,
+  }),
+  z.object({
+    type: z.literal('wheel'),
+    deltaY: z.number(),
+    deltaX: z.number().optional(),
+    x: z.number().optional(),
+    y: z.number().optional(),
+    timeoutMs: timeoutMsInput,
+  }),
+  z.object({
+    type: z.literal('wait_for'),
+    ...nodeFilterShape(),
+    present: z.boolean().optional(),
+    timeoutMs: timeoutMsInput,
+  }),
+  z.object({
+    type: z.literal('fill_fields'),
+    fields: z.array(fillFieldSchema).min(1).max(80),
+  }),
+])
+
+type BatchAction = z.infer<typeof batchActionSchema>
+
 export function createServer(): McpServer {
   const server = new McpServer(
-    { name: 'geometra', version: '1.19.9' },
+    { name: 'geometra', version: '1.19.10' },
     { capabilities: { tools: {} } },
   )
 
@@ -137,24 +288,27 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
     `Find elements in the current Geometra UI by stable id, role, name, text content, current value, or semantic state. Returns matching elements with their exact pixel bounds {x, y, width, height}, visible in-viewport bounds, an on-screen center point, visibility / scroll-reveal hints, role, name, value, state, and tree path.
 
 This is the Geometra equivalent of Playwright's locator — but instant, structured, and with no browser. Use the returned bounds to click elements or assert on layout.`,
-    {
-      id: z.string().optional().describe('Stable node id from geometra_snapshot or geometra_expand_section'),
-      role: z.string().optional().describe('ARIA role to match (e.g. "button", "textbox", "text", "heading", "listitem")'),
-      name: z.string().optional().describe('Accessible name to match (exact or substring)'),
-      text: z.string().optional().describe('Text content to search for (substring match)'),
-      value: z.string().optional().describe('Displayed / current field value to match (substring match)'),
-      checked: checkedStateInput(),
-      disabled: z.boolean().optional().describe('Match disabled state'),
-      focused: z.boolean().optional().describe('Match focused state'),
-      selected: z.boolean().optional().describe('Match selected state'),
-      expanded: z.boolean().optional().describe('Match expanded state'),
-    },
-    async ({ id, role, name, text, value, checked, disabled, focused, selected, expanded }) => {
+    nodeFilterShape(),
+    async ({ id, role, name, text, value, checked, disabled, focused, selected, expanded, invalid, required, busy }) => {
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
 
       const a11y = buildA11yTree(session.tree, session.layout)
-      const filter: NodeFilter = { id, role, name, text, value, checked, disabled, focused, selected, expanded }
+      const filter: NodeFilter = {
+        id,
+        role,
+        name,
+        text,
+        value,
+        checked,
+        disabled,
+        focused,
+        selected,
+        expanded,
+        invalid,
+        required,
+        busy,
+      }
       if (!hasNodeFilter(filter)) return err('Provide at least one query filter (id, role, name, text, value, or state)')
       const matches = findNodes(a11y, filter)
 
@@ -173,16 +327,7 @@ This is the Geometra equivalent of Playwright's locator — but instant, structu
 
 The filter matches the same fields as geometra_query. Set \`present: false\` to wait for something to disappear (for example an alert or a "Parsing…" status).`,
     {
-      id: z.string().optional().describe('Stable node id from geometra_snapshot or geometra_expand_section'),
-      role: z.string().optional().describe('ARIA role to match'),
-      name: z.string().optional().describe('Accessible name to match (exact or substring)'),
-      text: z.string().optional().describe('Text content to search for (substring match)'),
-      value: z.string().optional().describe('Displayed / current field value to match (substring match)'),
-      checked: checkedStateInput(),
-      disabled: z.boolean().optional().describe('Match disabled state'),
-      focused: z.boolean().optional().describe('Match focused state'),
-      selected: z.boolean().optional().describe('Match selected state'),
-      expanded: z.boolean().optional().describe('Match expanded state'),
+      ...nodeFilterShape(),
       present: z.boolean().optional().default(true).describe('Wait for a matching node to exist (default true) or disappear'),
       timeoutMs: z
         .number()
@@ -193,11 +338,25 @@ The filter matches the same fields as geometra_query. Set \`present: false\` to 
         .default(10_000)
         .describe('Maximum time to wait before returning an error (default 10000ms)'),
     },
-    async ({ id, role, name, text, value, checked, disabled, focused, selected, expanded, present, timeoutMs }) => {
+    async ({ id, role, name, text, value, checked, disabled, focused, selected, expanded, invalid, required, busy, present, timeoutMs }) => {
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
 
-      const filter: NodeFilter = { id, role, name, text, value, checked, disabled, focused, selected, expanded }
+      const filter: NodeFilter = {
+        id,
+        role,
+        name,
+        text,
+        value,
+        checked,
+        disabled,
+        focused,
+        selected,
+        expanded,
+        invalid,
+        required,
+        busy,
+      }
       if (!hasNodeFilter(filter)) return err('Provide at least one wait filter (id, role, name, text, value, or state)')
 
       const matchesCondition = () => {
@@ -225,6 +384,106 @@ The filter matches the same fields as geometra_query. Set \`present: false\` to 
       const matches = findNodes(after, filter)
       const result = matches.slice(0, 8).map(node => formatNode(node, after.bounds))
       return ok(JSON.stringify(result, null, 2))
+    }
+  )
+
+  server.tool(
+    'geometra_fill_fields',
+    `Fill several labeled form fields in one MCP call. This is the preferred high-level primitive for long forms.
+
+Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / comboboxes / radio-style questions addressed by field label + answer, \`"toggle"\` for individually labeled checkboxes or radios, and \`"file"\` for labeled uploads.`,
+    {
+      fields: z.array(fillFieldSchema).min(1).max(80).describe('Ordered labeled field operations to apply'),
+      stopOnError: z.boolean().optional().default(true).describe('Stop at the first failing field (default true)'),
+      failOnInvalid: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('Return an error if invalid fields remain after filling'),
+      detail: detailInput(),
+    },
+    async ({ fields, stopOnError, failOnInvalid, detail }) => {
+      const session = getSession()
+      if (!session) return err('Not connected. Call geometra_connect first.')
+
+      const steps: Array<Record<string, unknown>> = []
+      let stoppedAt: number | undefined
+
+      for (let index = 0; index < fields.length; index++) {
+        const field = fields[index]!
+        try {
+          const summary = await executeFillField(session, field, detail)
+          steps.push({ index, kind: field.kind, ok: true, summary })
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e)
+          steps.push({ index, kind: field.kind, ok: false, error: message })
+          if (stopOnError) {
+            stoppedAt = index
+            break
+          }
+        }
+      }
+
+      const after = sessionA11y(session)
+      const signals = after ? collectSessionSignals(after) : undefined
+      const invalidRemaining = signals?.invalidFields.length ?? 0
+      const payload = {
+        completed: stoppedAt === undefined && steps.length === fields.length,
+        fieldCount: fields.length,
+        steps,
+        ...(stoppedAt !== undefined ? { stoppedAt } : {}),
+        ...(signals ? { final: sessionSignalsPayload(signals) } : {}),
+      }
+
+      if (failOnInvalid && invalidRemaining > 0) {
+        return err(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
+      }
+
+      return ok(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
+    }
+  )
+
+  server.tool(
+    'geometra_run_actions',
+    `Execute several Geometra actions in one MCP round trip and return one consolidated result. This is the preferred path for long, multi-step form fills where one-tool-per-field would otherwise create too much chatter.
+
+Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_listbox_option\`, \`select_option\`, \`set_checked\`, \`wheel\`, \`wait_for\`, and \`fill_fields\`.`,
+    {
+      actions: z.array(batchActionSchema).min(1).max(80).describe('Ordered high-level action steps to run sequentially'),
+      stopOnError: z.boolean().optional().default(true).describe('Stop at the first failing step (default true)'),
+      detail: detailInput(),
+    },
+    async ({ actions, stopOnError, detail }) => {
+      const session = getSession()
+      if (!session) return err('Not connected. Call geometra_connect first.')
+
+      const steps: Array<Record<string, unknown>> = []
+      let stoppedAt: number | undefined
+
+      for (let index = 0; index < actions.length; index++) {
+        const action = actions[index]!
+        try {
+          const summary = await executeBatchAction(session, action, detail)
+          steps.push({ index, type: action.type, ok: true, summary })
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e)
+          steps.push({ index, type: action.type, ok: false, error: message })
+          if (stopOnError) {
+            stoppedAt = index
+            break
+          }
+        }
+      }
+
+      const after = sessionA11y(session)
+      const payload = {
+        completed: stoppedAt === undefined && steps.length === actions.length,
+        stepCount: actions.length,
+        steps,
+        ...(stoppedAt !== undefined ? { stoppedAt } : {}),
+        ...(after ? { final: sessionSignalsPayload(collectSessionSignals(after)) } : {}),
+      }
+      return ok(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
     }
   )
 
@@ -312,15 +571,16 @@ After clicking, returns a compact semantic delta when possible (dialogs/forms/li
         .max(60_000)
         .optional()
         .describe('Optional action wait timeout (use a longer value for slow submits or route transitions)'),
+      detail: detailInput(),
     },
-    async ({ x, y, timeoutMs }) => {
+    async ({ x, y, timeoutMs, detail }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
 
       const wait = await sendClick(session, x, y, timeoutMs)
 
-      const summary = postActionSummary(session, before, wait)
+      const summary = postActionSummary(session, before, wait, detail)
       return ok(`Clicked at (${x}, ${y}).\n${summary}`)
     }
   )
@@ -340,15 +600,16 @@ Each character is sent as a key event through the geometry protocol. Returns a c
         .max(60_000)
         .optional()
         .describe('Optional action wait timeout'),
+      detail: detailInput(),
     },
-    async ({ text, timeoutMs }) => {
+    async ({ text, timeoutMs, detail }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
 
       const wait = await sendType(session, text, timeoutMs)
 
-      const summary = postActionSummary(session, before, wait)
+      const summary = postActionSummary(session, before, wait, detail)
       return ok(`Typed "${text}".\n${summary}`)
     }
   )
@@ -370,15 +631,16 @@ Each character is sent as a key event through the geometry protocol. Returns a c
         .max(60_000)
         .optional()
         .describe('Optional action wait timeout'),
+      detail: detailInput(),
     },
-    async ({ key, shift, ctrl, meta, alt, timeoutMs }) => {
+    async ({ key, shift, ctrl, meta, alt, timeoutMs, detail }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
 
       const wait = await sendKey(session, key, { shift, ctrl, meta, alt }, timeoutMs)
 
-      const summary = postActionSummary(session, before, wait)
+      const summary = postActionSummary(session, before, wait, detail)
       return ok(`Pressed ${formatKeyCombo(key, { shift, ctrl, meta, alt })}.\n${summary}`)
     }
   )
@@ -388,11 +650,13 @@ Each character is sent as a key event through the geometry protocol. Returns a c
     'geometra_upload_files',
     `Attach local files to a file input. Requires \`@geometra/proxy\` (paths exist on the proxy host).
 
-Strategies: **auto** (default) tries chooser click if x,y given, else hidden \`input[type=file]\`, else first visible file input. **hidden** targets hidden inputs directly. **drop** needs dropX,dropY for drag-target zones. **chooser** requires x,y.`,
+Strategies: **auto** (default) tries chooser click if x,y given, else a labeled file input when \`fieldLabel\` is provided, else hidden \`input[type=file]\`, else first visible file input. **hidden** targets hidden inputs directly. **drop** needs dropX,dropY for drag-target zones. **chooser** requires x,y.`,
     {
       paths: z.array(z.string()).min(1).describe('Absolute paths on the proxy machine, e.g. /Users/you/resume.pdf'),
       x: z.number().optional().describe('Click X to trigger native file chooser'),
       y: z.number().optional().describe('Click Y to trigger native file chooser'),
+      fieldLabel: z.string().optional().describe('Prefer a specific labeled file field (for example "Resume" or "Cover letter")'),
+      exact: z.boolean().optional().describe('Exact match when using fieldLabel'),
       strategy: z
         .enum(['auto', 'chooser', 'hidden', 'drop'])
         .optional()
@@ -406,18 +670,21 @@ Strategies: **auto** (default) tries chooser click if x,y given, else hidden \`i
         .max(60_000)
         .optional()
         .describe('Optional action wait timeout (resume parsing / SPA upload flows often need longer than a normal click)'),
+      detail: detailInput(),
     },
-    async ({ paths, x, y, strategy, dropX, dropY, timeoutMs }) => {
+    async ({ paths, x, y, fieldLabel, exact, strategy, dropX, dropY, timeoutMs, detail }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
       try {
         const wait = await sendFileUpload(session, paths, {
           click: x !== undefined && y !== undefined ? { x, y } : undefined,
+          fieldLabel,
+          exact,
           strategy,
           drop: dropX !== undefined && dropY !== undefined ? { x: dropX, y: dropY } : undefined,
         }, timeoutMs ?? 8_000)
-        const summary = postActionSummary(session, before, wait)
+        const summary = postActionSummary(session, before, wait, detail)
         return ok(`Uploaded ${paths.length} file(s).\n${summary}`)
       } catch (e) {
         return err((e as Error).message)
@@ -444,8 +711,9 @@ Pass \`fieldLabel\` to open a labeled dropdown semantically instead of relying o
         .max(60_000)
         .optional()
         .describe('Optional action wait timeout for slow dropdowns / remote search results'),
+      detail: detailInput(),
     },
-    async ({ label, exact, openX, openY, fieldLabel, query, timeoutMs }) => {
+    async ({ label, exact, openX, openY, fieldLabel, query, timeoutMs, detail }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
@@ -456,7 +724,7 @@ Pass \`fieldLabel\` to open a labeled dropdown semantically instead of relying o
           fieldLabel,
           query,
         }, timeoutMs)
-        const summary = postActionSummary(session, before, wait)
+        const summary = postActionSummary(session, before, wait, detail)
         const fieldSummary = fieldLabel ? summarizeFieldLabelState(session, fieldLabel) : undefined
         return ok([
           `Picked listbox option "${label}".`,
@@ -488,8 +756,9 @@ Custom React/Vue dropdowns are not supported — open them with geometra_click a
         .max(60_000)
         .optional()
         .describe('Optional action wait timeout'),
+      detail: detailInput(),
     },
-    async ({ x, y, value, label, index, timeoutMs }) => {
+    async ({ x, y, value, label, index, timeoutMs, detail }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       if (value === undefined && label === undefined && index === undefined) {
@@ -498,7 +767,7 @@ Custom React/Vue dropdowns are not supported — open them with geometra_click a
       const before = sessionA11y(session)
       try {
         const wait = await sendSelectOption(session, x, y, { value, label, index }, timeoutMs)
-        const summary = postActionSummary(session, before, wait)
+        const summary = postActionSummary(session, before, wait, detail)
         return ok(`Selected option.\n${summary}`)
       } catch (e) {
         return err((e as Error).message)
@@ -523,14 +792,15 @@ Prefer this over raw coordinate clicks for custom forms that keep the real input
         .max(60_000)
         .optional()
         .describe('Optional action wait timeout'),
+      detail: detailInput(),
     },
-    async ({ label, checked, exact, controlType, timeoutMs }) => {
+    async ({ label, checked, exact, controlType, timeoutMs, detail }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
       try {
         const wait = await sendSetChecked(session, label, { checked, exact, controlType }, timeoutMs)
-        const summary = postActionSummary(session, before, wait)
+        const summary = postActionSummary(session, before, wait, detail)
         return ok(`Set ${controlType ?? 'checkbox/radio'} "${label}" to ${String(checked ?? true)}.\n${summary}`)
       } catch (e) {
         return err((e as Error).message)
@@ -554,14 +824,15 @@ Prefer this over raw coordinate clicks for custom forms that keep the real input
         .max(60_000)
         .optional()
         .describe('Optional action wait timeout'),
+      detail: detailInput(),
     },
-    async ({ deltaY, deltaX, x, y, timeoutMs }) => {
+    async ({ deltaY, deltaX, x, y, timeoutMs, detail }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
       try {
         const wait = await sendWheel(session, deltaY, { deltaX, x, y }, timeoutMs)
-        const summary = postActionSummary(session, before, wait)
+        const summary = postActionSummary(session, before, wait, detail)
         return ok(`Wheel delta (${deltaX ?? 0}, ${deltaY}).\n${summary}`)
       } catch (e) {
         return err((e as Error).message)
@@ -660,25 +931,43 @@ function sessionOverviewFromA11y(a11y: A11yNode): string {
   return [pageSummary, contextSummary, keyNodes].filter(Boolean).join('\n')
 }
 
-function postActionSummary(session: Session, before: A11yNode | null, wait?: UpdateWaitResult): string {
+function postActionSummary(
+  session: Session,
+  before: A11yNode | null,
+  wait?: UpdateWaitResult,
+  detail: ResponseDetail = 'minimal',
+): string {
   const after = sessionA11y(session)
   const notes: string[] = []
   if (wait?.status === 'acknowledged') {
-    notes.push('The peer acknowledged the action quickly; waiting logic did not need to rely on a full frame/patch round-trip.')
+    notes.push(detail === 'verbose'
+      ? 'The peer acknowledged the action quickly; waiting logic did not need to rely on a full frame/patch round-trip.'
+      : 'Peer acknowledged the action quickly.')
   }
   if (wait?.status === 'timed_out') {
     notes.push(
-      `No frame or patch arrived within ${wait.timeoutMs}ms after the action. The action may still have succeeded if it did not change geometry or semantics.`,
+      detail === 'verbose'
+        ? `No frame or patch arrived within ${wait.timeoutMs}ms after the action. The action may still have succeeded if it did not change geometry or semantics.`
+        : `No update arrived within ${wait.timeoutMs}ms; the action may still have succeeded.`,
     )
   }
   if (!after) return [...notes, 'No UI update received'].filter(Boolean).join('\n')
+  const signals = collectSessionSignals(after)
+  const validationSummary = summarizeValidationSignals(signals)
   if (before) {
     const delta = buildUiDelta(before, after)
     if (hasUiDelta(delta)) {
-      return [...notes, `Changes:\n${summarizeUiDelta(delta)}`].filter(Boolean).join('\n')
+      return [
+        ...notes,
+        `Changes:\n${summarizeUiDelta(delta, detail === 'verbose' ? 14 : 8)}`,
+        ...(detail === 'minimal' ? validationSummary : []),
+      ].filter(Boolean).join('\n')
     }
   }
-  return [...notes, `Current UI:\n${sessionOverviewFromA11y(after)}`].filter(Boolean).join('\n')
+  if (detail === 'verbose') {
+    return [...notes, `Current UI:\n${sessionOverviewFromA11y(after)}`].filter(Boolean).join('\n')
+  }
+  return [...notes, summarizeSessionSignals(signals), ...validationSummary].filter(Boolean).join('\n')
 }
 
 function summarizeCompactContext(context: ReturnType<typeof buildCompactUiIndex>['context']): string {
@@ -692,6 +981,329 @@ function summarizeCompactContext(context: ReturnType<typeof buildCompactUiIndex>
     parts.push(`focus=${context.focusedNode.role}${focusName}`)
   }
   return parts.length > 0 ? `Context: ${parts.join(' | ')}` : ''
+}
+
+interface SessionSignals {
+  pageUrl?: string
+  scrollX?: number
+  scrollY?: number
+  focus?: {
+    id: string
+    role: string
+    name?: string
+    value?: string
+  }
+  dialogCount: number
+  busyCount: number
+  alerts: string[]
+  invalidFields: Array<{
+    id: string
+    role: string
+    name?: string
+    error?: string
+  }>
+}
+
+function collectSessionSignals(root: A11yNode): SessionSignals {
+  const signals: SessionSignals = {
+    ...(root.meta?.pageUrl ? { pageUrl: root.meta.pageUrl } : {}),
+    ...(typeof root.meta?.scrollX === 'number' ? { scrollX: root.meta.scrollX } : {}),
+    ...(typeof root.meta?.scrollY === 'number' ? { scrollY: root.meta.scrollY } : {}),
+    dialogCount: 0,
+    busyCount: 0,
+    alerts: [],
+    invalidFields: [],
+  }
+
+  const seenAlerts = new Set<string>()
+  const seenInvalidIds = new Set<string>()
+
+  function walk(node: A11yNode) {
+    if (!signals.focus && node.state?.focused) {
+      signals.focus = {
+        id: nodeIdForPath(node.path),
+        role: node.role,
+        ...(node.name ? { name: node.name } : {}),
+        ...(node.value ? { value: node.value } : {}),
+      }
+    }
+    if (node.role === 'dialog' || node.role === 'alertdialog') signals.dialogCount++
+    if (node.state?.busy) signals.busyCount++
+    if (node.role === 'alert' || node.role === 'alertdialog') {
+      const text = truncateInlineText(node.name ?? node.validation?.error, 120)
+      if (text && !seenAlerts.has(text)) {
+        seenAlerts.add(text)
+        signals.alerts.push(text)
+      }
+    }
+    if ((node.role === 'textbox' || node.role === 'combobox' || node.role === 'checkbox' || node.role === 'radio') && node.state?.invalid) {
+      const id = nodeIdForPath(node.path)
+      if (!seenInvalidIds.has(id)) {
+        seenInvalidIds.add(id)
+        signals.invalidFields.push({
+          id,
+          role: node.role,
+          ...(node.name ? { name: truncateInlineText(node.name, 80) } : {}),
+          ...(node.validation?.error ? { error: truncateInlineText(node.validation.error, 120) } : {}),
+        })
+      }
+    }
+    for (const child of node.children) walk(child)
+  }
+
+  walk(root)
+  return signals
+}
+
+function summarizeSessionSignals(signals: SessionSignals): string {
+  const contextParts: string[] = []
+  if (signals.pageUrl) contextParts.push(`url=${signals.pageUrl}`)
+  if (signals.scrollX !== undefined || signals.scrollY !== undefined) {
+    contextParts.push(`scroll=(${signals.scrollX ?? 0},${signals.scrollY ?? 0})`)
+  }
+  if (signals.focus) {
+    const focusName = signals.focus.name ? ` "${truncateInlineText(signals.focus.name, 48)}"` : ''
+    const focusValue = signals.focus.value ? ` value=${JSON.stringify(truncateInlineText(signals.focus.value, 40))}` : ''
+    contextParts.push(`focus=${signals.focus.role}${focusName}${focusValue}`)
+  }
+
+  const statusParts = [
+    signals.dialogCount > 0 ? `dialogs=${signals.dialogCount}` : undefined,
+    signals.alerts.length > 0 ? `alerts=${signals.alerts.length}` : undefined,
+    signals.invalidFields.length > 0 ? `invalid=${signals.invalidFields.length}` : undefined,
+    signals.busyCount > 0 ? `busy=${signals.busyCount}` : undefined,
+  ].filter(Boolean)
+
+  return [
+    contextParts.length > 0 ? `Context: ${contextParts.join(' | ')}` : undefined,
+    statusParts.length > 0 ? `Status: ${statusParts.join(' | ')}` : 'Status: no semantic changes detected.',
+  ].filter(Boolean).join('\n')
+}
+
+function summarizeValidationSignals(signals: SessionSignals): string[] {
+  const lines: string[] = []
+  if (signals.alerts.length > 0) {
+    lines.push(`Alerts: ${signals.alerts.slice(0, 2).map(text => JSON.stringify(text)).join(' | ')}`)
+  }
+  if (signals.invalidFields.length > 0) {
+    const invalidSummary = signals.invalidFields
+      .slice(0, 4)
+      .map(field => {
+        const label = field.name ? `"${field.name}"` : field.id
+        return field.error ? `${label}: ${JSON.stringify(field.error)}` : label
+      })
+      .join(' | ')
+    lines.push(`Validation: ${invalidSummary}`)
+  }
+  return lines
+}
+
+function truncateInlineText(text: string | undefined, max: number): string | undefined {
+  if (!text) return undefined
+  const normalized = text.replace(/\s+/g, ' ').trim()
+  if (!normalized) return undefined
+  return normalized.length > max ? `${normalized.slice(0, max - 1)}…` : normalized
+}
+
+function sessionSignalsPayload(signals: SessionSignals): Record<string, unknown> {
+  return {
+    ...(signals.pageUrl ? { pageUrl: signals.pageUrl } : {}),
+    ...(signals.scrollX !== undefined || signals.scrollY !== undefined
+      ? { scroll: { x: signals.scrollX ?? 0, y: signals.scrollY ?? 0 } }
+      : {}),
+    ...(signals.focus ? { focus: signals.focus } : {}),
+    dialogCount: signals.dialogCount,
+    busyCount: signals.busyCount,
+    alerts: signals.alerts,
+    invalidFields: signals.invalidFields,
+  }
+}
+
+async function executeBatchAction(session: Session, action: BatchAction, detail: ResponseDetail): Promise<string> {
+  switch (action.type) {
+    case 'click': {
+      const before = sessionA11y(session)
+      const wait = await sendClick(session, action.x, action.y, action.timeoutMs)
+      return `Clicked at (${action.x}, ${action.y}).\n${postActionSummary(session, before, wait, detail)}`
+    }
+    case 'type': {
+      const before = sessionA11y(session)
+      const wait = await sendType(session, action.text, action.timeoutMs)
+      return `Typed "${action.text}".\n${postActionSummary(session, before, wait, detail)}`
+    }
+    case 'key': {
+      const before = sessionA11y(session)
+      const wait = await sendKey(
+        session,
+        action.key,
+        { shift: action.shift, ctrl: action.ctrl, meta: action.meta, alt: action.alt },
+        action.timeoutMs,
+      )
+      return `Pressed ${formatKeyCombo(action.key, action)}.\n${postActionSummary(session, before, wait, detail)}`
+    }
+    case 'upload_files': {
+      const before = sessionA11y(session)
+      const wait = await sendFileUpload(session, action.paths, {
+        click: action.x !== undefined && action.y !== undefined ? { x: action.x, y: action.y } : undefined,
+        fieldLabel: action.fieldLabel,
+        exact: action.exact,
+        strategy: action.strategy,
+        drop: action.dropX !== undefined && action.dropY !== undefined ? { x: action.dropX, y: action.dropY } : undefined,
+      }, action.timeoutMs ?? 8_000)
+      return `Uploaded ${action.paths.length} file(s).\n${postActionSummary(session, before, wait, detail)}`
+    }
+    case 'pick_listbox_option': {
+      const before = sessionA11y(session)
+      const wait = await sendListboxPick(session, action.label, {
+        exact: action.exact,
+        open: action.openX !== undefined && action.openY !== undefined ? { x: action.openX, y: action.openY } : undefined,
+        fieldLabel: action.fieldLabel,
+        query: action.query,
+      }, action.timeoutMs)
+      const summary = postActionSummary(session, before, wait, detail)
+      const fieldSummary = action.fieldLabel ? summarizeFieldLabelState(session, action.fieldLabel) : undefined
+      return [`Picked listbox option "${action.label}".`, fieldSummary, summary].filter(Boolean).join('\n')
+    }
+    case 'select_option': {
+      if (action.value === undefined && action.label === undefined && action.index === undefined) {
+        throw new Error('select_option step requires at least one of value, label, or index')
+      }
+      const before = sessionA11y(session)
+      const wait = await sendSelectOption(session, action.x, action.y, {
+        value: action.value,
+        label: action.label,
+        index: action.index,
+      }, action.timeoutMs)
+      return `Selected option.\n${postActionSummary(session, before, wait, detail)}`
+    }
+    case 'set_checked': {
+      const before = sessionA11y(session)
+      const wait = await sendSetChecked(session, action.label, {
+        checked: action.checked,
+        exact: action.exact,
+        controlType: action.controlType,
+      }, action.timeoutMs)
+      return `Set ${action.controlType ?? 'checkbox/radio'} "${action.label}" to ${String(action.checked ?? true)}.\n${postActionSummary(session, before, wait, detail)}`
+    }
+    case 'wheel': {
+      const before = sessionA11y(session)
+      const wait = await sendWheel(session, action.deltaY, {
+        deltaX: action.deltaX,
+        x: action.x,
+        y: action.y,
+      }, action.timeoutMs)
+      return `Wheel delta (${action.deltaX ?? 0}, ${action.deltaY}).\n${postActionSummary(session, before, wait, detail)}`
+    }
+    case 'wait_for': {
+      if (!session.tree || !session.layout) throw new Error('Not connected. Call geometra_connect first.')
+      const filter: NodeFilter = {
+        id: action.id,
+        role: action.role,
+        name: action.name,
+        text: action.text,
+        value: action.value,
+        checked: action.checked,
+        disabled: action.disabled,
+        focused: action.focused,
+        selected: action.selected,
+        expanded: action.expanded,
+        invalid: action.invalid,
+        required: action.required,
+        busy: action.busy,
+      }
+      if (!hasNodeFilter(filter)) {
+        throw new Error('wait_for step requires at least one filter')
+      }
+      const present = action.present ?? true
+      const timeoutMs = action.timeoutMs ?? 10_000
+      const startedAt = Date.now()
+      const matched = await waitForUiCondition(session, () => {
+        if (!session.tree || !session.layout) return false
+        const a11y = buildA11yTree(session.tree, session.layout)
+        const matches = findNodes(a11y, filter)
+        return present ? matches.length > 0 : matches.length === 0
+      }, timeoutMs)
+      const elapsedMs = Date.now() - startedAt
+      if (!matched) {
+        throw new Error(`Timed out after ${timeoutMs}ms waiting for ${present ? 'presence' : 'absence'} of ${JSON.stringify(filter)}`)
+      }
+      if (!present) {
+        return `Condition satisfied after ${elapsedMs}ms: no nodes matched ${JSON.stringify(filter)}.`
+      }
+      const after = sessionA11y(session)
+      if (!after) {
+        return `Condition satisfied after ${elapsedMs}ms for ${JSON.stringify(filter)}.`
+      }
+      const matches = findNodes(after, filter)
+      if (detail === 'verbose') {
+        return JSON.stringify(matches.slice(0, 8).map(node => formatNode(node, after.bounds)), null, 2)
+      }
+      return `Condition satisfied after ${elapsedMs}ms with ${matches.length} matching node(s).`
+    }
+    case 'fill_fields': {
+      const lines: string[] = []
+      for (const field of action.fields) {
+        lines.push(await executeFillField(session, field, detail))
+      }
+      return lines.join('\n')
+    }
+  }
+}
+
+async function executeFillField(session: Session, field: FillFieldInput, detail: ResponseDetail): Promise<string> {
+  switch (field.kind) {
+    case 'text': {
+      const before = sessionA11y(session)
+      const wait = await sendFieldText(session, field.fieldLabel, field.value, { exact: field.exact }, field.timeoutMs)
+      const fieldSummary = summarizeFieldLabelState(session, field.fieldLabel)
+      return [
+        `Filled text field "${field.fieldLabel}".`,
+        fieldSummary,
+        postActionSummary(session, before, wait, detail),
+      ].filter(Boolean).join('\n')
+    }
+    case 'choice': {
+      const before = sessionA11y(session)
+      const wait = await sendFieldChoice(
+        session,
+        field.fieldLabel,
+        field.value,
+        { exact: field.exact, query: field.query },
+        field.timeoutMs,
+      )
+      const fieldSummary = summarizeFieldLabelState(session, field.fieldLabel)
+      return [
+        `Set choice field "${field.fieldLabel}" to "${field.value}".`,
+        fieldSummary,
+        postActionSummary(session, before, wait, detail),
+      ].filter(Boolean).join('\n')
+    }
+    case 'toggle': {
+      const before = sessionA11y(session)
+      const wait = await sendSetChecked(
+        session,
+        field.label,
+        { checked: field.checked, exact: field.exact, controlType: field.controlType },
+        field.timeoutMs,
+      )
+      return `Set ${field.controlType ?? 'checkbox/radio'} "${field.label}" to ${String(field.checked ?? true)}.\n${postActionSummary(session, before, wait, detail)}`
+    }
+    case 'file': {
+      const before = sessionA11y(session)
+      const wait = await sendFileUpload(
+        session,
+        field.paths,
+        { fieldLabel: field.fieldLabel, exact: field.exact },
+        field.timeoutMs ?? 8_000,
+      )
+      const fieldSummary = summarizeFieldLabelState(session, field.fieldLabel)
+      return [
+        `Uploaded ${field.paths.length} file(s) to "${field.fieldLabel}".`,
+        fieldSummary,
+        postActionSummary(session, before, wait, detail),
+      ].filter(Boolean).join('\n')
+    }
+  }
 }
 
 function ok(text: string) {
@@ -717,12 +1329,21 @@ function nodeMatchesFilter(node: A11yNode, filter: NodeFilter): boolean {
   if (filter.role && node.role !== filter.role) return false
   if (!textMatches(node.name, filter.name)) return false
   if (!textMatches(node.value, filter.value)) return false
-  if (filter.text && !textMatches(`${node.name ?? ''} ${node.value ?? ''}`.trim(), filter.text)) return false
+  if (
+    filter.text &&
+    !textMatches(
+      `${node.name ?? ''} ${node.value ?? ''} ${node.validation?.error ?? ''} ${node.validation?.description ?? ''}`.trim(),
+      filter.text,
+    )
+  ) return false
   if (filter.checked !== undefined && node.state?.checked !== filter.checked) return false
   if (filter.disabled !== undefined && (node.state?.disabled ?? false) !== filter.disabled) return false
   if (filter.focused !== undefined && (node.state?.focused ?? false) !== filter.focused) return false
   if (filter.selected !== undefined && (node.state?.selected ?? false) !== filter.selected) return false
   if (filter.expanded !== undefined && (node.state?.expanded ?? false) !== filter.expanded) return false
+  if (filter.invalid !== undefined && (node.state?.invalid ?? false) !== filter.invalid) return false
+  if (filter.required !== undefined && (node.state?.required ?? false) !== filter.required) return false
+  if (filter.busy !== undefined && (node.state?.busy ?? false) !== filter.busy) return false
   return true
 }
 
@@ -756,6 +1377,7 @@ function summarizeFieldLabelState(session: Session, fieldLabel: string): string 
   const parts = [`Field "${fieldLabel}"`]
   if (match.value) parts.push(`value=${JSON.stringify(match.value)}`)
   if (match.state && Object.keys(match.state).length > 0) parts.push(`state=${JSON.stringify(match.state)}`)
+  if (match.validation?.error) parts.push(`error=${JSON.stringify(match.validation.error)}`)
   return parts.join(' ')
 }
 
@@ -812,6 +1434,7 @@ function formatNode(
     },
     focusable: node.focusable,
     ...(node.state && Object.keys(node.state).length > 0 ? { state: node.state } : {}),
+    ...(node.validation && Object.keys(node.validation).length > 0 ? { validation: node.validation } : {}),
     path: node.path,
   }
 }
