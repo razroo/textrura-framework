@@ -21,8 +21,8 @@ Geometra proxy:       Chromium → DOM geometry → same WebSocket as native →
 | `geometra_connect` | Connect with `url` (ws://…) **or** `pageUrl` (https://…) to auto-start geometra-proxy; `url: "https://…"` is auto-coerced onto the proxy path |
 | `geometra_query` | Find elements by stable id, role, name, text content, current value, or semantic state such as `invalid`, `required`, or `busy` |
 | `geometra_wait_for` | Wait for a semantic condition instead of guessing sleeps (`busy`, `disabled`, alerts, values, etc.) |
-| `geometra_fill_fields` | Fill labeled text/choice/toggle/file fields in one MCP call |
-| `geometra_run_actions` | Execute a batch of high-level actions in one MCP round trip and get one consolidated result |
+| `geometra_fill_fields` | Fill labeled text/choice/toggle/file fields in one MCP call; can return final-only status for the smallest responses |
+| `geometra_run_actions` | Execute a batch of high-level actions in one MCP round trip and get one consolidated result, with optional final-only output |
 | `geometra_page_model` | Summary-first webpage model: archetypes, stable section ids, counts, top-level sections, primary actions |
 | `geometra_expand_section` | Expand one form/dialog/list/landmark from `geometra_page_model` on demand |
 | `geometra_click` | Click an element by coordinates |
@@ -328,6 +328,11 @@ Typical batch:
 
 Single action tools now default to terse summaries. Pass `detail: "verbose"` when you need a fuller current-UI fallback for debugging.
 
+For the smallest long-form responses, prefer:
+
+1. `detail: "minimal"` for structured step metadata instead of narrated deltas
+2. `includeSteps: false` when you only need aggregate success/error counts plus the final validation/state payload
+
 Typical field fill:
 
 ```json
@@ -339,7 +344,9 @@ Typical field fill:
     { "kind": "choice", "fieldLabel": "Will you require sponsorship?", "value": "No" },
     { "kind": "file", "fieldLabel": "Resume", "paths": ["/Users/you/resume.pdf"] }
   ],
-  "failOnInvalid": true
+  "failOnInvalid": true,
+  "detail": "minimal",
+  "includeSteps": false
 }
 ```
 

@@ -49,6 +49,19 @@ interface NodeFilter {
   busy?: boolean
 }
 
+interface StepExecutionResult {
+  summary: string
+  compact: Record<string, unknown>
+}
+
+interface FieldStatePayload {
+  role: string
+  value?: string
+  valueLength?: number
+  state?: A11yNode['state']
+  error?: string
+}
+
 function checkedStateInput() {
   return z
     .union([z.boolean(), z.literal('mixed')])
@@ -203,7 +216,7 @@ type BatchAction = z.infer<typeof batchActionSchema>
 
 export function createServer(): McpServer {
   const server = new McpServer(
-    { name: 'geometra', version: '1.19.10' },
+    { name: 'geometra', version: '1.19.11' },
     { capabilities: { tools: {} } },
   )
 
@@ -400,9 +413,14 @@ Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / combo
         .optional()
         .default(false)
         .describe('Return an error if invalid fields remain after filling'),
+      includeSteps: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe('Include per-field step results in the JSON payload (default true). Set false for the smallest batch response.'),
       detail: detailInput(),
     },
-    async ({ fields, stopOnError, failOnInvalid, detail }) => {
+    async ({ fields, stopOnError, failOnInvalid, includeSteps, detail }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
 
@@ -412,8 +430,10 @@ Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / combo
       for (let index = 0; index < fields.length; index++) {
         const field = fields[index]!
         try {
-          const summary = await executeFillField(session, field, detail)
-          steps.push({ index, kind: field.kind, ok: true, summary })
+          const result = await executeFillField(session, field, detail)
+          steps.push(detail === 'verbose'
+            ? { index, kind: field.kind, ok: true, summary: result.summary }
+            : { index, kind: field.kind, ok: true, ...result.compact })
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e)
           steps.push({ index, kind: field.kind, ok: false, error: message })
@@ -427,12 +447,16 @@ Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / combo
       const after = sessionA11y(session)
       const signals = after ? collectSessionSignals(after) : undefined
       const invalidRemaining = signals?.invalidFields.length ?? 0
+      const successCount = steps.filter(step => step.ok === true).length
+      const errorCount = steps.length - successCount
       const payload = {
         completed: stoppedAt === undefined && steps.length === fields.length,
         fieldCount: fields.length,
-        steps,
+        successCount,
+        errorCount,
+        ...(includeSteps ? { steps } : {}),
         ...(stoppedAt !== undefined ? { stoppedAt } : {}),
-        ...(signals ? { final: sessionSignalsPayload(signals) } : {}),
+        ...(signals ? { final: sessionSignalsPayload(signals, detail) } : {}),
       }
 
       if (failOnInvalid && invalidRemaining > 0) {
@@ -451,9 +475,14 @@ Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_lis
     {
       actions: z.array(batchActionSchema).min(1).max(80).describe('Ordered high-level action steps to run sequentially'),
       stopOnError: z.boolean().optional().default(true).describe('Stop at the first failing step (default true)'),
+      includeSteps: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe('Include per-action step results in the JSON payload (default true). Set false for the smallest batch response.'),
       detail: detailInput(),
     },
-    async ({ actions, stopOnError, detail }) => {
+    async ({ actions, stopOnError, includeSteps, detail }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
 
@@ -463,8 +492,10 @@ Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_lis
       for (let index = 0; index < actions.length; index++) {
         const action = actions[index]!
         try {
-          const summary = await executeBatchAction(session, action, detail)
-          steps.push({ index, type: action.type, ok: true, summary })
+          const result = await executeBatchAction(session, action, detail, includeSteps)
+          steps.push(detail === 'verbose'
+            ? { index, type: action.type, ok: true, summary: result.summary }
+            : { index, type: action.type, ok: true, ...result.compact })
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e)
           steps.push({ index, type: action.type, ok: false, error: message })
@@ -476,12 +507,16 @@ Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_lis
       }
 
       const after = sessionA11y(session)
+      const successCount = steps.filter(step => step.ok === true).length
+      const errorCount = steps.length - successCount
       const payload = {
         completed: stoppedAt === undefined && steps.length === actions.length,
         stepCount: actions.length,
-        steps,
+        successCount,
+        errorCount,
+        ...(includeSteps ? { steps } : {}),
         ...(stoppedAt !== undefined ? { stoppedAt } : {}),
-        ...(after ? { final: sessionSignalsPayload(collectSessionSignals(after)) } : {}),
+        ...(after ? { final: sessionSignalsPayload(collectSessionSignals(after), detail) } : {}),
       }
       return ok(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
     }
@@ -1105,7 +1140,7 @@ function truncateInlineText(text: string | undefined, max: number): string | und
   return normalized.length > max ? `${normalized.slice(0, max - 1)}…` : normalized
 }
 
-function sessionSignalsPayload(signals: SessionSignals): Record<string, unknown> {
+function sessionSignalsPayload(signals: SessionSignals, detail: ResponseDetail = 'minimal'): Record<string, unknown> {
   return {
     ...(signals.pageUrl ? { pageUrl: signals.pageUrl } : {}),
     ...(signals.scrollX !== undefined || signals.scrollY !== undefined
@@ -1114,22 +1149,82 @@ function sessionSignalsPayload(signals: SessionSignals): Record<string, unknown>
     ...(signals.focus ? { focus: signals.focus } : {}),
     dialogCount: signals.dialogCount,
     busyCount: signals.busyCount,
-    alerts: signals.alerts,
-    invalidFields: signals.invalidFields,
+    alertCount: signals.alerts.length,
+    invalidCount: signals.invalidFields.length,
+    alerts: detail === 'verbose' ? signals.alerts : signals.alerts.slice(0, 2),
+    invalidFields: detail === 'verbose' ? signals.invalidFields : signals.invalidFields.slice(0, 4),
   }
 }
 
-async function executeBatchAction(session: Session, action: BatchAction, detail: ResponseDetail): Promise<string> {
+function compactTextValue(value: string, inlineLimit = 48): { value?: string; valueLength?: number } {
+  const normalized = value.replace(/\s+/g, ' ').trim()
+  if (!normalized) return { valueLength: value.length }
+  return normalized.length <= inlineLimit
+    ? { value: normalized }
+    : { valueLength: value.length }
+}
+
+function fieldStatePayload(session: Session, fieldLabel: string): FieldStatePayload | undefined {
+  const a11y = sessionA11y(session)
+  if (!a11y) return undefined
+  const matches = findNodes(a11y, {
+    name: fieldLabel,
+    role: 'combobox',
+  })
+  if (matches.length === 0) {
+    matches.push(...findNodes(a11y, { name: fieldLabel, role: 'textbox' }))
+  }
+  if (matches.length === 0) {
+    matches.push(...findNodes(a11y, { name: fieldLabel, role: 'button' }))
+  }
+  const match = matches[0]
+  if (!match) return undefined
+
+  const valuePayload = match.value ? compactTextValue(match.value, 64) : {}
+  return {
+    role: match.role,
+    ...valuePayload,
+    ...(match.state && Object.keys(match.state).length > 0 ? { state: match.state } : {}),
+    ...(match.validation?.error ? { error: truncateInlineText(match.validation.error, 120) } : {}),
+  }
+}
+
+function waitStatusPayload(wait: UpdateWaitResult | undefined): Record<string, unknown> {
+  return wait ? { wait: wait.status } : {}
+}
+
+function compactFilterPayload(filter: NodeFilter): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(filter).filter(([, value]) => value !== undefined))
+}
+
+async function executeBatchAction(
+  session: Session,
+  action: BatchAction,
+  detail: ResponseDetail,
+  includeSteps: boolean,
+): Promise<StepExecutionResult> {
   switch (action.type) {
     case 'click': {
       const before = sessionA11y(session)
       const wait = await sendClick(session, action.x, action.y, action.timeoutMs)
-      return `Clicked at (${action.x}, ${action.y}).\n${postActionSummary(session, before, wait, detail)}`
+      return {
+        summary: `Clicked at (${action.x}, ${action.y}).\n${postActionSummary(session, before, wait, detail)}`,
+        compact: {
+          at: { x: action.x, y: action.y },
+          ...waitStatusPayload(wait),
+        },
+      }
     }
     case 'type': {
       const before = sessionA11y(session)
       const wait = await sendType(session, action.text, action.timeoutMs)
-      return `Typed "${action.text}".\n${postActionSummary(session, before, wait, detail)}`
+      return {
+        summary: `Typed "${action.text}".\n${postActionSummary(session, before, wait, detail)}`,
+        compact: {
+          ...compactTextValue(action.text),
+          ...waitStatusPayload(wait),
+        },
+      }
     }
     case 'key': {
       const before = sessionA11y(session)
@@ -1139,7 +1234,13 @@ async function executeBatchAction(session: Session, action: BatchAction, detail:
         { shift: action.shift, ctrl: action.ctrl, meta: action.meta, alt: action.alt },
         action.timeoutMs,
       )
-      return `Pressed ${formatKeyCombo(action.key, action)}.\n${postActionSummary(session, before, wait, detail)}`
+      return {
+        summary: `Pressed ${formatKeyCombo(action.key, action)}.\n${postActionSummary(session, before, wait, detail)}`,
+        compact: {
+          key: formatKeyCombo(action.key, action),
+          ...waitStatusPayload(wait),
+        },
+      }
     }
     case 'upload_files': {
       const before = sessionA11y(session)
@@ -1150,7 +1251,16 @@ async function executeBatchAction(session: Session, action: BatchAction, detail:
         strategy: action.strategy,
         drop: action.dropX !== undefined && action.dropY !== undefined ? { x: action.dropX, y: action.dropY } : undefined,
       }, action.timeoutMs ?? 8_000)
-      return `Uploaded ${action.paths.length} file(s).\n${postActionSummary(session, before, wait, detail)}`
+      return {
+        summary: `Uploaded ${action.paths.length} file(s).\n${postActionSummary(session, before, wait, detail)}`,
+        compact: {
+          fileCount: action.paths.length,
+          ...(action.fieldLabel ? { fieldLabel: action.fieldLabel } : {}),
+          ...(action.strategy ? { strategy: action.strategy } : {}),
+          ...waitStatusPayload(wait),
+          ...(action.fieldLabel ? { readback: fieldStatePayload(session, action.fieldLabel) } : {}),
+        },
+      }
     }
     case 'pick_listbox_option': {
       const before = sessionA11y(session)
@@ -1162,7 +1272,15 @@ async function executeBatchAction(session: Session, action: BatchAction, detail:
       }, action.timeoutMs)
       const summary = postActionSummary(session, before, wait, detail)
       const fieldSummary = action.fieldLabel ? summarizeFieldLabelState(session, action.fieldLabel) : undefined
-      return [`Picked listbox option "${action.label}".`, fieldSummary, summary].filter(Boolean).join('\n')
+      return {
+        summary: [`Picked listbox option "${action.label}".`, fieldSummary, summary].filter(Boolean).join('\n'),
+        compact: {
+          label: action.label,
+          ...(action.fieldLabel ? { fieldLabel: action.fieldLabel } : {}),
+          ...waitStatusPayload(wait),
+          ...(action.fieldLabel ? { readback: fieldStatePayload(session, action.fieldLabel) } : {}),
+        },
+      }
     }
     case 'select_option': {
       if (action.value === undefined && action.label === undefined && action.index === undefined) {
@@ -1174,7 +1292,16 @@ async function executeBatchAction(session: Session, action: BatchAction, detail:
         label: action.label,
         index: action.index,
       }, action.timeoutMs)
-      return `Selected option.\n${postActionSummary(session, before, wait, detail)}`
+      return {
+        summary: `Selected option.\n${postActionSummary(session, before, wait, detail)}`,
+        compact: {
+          at: { x: action.x, y: action.y },
+          ...(action.value !== undefined ? { value: action.value } : {}),
+          ...(action.label !== undefined ? { label: action.label } : {}),
+          ...(action.index !== undefined ? { index: action.index } : {}),
+          ...waitStatusPayload(wait),
+        },
+      }
     }
     case 'set_checked': {
       const before = sessionA11y(session)
@@ -1183,7 +1310,15 @@ async function executeBatchAction(session: Session, action: BatchAction, detail:
         exact: action.exact,
         controlType: action.controlType,
       }, action.timeoutMs)
-      return `Set ${action.controlType ?? 'checkbox/radio'} "${action.label}" to ${String(action.checked ?? true)}.\n${postActionSummary(session, before, wait, detail)}`
+      return {
+        summary: `Set ${action.controlType ?? 'checkbox/radio'} "${action.label}" to ${String(action.checked ?? true)}.\n${postActionSummary(session, before, wait, detail)}`,
+        compact: {
+          label: action.label,
+          checked: action.checked ?? true,
+          ...(action.controlType ? { controlType: action.controlType } : {}),
+          ...waitStatusPayload(wait),
+        },
+      }
     }
     case 'wheel': {
       const before = sessionA11y(session)
@@ -1192,7 +1327,15 @@ async function executeBatchAction(session: Session, action: BatchAction, detail:
         x: action.x,
         y: action.y,
       }, action.timeoutMs)
-      return `Wheel delta (${action.deltaX ?? 0}, ${action.deltaY}).\n${postActionSummary(session, before, wait, detail)}`
+      return {
+        summary: `Wheel delta (${action.deltaX ?? 0}, ${action.deltaY}).\n${postActionSummary(session, before, wait, detail)}`,
+        compact: {
+          deltaY: action.deltaY,
+          ...(action.deltaX !== undefined ? { deltaX: action.deltaX } : {}),
+          ...(action.x !== undefined && action.y !== undefined ? { at: { x: action.x, y: action.y } } : {}),
+          ...waitStatusPayload(wait),
+        },
+      }
     }
     case 'wait_for': {
       if (!session.tree || !session.layout) throw new Error('Not connected. Call geometra_connect first.')
@@ -1228,39 +1371,87 @@ async function executeBatchAction(session: Session, action: BatchAction, detail:
         throw new Error(`Timed out after ${timeoutMs}ms waiting for ${present ? 'presence' : 'absence'} of ${JSON.stringify(filter)}`)
       }
       if (!present) {
-        return `Condition satisfied after ${elapsedMs}ms: no nodes matched ${JSON.stringify(filter)}.`
+        return {
+          summary: `Condition satisfied after ${elapsedMs}ms: no nodes matched ${JSON.stringify(filter)}.`,
+          compact: {
+            present,
+            elapsedMs,
+            filter: compactFilterPayload(filter),
+          },
+        }
       }
       const after = sessionA11y(session)
       if (!after) {
-        return `Condition satisfied after ${elapsedMs}ms for ${JSON.stringify(filter)}.`
+        return {
+          summary: `Condition satisfied after ${elapsedMs}ms for ${JSON.stringify(filter)}.`,
+          compact: {
+            present,
+            elapsedMs,
+            filter: compactFilterPayload(filter),
+          },
+        }
       }
       const matches = findNodes(after, filter)
       if (detail === 'verbose') {
-        return JSON.stringify(matches.slice(0, 8).map(node => formatNode(node, after.bounds)), null, 2)
+        return {
+          summary: JSON.stringify(matches.slice(0, 8).map(node => formatNode(node, after.bounds)), null, 2),
+          compact: {
+            present,
+            elapsedMs,
+            matchCount: matches.length,
+            filter: compactFilterPayload(filter),
+          },
+        }
       }
-      return `Condition satisfied after ${elapsedMs}ms with ${matches.length} matching node(s).`
+      return {
+        summary: `Condition satisfied after ${elapsedMs}ms with ${matches.length} matching node(s).`,
+        compact: {
+          present,
+          elapsedMs,
+          matchCount: matches.length,
+          filter: compactFilterPayload(filter),
+        },
+      }
     }
     case 'fill_fields': {
-      const lines: string[] = []
-      for (const field of action.fields) {
-        lines.push(await executeFillField(session, field, detail))
+      const steps: Array<Record<string, unknown>> = []
+      for (let index = 0; index < action.fields.length; index++) {
+        const field = action.fields[index]!
+        const result = await executeFillField(session, field, detail)
+        steps.push(detail === 'verbose'
+          ? { index, kind: field.kind, ok: true, summary: result.summary }
+          : { index, kind: field.kind, ok: true, ...result.compact })
       }
-      return lines.join('\n')
+      return {
+        summary: steps.map(step => String(step.summary ?? '')).filter(Boolean).join('\n'),
+        compact: {
+          fieldCount: action.fields.length,
+          ...(includeSteps ? { steps } : {}),
+        },
+      }
     }
   }
 }
 
-async function executeFillField(session: Session, field: FillFieldInput, detail: ResponseDetail): Promise<string> {
+async function executeFillField(session: Session, field: FillFieldInput, detail: ResponseDetail): Promise<StepExecutionResult> {
   switch (field.kind) {
     case 'text': {
       const before = sessionA11y(session)
       const wait = await sendFieldText(session, field.fieldLabel, field.value, { exact: field.exact }, field.timeoutMs)
       const fieldSummary = summarizeFieldLabelState(session, field.fieldLabel)
-      return [
-        `Filled text field "${field.fieldLabel}".`,
-        fieldSummary,
-        postActionSummary(session, before, wait, detail),
-      ].filter(Boolean).join('\n')
+      return {
+        summary: [
+          `Filled text field "${field.fieldLabel}".`,
+          fieldSummary,
+          postActionSummary(session, before, wait, detail),
+        ].filter(Boolean).join('\n'),
+        compact: {
+          fieldLabel: field.fieldLabel,
+          ...compactTextValue(field.value),
+          ...waitStatusPayload(wait),
+          readback: fieldStatePayload(session, field.fieldLabel),
+        },
+      }
     }
     case 'choice': {
       const before = sessionA11y(session)
@@ -1272,11 +1463,19 @@ async function executeFillField(session: Session, field: FillFieldInput, detail:
         field.timeoutMs,
       )
       const fieldSummary = summarizeFieldLabelState(session, field.fieldLabel)
-      return [
-        `Set choice field "${field.fieldLabel}" to "${field.value}".`,
-        fieldSummary,
-        postActionSummary(session, before, wait, detail),
-      ].filter(Boolean).join('\n')
+      return {
+        summary: [
+          `Set choice field "${field.fieldLabel}" to "${field.value}".`,
+          fieldSummary,
+          postActionSummary(session, before, wait, detail),
+        ].filter(Boolean).join('\n'),
+        compact: {
+          fieldLabel: field.fieldLabel,
+          value: field.value,
+          ...waitStatusPayload(wait),
+          readback: fieldStatePayload(session, field.fieldLabel),
+        },
+      }
     }
     case 'toggle': {
       const before = sessionA11y(session)
@@ -1286,7 +1485,15 @@ async function executeFillField(session: Session, field: FillFieldInput, detail:
         { checked: field.checked, exact: field.exact, controlType: field.controlType },
         field.timeoutMs,
       )
-      return `Set ${field.controlType ?? 'checkbox/radio'} "${field.label}" to ${String(field.checked ?? true)}.\n${postActionSummary(session, before, wait, detail)}`
+      return {
+        summary: `Set ${field.controlType ?? 'checkbox/radio'} "${field.label}" to ${String(field.checked ?? true)}.\n${postActionSummary(session, before, wait, detail)}`,
+        compact: {
+          label: field.label,
+          checked: field.checked ?? true,
+          ...(field.controlType ? { controlType: field.controlType } : {}),
+          ...waitStatusPayload(wait),
+        },
+      }
     }
     case 'file': {
       const before = sessionA11y(session)
@@ -1297,11 +1504,19 @@ async function executeFillField(session: Session, field: FillFieldInput, detail:
         field.timeoutMs ?? 8_000,
       )
       const fieldSummary = summarizeFieldLabelState(session, field.fieldLabel)
-      return [
-        `Uploaded ${field.paths.length} file(s) to "${field.fieldLabel}".`,
-        fieldSummary,
-        postActionSummary(session, before, wait, detail),
-      ].filter(Boolean).join('\n')
+      return {
+        summary: [
+          `Uploaded ${field.paths.length} file(s) to "${field.fieldLabel}".`,
+          fieldSummary,
+          postActionSummary(session, before, wait, detail),
+        ].filter(Boolean).join('\n'),
+        compact: {
+          fieldLabel: field.fieldLabel,
+          fileCount: field.paths.length,
+          ...waitStatusPayload(wait),
+          readback: fieldStatePayload(session, field.fieldLabel),
+        },
+      }
     }
   }
 }
@@ -1360,24 +1575,14 @@ export function findNodes(node: A11yNode, filter: NodeFilter): A11yNode[] {
 }
 
 function summarizeFieldLabelState(session: Session, fieldLabel: string): string | undefined {
-  const a11y = sessionA11y(session)
-  if (!a11y) return undefined
-  const matches = findNodes(a11y, {
-    name: fieldLabel,
-    role: 'combobox',
-  })
-  if (matches.length === 0) {
-    matches.push(...findNodes(a11y, { name: fieldLabel, role: 'textbox' }))
-  }
-  if (matches.length === 0) {
-    matches.push(...findNodes(a11y, { name: fieldLabel, role: 'button' }))
-  }
-  const match = matches[0]
-  if (!match) return undefined
+  const payload = fieldStatePayload(session, fieldLabel)
+  if (!payload) return undefined
   const parts = [`Field "${fieldLabel}"`]
-  if (match.value) parts.push(`value=${JSON.stringify(match.value)}`)
-  if (match.state && Object.keys(match.state).length > 0) parts.push(`state=${JSON.stringify(match.state)}`)
-  if (match.validation?.error) parts.push(`error=${JSON.stringify(match.validation.error)}`)
+  if (payload.role) parts.push(`role=${String(payload.role)}`)
+  if (payload.value) parts.push(`value=${JSON.stringify(payload.value)}`)
+  if (payload.valueLength) parts.push(`valueLength=${String(payload.valueLength)}`)
+  if (payload.state) parts.push(`state=${JSON.stringify(payload.state)}`)
+  if (payload.error) parts.push(`error=${JSON.stringify(payload.error)}`)
   return parts.join(' ')
 }
 

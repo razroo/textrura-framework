@@ -155,11 +155,15 @@ Use it for labeled:
 
 This keeps the agent at the field-intent level and avoids repeated control-specific micro-decisions.
 
+When the page is long and the text payload is large, keep `detail: "minimal"` so Geometra returns compact structured step results instead of verbose action narration.
+
 ### 7. Batch obvious multi-step flows
 
 `geometra_run_actions` exists for longer predictable workflows where you need to mix navigation, waits, and field entry in one MCP round trip.
 
 It complements `page_model` / `expand_section`; it does not replace them.
+
+For token-sensitive automation loops, add `includeSteps: false` so the response is mostly aggregate status plus the final validation/state payload.
 
 ### 8. Query only when you know the target
 
@@ -193,6 +197,13 @@ Use `geometra_snapshot` compact when:
 Use `geometra_snapshot({ view: "full" })` only for deeper debugging.
 
 Action tools default to terse summaries. Use `detail: "verbose"` when you need a fuller fallback view for debugging.
+
+For the lowest-token batch pattern:
+
+1. `geometra_fill_fields` or `geometra_run_actions`
+2. `detail: "minimal"`
+3. `includeSteps: false`
+4. inspect the returned `final.invalidCount`, `final.alertCount`, and any sampled `invalidFields`
 
 ## Headed vs Headless
 
