@@ -285,11 +285,13 @@ let activeSession: Session | null = null
 const ACTION_UPDATE_TIMEOUT_MS = 2000
 const LISTBOX_UPDATE_TIMEOUT_MS = 4500
 const FILL_BATCH_BASE_TIMEOUT_MS = 2500
-const FILL_BATCH_TEXT_FIELD_TIMEOUT_MS = 250
-const FILL_BATCH_CHOICE_FIELD_TIMEOUT_MS = 450
-const FILL_BATCH_TOGGLE_FIELD_TIMEOUT_MS = 200
+const FILL_BATCH_TEXT_FIELD_TIMEOUT_MS = 275
+const FILL_BATCH_TEXT_LENGTH_TIMEOUT_MS = 120
+const FILL_BATCH_TEXT_LENGTH_SLICE = 80
+const FILL_BATCH_CHOICE_FIELD_TIMEOUT_MS = 500
+const FILL_BATCH_TOGGLE_FIELD_TIMEOUT_MS = 225
 const FILL_BATCH_FILE_FIELD_TIMEOUT_MS = 5000
-const FILL_BATCH_MAX_TIMEOUT_MS = 30_000
+const FILL_BATCH_MAX_TIMEOUT_MS = 60_000
 let nextRequestSequence = 0
 
 export type ProxyFillField =
@@ -438,10 +440,13 @@ export function disconnect(): void {
 
 function estimateFillBatchTimeout(fields: ProxyFillField[]): number {
   let total = FILL_BATCH_BASE_TIMEOUT_MS
+  let totalTextLength = 0
   for (const field of fields) {
     switch (field.kind) {
       case 'text':
+        totalTextLength += field.value.length
         total += FILL_BATCH_TEXT_FIELD_TIMEOUT_MS
+        total += Math.ceil(Math.max(1, field.value.length) / FILL_BATCH_TEXT_LENGTH_SLICE) * FILL_BATCH_TEXT_LENGTH_TIMEOUT_MS
         break
       case 'choice':
         total += FILL_BATCH_CHOICE_FIELD_TIMEOUT_MS
@@ -453,6 +458,9 @@ function estimateFillBatchTimeout(fields: ProxyFillField[]): number {
         total += FILL_BATCH_FILE_FIELD_TIMEOUT_MS
         break
     }
+  }
+  if (fields.length >= 20 || totalTextLength >= 1500) {
+    total = Math.max(total, 30_000)
   }
   return Math.min(total, FILL_BATCH_MAX_TIMEOUT_MS)
 }

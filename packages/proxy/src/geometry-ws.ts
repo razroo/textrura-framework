@@ -93,7 +93,7 @@ async function handleClientMessage(
   page: Page,
   ws: WebSocket,
   raw: unknown,
-  onViewportOrInput: (kind: 'resize' | 'input', requestId?: string) => void,
+  onViewportOrInput: (kind: 'resize' | 'input', requestId?: string, result?: unknown) => void,
   onHandlerError: (err: unknown) => void,
 ): Promise<void> {
   let msg: ParsedClientMessage
@@ -192,15 +192,7 @@ async function handleClientMessage(
     if (isFillFieldsMessage(msg)) {
       await fillFields(page, msg.fields)
       const result = await fillFieldsAckResult(page)
-      if (ws.readyState === ws.OPEN) {
-        ws.send(JSON.stringify({
-          type: 'ack',
-          ...(requestId ? { requestId } : {}),
-          result,
-          protocolVersion: PROXY_PROTOCOL_VERSION,
-        }))
-      }
-      onViewportOrInput('input')
+      onViewportOrInput('input', requestId, result)
       return
     }
 
@@ -463,11 +455,11 @@ export function startGeometryWebSocket(options: {
             options.page,
             ws,
             raw,
-            (kind, requestId) => {
+            (kind, requestId, result) => {
               if (kind === 'resize') {
                 void runExtractQueued()
               } else {
-                pendingInputAcks.push({ ws, ...(requestId ? { requestId } : {}) })
+                pendingInputAcks.push({ ws, ...(requestId ? { requestId } : {}), ...(result !== undefined ? { result } : {}) })
                 scheduleExtract()
               }
             },

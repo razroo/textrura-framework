@@ -31,7 +31,7 @@ jobs:
         run: bun run build
 
       - name: Benchmark MCP form flow
-        run: bun run benchmark:mcp-flow -- --assert
+        run: bun run benchmark:mcp-flow:all -- --assert
 
       - name: Examples smoke
         run: bun run examples:smoke

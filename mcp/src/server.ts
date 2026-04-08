@@ -566,10 +566,12 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
 
       if (!includeSteps) {
         let usedBatch = false
+        let batchAckResult: ProxyFillAckResult | undefined
         try {
           const startRevision = session.updateRevision
           const wait = await sendFillFields(session, planned.fields)
           const ackResult = parseProxyFillAckResult(wait.result)
+          batchAckResult = ackResult
           if (ackResult && ackResult.invalidCount === 0) {
             usedBatch = true
             const payload = {
@@ -592,6 +594,15 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
           if (!canFallbackToSequentialFill(e)) {
             const message = e instanceof Error ? e.message : String(e)
             return err(message)
+          }
+        }
+
+        if (usedBatch) {
+          const after = sessionA11y(session)
+          const signals = after ? collectSessionSignals(after) : undefined
+          const invalidRemaining = signals?.invalidFields.length ?? 0
+          if ((!batchAckResult || batchAckResult.invalidCount > 0) && invalidRemaining > 0) {
+            usedBatch = false
           }
         }
 

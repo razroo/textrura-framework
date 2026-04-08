@@ -505,6 +505,79 @@ describe('query and reveal tools', () => {
     })
   })
 
+  it('falls back to sequential fill when a batched fill ends without a clean ack and invalid fields remain', async () => {
+    const handler = getToolHandler('geometra_fill_form')
+    mockState.sendFillFields.mockResolvedValueOnce({
+      status: 'updated',
+      timeoutMs: 6000,
+      result: undefined,
+    })
+    mockState.formSchemas = [
+      {
+        formId: 'fm:0',
+        name: 'Application',
+        fieldCount: 2,
+        requiredCount: 2,
+        invalidCount: 2,
+        fields: [
+          { id: 'ff:0.0', kind: 'text', label: 'Full name', required: true, invalid: true },
+          { id: 'ff:0.1', kind: 'choice', label: 'Preferred location', required: true, invalid: true },
+        ],
+      },
+    ]
+    mockState.currentA11yRoot = node('group', undefined, {
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 640 },
+      children: [
+        node('textbox', 'Full name', {
+          path: [0],
+          state: { required: true, invalid: true },
+        }),
+        node('combobox', 'Preferred location', {
+          path: [1],
+          value: 'Select',
+          state: { required: true, invalid: true },
+        }),
+      ],
+    })
+
+    const result = await handler({
+      valuesById: {
+        'ff:0.0': 'Taylor Applicant',
+        'ff:0.1': 'Berlin, Germany',
+      },
+      includeSteps: false,
+      detail: 'minimal',
+      failOnInvalid: false,
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+
+    expect(mockState.sendFillFields).toHaveBeenCalledTimes(1)
+    expect(mockState.sendFieldText).toHaveBeenCalledWith(
+      mockState.session,
+      'Full name',
+      'Taylor Applicant',
+      { exact: undefined },
+      undefined,
+    )
+    expect(mockState.sendFieldChoice).toHaveBeenCalledWith(
+      mockState.session,
+      'Preferred location',
+      'Berlin, Germany',
+      { exact: undefined, query: undefined },
+      undefined,
+    )
+    expect(payload).toMatchObject({
+      completed: true,
+      execution: 'sequential',
+      formId: 'fm:0',
+      requestedValueCount: 2,
+      fieldCount: 2,
+      successCount: 2,
+      errorCount: 0,
+    })
+  })
+
   it('reveals an offscreen target with semantic scrolling instead of requiring manual wheels', async () => {
     const handler = getToolHandler('geometra_reveal')
 

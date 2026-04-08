@@ -107,7 +107,7 @@ describe('proxy-backed MCP actions', () => {
     }
   })
 
-  it('sends batched fillFields messages and resolves from the resulting update', async () => {
+  it('waits for the post-batch update before resolving fillFields acks', async () => {
     const wss = new WebSocketServer({ port: 0 })
     let seenMessage: { type?: string; fields?: unknown[] } | undefined
     wss.on('connection', ws => {
@@ -126,6 +126,16 @@ describe('proxy-backed MCP actions', () => {
         if (msg.type === 'fillFields') {
           seenMessage = msg
           ws.send(JSON.stringify({
+            type: 'frame',
+            layout: { x: 0, y: 0, width: 1024, height: 768, children: [] },
+            tree: {
+              kind: 'box',
+              props: {},
+              semantic: { tag: 'body', role: 'group', ariaLabel: 'Filled' },
+              children: [],
+            },
+          }))
+          ws.send(JSON.stringify({
             type: 'ack',
             requestId: msg.requestId,
             result: {
@@ -134,16 +144,6 @@ describe('proxy-backed MCP actions', () => {
               alertCount: 0,
               dialogCount: 0,
               busyCount: 0,
-            },
-          }))
-          ws.send(JSON.stringify({
-            type: 'frame',
-            layout: { x: 0, y: 0, width: 1024, height: 768, children: [] },
-            tree: {
-              kind: 'box',
-              props: {},
-              semantic: { tag: 'body', role: 'group', ariaLabel: 'Filled' },
-              children: [],
             },
           }))
         }
@@ -166,7 +166,7 @@ describe('proxy-backed MCP actions', () => {
           { kind: 'choice', fieldLabel: 'Country', value: 'Germany' },
         ], 80),
       ).resolves.toMatchObject({
-        status: 'acknowledged',
+        status: 'updated',
         timeoutMs: 80,
         result: {
           pageUrl: 'https://jobs.example.com/application',

@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Geometra MCP Heavy Form Benchmark</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f3efe7;
+        --card: #fffdf8;
+        --ink: #1a1f19;
+        --muted: #5d665c;
+        --border: #d8cfbf;
+        --accent: #224f39;
+        --accent-soft: #e5efe8;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(34, 79, 57, 0.08), transparent 24rem),
+          linear-gradient(180deg, #fbf9f3 0%, var(--bg) 52%, #ece5d8 100%);
+      }
+
+      main {
+        width: min(64rem, calc(100vw - 2rem));
+        margin: 0 auto;
+        padding: 2rem 0 5rem;
+      }
+
+      header,
+      form,
+      aside {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 1.35rem;
+        box-shadow: 0 0.9rem 2.2rem rgba(29, 37, 30, 0.06);
+      }
+
+      header,
+      aside,
+      form {
+        padding: 1.4rem;
+      }
+
+      header {
+        margin-bottom: 1.35rem;
+      }
+
+      h1,
+      h2 {
+        margin: 0 0 0.75rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+
+      h1 {
+        font-size: clamp(2rem, 5vw, 3.3rem);
+      }
+
+      p,
+      li,
+      label,
+      legend,
+      select,
+      input,
+      textarea,
+      button,
+      output,
+      small {
+        font-size: 1rem;
+        line-height: 1.5;
+      }
+
+      p,
+      small,
+      li {
+        color: var(--muted);
+      }
+
+      .layout {
+        display: grid;
+        gap: 1.35rem;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 2.6rem;
+        padding: 0.65rem 0.9rem;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      section + section {
+        margin-top: 1.65rem;
+        padding-top: 1.65rem;
+        border-top: 1px solid var(--border);
+      }
+
+      .grid {
+        display: grid;
+        gap: 1rem;
+      }
+
+      .grid.columns-2 {
+        grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+      }
+
+      .grid.columns-3 {
+        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+      }
+
+      label,
+      .stack > span {
+        display: grid;
+        gap: 0.4rem;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        border: 1px solid #bfb4a2;
+        border-radius: 0.8rem;
+        padding: 0.72rem 0.82rem;
+        background: #fff;
+        color: var(--ink);
+      }
+
+      textarea {
+        min-height: 10rem;
+        resize: vertical;
+      }
+
+      fieldset {
+        margin: 0;
+        border: 1px solid var(--border);
+        border-radius: 1rem;
+        padding: 0.9rem 1rem 1rem;
+      }
+
+      fieldset p {
+        margin: 0.35rem 0 0.95rem;
+      }
+
+      .inline-options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.85rem 1.4rem;
+      }
+
+      .inline-options label,
+      .checkbox {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+      }
+
+      .inline-options input,
+      .checkbox input {
+        width: auto;
+        margin: 0;
+      }
+
+      .summary-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.8rem;
+        margin-top: 1.35rem;
+      }
+
+      output {
+        display: inline-flex;
+        align-items: center;
+        min-height: 2.8rem;
+        padding: 0.7rem 0.95rem;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 0.82rem 1.28rem;
+        background: var(--accent);
+        color: #f6f4ee;
+        cursor: pointer;
+      }
+
+      ul {
+        margin: 0.75rem 0 0;
+        padding-left: 1.2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="layout">
+      <header>
+        <div class="pill">Heavy benchmark surface</div>
+        <h1>Long semantic application form</h1>
+        <p>
+          This benchmark is intentionally heavier than the baseline surface: more required fields, more repeated
+          Yes / No groups, several selects, multiple required checkboxes, and a long stack of essay prompts.
+        </p>
+        <p>
+          The goal is to measure what happens when the benchmark looks closer to a real recruiting flow that spans
+          multiple scroll depths and forces the automation path to keep payloads under control while still ending in
+          a clean validation state.
+        </p>
+      </header>
+
+      <form id="application-form">
+        <section aria-labelledby="contact-heading">
+          <h2 id="contact-heading">Contact details</h2>
+          <p>Start with the straightforward profile information.</p>
+          <div class="grid columns-2">
+            <label for="full-name">
+              Full name
+              <input id="full-name" name="fullName" autocomplete="off" required />
+            </label>
+            <label for="email">
+              Email
+              <input id="email" name="email" type="email" autocomplete="off" required />
+            </label>
+            <label for="phone">
+              Phone
+              <input id="phone" name="phone" type="tel" autocomplete="off" required />
+            </label>
+            <label for="location">
+              Preferred location
+              <select id="location" name="location" required>
+                <option value="">Choose a location</option>
+                <option>Berlin, Germany</option>
+                <option>Remote, Europe</option>
+                <option>New York, New York</option>
+              </select>
+            </label>
+            <label for="current-title">
+              Current title
+              <input id="current-title" name="currentTitle" autocomplete="off" required />
+            </label>
+            <label for="current-company">
+              Current company
+              <input id="current-company" name="currentCompany" autocomplete="off" required />
+            </label>
+            <label for="linkedin">
+              LinkedIn URL
+              <input id="linkedin" name="linkedin" type="url" autocomplete="off" required />
+            </label>
+            <label for="portfolio">
+              Portfolio URL
+              <input id="portfolio" name="portfolio" type="url" autocomplete="off" required />
+            </label>
+          </div>
+        </section>
+
+        <section aria-labelledby="experience-heading">
+          <h2 id="experience-heading">Experience snapshot</h2>
+          <p>These selects make the schema denser without relying only on free-form text.</p>
+          <div class="grid columns-3">
+            <label for="devtools-years">
+              Years building developer tools
+              <select id="devtools-years" name="devtoolsYears" required>
+                <option value="">Select</option>
+                <option>0-2 years</option>
+                <option>3-5 years</option>
+                <option>6-8 years</option>
+                <option>9+ years</option>
+              </select>
+            </label>
+            <label for="lead-years">
+              Years leading teams
+              <select id="lead-years" name="leadYears" required>
+                <option value="">Select</option>
+                <option>0-1 years</option>
+                <option>2-3 years</option>
+                <option>3-5 years</option>
+                <option>6+ years</option>
+              </select>
+            </label>
+            <label for="largest-team">
+              Largest team managed
+              <select id="largest-team" name="largestTeam" required>
+                <option value="">Select</option>
+                <option>1-3 people</option>
+                <option>4-5 people</option>
+                <option>6-10 people</option>
+                <option>11+ people</option>
+              </select>
+            </label>
+            <label for="employment-type">
+              Preferred employment type
+              <select id="employment-type" name="employmentType" required>
+                <option value="">Select</option>
+                <option>Full-time</option>
+                <option>Contract</option>
+                <option>Part-time</option>
+              </select>
+            </label>
+            <label for="primary-platform">
+              Which platform have you spent the most time on?
+              <select id="primary-platform" name="primaryPlatform" required>
+                <option value="">Select</option>
+                <option>B2B SaaS</option>
+                <option>Developer infrastructure</option>
+                <option>Consumer mobile</option>
+                <option>Marketplace systems</option>
+              </select>
+            </label>
+            <label for="primary-language">
+              Which programming language do you reach for first?
+              <select id="primary-language" name="primaryLanguage" required>
+                <option value="">Select</option>
+                <option>TypeScript</option>
+                <option>Go</option>
+                <option>Python</option>
+                <option>Rust</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section aria-labelledby="logistics-heading">
+          <h2 id="logistics-heading">Logistics</h2>
+          <p>These fields add more required data types before the eligibility block.</p>
+          <div class="grid columns-3">
+            <label for="start-date">
+              Earliest start date
+              <input id="start-date" name="startDate" type="date" required />
+            </label>
+            <label for="cash-comp">
+              Desired annual cash compensation
+              <input id="cash-comp" name="cashComp" autocomplete="off" required />
+            </label>
+            <label for="timezone">
+              Preferred working timezone
+              <select id="timezone" name="timezone" required>
+                <option value="">Select</option>
+                <option>Central European Time</option>
+                <option>Eastern Time</option>
+                <option>Pacific Time</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section aria-labelledby="eligibility-heading">
+          <h2 id="eligibility-heading">Eligibility and working constraints</h2>
+          <p>This block intentionally repeats Yes / No controls to stress contextual matching.</p>
+          <div class="grid">
+            <fieldset>
+              <legend>Are you legally authorized to work in Germany?</legend>
+              <p>Choose the answer that reflects your current work authorization.</p>
+              <div class="inline-options">
+                <label><input type="radio" name="authorization" value="yes" required /> Yes</label>
+                <label><input type="radio" name="authorization" value="no" /> No</label>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Will you now or in the future require sponsorship?</legend>
+              <p>This intentionally repeats Yes / No labels to test contextual disambiguation.</p>
+              <div class="inline-options">
+                <label><input type="radio" name="sponsorship" value="yes" required /> Yes</label>
+                <label><input type="radio" name="sponsorship" value="no" /> No</label>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Can you work a hybrid schedule in Berlin three days a week?</legend>
+              <p>Assume the team plans in-office collaboration on a fixed cadence.</p>
+              <div class="inline-options">
+                <label><input type="radio" name="hybrid" value="yes" required /> Yes</label>
+                <label><input type="radio" name="hybrid" value="no" /> No</label>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Are you open to travel up to 20 percent?</legend>
+              <p>Travel usually means offsites, customer visits, and cross-functional planning.</p>
+              <div class="inline-options">
+                <label><input type="radio" name="travel" value="yes" required /> Yes</label>
+                <label><input type="radio" name="travel" value="no" /> No</label>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Can you overlap at least four hours with Eastern Time?</legend>
+              <p>The product and go-to-market teams collaborate across Europe and North America.</p>
+              <div class="inline-options">
+                <label><input type="radio" name="overlap" value="yes" required /> Yes</label>
+                <label><input type="radio" name="overlap" value="no" /> No</label>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Are you comfortable participating in an on-call rotation?</legend>
+              <p>Not constant firefighting, but occasional shared responsibility for production health.</p>
+              <div class="inline-options">
+                <label><input type="radio" name="oncall" value="yes" required /> Yes</label>
+                <label><input type="radio" name="oncall" value="no" /> No</label>
+              </div>
+            </fieldset>
+          </div>
+        </section>
+
+        <section aria-labelledby="commitments-heading">
+          <h2 id="commitments-heading">Commitments</h2>
+          <p>These checkboxes are here to keep the fill path honest about non-text controls.</p>
+          <div class="grid">
+            <label class="checkbox" for="future-roles">
+              <input id="future-roles" name="futureRoles" type="checkbox" />
+              Share my profile for future roles
+            </label>
+            <label class="checkbox" for="take-home">
+              <input id="take-home" name="takeHome" type="checkbox" required />
+              I can complete a take-home exercise within one week
+            </label>
+            <label class="checkbox" for="working-agreement">
+              <input id="working-agreement" name="workingAgreement" type="checkbox" required />
+              I have read the working agreement for this role
+            </label>
+          </div>
+        </section>
+
+        <section aria-labelledby="essays-heading">
+          <h2 id="essays-heading">Written responses</h2>
+          <p>The form gets intentionally long here so semantic filling has to cross multiple viewport heights.</p>
+          <div class="grid">
+            <label for="why-geometra">
+              Why Geometra?
+              <textarea id="why-geometra" name="whyGeometra" minlength="80" required></textarea>
+            </label>
+            <label for="hard-problem">
+              Describe a hard problem you solved.
+              <textarea id="hard-problem" name="hardProblem" minlength="80" required></textarea>
+            </label>
+            <label for="launch-story">
+              Tell us about a product launch you drove end-to-end.
+              <textarea id="launch-story" name="launchStory" minlength="80" required></textarea>
+            </label>
+            <label for="measurement-story">
+              Describe a time you changed a system through measurement.
+              <textarea id="measurement-story" name="measurementStory" minlength="80" required></textarea>
+            </label>
+            <label for="team-environment">
+              What kind of team environment helps you do your best work?
+              <textarea id="team-environment" name="teamEnvironment" minlength="60" required></textarea>
+            </label>
+            <label for="debugging-story">
+              Describe a debugging session that changed how you build software.
+              <textarea id="debugging-story" name="debuggingStory" minlength="80" required></textarea>
+            </label>
+          </div>
+        </section>
+
+        <section aria-labelledby="links-heading">
+          <h2 id="links-heading">Relevant links</h2>
+          <p>Finish with a couple of URL fields so the long form ends with more fill work below the essays.</p>
+          <div class="grid columns-2">
+            <label for="writing-sample">
+              Best writing sample URL
+              <input id="writing-sample" name="writingSample" type="url" required />
+            </label>
+            <label for="open-source">
+              Open source project URL
+              <input id="open-source" name="openSource" type="url" required />
+            </label>
+          </div>
+        </section>
+
+        <div class="summary-row">
+          <button type="button" id="validate-draft">Validate draft</button>
+          <output id="form-status" role="status" aria-live="polite"></output>
+        </div>
+      </form>
+
+      <aside>
+        <h2>What this heavy benchmark should highlight</h2>
+        <ul>
+          <li>How much schema output grows when a form gets materially longer.</li>
+          <li>Whether the compact Geometra fill path still beats a snapshot-plus-script loop on tokens.</li>
+          <li>How much wall-clock time comes from connect/startup versus the actual form fill.</li>
+        </ul>
+      </aside>
+    </main>
+
+    <script>
+      const form = document.getElementById('application-form')
+      const status = document.getElementById('form-status')
+      const validate = document.getElementById('validate-draft')
+
+      function updateStatus() {
+        const required = Array.from(form.querySelectorAll('[required]'))
+        const invalid = Array.from(form.querySelectorAll(':invalid'))
+        const completed = required.length - invalid.length
+        status.textContent = `${completed} of ${required.length} required answers valid. ${invalid.length} field(s) still need attention.`
+      }
+
+      form.addEventListener('input', updateStatus)
+      form.addEventListener('change', updateStatus)
+      validate.addEventListener('click', () => {
+        form.reportValidity()
+        updateStatus()
+      })
+
+      updateStatus()
+    </script>
+  </body>
+</html>

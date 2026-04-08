@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Compare a real semantic form workflow:
+ * Compare semantic form workflows:
  * - Geometra MCP: connect + form_schema + fill_form
  * - Playwright MCP style: navigate + aria snapshot + browser_run_code
  *
@@ -10,6 +10,8 @@
  *
  * Run from repo root:
  *   node scripts/benchmark-mcp-form-flow.mjs
+ *   node scripts/benchmark-mcp-form-flow.mjs --scenario heavy
+ *   node scripts/benchmark-mcp-form-flow.mjs --all
  */
 import http from 'node:http'
 import { spawnSync } from 'node:child_process'
@@ -21,22 +23,136 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { chromium } from 'playwright'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const BENCHMARK_HTML = path.join(ROOT, 'demos', 'mcp-form-benchmark', 'index.html')
 const VIEWPORT = { width: 1280, height: 900 }
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
 
-const FORM_DATA = {
-  fullName: 'Taylor Applicant',
-  email: 'taylor@example.com',
-  phone: '+49 30 1234 5678',
-  location: 'Berlin, Germany',
-  authorization: 'Yes',
-  sponsorship: 'No',
-  futureRoles: true,
-  whyGeometra:
-    'Geometra treats browser automation as a semantic systems problem instead of a sequence of brittle clicks, which is exactly the layer I want to help push forward.',
-  hardProblem:
-    'I rebuilt a failing workflow orchestration path by isolating race conditions, adding deterministic retries, and redesigning the state model so late async events could not corrupt user-visible progress.',
+const SCENARIOS = {
+  baseline: {
+    id: 'baseline',
+    title: 'Baseline semantic application form',
+    htmlPath: path.join(ROOT, 'demos', 'mcp-form-benchmark', 'index.html'),
+    steps: [
+      { kind: 'text', label: 'Full name', value: 'Taylor Applicant' },
+      { kind: 'text', label: 'Email', value: 'taylor@example.com' },
+      { kind: 'text', label: 'Phone', value: '+49 30 1234 5678' },
+      { kind: 'select', label: 'Preferred location', value: 'Berlin, Germany' },
+      { kind: 'radio', groupLabel: 'Are you legally authorized to work in Germany?', value: 'Yes' },
+      { kind: 'radio', groupLabel: 'Will you now or in the future require sponsorship?', value: 'No' },
+      { kind: 'checkbox', label: 'Share my profile for future roles', checked: true },
+      {
+        kind: 'text',
+        label: 'Why Geometra?',
+        value:
+          'Geometra treats browser automation as a semantic systems problem instead of a sequence of brittle clicks, which is exactly the layer I want to help push forward.',
+      },
+      {
+        kind: 'text',
+        label: 'Describe a hard problem you solved.',
+        value:
+          'I rebuilt a failing workflow orchestration path by isolating race conditions, adding deterministic retries, and redesigning the state model so late async events could not corrupt user-visible progress.',
+      },
+    ],
+  },
+  heavy: {
+    id: 'heavy',
+    title: 'Heavy long-form application benchmark',
+    htmlPath: path.join(ROOT, 'demos', 'mcp-form-benchmark-heavy', 'index.html'),
+    steps: [
+      { kind: 'text', label: 'Full name', value: 'Taylor Applicant' },
+      { kind: 'text', label: 'Email', value: 'taylor@example.com' },
+      { kind: 'text', label: 'Phone', value: '+49 30 1234 5678' },
+      { kind: 'select', label: 'Preferred location', value: 'Berlin, Germany' },
+      { kind: 'text', label: 'Current title', value: 'Staff Product Engineer' },
+      { kind: 'text', label: 'Current company', value: 'Observatory Systems' },
+      { kind: 'text', label: 'LinkedIn URL', value: 'https://www.linkedin.com/in/taylor-applicant' },
+      { kind: 'text', label: 'Portfolio URL', value: 'https://taylor.example.com' },
+      { kind: 'select', label: 'Years building developer tools', value: '6-8 years' },
+      { kind: 'select', label: 'Years leading teams', value: '3-5 years' },
+      { kind: 'select', label: 'Largest team managed', value: '6-10 people' },
+      { kind: 'select', label: 'Preferred employment type', value: 'Full-time' },
+      { kind: 'select', label: 'Which platform have you spent the most time on?', value: 'B2B SaaS' },
+      { kind: 'select', label: 'Which programming language do you reach for first?', value: 'TypeScript' },
+      { kind: 'text', label: 'Earliest start date', value: '2026-06-01' },
+      { kind: 'text', label: 'Desired annual cash compensation', value: '$220,000 USD' },
+      { kind: 'select', label: 'Preferred working timezone', value: 'Central European Time' },
+      { kind: 'radio', groupLabel: 'Are you legally authorized to work in Germany?', value: 'Yes' },
+      { kind: 'radio', groupLabel: 'Will you now or in the future require sponsorship?', value: 'No' },
+      { kind: 'radio', groupLabel: 'Can you work a hybrid schedule in Berlin three days a week?', value: 'Yes' },
+      { kind: 'radio', groupLabel: 'Are you open to travel up to 20 percent?', value: 'Yes' },
+      { kind: 'radio', groupLabel: 'Can you overlap at least four hours with Eastern Time?', value: 'Yes' },
+      { kind: 'radio', groupLabel: 'Are you comfortable participating in an on-call rotation?', value: 'Yes' },
+      { kind: 'checkbox', label: 'Share my profile for future roles', checked: true },
+      { kind: 'checkbox', label: 'I can complete a take-home exercise within one week', checked: true },
+      { kind: 'checkbox', label: 'I have read the working agreement for this role', checked: true },
+      {
+        kind: 'text',
+        label: 'Why Geometra?',
+        value:
+          'Geometra is interesting because it pushes browser automation up a level. I care about making agentic systems reliable in messy real interfaces, and the combination of semantic extraction, geometry, and compact tool surfaces is exactly the kind of systems problem I like working on.',
+      },
+      {
+        kind: 'text',
+        label: 'Describe a hard problem you solved.',
+        value:
+          'I inherited a workflow engine that mixed user-visible state with late asynchronous side effects. I isolated the races, split durable state from transient execution state, and added deterministic replay instrumentation so we could verify that retries and delayed callbacks could no longer corrupt the active run.',
+      },
+      {
+        kind: 'text',
+        label: 'Tell us about a product launch you drove end-to-end.',
+        value:
+          'I led the rollout of a new incident review surface from discovery through launch. That meant shaping the API, pairing on interaction design, building migration tooling, defining success metrics, and running the staged rollout until adoption and task completion hit the target thresholds.',
+      },
+      {
+        kind: 'text',
+        label: 'Describe a time you changed a system through measurement.',
+        value:
+          'A performance debate kept circling without progress, so I instrumented the rendering path, built a representative workload harness, and published regression budgets. Once the team could see the actual cost centers, we removed speculative fixes and focused on the two operations that dominated tail latency.',
+      },
+      {
+        kind: 'text',
+        label: 'What kind of team environment helps you do your best work?',
+        value:
+          'I do best on teams that are direct, evidence-driven, and willing to make constraints explicit. I like environments where quality is discussed concretely, tradeoffs are written down, and shipping quickly does not excuse vague ownership or unclear operating standards.',
+      },
+      {
+        kind: 'text',
+        label: 'Describe a debugging session that changed how you build software.',
+        value:
+          'I once spent days chasing an intermittent failure that only appeared under production timing. After that, I started building diagnostic hooks and reproducible harnesses before touching fixes, because the shortest path is usually to improve observability first and only then change behavior.',
+      },
+      { kind: 'text', label: 'Best writing sample URL', value: 'https://taylor.example.com/writing/performance-playbooks' },
+      { kind: 'text', label: 'Open source project URL', value: 'https://github.com/taylor-applicant/control-plane-lab' },
+    ],
+  },
+}
+
+function parseArgs(argv) {
+  let scenario = 'baseline'
+  let runAll = false
+  const assert = argv.includes('--assert')
+
+  for (let index = 0; index < argv.length; index++) {
+    const arg = argv[index]
+    if (arg === '--scenario') {
+      scenario = argv[index + 1] ?? ''
+      index++
+      continue
+    }
+    if (arg === '--all') {
+      runAll = true
+    }
+  }
+
+  return { scenario, runAll, assert }
+}
+
+function selectedScenarios({ scenario, runAll }) {
+  if (runAll) return Object.values(SCENARIOS)
+  const selected = SCENARIOS[scenario]
+  if (!selected) {
+    throw new Error(`Unknown scenario "${scenario}". Available scenarios: ${Object.keys(SCENARIOS).join(', ')}`)
+  }
+  return [selected]
 }
 
 function bytes(value) {
@@ -143,7 +259,17 @@ async function invokeTool(handler, name, input) {
   return buildResult(name, input, contentText(result), performance.now() - started)
 }
 
-async function runGeometraFlow(url, createServer) {
+function scenarioValuesByLabel(scenario) {
+  return Object.fromEntries(
+    scenario.steps.map(step => {
+      if (step.kind === 'radio') return [step.groupLabel, step.value]
+      if (step.kind === 'checkbox') return [step.label, step.checked]
+      return [step.label, step.value]
+    }),
+  )
+}
+
+async function runGeometraFlow(url, createServer, scenario) {
   const server = createServer()
   const connect = getToolHandler(server, 'geometra_connect')
   const disconnect = getToolHandler(server, 'geometra_disconnect')
@@ -173,21 +299,18 @@ async function runGeometraFlow(url, createServer) {
     const form = formSchemaPayload.forms?.[0]
     if (!form?.formId) throw new Error('Geometra form schema did not return a form id')
 
-    const fieldsByLabel = Object.fromEntries(form.fields.map(field => [field.label, field.id]))
+    const fieldIdsByLabel = Object.fromEntries(form.fields.map(field => [field.label, field.id]))
+    const valuesByLabel = scenarioValuesByLabel(scenario)
+    const missingLabels = Object.keys(valuesByLabel).filter(label => !fieldIdsByLabel[label])
+    if (missingLabels.length > 0) {
+      throw new Error(`Scenario ${scenario.id} is missing form schema labels: ${missingLabels.join(', ')}`)
+    }
 
     const fillStep = await invokeTool(fillForm, 'geometra_fill_form', {
       formId: form.formId,
-      valuesById: {
-        [fieldsByLabel['Full name']]: FORM_DATA.fullName,
-        [fieldsByLabel['Email']]: FORM_DATA.email,
-        [fieldsByLabel['Phone']]: FORM_DATA.phone,
-        [fieldsByLabel['Preferred location']]: FORM_DATA.location,
-        [fieldsByLabel['Are you legally authorized to work in Germany?']]: FORM_DATA.authorization,
-        [fieldsByLabel['Will you now or in the future require sponsorship?']]: FORM_DATA.sponsorship,
-        [fieldsByLabel['Share my profile for future roles']]: FORM_DATA.futureRoles,
-        [fieldsByLabel['Why Geometra?']]: FORM_DATA.whyGeometra,
-        [fieldsByLabel['Describe a hard problem you solved.']]: FORM_DATA.hardProblem,
-      },
+      valuesById: Object.fromEntries(
+        Object.entries(valuesByLabel).map(([label, value]) => [fieldIdsByLabel[label], value]),
+      ),
       includeSteps: false,
       detail: 'minimal',
       failOnInvalid: true,
@@ -212,28 +335,32 @@ async function runGeometraFlow(url, createServer) {
   }
 }
 
-function renderPlaywrightRunCode() {
-  return `
-await page.getByLabel('Full name').fill(${JSON.stringify(FORM_DATA.fullName)});
-await page.getByLabel('Email').fill(${JSON.stringify(FORM_DATA.email)});
-await page.getByLabel('Phone').fill(${JSON.stringify(FORM_DATA.phone)});
-await page.getByLabel('Preferred location').selectOption({ label: ${JSON.stringify(FORM_DATA.location)} });
-const authorizationFieldset = page.locator('fieldset').filter({ hasText: ${JSON.stringify('Are you legally authorized to work in Germany?')} });
-await authorizationFieldset.getByLabel(${JSON.stringify(FORM_DATA.authorization)}).check();
-const sponsorshipFieldset = page.locator('fieldset').filter({ hasText: ${JSON.stringify('Will you now or in the future require sponsorship?')} });
-await sponsorshipFieldset.getByLabel(${JSON.stringify(FORM_DATA.sponsorship)}).check();
-await page.getByLabel(${JSON.stringify('Share my profile for future roles')}).setChecked(${FORM_DATA.futureRoles ? 'true' : 'false'});
-await page.getByLabel('Why Geometra?').fill(${JSON.stringify(FORM_DATA.whyGeometra)});
-await page.getByLabel('Describe a hard problem you solved.').fill(${JSON.stringify(FORM_DATA.hardProblem)});
+function renderPlaywrightStep(step) {
+  if (step.kind === 'text') {
+    return `await page.getByLabel(${JSON.stringify(step.label)}).fill(${JSON.stringify(step.value)});`
+  }
+  if (step.kind === 'select') {
+    return `await page.getByLabel(${JSON.stringify(step.label)}).selectOption({ label: ${JSON.stringify(step.value)} });`
+  }
+  if (step.kind === 'radio') {
+    return `await page.locator('fieldset').filter({ hasText: ${JSON.stringify(step.groupLabel)} }).getByLabel(${JSON.stringify(step.value)}).check();`
+  }
+  return `await page.getByLabel(${JSON.stringify(step.label)}).setChecked(${step.checked ? 'true' : 'false'});`
+}
+
+function renderPlaywrightRunCode(scenario) {
+  const lines = scenario.steps.map(renderPlaywrightStep)
+  lines.push(`
 return {
   ok: true,
   invalidCount: await page.locator(':invalid').count(),
   status: await page.getByRole('status').textContent(),
 }
-`.trim()
+`.trim())
+  return lines.join('\n')
 }
 
-async function runPlaywrightFlow(url) {
+async function runPlaywrightFlow(url, scenario) {
   const launchStarted = performance.now()
   const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage({ viewport: VIEWPORT })
@@ -251,7 +378,7 @@ async function runPlaywrightFlow(url) {
     const snapshot = await page.locator('body').ariaSnapshot({ mode: 'ai', timeout: 15_000 })
     const snapshotStep = buildResult('browser_snapshot', snapshotInput, snapshot, performance.now() - snapshotStarted)
 
-    const code = renderPlaywrightRunCode()
+    const code = renderPlaywrightRunCode(scenario)
     const runCodeStarted = performance.now()
     const result = await new AsyncFunction('page', code)(page)
     const runCodeOutput = JSON.stringify(result)
@@ -309,26 +436,38 @@ function printDelta(label, geometraTotals, playwrightTotals) {
   console.log(`${label}: Geometra and Playwright were equal on combined bytes.`)
 }
 
-function assertBenchmark(geometra, playwright) {
+function assertBenchmark(geometra, playwright, scenario) {
   const geometraTotals = withApproxTokens(summarizeTotals(geometra.steps))
   const geometraSemanticTotals = withApproxTokens(summarizeTotals(geometra.semanticSteps))
   const playwrightTotals = withApproxTokens(summarizeTotals(playwright.steps))
   const playwrightSemanticTotals = withApproxTokens(summarizeTotals(playwright.semanticSteps))
+  const geometraInvalidCount = geometra.fillPayload.final?.invalidCount
+  const playwrightInvalidCount = playwright.runCodeResult.invalidCount
 
   const failures = []
+  if (geometraInvalidCount !== 0) {
+    failures.push(
+      `[${scenario.id}] Expected Geometra to finish with invalidCount=0, received ${String(geometraInvalidCount ?? 'unknown')}.`,
+    )
+  }
+  if (playwrightInvalidCount !== 0) {
+    failures.push(
+      `[${scenario.id}] Expected Playwright to finish with invalidCount=0, received ${String(playwrightInvalidCount ?? 'unknown')}.`,
+    )
+  }
   if (geometra.steps[1].outputBytes >= playwright.steps[1].outputBytes) {
     failures.push(
-      `Expected geometra_form_schema output (${geometra.steps[1].outputBytes} B) to be smaller than the Playwright snapshot (${playwright.steps[1].outputBytes} B).`,
+      `[${scenario.id}] Expected geometra_form_schema output (${geometra.steps[1].outputBytes} B) to be smaller than the Playwright snapshot (${playwright.steps[1].outputBytes} B).`,
     )
   }
   if (geometraSemanticTotals.totalBytes >= playwrightSemanticTotals.totalBytes) {
     failures.push(
-      `Expected Geometra semantic flow (${geometraSemanticTotals.totalBytes} B) to beat Playwright (${playwrightSemanticTotals.totalBytes} B).`,
+      `[${scenario.id}] Expected Geometra semantic flow (${geometraSemanticTotals.totalBytes} B) to beat Playwright (${playwrightSemanticTotals.totalBytes} B).`,
     )
   }
   if (geometraTotals.totalBytes >= playwrightTotals.totalBytes) {
     failures.push(
-      `Expected Geometra end-to-end flow (${geometraTotals.totalBytes} B) to beat Playwright (${playwrightTotals.totalBytes} B).`,
+      `[${scenario.id}] Expected Geometra end-to-end flow (${geometraTotals.totalBytes} B) to beat Playwright (${playwrightTotals.totalBytes} B).`,
     )
   }
 
@@ -337,24 +476,8 @@ function assertBenchmark(geometra, playwright) {
   }
 }
 
-async function main() {
-  runBuild(
-    '@geometra/proxy',
-    'bun',
-    ['run', '--filter', '@geometra/proxy', 'build'],
-    ROOT,
-    path.join(ROOT, 'packages/proxy/dist/extractor.js'),
-  )
-  runBuild(
-    '@geometra/mcp',
-    'npm',
-    ['run', 'build'],
-    path.join(ROOT, 'mcp'),
-    path.join(ROOT, 'mcp/dist/server.js'),
-  )
-
-  const { createServer } = await import(pathToFileURL(path.join(ROOT, 'mcp/dist/server.js')).href)
-  const { server, url } = await startStaticServer(BENCHMARK_HTML)
+async function runScenario(scenario, createServer, assert) {
+  const { server, url } = await startStaticServer(scenario.htmlPath)
 
   try {
     const warmup = await fetch(url)
@@ -362,12 +485,14 @@ async function main() {
       throw new Error(`Benchmark page warmup failed: ${warmup.status}`)
     }
 
+    console.log(`\nScenario: ${scenario.id}`)
+    console.log(`${scenario.title}`)
     console.log('Geometra MCP vs Playwright MCP-style form-flow benchmark')
     console.log('Playwright side is approximated as navigate + aria snapshot + browser_run_code.')
     console.log(`Benchmark page: ${url}`)
 
-    const geometra = await runGeometraFlow(url, createServer)
-    const playwright = await runPlaywrightFlow(url)
+    const geometra = await runGeometraFlow(url, createServer, scenario)
+    const playwright = await runPlaywrightFlow(url, scenario)
 
     printStepTable('Geometra steps', geometra.steps)
     printStepTable('Playwright-style steps', playwright.steps)
@@ -408,14 +533,43 @@ async function main() {
       `Playwright run_code input: ${playwright.steps[2].inputBytes} B (~${approxTokens(playwright.steps[2].inputBytes)} tokens), invalidCount=${playwright.runCodeResult.invalidCount}`,
     )
 
-    if (process.argv.includes('--assert')) {
-      assertBenchmark(geometra, playwright)
+    if (assert) {
+      assertBenchmark(geometra, playwright, scenario)
       console.log('\nAssertions passed.')
     }
   } finally {
     await new Promise((resolve, reject) => {
       server.close(err => (err ? reject(err) : resolve()))
     })
+  }
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2))
+  const scenarios = selectedScenarios(args)
+
+  runBuild(
+    '@geometra/proxy',
+    'bun',
+    ['run', '--filter', '@geometra/proxy', 'build'],
+    ROOT,
+    path.join(ROOT, 'packages/proxy/dist/extractor.js'),
+  )
+  runBuild(
+    '@geometra/mcp',
+    'npm',
+    ['run', 'build'],
+    path.join(ROOT, 'mcp'),
+    path.join(ROOT, 'mcp/dist/server.js'),
+  )
+
+  const { createServer } = await import(pathToFileURL(path.join(ROOT, 'mcp/dist/server.js')).href)
+
+  for (const [index, scenario] of scenarios.entries()) {
+    if (index > 0) {
+      console.log('\n' + '='.repeat(80))
+    }
+    await runScenario(scenario, createServer, args.assert)
   }
 }
 
