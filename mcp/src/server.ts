@@ -259,7 +259,7 @@ type BatchAction = z.infer<typeof batchActionSchema>
 
 export function createServer(): McpServer {
   const server = new McpServer(
-    { name: 'geometra', version: '1.19.13' },
+    { name: 'geometra', version: '1.19.14' },
     { capabilities: { tools: {} } },
   )
 
