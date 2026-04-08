@@ -1,34 +1,23 @@
-import type { Server as HttpServer } from 'node:http'
+import http, { type Server as HttpServer } from 'node:http'
 import type { UIElement } from '@geometra/core'
 import { createServer, type TexturaServer, type TexturaServerOptions } from '../server.js'
-
-const TEST_PORT_BASE = 38000
-const TEST_PORT_SPAN = 20000
-const MAX_BIND_ATTEMPTS = 20
-
-function pickPort(): number {
-  return TEST_PORT_BASE + Math.floor(Math.random() * TEST_PORT_SPAN)
-}
-
-function isAddrInUse(err: unknown): boolean {
-  return typeof err === 'object' && err !== null && 'code' in err && (err as { code?: unknown }).code === 'EADDRINUSE'
-}
 
 export async function createStandaloneTestServer(
   view: () => UIElement,
   options: Omit<TexturaServerOptions, 'port' | 'httpServer'> = {},
 ): Promise<{ server: TexturaServer; port: number }> {
-  for (let attempt = 0; attempt < MAX_BIND_ATTEMPTS; attempt++) {
-    const port = pickPort()
-    try {
-      const server = await createServer(view, { ...options, port })
-      return { server, port }
-    } catch (err) {
-      if (!isAddrInUse(err) || attempt === MAX_BIND_ATTEMPTS - 1) throw err
-    }
+  const httpServer = http.createServer()
+  const port = await listenHttpServer(httpServer)
+  const geometra = await createServer(view, { ...options, httpServer, wsPath: '/' })
+  const server: TexturaServer = {
+    update: () => geometra.update(),
+    broadcastData: (channel, payload) => geometra.broadcastData(channel, payload),
+    close: () => {
+      geometra.close()
+      httpServer.close()
+    },
   }
-
-  throw new Error('Failed to bind standalone test server after repeated EADDRINUSE retries')
+  return { server, port }
 }
 
 export async function listenHttpServer(httpServer: HttpServer): Promise<number> {
