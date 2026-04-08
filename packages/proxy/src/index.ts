@@ -147,7 +147,6 @@ async function main(): Promise<void> {
   const pace = slowMo > 0 ? `, slowMo ${slowMo}ms` : ''
   console.error(`[geometra-proxy] Chromium ${mode}${pace}`)
   console.error(`[geometra-proxy] Loading ${url} …`)
-  await page.goto(url, { waitUntil: 'domcontentloaded' })
 
   const hub = startGeometryWebSocket({
     port,
@@ -171,7 +170,11 @@ async function main(): Promise<void> {
     },
   })
 
+  const navigation = page.goto(url, { waitUntil: 'domcontentloaded' })
   const wsUrl = await listeningPromise
+  console.error(`[geometra-proxy] Ready. Connect MCP with geometra_connect({ url: "${wsUrl}" })`)
+  emitReadySignal(wsUrl, url)
+  await navigation
   await hub.flushExtract()
   await installDomObserver(page, hub.scheduleExtract)
   page.on('domcontentloaded', () => {
@@ -184,9 +187,6 @@ async function main(): Promise<void> {
         console.error('[geometra-proxy] observer reinstall failed:', message)
       })
   })
-
-  console.error(`[geometra-proxy] Ready. Connect MCP with geometra_connect({ url: "${wsUrl}" })`)
-  emitReadySignal(wsUrl, url)
 
   let shuttingDown = false
   const shutdown = async () => {

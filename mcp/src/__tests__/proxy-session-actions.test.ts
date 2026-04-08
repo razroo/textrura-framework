@@ -112,7 +112,7 @@ describe('proxy-backed MCP actions', () => {
     let seenMessage: { type?: string; fields?: unknown[] } | undefined
     wss.on('connection', ws => {
       ws.on('message', raw => {
-        const msg = JSON.parse(String(raw)) as { type?: string; fields?: unknown[] }
+        const msg = JSON.parse(String(raw)) as { type?: string; fields?: unknown[]; requestId?: string }
 
         if (msg.type === 'resize') {
           ws.send(JSON.stringify({
@@ -125,6 +125,17 @@ describe('proxy-backed MCP actions', () => {
 
         if (msg.type === 'fillFields') {
           seenMessage = msg
+          ws.send(JSON.stringify({
+            type: 'ack',
+            requestId: msg.requestId,
+            result: {
+              pageUrl: 'https://jobs.example.com/application',
+              invalidCount: 0,
+              alertCount: 0,
+              dialogCount: 0,
+              busyCount: 0,
+            },
+          }))
           ws.send(JSON.stringify({
             type: 'frame',
             layout: { x: 0, y: 0, width: 1024, height: 768, children: [] },
@@ -154,7 +165,15 @@ describe('proxy-backed MCP actions', () => {
           { kind: 'text', fieldLabel: 'Full name', value: 'Taylor Applicant' },
           { kind: 'choice', fieldLabel: 'Country', value: 'Germany' },
         ], 80),
-      ).resolves.toMatchObject({ status: 'updated', timeoutMs: 80 })
+      ).resolves.toMatchObject({
+        status: 'acknowledged',
+        timeoutMs: 80,
+        result: {
+          pageUrl: 'https://jobs.example.com/application',
+          invalidCount: 0,
+          alertCount: 0,
+        },
+      })
       expect(seenMessage).toMatchObject({
         type: 'fillFields',
         fields: [

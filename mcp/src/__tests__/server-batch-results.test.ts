@@ -47,7 +47,11 @@ const mockState = vi.hoisted(() => ({
   sendFileUpload: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 8000 })),
   sendFieldText: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 2000 })),
   sendFieldChoice: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 2000 })),
-  sendFillFields: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 6000 })),
+  sendFillFields: vi.fn(async () => ({
+    status: 'updated' as 'updated' | 'acknowledged',
+    timeoutMs: 6000,
+    result: undefined as unknown,
+  })),
   sendListboxPick: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 4500 })),
   sendSelectOption: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 2000 })),
   sendSetChecked: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 2000 })),
@@ -366,6 +370,17 @@ describe('batch MCP result shaping', () => {
 
   it('uses batched proxy fill for compact fill_form responses', async () => {
     const handler = getToolHandler('geometra_fill_form')
+    mockState.sendFillFields.mockResolvedValueOnce({
+      status: 'acknowledged',
+      timeoutMs: 6000,
+      result: {
+        pageUrl: 'https://jobs.example.com/application',
+        invalidCount: 0,
+        alertCount: 0,
+        dialogCount: 0,
+        busyCount: 0,
+      },
+    })
     mockState.formSchemas = [
       {
         formId: 'fm:0',
@@ -423,10 +438,15 @@ describe('batch MCP result shaping', () => {
     expect(payload).toMatchObject({
       completed: true,
       execution: 'batched',
+      finalSource: 'proxy',
       formId: 'fm:0',
       fieldCount: 3,
       successCount: 3,
       errorCount: 0,
+      final: {
+        invalidCount: 0,
+        alertCount: 0,
+      },
     })
     expect(payload).not.toHaveProperty('steps')
   })

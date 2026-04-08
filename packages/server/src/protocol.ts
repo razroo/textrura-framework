@@ -60,7 +60,7 @@ export type ServerDataMessage = VersionedMessage & {
 export type ServerMessage =
   | (VersionedMessage & { type: 'frame'; layout: ComputedLayout; tree: UIElement })
   | (VersionedMessage & { type: 'patch'; patches: LayoutPatch[] })
-  | (VersionedMessage & CorrelatedMessage & { type: 'ack' })
+  | (VersionedMessage & CorrelatedMessage & { type: 'ack'; result?: unknown })
   | (VersionedMessage & CorrelatedMessage & { type: 'error'; message: string; code?: number })
   | ServerDataMessage
 

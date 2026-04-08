@@ -35,6 +35,7 @@ const DOM_OBSERVER_BINDINGS = new WeakSet<Page>()
 interface PendingInputAck {
   ws: WebSocket
   requestId?: string
+  result?: unknown
 }
 
 function isProtocolCompatible(peerVersion: number | undefined): boolean {
@@ -190,7 +191,16 @@ async function handleClientMessage(
 
     if (isFillFieldsMessage(msg)) {
       await fillFields(page, msg.fields)
-      onViewportOrInput('input', requestId)
+      const result = await fillFieldsAckResult(page)
+      if (ws.readyState === ws.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'ack',
+          ...(requestId ? { requestId } : {}),
+          result,
+          protocolVersion: PROXY_PROTOCOL_VERSION,
+        }))
+      }
+      onViewportOrInput('input')
       return
     }
 
@@ -240,6 +250,31 @@ async function handleClientMessage(
   }
 }
 
+async function fillFieldsAckResult(page: Page): Promise<Record<string, unknown>> {
+  const frames = page.frames()
+  const [invalidCount, alertCount, dialogCount, busyCount] = await Promise.all([
+    countAcrossFrames(frames, ':invalid'),
+    countAcrossFrames(frames, '[role="alert"], [role="alertdialog"]'),
+    countAcrossFrames(frames, '[role="dialog"], [role="alertdialog"]'),
+    countAcrossFrames(frames, '[aria-busy="true"]'),
+  ])
+
+  return {
+    pageUrl: page.url(),
+    invalidCount,
+    alertCount,
+    dialogCount,
+    busyCount,
+  }
+}
+
+async function countAcrossFrames(frames: ReturnType<Page['frames']>, selector: string): Promise<number> {
+  const counts = await Promise.all(
+    frames.map(frame => frame.locator(selector).count().catch(() => 0)),
+  )
+  return counts.reduce((sum, count) => sum + count, 0)
+}
+
 export interface GeometryWsHub {
   /** Run extraction and broadcast (debounced observer calls this). */
   scheduleExtract: () => void
@@ -273,11 +308,12 @@ export function startGeometryWebSocket(options: {
     if (pendingInputAcks.length === 0) return
     const pending = pendingInputAcks
     pendingInputAcks = []
-    for (const { ws, requestId } of pending) {
+    for (const { ws, requestId, result } of pending) {
       if (ws.readyState === ws.OPEN) {
         ws.send(JSON.stringify({
           type: 'ack',
           ...(requestId ? { requestId } : {}),
+          ...(result !== undefined ? { result } : {}),
           protocolVersion: PROXY_PROTOCOL_VERSION,
         }))
       }

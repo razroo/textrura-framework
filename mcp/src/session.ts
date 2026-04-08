@@ -278,6 +278,7 @@ export interface Session {
 export interface UpdateWaitResult {
   status: 'updated' | 'acknowledged' | 'timed_out'
   timeoutMs: number
+  result?: unknown
 }
 
 let activeSession: Session | null = null
@@ -319,7 +320,10 @@ function shutdownPreviousSession(): void {
  * Connect to a running Geometra server. Waits for the first frame so that
  * layout/tree state is available immediately after connection.
  */
-export function connect(url: string): Promise<Session> {
+export function connect(
+  url: string,
+  opts?: { width?: number; height?: number; skipInitialResize?: boolean },
+): Promise<Session> {
   return new Promise((resolve, reject) => {
     shutdownPreviousSession()
 
@@ -336,8 +340,10 @@ export function connect(url: string): Promise<Session> {
     }, 10_000)
 
     ws.on('open', () => {
-      // Send initial resize so server computes layout
-      ws.send(JSON.stringify({ type: 'resize', width: 1024, height: 768 }))
+      if (opts?.skipInitialResize) return
+      const width = opts?.width ?? 1024
+      const height = opts?.height ?? 768
+      ws.send(JSON.stringify({ type: 'resize', width, height }))
     })
 
     ws.on('message', (data) => {
@@ -409,7 +415,7 @@ export async function connectThroughProxy(options: {
     slowMo: options.slowMo,
   })
   try {
-    const session = await connect(wsUrl)
+    const session = await connect(wsUrl, { skipInitialResize: true })
     session.proxyChild = child
     return session
   } catch (e) {
@@ -1485,7 +1491,9 @@ function buildFormSchemaForNode(
     }
   }
 
-  const filteredFields = fields.filter(field => {
+  const compactFields = trimSchemaFieldContexts(fields)
+
+  const filteredFields = compactFields.filter(field => {
     if (options?.onlyRequiredFields && !field.required) return false
     if (options?.onlyInvalidFields && !field.invalid) return false
     return true
@@ -1497,11 +1505,37 @@ function buildFormSchemaForNode(
   return {
     formId: sectionIdForPath('form', formNode.path),
     ...(name ? { name } : {}),
-    fieldCount: fields.length,
-    requiredCount: fields.filter(field => field.required).length,
-    invalidCount: fields.filter(field => field.invalid).length,
+    fieldCount: compactFields.length,
+    requiredCount: compactFields.filter(field => field.required).length,
+    invalidCount: compactFields.filter(field => field.invalid).length,
     fields: pageFields,
   }
+}
+
+function trimSchemaFieldContexts(fields: FormSchemaField[]): FormSchemaField[] {
+  const labelCounts = new Map<string, number>()
+  for (const field of fields) {
+    const key = normalizeUiText(field.label)
+    labelCounts.set(key, (labelCounts.get(key) ?? 0) + 1)
+  }
+
+  return fields.map(field => {
+    if (!field.context) return field
+
+    const trimmed: NodeContextModel = {}
+    if (field.context.prompt && normalizeUiText(field.context.prompt) !== normalizeUiText(field.label)) {
+      trimmed.prompt = field.context.prompt
+    }
+    if ((labelCounts.get(normalizeUiText(field.label)) ?? 0) > 1 && field.context.section) {
+      trimmed.section = field.context.section
+    }
+
+    if (Object.keys(trimmed).length === 0) {
+      const { context: _context, ...rest } = field
+      return rest
+    }
+    return { ...field, context: trimmed }
+  })
 }
 
 function toLandmarkModel(node: A11yNode): PageLandmark {
@@ -2320,6 +2354,7 @@ function waitForNextUpdate(
             resolve({
               status: session.updateRevision > startRevision ? 'updated' : 'acknowledged',
               timeoutMs,
+              ...(msg.result !== undefined ? { result: msg.result } : {}),
             })
           }
           return
@@ -2338,7 +2373,11 @@ function waitForNextUpdate(
           resolve({ status: 'updated', timeoutMs })
         } else if (msg.type === 'ack') {
           cleanup()
-          resolve({ status: 'acknowledged', timeoutMs })
+          resolve({
+            status: 'acknowledged',
+            timeoutMs,
+            ...(msg.result !== undefined ? { result: msg.result } : {}),
+          })
         }
       } catch { /* ignore */ }
     }

@@ -65,6 +65,14 @@ interface FieldStatePayload {
   error?: string
 }
 
+interface ProxyFillAckResult {
+  pageUrl?: string
+  invalidCount: number
+  alertCount: number
+  dialogCount: number
+  busyCount: number
+}
+
 interface FormattedNodePayload extends Record<string, unknown> {
   id: string
   role: string
@@ -323,7 +331,10 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
             detail: input.detail,
           }), null, input.detail === 'verbose' ? 2 : undefined))
         }
-        const session = await connect(target.wsUrl!)
+        const session = await connect(target.wsUrl!, {
+          width: input.width,
+          height: input.height,
+        })
         return ok(JSON.stringify(connectPayload(session, {
           transport: 'ws',
           requestedWsUrl: target.wsUrl,
@@ -558,6 +569,22 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
         try {
           const startRevision = session.updateRevision
           const wait = await sendFillFields(session, planned.fields)
+          const ackResult = parseProxyFillAckResult(wait.result)
+          if (ackResult && ackResult.invalidCount === 0) {
+            usedBatch = true
+            const payload = {
+              completed: true,
+              execution: 'batched',
+              finalSource: 'proxy',
+              formId: schema.formId,
+              requestedValueCount: entryCount,
+              fieldCount: planned.fields.length,
+              successCount: planned.fields.length,
+              errorCount: 0,
+              final: ackResult,
+            }
+            return ok(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
+          }
           await waitForDeferredBatchUpdate(session, startRevision, wait)
           await waitForBatchFieldReadback(session, planned.fields)
           usedBatch = true
@@ -575,6 +602,7 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
           const payload = {
             completed: true,
             execution: 'batched',
+            finalSource: 'session',
             formId: schema.formId,
             requestedValueCount: entryCount,
             fieldCount: planned.fields.length,
@@ -1673,6 +1701,26 @@ function canFallbackToSequentialFill(error: unknown): boolean {
     message.includes('Unsupported client message type "fillFields"') ||
     message.includes('Client message type "fillFields" is not supported')
   )
+}
+
+function parseProxyFillAckResult(value: unknown): ProxyFillAckResult | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const candidate = value as Record<string, unknown>
+  if (
+    typeof candidate.invalidCount !== 'number' ||
+    typeof candidate.alertCount !== 'number' ||
+    typeof candidate.dialogCount !== 'number' ||
+    typeof candidate.busyCount !== 'number'
+  ) {
+    return undefined
+  }
+  return {
+    ...(typeof candidate.pageUrl === 'string' ? { pageUrl: candidate.pageUrl } : {}),
+    invalidCount: candidate.invalidCount,
+    alertCount: candidate.alertCount,
+    dialogCount: candidate.dialogCount,
+    busyCount: candidate.busyCount,
+  }
 }
 
 async function waitForDeferredBatchUpdate(
