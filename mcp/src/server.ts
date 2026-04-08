@@ -164,6 +164,7 @@ const formValueSchema = z.union([
 ])
 
 type FormValueInput = z.infer<typeof formValueSchema>
+const formValuesRecordSchema = z.record(z.string(), formValueSchema)
 
 const batchActionSchema = z.discriminatedUnion('type', [
   z.object({
@@ -515,8 +516,8 @@ Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / combo
 Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most stable matching, or \`valuesByLabel\` when labels are unique enough. MCP resolves the form schema, executes the semantic field operations server-side, and returns one consolidated result.`,
     {
       formId: z.string().optional().describe('Optional form id from geometra_form_schema or geometra_page_model'),
-      valuesById: z.record(formValueSchema).optional().describe('Form values keyed by stable field id from geometra_form_schema'),
-      valuesByLabel: z.record(formValueSchema).optional().describe('Form values keyed by schema field label'),
+      valuesById: formValuesRecordSchema.optional().describe('Form values keyed by stable field id from geometra_form_schema'),
+      valuesByLabel: formValuesRecordSchema.optional().describe('Form values keyed by schema field label'),
       stopOnError: z.boolean().optional().default(true).describe('Stop at the first failing field (default true)'),
       failOnInvalid: z
         .boolean()
