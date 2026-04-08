@@ -403,12 +403,32 @@ describe('setFieldChoice', () => {
       </fieldset>
     `)
 
-    await setFieldChoice(page, 'Will you require sponsorship?', 'No')
+    await setFieldChoice(page, 'Will you require sponsorship?', 'No', { choiceType: 'group' })
 
     expect(await page.locator('#question-a input[value="yes"]').isChecked()).toBe(false)
     expect(await page.locator('#question-a input[value="no"]').isChecked()).toBe(false)
     expect(await page.locator('#question-b input[value="yes"]').isChecked()).toBe(false)
     expect(await page.locator('#question-b input[value="no"]').isChecked()).toBe(true)
+    await page.close()
+  })
+
+  it('fails grouped choices without taking the listbox path when a group hint is provided', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 900 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; }
+      </style>
+      <fieldset id="question-a">
+        <legend>Will you require sponsorship?</legend>
+        <label><input type="radio" name="sponsor" value="yes" /> Yes</label>
+        <label><input type="radio" name="sponsor" value="no" /> No</label>
+      </fieldset>
+    `)
+
+    await expect(
+      setFieldChoice(page, 'Will you require sponsorship?', 'Maybe', { choiceType: 'group' }),
+    ).rejects.toThrow('no grouped choice matching "Maybe"')
+
     await page.close()
   })
 })

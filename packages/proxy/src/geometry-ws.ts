@@ -184,7 +184,11 @@ async function handleClientMessage(
     }
 
     if (isSetFieldChoiceMessage(msg)) {
-      await setFieldChoice(page, msg.fieldLabel, msg.value, { exact: msg.exact, query: msg.query })
+      await setFieldChoice(page, msg.fieldLabel, msg.value, {
+        exact: msg.exact,
+        query: msg.query,
+        choiceType: msg.choiceType,
+      })
       onViewportOrInput('input', requestId)
       return
     }

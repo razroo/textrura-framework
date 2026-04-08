@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { ElementHandle, Frame, Locator, Page } from 'playwright'
-import type { ClientFillField } from './types.js'
+import type { ClientChoiceType, ClientFillField } from './types.js'
 
 function delay(ms: number): Promise<void> {
   return new Promise(r => setTimeout(r, ms))
@@ -18,6 +18,24 @@ const OPTION_PICKER_SELECTOR =
 interface AnchorPoint {
   x?: number
   y?: number
+}
+
+interface FillLookupCache {
+  control: Map<string, Locator | null>
+  editable: Map<string, Locator | null>
+  fileInput: Map<string, Locator | null>
+}
+
+function createFillLookupCache(): FillLookupCache {
+  return {
+    control: new Map(),
+    editable: new Map(),
+    fileInput: new Map(),
+  }
+}
+
+function lookupCacheKey(kind: 'control' | 'editable' | 'file', label: string, exact: boolean): string {
+  return `${kind}:${exact ? 'exact' : 'fuzzy'}:${normalizedOptionLabel(label)}`
 }
 
 function normalizedOptionLabel(value: string): string {
@@ -411,6 +429,29 @@ async function findLabeledControl(
   return bestIndex >= 0 ? fallbackCandidates.nth(bestIndex) : null
 }
 
+async function findLabeledControlInPage(
+  page: Page,
+  fieldLabel: string,
+  exact: boolean,
+  opts?: { preferredAnchor?: AnchorPoint; cache?: FillLookupCache },
+): Promise<Locator | null> {
+  const cacheable = !opts?.preferredAnchor
+  const cacheKey = lookupCacheKey('control', fieldLabel, exact)
+  if (cacheable && opts?.cache?.control.has(cacheKey)) {
+    return opts.cache.control.get(cacheKey) ?? null
+  }
+
+  for (const frame of page.frames()) {
+    const locator = await findLabeledControl(frame, fieldLabel, exact, { preferredAnchor: opts?.preferredAnchor })
+    if (!locator) continue
+    if (cacheable) opts?.cache?.control.set(cacheKey, locator)
+    return locator
+  }
+
+  if (cacheable) opts?.cache?.control.set(cacheKey, null)
+  return null
+}
+
 function textMatches(candidate: string | undefined, expected: string, exact: boolean): boolean {
   return selectionMatchScore(candidate, expected, exact) !== null
 }
@@ -437,10 +478,10 @@ async function openDropdownControl(
   page: Page,
   fieldLabel: string,
   exact: boolean,
+  cache?: FillLookupCache,
 ): Promise<{ locator: Locator; handle: ElementHandle<Element> | null; editable: boolean; anchorX?: number; anchorY?: number }> {
-  for (const frame of page.frames()) {
-    const locator = await findLabeledControl(frame, fieldLabel, exact)
-    if (!locator) continue
+  const locator = await findLabeledControlInPage(page, fieldLabel, exact, { cache })
+  if (locator) {
     await locator.scrollIntoViewIfNeeded()
     const handle = await locator.elementHandle()
     const clickTarget = await resolveMeaningfulClickTarget(locator)
@@ -870,11 +911,43 @@ async function findLabeledFileInput(frame: Frame, fieldLabel: string, exact: boo
   return bestIndex >= 0 ? loc.nth(bestIndex) : null
 }
 
+async function findLabeledFileInputInPage(
+  page: Page,
+  fieldLabel: string,
+  exact: boolean,
+  cache?: FillLookupCache,
+): Promise<Locator | null> {
+  const cacheKey = lookupCacheKey('file', fieldLabel, exact)
+  if (cache?.fileInput.has(cacheKey)) return cache.fileInput.get(cacheKey) ?? null
+
+  for (const frame of page.frames()) {
+    const locator = await findLabeledFileInput(frame, fieldLabel, exact)
+    if (!locator) continue
+    cache?.fileInput.set(cacheKey, locator)
+    return locator
+  }
+
+  cache?.fileInput.set(cacheKey, null)
+  return null
+}
+
 async function attachHiddenInAllFrames(
   page: Page,
   paths: string[],
-  opts?: { fieldLabel?: string; exact?: boolean },
+  opts?: { fieldLabel?: string; exact?: boolean; cache?: FillLookupCache },
 ): Promise<boolean> {
+  if (opts?.fieldLabel) {
+    const labeled = await findLabeledFileInputInPage(page, opts.fieldLabel, opts.exact ?? false, opts.cache)
+    if (labeled) {
+      try {
+        await labeled.setInputFiles(paths)
+        return true
+      } catch {
+        /* fall through to uncached scan */
+      }
+    }
+  }
+
   for (const frame of page.frames()) {
     if (opts?.fieldLabel) {
       const labeled = await findLabeledFileInput(frame, opts.fieldLabel, opts.exact ?? false)
@@ -950,6 +1023,7 @@ export async function attachFiles(
     strategy?: FileAttachStrategy
     dropX?: number
     dropY?: number
+    cache?: FillLookupCache
   },
 ): Promise<void> {
   const strategy = opts?.strategy ?? 'auto'
@@ -969,7 +1043,7 @@ export async function attachFiles(
   }
 
   if (strategy === 'hidden' || strategy === 'auto') {
-    if (await attachHiddenInAllFrames(page, paths, { fieldLabel, exact })) return
+    if (await attachHiddenInAllFrames(page, paths, { fieldLabel, exact, cache: opts?.cache })) return
     if (strategy === 'hidden') {
       if (fieldLabel) {
         throw new Error(`file: hidden strategy could not find input[type=file] for field "${fieldLabel}"`)
@@ -1002,7 +1076,15 @@ export async function attachFiles(
   )
 }
 
-async function findLabeledEditableField(page: Page, fieldLabel: string, exact: boolean): Promise<Locator | null> {
+async function findLabeledEditableField(
+  page: Page,
+  fieldLabel: string,
+  exact: boolean,
+  cache?: FillLookupCache,
+): Promise<Locator | null> {
+  const cacheKey = lookupCacheKey('editable', fieldLabel, exact)
+  if (cache?.editable.has(cacheKey)) return cache.editable.get(cacheKey) ?? null
+
   for (const frame of page.frames()) {
     const candidates = [
       frame.getByLabel(fieldLabel, { exact }),
@@ -1012,13 +1094,20 @@ async function findLabeledEditableField(page: Page, fieldLabel: string, exact: b
     for (const candidate of candidates) {
       const visible = await firstVisible(candidate, { minWidth: 1, minHeight: 1 })
       if (!visible) continue
-      if (await locatorIsEditable(visible)) return visible
+      if (await locatorIsEditable(visible)) {
+        cache?.editable.set(cacheKey, visible)
+        return visible
+      }
     }
 
     const fallback = await findLabeledControl(frame, fieldLabel, exact)
-    if (fallback && await locatorIsEditable(fallback)) return fallback
+    if (fallback && await locatorIsEditable(fallback)) {
+      cache?.editable.set(cacheKey, fallback)
+      return fallback
+    }
   }
 
+  cache?.editable.set(cacheKey, null)
   return null
 }
 
@@ -1108,14 +1197,294 @@ async function setLocatorTextValue(locator: Locator, value: string): Promise<boo
   }
 }
 
+async function attemptNativeBatchFill(page: Page, fields: FormFieldFill[]): Promise<boolean[]> {
+  type NativeBatchPendingField =
+    | { index: number; kind: 'text'; fieldLabel: string; value: string; exact: boolean }
+    | { index: number; kind: 'choice'; fieldLabel: string; value: string; exact: boolean; choiceType: ClientChoiceType | null }
+    | { index: number; kind: 'toggle'; label: string; checked: boolean; exact: boolean; controlType: 'checkbox' | 'radio' | null }
+
+  const results = fields.map(() => false)
+
+  for (const frame of page.frames()) {
+    const pending: NativeBatchPendingField[] = []
+    for (let index = 0; index < fields.length; index++) {
+      if (results[index]) continue
+      const field = fields[index]!
+      if (field.kind === 'file') continue
+      if (field.kind === 'text') {
+        pending.push({
+          index,
+          kind: 'text',
+          fieldLabel: field.fieldLabel,
+          value: field.value,
+          exact: field.exact ?? false,
+        })
+        continue
+      }
+      if (field.kind === 'choice') {
+        pending.push({
+          index,
+          kind: 'choice',
+          fieldLabel: field.fieldLabel,
+          value: field.value,
+          exact: field.exact ?? false,
+          choiceType: field.choiceType ?? null,
+        })
+        continue
+      }
+      pending.push({
+        index,
+        kind: 'toggle',
+        label: field.label,
+        checked: field.checked ?? true,
+        exact: field.exact ?? false,
+        controlType: field.controlType ?? null,
+      })
+    }
+
+    if (pending.length === 0) break
+
+    const frameResults = await frame.evaluate((items) => {
+      type ChoiceType = 'select' | 'group' | 'listbox' | null
+      type NativeBatchField =
+        | { index: number; kind: 'text'; fieldLabel: string; value: string; exact: boolean }
+        | { index: number; kind: 'choice'; fieldLabel: string; value: string; exact: boolean; choiceType: ChoiceType }
+        | { index: number; kind: 'toggle'; label: string; checked: boolean; exact: boolean; controlType: 'checkbox' | 'radio' | null }
+
+      function normalize(value: string | null | undefined): string {
+        return (value ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
+      }
+
+      function matches(candidate: string | null | undefined, expected: string, exact: boolean): boolean {
+        const normalizedCandidate = normalize(candidate)
+        const normalizedExpected = normalize(expected)
+        if (!normalizedCandidate || !normalizedExpected) return false
+        return exact ? normalizedCandidate === normalizedExpected : normalizedCandidate.includes(normalizedExpected)
+      }
+
+      function visible(el: Element): el is HTMLElement {
+        if (!(el instanceof HTMLElement)) return false
+        const rect = el.getBoundingClientRect()
+        if (rect.width <= 0 || rect.height <= 0) return false
+        const style = getComputedStyle(el)
+        return style.display !== 'none' && style.visibility !== 'hidden'
+      }
+
+      function referencedText(ids: string | null): string | undefined {
+        if (!ids) return undefined
+        const text = ids
+          .split(/\s+/)
+          .map(id => document.getElementById(id)?.textContent?.trim() ?? '')
+          .filter(Boolean)
+          .join(' ')
+          .trim()
+        return text || undefined
+      }
+
+      function explicitLabelText(el: Element): string | undefined {
+        const aria = el.getAttribute('aria-label')?.trim()
+        if (aria) return aria
+        const labelledBy = referencedText(el.getAttribute('aria-labelledby'))
+        if (labelledBy) return labelledBy
+        if (
+          (el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) &&
+          el.labels &&
+          el.labels.length > 0
+        ) {
+          return el.labels[0]?.textContent?.trim() || undefined
+        }
+        if (el instanceof HTMLElement && el.id) {
+          const label = document.querySelector(`label[for="${CSS.escape(el.id)}"]`)
+          const text = label?.textContent?.trim()
+          if (text) return text
+        }
+        if (el.parentElement?.tagName.toLowerCase() === 'label') {
+          return el.parentElement.textContent?.trim() || undefined
+        }
+        return undefined
+      }
+
+      function dispatch(target: HTMLElement): void {
+        target.dispatchEvent(new Event('input', { bubbles: true }))
+        target.dispatchEvent(new Event('change', { bubbles: true }))
+      }
+
+      function setInputLikeValue(target: HTMLInputElement | HTMLTextAreaElement, next: string): void {
+        const proto = target instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype
+        const descriptor = Object.getOwnPropertyDescriptor(proto, 'value')
+        if (descriptor?.set) descriptor.set.call(target, next)
+        else target.value = next
+      }
+
+      function currentValue(el: Element): string {
+        if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return el.value
+        if (el instanceof HTMLSelectElement) return el.selectedOptions[0]?.textContent?.trim() || el.value
+        if (el instanceof HTMLElement && el.isContentEditable) return el.innerText || el.textContent || ''
+        return ''
+      }
+
+      function setTextField(fieldLabel: string, value: string, exact: boolean): boolean {
+        const controls = Array.from(document.querySelectorAll('input, textarea, [contenteditable="true"]'))
+        for (const control of controls) {
+          if (!(control instanceof Element) || !visible(control)) continue
+          if (control instanceof HTMLInputElement && ['checkbox', 'radio', 'file', 'button', 'submit', 'reset', 'hidden'].includes(control.type)) {
+            continue
+          }
+          if (!matches(explicitLabelText(control), fieldLabel, exact)) continue
+          if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement) {
+            control.focus()
+            setInputLikeValue(control, value)
+            dispatch(control)
+            return matches(currentValue(control), value, false)
+          }
+          if (control instanceof HTMLElement && control.isContentEditable) {
+            control.focus()
+            control.textContent = value
+            dispatch(control)
+            return matches(currentValue(control), value, false)
+          }
+        }
+        return false
+      }
+
+      function setSelectField(fieldLabel: string, value: string, exact: boolean): boolean {
+        const controls = Array.from(document.querySelectorAll('select'))
+        for (const control of controls) {
+          if (!(control instanceof HTMLSelectElement) || !visible(control)) continue
+          if (!matches(explicitLabelText(control), fieldLabel, exact)) continue
+          const expected = normalize(value)
+          const option = Array.from(control.options).find((candidate) => {
+            const label = normalize(candidate.textContent)
+            const rawValue = normalize(candidate.value)
+            return exact ? label === expected || rawValue === expected : label.includes(expected) || rawValue.includes(expected)
+          })
+          if (!option) return false
+          control.value = option.value
+          dispatch(control)
+          return matches(currentValue(control), value, false) || normalize(control.value) === expected
+        }
+        return false
+      }
+
+      function groupPrompt(container: Element): string | undefined {
+        const legend = container.querySelector('legend')?.textContent?.trim()
+        if (legend) return legend
+        const explicit = explicitLabelText(container)
+        if (explicit) return explicit
+        const textLike = container.querySelector('h1, h2, h3, h4, h5, h6, p, span, div')
+        const text = textLike?.textContent?.trim()
+        return text || undefined
+      }
+
+      function choiceLabel(el: Element): string | undefined {
+        if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
+          return explicitLabelText(el)
+        }
+        if (el instanceof HTMLLabelElement) return el.textContent?.trim() || undefined
+        const explicit = explicitLabelText(el)
+        if (explicit) return explicit
+        return el.textContent?.trim() || undefined
+      }
+
+      function setGroupedChoice(fieldLabel: string, value: string, exact: boolean): boolean {
+        const groups = Array.from(document.querySelectorAll('fieldset, [role="radiogroup"], [role="group"]'))
+          .filter((el): el is HTMLElement => visible(el) && matches(groupPrompt(el), fieldLabel, exact))
+        for (const group of groups) {
+          const options = Array.from(
+            group.querySelectorAll('input[type="radio"], input[type="checkbox"], [role="radio"], [role="checkbox"], label, button'),
+          )
+          for (const option of options) {
+            if (!(option instanceof Element) || !visible(option)) continue
+            if (!matches(choiceLabel(option), value, exact)) continue
+
+            if (option instanceof HTMLInputElement) {
+              if (!option.checked) option.click()
+              if (!option.checked) {
+                option.checked = true
+                dispatch(option)
+              }
+              return option.checked
+            }
+            if (option instanceof HTMLLabelElement) {
+              option.click()
+              const control = option.control
+              if (control instanceof HTMLInputElement) return control.checked
+              return true
+            }
+            option.click()
+            return true
+          }
+        }
+        return false
+      }
+
+      function setToggle(label: string, checked: boolean, exact: boolean, controlType: 'checkbox' | 'radio' | null): boolean {
+        const inputs = Array.from(document.querySelectorAll('input[type="checkbox"], input[type="radio"]'))
+        for (const input of inputs) {
+          if (!(input instanceof HTMLInputElement) || !visible(input)) continue
+          if (controlType && input.type !== controlType) continue
+          if (!matches(explicitLabelText(input), label, exact)) continue
+          if (input.checked !== checked) {
+            input.click()
+            if (input.checked !== checked) {
+              input.checked = checked
+              dispatch(input)
+            }
+          }
+          return input.checked === checked
+        }
+
+        const labels = Array.from(document.querySelectorAll('label'))
+        for (const labelEl of labels) {
+          if (!(labelEl instanceof HTMLLabelElement) || !visible(labelEl)) continue
+          if (!matches(labelEl.textContent, label, exact)) continue
+          const control = labelEl.control
+          if (!(control instanceof HTMLInputElement)) continue
+          if (controlType && control.type !== controlType) continue
+          if (control.checked !== checked) labelEl.click()
+          if (control.checked !== checked) {
+            control.checked = checked
+            dispatch(control)
+          }
+          return control.checked === checked
+        }
+
+        return false
+      }
+
+      return items.map((field: NativeBatchField) => {
+        if (field.kind === 'text') return { index: field.index, ok: setTextField(field.fieldLabel, field.value, field.exact) }
+        if (field.kind === 'choice') {
+          if (field.choiceType === 'group') {
+            return { index: field.index, ok: setGroupedChoice(field.fieldLabel, field.value, field.exact) }
+          }
+          if (field.choiceType === 'listbox') {
+            return { index: field.index, ok: false }
+          }
+          const selected = setSelectField(field.fieldLabel, field.value, field.exact)
+          if (selected) return { index: field.index, ok: true }
+          return { index: field.index, ok: setGroupedChoice(field.fieldLabel, field.value, field.exact) }
+        }
+        return { index: field.index, ok: setToggle(field.label, field.checked, field.exact, field.controlType) }
+      })
+    }, pending).catch(() => [] as Array<{ index: number; ok: boolean }>)
+
+    for (const entry of frameResults) {
+      if (entry?.ok === true) results[entry.index] = true
+    }
+  }
+
+  return results
+}
+
 export async function setFieldText(
   page: Page,
   fieldLabel: string,
   value: string,
-  opts?: { exact?: boolean },
+  opts?: { exact?: boolean; cache?: FillLookupCache },
 ): Promise<void> {
   const exact = opts?.exact ?? false
-  const locator = await findLabeledEditableField(page, fieldLabel, exact)
+  const locator = await findLabeledEditableField(page, fieldLabel, exact, opts?.cache)
   if (!locator) {
     throw new Error(`setFieldText: no visible editable field matching "${fieldLabel}"`)
   }
@@ -1307,21 +1676,23 @@ export async function setFieldChoice(
   page: Page,
   fieldLabel: string,
   value: string,
-  opts?: { exact?: boolean; query?: string },
+  opts?: { exact?: boolean; query?: string; choiceType?: ClientChoiceType; cache?: FillLookupCache },
 ): Promise<void> {
   const exact = opts?.exact ?? false
 
-  for (const frame of page.frames()) {
-    const locator = await findLabeledControl(frame, fieldLabel, exact)
-    if (!locator) continue
-
+  const locator = await findLabeledControlInPage(page, fieldLabel, exact, { cache: opts?.cache })
+  if (locator) {
     await locator.scrollIntoViewIfNeeded()
     if (await setNativeSelectByLabel(locator, value, exact)) {
       const displayed = await locatorDisplayedValues(locator)
       if (displayed.some(candidate => displayedValueMatchesSelection(candidate, value, exact))) return
       throw new Error(`setFieldChoice: selected "${value}" for field "${fieldLabel}" but could not confirm it`)
     }
-    break
+  }
+
+  if (opts?.choiceType === 'group') {
+    if (await chooseValueFromLabeledGroup(page, fieldLabel, value, exact)) return
+    throw new Error(`setFieldChoice: no grouped choice matching "${value}" for field "${fieldLabel}"`)
   }
 
   try {
@@ -1329,6 +1700,7 @@ export async function setFieldChoice(
       fieldLabel,
       exact,
       query: opts?.query,
+      cache: opts?.cache,
     })
     return
   } catch (listboxError) {
@@ -1340,13 +1712,23 @@ export async function setFieldChoice(
 export type FormFieldFill = ClientFillField
 
 export async function fillFields(page: Page, fields: FormFieldFill[]): Promise<void> {
-  for (const field of fields) {
+  const cache = createFillLookupCache()
+  const nativeResults = await attemptNativeBatchFill(page, fields)
+
+  for (let index = 0; index < fields.length; index++) {
+    const field = fields[index]!
+    if (nativeResults[index]) continue
     if (field.kind === 'text') {
-      await setFieldText(page, field.fieldLabel, field.value, { exact: field.exact })
+      await setFieldText(page, field.fieldLabel, field.value, { exact: field.exact, cache })
       continue
     }
     if (field.kind === 'choice') {
-      await setFieldChoice(page, field.fieldLabel, field.value, { exact: field.exact, query: field.query })
+      await setFieldChoice(page, field.fieldLabel, field.value, {
+        exact: field.exact,
+        query: field.query,
+        choiceType: field.choiceType,
+        cache,
+      })
       continue
     }
     if (field.kind === 'toggle') {
@@ -1357,7 +1739,7 @@ export async function fillFields(page: Page, fields: FormFieldFill[]): Promise<v
       })
       continue
     }
-    await attachFiles(page, field.paths, { fieldLabel: field.fieldLabel, exact: field.exact })
+    await attachFiles(page, field.paths, { fieldLabel: field.fieldLabel, exact: field.exact, cache })
   }
 }
 
@@ -1417,7 +1799,7 @@ export async function selectNativeOption(page: Page, x: number, y: number, opt: 
 export async function pickListboxOption(
   page: Page,
   label: string,
-  opts?: { exact?: boolean; openX?: number; openY?: number; fieldLabel?: string; query?: string },
+  opts?: { exact?: boolean; openX?: number; openY?: number; fieldLabel?: string; query?: string; cache?: FillLookupCache },
 ): Promise<void> {
   let anchor: AnchorPoint | undefined
   const exact = opts?.exact ?? false
@@ -1426,7 +1808,7 @@ export async function pickListboxOption(
   let openedHandle: ElementHandle<Element> | null | undefined
 
   if (opts?.fieldLabel) {
-    const opened = await openDropdownControl(page, opts.fieldLabel, exact)
+    const opened = await openDropdownControl(page, opts.fieldLabel, exact, opts.cache)
     anchor = { x: opened.anchorX, y: opened.anchorY }
     openedHandle = opened.handle
     const query = opts.query ?? label

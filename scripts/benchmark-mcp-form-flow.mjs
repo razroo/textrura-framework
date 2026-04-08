@@ -52,6 +52,11 @@ const SCENARIOS = {
           'I rebuilt a failing workflow orchestration path by isolating race conditions, adding deterministic retries, and redesigning the state model so late async events could not corrupt user-visible progress.',
       },
     ],
+    groups: [
+      { name: 'profile', range: [0, 4] },
+      { name: 'eligibility', range: [4, 7] },
+      { name: 'essays', range: [7, 9] },
+    ],
   },
   heavy: {
     id: 'heavy',
@@ -122,6 +127,13 @@ const SCENARIOS = {
       },
       { kind: 'text', label: 'Best writing sample URL', value: 'https://taylor.example.com/writing/performance-playbooks' },
       { kind: 'text', label: 'Open source project URL', value: 'https://github.com/taylor-applicant/control-plane-lab' },
+    ],
+    groups: [
+      { name: 'profile', range: [0, 17] },
+      { name: 'eligibility', range: [17, 23] },
+      { name: 'commitments', range: [23, 26] },
+      { name: 'essays', range: [26, 32] },
+      { name: 'links', range: [32, 34] },
     ],
   },
 }
@@ -269,6 +281,21 @@ function scenarioValuesByLabel(scenario) {
   )
 }
 
+function scenarioStepsToProxyFields(steps) {
+  return steps.map(step => {
+    if (step.kind === 'text') {
+      return { kind: 'text', fieldLabel: step.label, value: step.value }
+    }
+    if (step.kind === 'select') {
+      return { kind: 'choice', fieldLabel: step.label, value: step.value, choiceType: 'select' }
+    }
+    if (step.kind === 'radio') {
+      return { kind: 'choice', fieldLabel: step.groupLabel, value: step.value, choiceType: 'group' }
+    }
+    return { kind: 'toggle', label: step.label, checked: step.checked, controlType: 'checkbox' }
+  })
+}
+
 async function runGeometraFlow(url, createServer, scenario) {
   const server = createServer()
   const connect = getToolHandler(server, 'geometra_connect')
@@ -401,6 +428,35 @@ async function runPlaywrightFlow(url, scenario) {
   }
 }
 
+async function runGeometraProxyGroupDiagnostics(url, scenario, proxyFillFields) {
+  if (!Array.isArray(scenario.groups) || scenario.groups.length === 0) return []
+
+  const browser = await chromium.launch({ headless: true })
+  const page = await browser.newPage({ viewport: VIEWPORT })
+
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+
+    const diagnostics = []
+    for (const group of scenario.groups) {
+      const [start, end] = group.range
+      const fields = scenarioStepsToProxyFields(scenario.steps.slice(start, end))
+      const started = performance.now()
+      await proxyFillFields(page, fields)
+      diagnostics.push({
+        name: group.name,
+        fieldCount: fields.length,
+        elapsedMs: performance.now() - started,
+      })
+    }
+
+    const invalidCount = await page.locator(':invalid').count()
+    return { diagnostics, invalidCount }
+  } finally {
+    await browser.close()
+  }
+}
+
 function printStepTable(title, steps) {
   console.log(`\n${title}`)
   console.log('| Step | Input B | Output B | Total B | ~Tokens | ms |')
@@ -416,6 +472,17 @@ function printTotals(label, totals) {
   console.log(
     `${label}: ${totals.turns} turns, ${totals.totalBytes} B total (~${totals.approxTokens} tokens), ${totals.elapsedMs.toFixed(1)} ms`,
   )
+}
+
+function printGroupDiagnostics(diagnostics, invalidCount) {
+  if (!Array.isArray(diagnostics) || diagnostics.length === 0) return
+  console.log('\nGeometra proxy group timings')
+  console.log('| Group | Fields | ms |')
+  console.log('|---|--:|--:|')
+  for (const group of diagnostics) {
+    console.log(`| ${group.name} | ${group.fieldCount} | ${group.elapsedMs.toFixed(1)} |`)
+  }
+  console.log(`Proxy diagnostic invalidCount after grouped fill: ${invalidCount}`)
 }
 
 function printDelta(label, geometraTotals, playwrightTotals) {
@@ -476,7 +543,7 @@ function assertBenchmark(geometra, playwright, scenario) {
   }
 }
 
-async function runScenario(scenario, createServer, assert) {
+async function runScenario(scenario, createServer, proxyFillFields, assert) {
   const { server, url } = await startStaticServer(scenario.htmlPath)
 
   try {
@@ -493,6 +560,7 @@ async function runScenario(scenario, createServer, assert) {
 
     const geometra = await runGeometraFlow(url, createServer, scenario)
     const playwright = await runPlaywrightFlow(url, scenario)
+    const groupDiagnostics = await runGeometraProxyGroupDiagnostics(url, scenario, proxyFillFields)
 
     printStepTable('Geometra steps', geometra.steps)
     printStepTable('Playwright-style steps', playwright.steps)
@@ -532,6 +600,7 @@ async function runScenario(scenario, createServer, assert) {
     console.log(
       `Playwright run_code input: ${playwright.steps[2].inputBytes} B (~${approxTokens(playwright.steps[2].inputBytes)} tokens), invalidCount=${playwright.runCodeResult.invalidCount}`,
     )
+    printGroupDiagnostics(groupDiagnostics.diagnostics, groupDiagnostics.invalidCount)
 
     if (assert) {
       assertBenchmark(geometra, playwright, scenario)
@@ -564,12 +633,13 @@ async function main() {
   )
 
   const { createServer } = await import(pathToFileURL(path.join(ROOT, 'mcp/dist/server.js')).href)
+  const { fillFields: proxyFillFields } = await import(pathToFileURL(path.join(ROOT, 'packages/proxy/dist/dom-actions.js')).href)
 
   for (const [index, scenario] of scenarios.entries()) {
     if (index > 0) {
       console.log('\n' + '='.repeat(80))
     }
-    await runScenario(scenario, createServer, args.assert)
+    await runScenario(scenario, createServer, proxyFillFields, args.assert)
   }
 }
 

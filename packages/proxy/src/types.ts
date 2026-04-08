@@ -25,6 +25,7 @@ export interface GeometrySnapshot {
 }
 
 export const PROXY_PROTOCOL_VERSION = 1 as const
+export type ClientChoiceType = 'select' | 'group' | 'listbox'
 
 export type ClientEventMessage = {
   type: 'event'
@@ -93,6 +94,7 @@ export type ClientSetFieldChoiceMessage = {
   fieldLabel: string
   value: string
   query?: string
+  choiceType?: ClientChoiceType
   exact?: boolean
   requestId?: string
   protocolVersion?: number
@@ -100,7 +102,7 @@ export type ClientSetFieldChoiceMessage = {
 
 export type ClientFillField =
   | { kind: 'text'; fieldLabel: string; value: string; exact?: boolean }
-  | { kind: 'choice'; fieldLabel: string; value: string; query?: string; exact?: boolean }
+  | { kind: 'choice'; fieldLabel: string; value: string; query?: string; exact?: boolean; choiceType?: ClientChoiceType }
   | { kind: 'toggle'; label: string; checked?: boolean; exact?: boolean; controlType?: 'checkbox' | 'radio' }
   | { kind: 'file'; fieldLabel: string; paths: string[]; exact?: boolean }
 

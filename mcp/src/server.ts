@@ -144,6 +144,10 @@ const fillFieldSchema = z.discriminatedUnion('kind', [
     fieldLabel: z.string().describe('Visible field label / accessible name'),
     value: z.string().describe('Desired option value / answer label'),
     query: z.string().optional().describe('Optional search text for searchable comboboxes'),
+    choiceType: z
+      .enum(['select', 'group', 'listbox'])
+      .optional()
+      .describe('Optional choice subtype hint. Use `group` for repeated radio/button answers, `select` for native selects, and `listbox` for searchable dropdowns.'),
     exact: z.boolean().optional().describe('Exact label match'),
     timeoutMs: timeoutMsInput.describe('Optional action wait timeout'),
   }),
@@ -1637,7 +1641,7 @@ function plannedFillInputsForField(field: FormSchemaField, value: FormValueInput
   if (field.kind === 'choice') {
     const coerced = coerceChoiceValue(field, value)
     if (!coerced) return { error: `Field "${field.label}" expects a string value` }
-    return [{ kind: 'choice', fieldLabel: field.label, value: coerced }]
+    return [{ kind: 'choice', fieldLabel: field.label, value: coerced, ...(field.choiceType ? { choiceType: field.choiceType } : {}) }]
   }
 
   if (field.kind === 'toggle') {
@@ -2041,7 +2045,7 @@ async function executeFillField(session: Session, field: FillFieldInput, detail:
         session,
         field.fieldLabel,
         field.value,
-        { exact: field.exact, query: field.query },
+        { exact: field.exact, query: field.query, choiceType: field.choiceType },
         field.timeoutMs,
       )
       const fieldSummary = summarizeFieldLabelState(session, field.fieldLabel)
@@ -2054,6 +2058,7 @@ async function executeFillField(session: Session, field: FillFieldInput, detail:
         compact: {
           fieldLabel: field.fieldLabel,
           value: field.value,
+          ...(field.choiceType ? { choiceType: field.choiceType } : {}),
           ...waitStatusPayload(wait),
           readback: fieldStatePayload(session, field.fieldLabel),
         },

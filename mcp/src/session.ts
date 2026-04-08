@@ -22,7 +22,7 @@ export interface A11yNode {
     busy?: boolean
   }
   validation?: { description?: string; error?: string }
-  meta?: { pageUrl?: string; scrollX?: number; scrollY?: number }
+  meta?: { pageUrl?: string; scrollX?: number; scrollY?: number; controlTag?: string }
   bounds: { x: number; y: number; width: number; height: number }
   path: number[]
   children: A11yNode[]
@@ -194,6 +194,7 @@ export interface PageSectionDetail {
 }
 
 export type FormSchemaFieldKind = 'text' | 'choice' | 'toggle' | 'multi_choice'
+export type FormSchemaChoiceType = 'select' | 'group' | 'listbox'
 
 export interface FormSchemaField {
   id: string
@@ -201,6 +202,7 @@ export interface FormSchemaField {
   label: string
   required?: boolean
   invalid?: boolean
+  choiceType?: FormSchemaChoiceType
   controlType?: 'checkbox' | 'radio'
   value?: string
   valueLength?: number
@@ -296,7 +298,7 @@ let nextRequestSequence = 0
 
 export type ProxyFillField =
   | { kind: 'text'; fieldLabel: string; value: string; exact?: boolean }
-  | { kind: 'choice'; fieldLabel: string; value: string; query?: string; exact?: boolean }
+  | { kind: 'choice'; fieldLabel: string; value: string; query?: string; exact?: boolean; choiceType?: FormSchemaChoiceType }
   | { kind: 'toggle'; label: string; checked?: boolean; exact?: boolean; controlType?: 'checkbox' | 'radio' }
   | { kind: 'file'; fieldLabel: string; paths: string[]; exact?: boolean }
 
@@ -449,7 +451,7 @@ function estimateFillBatchTimeout(fields: ProxyFillField[]): number {
         total += Math.ceil(Math.max(1, field.value.length) / FILL_BATCH_TEXT_LENGTH_SLICE) * FILL_BATCH_TEXT_LENGTH_TIMEOUT_MS
         break
       case 'choice':
-        total += FILL_BATCH_CHOICE_FIELD_TIMEOUT_MS
+        total += field.choiceType === 'group' ? FILL_BATCH_TOGGLE_FIELD_TIMEOUT_MS : FILL_BATCH_CHOICE_FIELD_TIMEOUT_MS
         break
       case 'toggle':
         total += FILL_BATCH_TOGGLE_FIELD_TIMEOUT_MS
@@ -627,7 +629,7 @@ export function sendFieldChoice(
   session: Session,
   fieldLabel: string,
   value: string,
-  opts?: { exact?: boolean; query?: string },
+  opts?: { exact?: boolean; query?: string; choiceType?: FormSchemaChoiceType },
   timeoutMs = LISTBOX_UPDATE_TIMEOUT_MS,
 ): Promise<UpdateWaitResult> {
   const payload: Record<string, unknown> = {
@@ -637,6 +639,7 @@ export function sendFieldChoice(
   }
   if (opts?.exact !== undefined) payload.exact = opts.exact
   if (opts?.query) payload.query = opts.query
+  if (opts?.choiceType) payload.choiceType = opts.choiceType
   return sendAndWaitForUpdate(session, payload, timeoutMs)
 }
 
@@ -1379,11 +1382,18 @@ function simpleSchemaField(root: A11yNode, node: A11yNode): FormSchemaField | nu
   const context = nodeContext(root, node)
   const label = fieldLabel(node) ?? sanitizeInlineName(node.name, 80) ?? context?.prompt
   if (!label) return null
+  const choiceType =
+    node.role === 'combobox'
+      ? node.meta?.controlTag === 'select'
+        ? 'select'
+        : 'listbox'
+      : undefined
 
   return {
     id: formFieldIdForPath(node.path),
     kind: node.role === 'combobox' ? 'choice' : 'text',
     label,
+    ...(choiceType ? { choiceType } : {}),
     ...(node.state?.required ? { required: true } : {}),
     ...(node.state?.invalid ? { invalid: true } : {}),
     ...compactSchemaValue(node.value, 72),
@@ -1417,6 +1427,7 @@ function groupedSchemaField(
     id: formFieldIdForPath(grouped.container.path),
     kind: radioLike ? 'choice' : 'multi_choice',
     label: grouped.prompt,
+    ...(radioLike ? { choiceType: 'group' as const } : {}),
     ...(grouped.controls.some(control => control.state?.required) ? { required: true } : {}),
     ...(grouped.controls.some(control => control.state?.invalid) ? { invalid: true } : {}),
     ...(radioLike
@@ -2235,6 +2246,7 @@ function walkNode(element: Record<string, unknown>, layout: Record<string, unkno
   if (typeof semantic?.pageUrl === 'string') meta.pageUrl = semantic.pageUrl
   if (typeof semantic?.scrollX === 'number' && Number.isFinite(semantic.scrollX)) meta.scrollX = semantic.scrollX
   if (typeof semantic?.scrollY === 'number' && Number.isFinite(semantic.scrollY)) meta.scrollY = semantic.scrollY
+  if (typeof semantic?.tag === 'string' && semantic.tag.trim().length > 0) meta.controlTag = semantic.tag
 
   const children: A11yNode[] = []
   const elementChildren = element.children as Record<string, unknown>[] | undefined

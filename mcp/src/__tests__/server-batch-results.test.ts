@@ -277,8 +277,8 @@ describe('batch MCP result shaping', () => {
         invalidCount: 0,
         fields: [
           { id: 'ff:0.0', kind: 'text', label: 'Full name', required: true },
-          { id: 'ff:0.1', kind: 'choice', label: 'Preferred location', required: true },
-          { id: 'ff:0.2', kind: 'choice', label: 'Are you legally authorized to work in Germany?', options: ['Yes', 'No'], optionCount: 2 },
+          { id: 'ff:0.1', kind: 'choice', label: 'Preferred location', required: true, choiceType: 'select' },
+          { id: 'ff:0.2', kind: 'choice', label: 'Are you legally authorized to work in Germany?', choiceType: 'group', options: ['Yes', 'No'], optionCount: 2 },
           { id: 'ff:0.3', kind: 'toggle', label: 'Share my profile for future roles', controlType: 'checkbox' },
         ],
       },
@@ -309,7 +309,7 @@ describe('batch MCP result shaping', () => {
         invalidCount: 0,
         fields: [
           { id: 'ff:0.0', kind: 'text', label: 'Full name', required: true },
-          { id: 'ff:0.1', kind: 'choice', label: 'Are you legally authorized to work in Germany?', options: ['Yes', 'No'], optionCount: 2 },
+          { id: 'ff:0.1', kind: 'choice', label: 'Are you legally authorized to work in Germany?', choiceType: 'group', options: ['Yes', 'No'], optionCount: 2 },
           { id: 'ff:0.2', kind: 'toggle', label: 'Share my profile for future roles', controlType: 'checkbox' },
           { id: 'ff:0.3', kind: 'text', label: 'Why Geometra?' },
         ],
@@ -349,7 +349,7 @@ describe('batch MCP result shaping', () => {
       mockState.session,
       'Are you legally authorized to work in Germany?',
       'Yes',
-      { exact: undefined, query: undefined },
+      { exact: undefined, query: undefined, choiceType: 'group' },
       undefined,
     )
     expect(payload).toMatchObject({
@@ -390,7 +390,7 @@ describe('batch MCP result shaping', () => {
         invalidCount: 0,
         fields: [
           { id: 'ff:0.0', kind: 'text', label: 'Full name', required: true },
-          { id: 'ff:0.1', kind: 'choice', label: 'Preferred location', required: true },
+          { id: 'ff:0.1', kind: 'choice', label: 'Preferred location', required: true, choiceType: 'select' },
           { id: 'ff:0.2', kind: 'toggle', label: 'Share my profile for future roles', controlType: 'checkbox' },
         ],
       },
@@ -423,7 +423,7 @@ describe('batch MCP result shaping', () => {
       mockState.session,
       [
         { kind: 'text', fieldLabel: 'Full name', value: 'Taylor Applicant' },
-        { kind: 'choice', fieldLabel: 'Preferred location', value: 'Berlin, Germany' },
+        { kind: 'choice', fieldLabel: 'Preferred location', value: 'Berlin, Germany', choiceType: 'select' },
         {
           kind: 'toggle',
           label: 'Share my profile for future roles',
@@ -521,7 +521,7 @@ describe('query and reveal tools', () => {
         invalidCount: 2,
         fields: [
           { id: 'ff:0.0', kind: 'text', label: 'Full name', required: true, invalid: true },
-          { id: 'ff:0.1', kind: 'choice', label: 'Preferred location', required: true, invalid: true },
+          { id: 'ff:0.1', kind: 'choice', label: 'Preferred location', required: true, invalid: true, choiceType: 'select' },
         ],
       },
     ]
@@ -564,7 +564,7 @@ describe('query and reveal tools', () => {
       mockState.session,
       'Preferred location',
       'Berlin, Germany',
-      { exact: undefined, query: undefined },
+      { exact: undefined, query: undefined, choiceType: 'select' },
       undefined,
     )
     expect(payload).toMatchObject({

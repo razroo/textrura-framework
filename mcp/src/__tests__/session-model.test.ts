@@ -299,6 +299,7 @@ describe('buildFormSchemas', () => {
               path: [0, 1],
               state: { required: true },
               value: 'Berlin, Germany',
+              meta: { controlTag: 'select' },
             }),
             node('group', undefined, { x: 40, y: 260, width: 520, height: 96 }, {
               path: [0, 2],
@@ -352,12 +353,14 @@ describe('buildFormSchemas', () => {
       expect.objectContaining({
         kind: 'choice',
         label: 'Preferred location',
+        choiceType: 'select',
         required: true,
         value: 'Berlin, Germany',
       }),
       expect.objectContaining({
         kind: 'choice',
         label: 'Are you legally authorized to work in Germany?',
+        choiceType: 'group',
         required: true,
         optionCount: 2,
         options: ['Yes', 'No'],
@@ -411,6 +414,7 @@ describe('buildFormSchemas', () => {
     const schema = buildFormSchemas(tree)[0]
     expect(schema?.fields[0]).toMatchObject({
       kind: 'choice',
+      choiceType: 'group',
       label: 'Will you now or in the future require sponsorship?',
       options: ['Yes', 'No'],
     })
