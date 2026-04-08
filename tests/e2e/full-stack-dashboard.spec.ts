@@ -46,15 +46,46 @@ async function clickCanvas(page: Page, x: number, y: number): Promise<void> {
   await canvas.click({ position: { x, y } })
 }
 
-async function dragSelect(page: Page, startX: number, startY: number, endX: number, endY: number): Promise<void> {
-  const box = await page.locator('canvas').boundingBox()
-  if (!box) {
-    throw new Error('Canvas bounding box unavailable')
+async function getMirroredLabelBounds(
+  page: Page,
+  label: string,
+  options: { exact?: boolean } = {},
+): Promise<{ x: number; y: number; width: number; height: number } | null> {
+  return page.evaluate(
+    ({ expectedLabel, exact }) => {
+      const nodes = Array.from(document.querySelectorAll<HTMLElement>('[aria-label]'))
+      const target = nodes.find((node) => {
+        const current = node.getAttribute('aria-label')
+        if (typeof current !== 'string') return false
+        return exact ? current === expectedLabel : current.includes(expectedLabel)
+      })
+      if (!target) return null
+      const left = Number.parseFloat(target.style.left || '0')
+      const top = Number.parseFloat(target.style.top || '0')
+      const width = Number.parseFloat(target.style.width || '1')
+      const height = Number.parseFloat(target.style.height || '1')
+      return { x: left, y: top, width, height }
+    },
+    { expectedLabel: label, exact: options.exact === true },
+  )
+}
+
+async function clickMirroredLabel(
+  page: Page,
+  label: string,
+  options: { exact?: boolean } = {},
+): Promise<void> {
+  const bounds = await getMirroredLabelBounds(page, label, options)
+
+  if (!bounds) {
+    throw new Error(`Accessibility mirror target not found: ${label}`)
   }
-  await page.mouse.move(box.x + startX, box.y + startY)
-  await page.mouse.down()
-  await page.mouse.move(box.x + endX, box.y + endY, { steps: 12 })
-  await page.mouse.up()
+
+  await clickCanvas(
+    page,
+    bounds.x + Math.max(1, bounds.width) / 2,
+    bounds.y + Math.max(1, bounds.height) / 2,
+  )
 }
 
 test('full-stack demo supports routed actions, dialog flows, and text selection/copy', async ({
@@ -67,33 +98,29 @@ test('full-stack demo supports routed actions, dialog flows, and text selection/
 
   await page.goto('/')
   await expectMirroredLabel(page, 'Live deploy health')
-
-  await clickCanvas(page, 145, 184)
-  await expectMirroredLabel(page, 'Command deck')
-
-  await clickCanvas(page, 430, 245)
-  await expectMirroredLabelContaining(page, 'Approved Payments. Queue data revalidated on the server.')
-
-  await clickCanvas(page, 430, 365)
-  await expectMirroredLabelContaining(page, 'Promoted a hotfix and refreshed overview release health.')
-
-  // Skip the non-interactive table header row; first data row is one row below.
-  await clickCanvas(page, 760, 338)
-  await expectMirroredLabelContaining(page, 'Selected Edge cache (P2) routed to Platform.')
-
-  await clickCanvas(page, 430, 384)
-  // In GEOMETRA_E2E the server skips the settings toast so banner height matches stable layout for canvas hits.
-  await expectMirroredLabelContaining(page, '/settings')
-
-  await clickCanvas(page, 145, 233)
-  await expectMirroredLabel(page, 'Appearance')
-
-  // E2E server seeds draft + auto-submits settings action after navigation (see full-stack-dashboard loader).
-  await expectMirroredLabelContaining(page, 'Saved Warm Ember with compact mode on.')
-
-  await dragSelect(page, 56, 330, 210, 330)
+  await page.keyboard.press(`${COPY_MODIFIER}+a`)
   await page.keyboard.press(`${COPY_MODIFIER}+c`)
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
     .toContain('The same route tree drives')
+
+  await clickMirroredLabel(page, 'Queue', { exact: true })
+  await expectMirroredLabel(page, 'Command deck')
+
+  await clickMirroredLabel(page, 'Approve next green rollout', { exact: true })
+  await expectMirroredLabelContaining(page, 'Approved Payments. Queue data revalidated on the server.')
+
+  await clickMirroredLabel(page, 'Promote checkout hotfix', { exact: true })
+  await expectMirroredLabelContaining(page, 'Promoted a hotfix and refreshed overview release health.')
+
+  await clickMirroredLabel(page, 'Edge cache', { exact: true })
+  await expectMirroredLabelContaining(page, 'Selected Edge cache (P2) routed to Platform.')
+
+  await clickMirroredLabel(page, 'Open settings route', { exact: true })
+  await expectMirroredLabelContaining(page, '/settings')
+
+  await expectMirroredLabel(page, 'Appearance')
+
+  // E2E server seeds draft + auto-submits settings action after navigation (see full-stack-dashboard loader).
+  await expectMirroredLabelContaining(page, 'Saved Warm Ember with compact mode on.')
 })
