@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { formatConnectFailureMessage, isHttpUrl, normalizeConnectTarget } from './connect-utils.js'
@@ -30,10 +31,18 @@ import {
   summarizeUiDelta,
   waitForUiCondition,
 } from './session.js'
-import type { A11yNode, FormSchemaField, FormSchemaModel, Session, UpdateWaitResult } from './session.js'
+import type {
+  A11yNode,
+  FormSchemaBuildOptions,
+  FormSchemaField,
+  FormSchemaModel,
+  Session,
+  UpdateWaitResult,
+} from './session.js'
 
 type NodeStateFilterValue = boolean | 'mixed'
 type ResponseDetail = 'minimal' | 'verbose'
+type FormSchemaFormat = 'compact' | 'packed'
 
 interface NodeFilter {
   id?: string
@@ -110,6 +119,22 @@ function detailInput() {
     .describe('`minimal` (default) returns terse action summaries. Use `verbose` for a fuller current-UI fallback.')
 }
 
+function formSchemaFormatInput() {
+  return z
+    .enum(['compact', 'packed'])
+    .optional()
+    .default('compact')
+    .describe('`compact` (default) returns readable JSON fields. Use `packed` for the smallest schema payload with short keys.')
+}
+
+function formSchemaContextInput() {
+  return z
+    .enum(['auto', 'always', 'none'])
+    .optional()
+    .default('auto')
+    .describe('How much disambiguation context to include in form schema rows. `auto` keeps context only when it helps.')
+}
+
 function nodeFilterShape() {
   return {
     id: z.string().optional().describe('Stable node id from geometra_snapshot or geometra_expand_section'),
@@ -134,6 +159,7 @@ const timeoutMsInput = z.number().int().min(50).max(60_000).optional()
 const fillFieldSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('text'),
+    fieldId: z.string().optional().describe('Optional stable field id from geometra_form_schema'),
     fieldLabel: z.string().describe('Visible field label / accessible name'),
     value: z.string().describe('Text value to set'),
     exact: z.boolean().optional().describe('Exact label match'),
@@ -141,6 +167,7 @@ const fillFieldSchema = z.discriminatedUnion('kind', [
   }),
   z.object({
     kind: z.literal('choice'),
+    fieldId: z.string().optional().describe('Optional stable field id from geometra_form_schema'),
     fieldLabel: z.string().describe('Visible field label / accessible name'),
     value: z.string().describe('Desired option value / answer label'),
     query: z.string().optional().describe('Optional search text for searchable comboboxes'),
@@ -153,6 +180,7 @@ const fillFieldSchema = z.discriminatedUnion('kind', [
   }),
   z.object({
     kind: z.literal('toggle'),
+    fieldId: z.string().optional().describe('Optional stable field id from geometra_form_schema'),
     label: z.string().describe('Visible checkbox/radio label to set'),
     checked: z.boolean().optional().default(true).describe('Desired checked state (default true)'),
     exact: z.boolean().optional().describe('Exact label match'),
@@ -161,6 +189,7 @@ const fillFieldSchema = z.discriminatedUnion('kind', [
   }),
   z.object({
     kind: z.literal('file'),
+    fieldId: z.string().optional().describe('Optional stable field id from geometra_form_schema'),
     fieldLabel: z.string().describe('Visible file-field label / accessible name'),
     paths: z.array(z.string()).min(1).describe('Absolute paths on the proxy machine'),
     exact: z.boolean().optional().describe('Exact label match'),
@@ -311,12 +340,35 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
         .nonnegative()
         .optional()
         .describe('Playwright slowMo (ms) on spawned proxy for easier visual following.'),
+      returnForms: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('Include compact form schema discovery in the connect response so form flows can start in one turn.'),
+      formId: z.string().optional().describe('Optional form id filter when returnForms=true'),
+      maxFields: z.number().int().min(1).max(120).optional().default(80).describe('Cap returned fields per form when returnForms=true'),
+      onlyRequiredFields: z.boolean().optional().default(false).describe('Only include required fields when returnForms=true'),
+      onlyInvalidFields: z.boolean().optional().default(false).describe('Only include invalid fields when returnForms=true'),
+      includeOptions: z.boolean().optional().default(false).describe('Include explicit choice option labels in returned form schemas'),
+      includeContext: formSchemaContextInput(),
+      sinceSchemaId: z.string().optional().describe('If the current schema matches this id, return changed=false without resending forms'),
+      schemaFormat: formSchemaFormatInput(),
       detail: detailInput(),
     },
     async input => {
       const normalized = normalizeConnectTarget({ url: input.url, pageUrl: input.pageUrl })
       if (!normalized.ok) return err(normalized.error)
       const target = normalized.value
+      const formSchema = {
+        formId: input.formId,
+        maxFields: input.maxFields,
+        onlyRequiredFields: input.onlyRequiredFields,
+        onlyInvalidFields: input.onlyInvalidFields,
+        includeOptions: input.includeOptions,
+        includeContext: input.includeContext,
+        sinceSchemaId: input.sinceSchemaId,
+        format: input.schemaFormat,
+      }
 
       try {
         if (target.kind === 'proxy') {
@@ -328,22 +380,32 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
             height: input.height,
             slowMo: input.slowMo,
           })
-          return ok(JSON.stringify(connectPayload(session, {
+          if (input.returnForms) {
+            await stabilizeInlineFormSchemas(session, formSchema)
+          }
+          return ok(JSON.stringify(connectResponsePayload(session, {
             transport: 'proxy',
             requestedPageUrl: target.pageUrl,
             autoCoercedFromUrl: target.autoCoercedFromUrl,
             detail: input.detail,
+            returnForms: input.returnForms,
+            formSchema,
           }), null, input.detail === 'verbose' ? 2 : undefined))
         }
         const session = await connect(target.wsUrl!, {
           width: input.width,
           height: input.height,
         })
-        return ok(JSON.stringify(connectPayload(session, {
+        if (input.returnForms) {
+          await stabilizeInlineFormSchemas(session, formSchema)
+        }
+        return ok(JSON.stringify(connectResponsePayload(session, {
           transport: 'ws',
           requestedWsUrl: target.wsUrl,
           autoCoercedFromUrl: false,
           detail: input.detail,
+          returnForms: input.returnForms,
+          formSchema,
         }), null, input.detail === 'verbose' ? 2 : undefined))
       } catch (e) {
         return err(`Failed to connect: ${formatConnectFailureMessage(e, target)}`)
@@ -362,7 +424,8 @@ This is the Geometra equivalent of Playwright's locator — but instant, structu
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
 
-      const a11y = buildA11yTree(session.tree, session.layout)
+      const a11y = sessionA11y(session)
+      if (!a11y) return err('No UI tree available')
       const filter: NodeFilter = {
         id,
         role,
@@ -432,7 +495,8 @@ The filter matches the same fields as geometra_query. Set \`present: false\` to 
 
       const matchesCondition = () => {
         if (!session.tree || !session.layout) return false
-        const a11y = buildA11yTree(session.tree, session.layout)
+        const a11y = sessionA11y(session)
+        if (!a11y) return false
         const matches = findNodes(a11y, filter)
         return present ? matches.length > 0 : matches.length === 0
       }
@@ -529,8 +593,15 @@ Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / combo
     'geometra_fill_form',
     `Fill a form from a compact values object instead of expanding sections first. This is the lowest-token happy path for standard application flows.
 
-Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most stable matching, or \`valuesByLabel\` when labels are unique enough. MCP resolves the form schema, executes the semantic field operations server-side, and returns one consolidated result.`,
+Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most stable matching, or \`valuesByLabel\` when labels are unique enough. MCP resolves the form schema, executes the semantic field operations server-side, and returns one consolidated result. If you pass \`pageUrl\` or \`url\`, MCP will connect first so known-form fills can run in a single tool call.`,
     {
+      url: z.string().optional().describe('Optional target URL. Use a ws:// Geometra server URL or an http(s) page URL to auto-connect before filling.'),
+      pageUrl: z.string().optional().describe('Optional http(s) page URL to auto-connect before filling. Prefer this over url for browser pages.'),
+      port: z.number().int().min(0).max(65535).optional().describe('Preferred local port for an auto-spawned proxy (default: ephemeral OS-assigned port).'),
+      headless: z.boolean().optional().describe('Run Chromium headless when auto-spawning a proxy (default false = visible window).'),
+      width: z.number().int().positive().optional().describe('Viewport width for auto-connected sessions.'),
+      height: z.number().int().positive().optional().describe('Viewport height for auto-connected sessions.'),
+      slowMo: z.number().int().nonnegative().optional().describe('Playwright slowMo (ms) when auto-spawning a proxy.'),
       formId: z.string().optional().describe('Optional form id from geometra_form_schema or geometra_page_model'),
       valuesById: formValuesRecordSchema.optional().describe('Form values keyed by stable field id from geometra_form_schema'),
       valuesByLabel: formValuesRecordSchema.optional().describe('Form values keyed by schema field label'),
@@ -547,18 +618,86 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
         .describe('Include per-field step results in the JSON payload (default false for the smallest response)'),
       detail: detailInput(),
     },
-    async ({ formId, valuesById, valuesByLabel, stopOnError, failOnInvalid, includeSteps, detail }) => {
-      const session = getSession()
-      if (!session) return err('Not connected. Call geometra_connect first.')
+    async ({ url, pageUrl, port, headless, width, height, slowMo, formId, valuesById, valuesByLabel, stopOnError, failOnInvalid, includeSteps, detail }) => {
+      const directFields =
+        !includeSteps && !formId && Object.keys(valuesById ?? {}).length === 0
+          ? directLabelBatchFields(valuesByLabel)
+          : null
+
+      const resolved = await ensureToolSession(
+        {
+          url,
+          pageUrl,
+          port,
+          headless,
+          width,
+          height,
+          slowMo,
+          awaitInitialFrame: directFields ? false : undefined,
+        },
+        'Not connected. Call geometra_connect first, or pass pageUrl/url to geometra_fill_form.',
+      )
+      if (!resolved.ok) return err(resolved.error)
+      const session = resolved.session
+      const connection = autoConnectionPayload(resolved)
 
       const entryCount = Object.keys(valuesById ?? {}).length + Object.keys(valuesByLabel ?? {}).length
       if (entryCount === 0) {
         return err('Provide at least one value in valuesById or valuesByLabel')
       }
 
+      if (directFields) {
+        try {
+          const startRevision = session.updateRevision
+          const wait = await sendFillFields(session, directFields)
+          const ackResult = parseProxyFillAckResult(wait.result)
+          if (ackResult && ackResult.invalidCount === 0) {
+            return ok(JSON.stringify({
+              ...connection,
+              completed: true,
+              execution: 'batched-direct',
+              finalSource: 'proxy',
+              requestedValueCount: entryCount,
+              fieldCount: directFields.length,
+              successCount: directFields.length,
+              errorCount: 0,
+              final: ackResult,
+            }, null, detail === 'verbose' ? 2 : undefined))
+          }
+
+          await waitForDeferredBatchUpdate(session, startRevision, wait)
+          const afterDirect = sessionA11y(session)
+          const directSignals = afterDirect ? collectSessionSignals(afterDirect) : undefined
+          if (directSignals && directSignals.invalidFields.length === 0) {
+            return ok(JSON.stringify({
+              ...connection,
+              completed: true,
+              execution: 'batched-direct',
+              finalSource: 'session',
+              requestedValueCount: entryCount,
+              fieldCount: directFields.length,
+              successCount: directFields.length,
+              errorCount: 0,
+              final: sessionSignalsPayload(directSignals, detail),
+            }, null, detail === 'verbose' ? 2 : undefined))
+          }
+        } catch (e) {
+          if (!canFallbackToSequentialFill(e)) {
+            const message = e instanceof Error ? e.message : String(e)
+            return err(message)
+          }
+        }
+      }
+
+      if (!session.tree || !session.layout) {
+        await waitForUiCondition(session, () => Boolean(session.tree && session.layout), 2_000)
+      }
       const afterConnect = sessionA11y(session)
       if (!afterConnect) return err('No UI tree available for form filling')
-      const schemas = buildFormSchemas(afterConnect)
+      const schemas = getSessionFormSchemas(session, {
+        includeOptions: true,
+        includeContext: 'auto',
+      })
       if (schemas.length === 0) return err('No forms found in the current UI')
 
       const resolution = resolveTargetFormSchema(schemas, { formId, valuesById, valuesByLabel })
@@ -579,6 +718,7 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
           if (ackResult && ackResult.invalidCount === 0) {
             usedBatch = true
             const payload = {
+              ...connection,
               completed: true,
               execution: 'batched',
               finalSource: 'proxy',
@@ -615,6 +755,7 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
           const signals = after ? collectSessionSignals(after) : undefined
           const invalidRemaining = signals?.invalidFields.length ?? 0
           const payload = {
+            ...connection,
             completed: true,
             execution: 'batched',
             finalSource: 'session',
@@ -660,6 +801,7 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
       const successCount = steps.filter(step => step.ok === true).length
       const errorCount = steps.length - successCount
       const payload = {
+        ...connection,
         completed: stoppedAt === undefined && steps.length === planned.fields.length,
         execution: 'sequential',
         formId: schema.formId,
@@ -763,7 +905,8 @@ Use this first on normal HTML pages when you want to understand the page shape w
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
 
-      const a11y = buildA11yTree(session.tree, session.layout)
+      const a11y = sessionA11y(session)
+      if (!a11y) return err('No UI tree available')
       const model = buildPageModel(a11y, { maxPrimaryActions, maxSectionsPerKind })
       return ok(JSON.stringify(model))
     }
@@ -773,28 +916,49 @@ Use this first on normal HTML pages when you want to understand the page shape w
     'geometra_form_schema',
     `Get a compact, fill-oriented schema for forms on the page. This is the preferred discovery step before geometra_fill_form.
 
-Unlike geometra_expand_section, this collapses repeated radio/button groups into single logical fields, keeps output compact, and omits layout-heavy detail by default.`,
+Unlike geometra_expand_section, this collapses repeated radio/button groups into single logical fields, keeps output compact, and omits layout-heavy detail by default. If you pass \`pageUrl\` or \`url\`, MCP will connect first so discovery can happen in one tool call.`,
     {
+      url: z.string().optional().describe('Optional target URL. Use a ws:// Geometra server URL or an http(s) page URL to auto-connect before discovery.'),
+      pageUrl: z.string().optional().describe('Optional http(s) page URL to auto-connect before discovery. Prefer this over url for browser pages.'),
+      port: z.number().int().min(0).max(65535).optional().describe('Preferred local port for an auto-spawned proxy (default: ephemeral OS-assigned port).'),
+      headless: z.boolean().optional().describe('Run Chromium headless when auto-spawning a proxy (default false = visible window).'),
+      width: z.number().int().positive().optional().describe('Viewport width for auto-connected sessions.'),
+      height: z.number().int().positive().optional().describe('Viewport height for auto-connected sessions.'),
+      slowMo: z.number().int().nonnegative().optional().describe('Playwright slowMo (ms) when auto-spawning a proxy.'),
       formId: z.string().optional().describe('Optional form id from geometra_page_model. If omitted, returns every form schema on the page.'),
       maxFields: z.number().int().min(1).max(120).optional().default(80).describe('Cap returned fields per form'),
       onlyRequiredFields: z.boolean().optional().default(false).describe('Only include required fields'),
       onlyInvalidFields: z.boolean().optional().default(false).describe('Only include invalid fields'),
+      includeOptions: z.boolean().optional().default(false).describe('Include explicit choice option labels'),
+      includeContext: formSchemaContextInput(),
+      sinceSchemaId: z.string().optional().describe('If the current schema matches this id, return changed=false without resending forms'),
+      format: formSchemaFormatInput(),
     },
-    async ({ formId, maxFields, onlyRequiredFields, onlyInvalidFields }) => {
-      const session = getSession()
-      if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
+    async ({ url, pageUrl, port, headless, width, height, slowMo, formId, maxFields, onlyRequiredFields, onlyInvalidFields, includeOptions, includeContext, sinceSchemaId, format }) => {
+      const resolved = await ensureToolSession(
+        { url, pageUrl, port, headless, width, height, slowMo },
+        'Not connected. Call geometra_connect first, or pass pageUrl/url to geometra_form_schema.',
+      )
+      if (!resolved.ok) return err(resolved.error)
+      const session = resolved.session
 
-      const a11y = buildA11yTree(session.tree, session.layout)
-      const forms = buildFormSchemas(a11y, {
+      const payload = formSchemaResponsePayload(session, {
         formId,
         maxFields,
         onlyRequiredFields,
         onlyInvalidFields,
+        includeOptions,
+        includeContext,
+        sinceSchemaId,
+        format,
       })
-      if (forms.length === 0) {
+      if (payload.formCount === 0) {
         return err(formId ? `No form schema found for id ${formId}` : 'No forms found in the current UI')
       }
-      return ok(JSON.stringify({ forms }))
+      return ok(JSON.stringify({
+        ...autoConnectionPayload(resolved),
+        ...payload,
+      }))
     }
   )
 
@@ -838,7 +1002,8 @@ Use this after geometra_page_model when you know which form/dialog/list/landmark
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
 
-      const a11y = buildA11yTree(session.tree, session.layout)
+      const a11y = sessionA11y(session)
+      if (!a11y) return err('No UI tree available')
       const detail = expandPageSection(a11y, id, {
         maxHeadings,
         maxFields,
@@ -1263,7 +1428,8 @@ JSON is minified in compact view to save tokens. For a summary-first overview, u
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
 
-      const a11y = buildA11yTree(session.tree, session.layout)
+      const a11y = sessionA11y(session)
+      if (!a11y) return err('No UI tree available')
       if (view === 'full') {
         return ok(JSON.stringify(a11y, null, 2))
       }
@@ -1297,11 +1463,13 @@ For a token-efficient semantic view, use geometra_snapshot (default compact). Fo
   // ── disconnect ───────────────────────────────────────────────
   server.tool(
     'geometra_disconnect',
-    `Disconnect from the Geometra server and clean up the WebSocket connection.`,
-    {},
-    async () => {
-      disconnect()
-      return ok('Disconnected.')
+    `Disconnect from the Geometra server. Proxy-backed sessions keep the browser alive by default so the next geometra_connect can reuse it quickly; pass closeBrowser=true to fully tear down the proxy/browser.`,
+    {
+      closeBrowser: z.boolean().optional().default(false).describe('Fully close the spawned proxy/browser instead of keeping it warm for reuse'),
+    },
+    async ({ closeBrowser }) => {
+      disconnect({ closeProxy: closeBrowser })
+      return ok(closeBrowser ? 'Disconnected and closed browser.' : 'Disconnected.')
     }
   )
 
@@ -1340,7 +1508,262 @@ function connectPayload(
 
 function sessionA11y(session: Session): A11yNode | null {
   if (!session.tree || !session.layout) return null
-  return buildA11yTree(session.tree, session.layout)
+  if (session.cachedA11yRevision === session.updateRevision) {
+    return session.cachedA11y ?? null
+  }
+  const a11y = buildA11yTree(session.tree, session.layout)
+  session.cachedA11y = a11y
+  session.cachedA11yRevision = session.updateRevision
+  return a11y
+}
+
+function shortHash(value: string): string {
+  return createHash('sha1').update(value).digest('hex').slice(0, 12)
+}
+
+function formSchemaCacheKey(options: FormSchemaBuildOptions): string {
+  return JSON.stringify({
+    formId: options.formId ?? null,
+    maxFields: options.maxFields ?? null,
+    onlyRequiredFields: options.onlyRequiredFields ?? false,
+    onlyInvalidFields: options.onlyInvalidFields ?? false,
+    includeOptions: options.includeOptions ?? false,
+    includeContext: options.includeContext ?? 'auto',
+  })
+}
+
+function getSessionFormSchemas(session: Session, options: FormSchemaBuildOptions): FormSchemaModel[] {
+  const key = formSchemaCacheKey(options)
+  const cached = session.cachedFormSchemas?.get(key)
+  if (cached && cached.revision === session.updateRevision) return cached.forms
+
+  const a11y = sessionA11y(session)
+  if (!a11y) return []
+  const forms = buildFormSchemas(a11y, options)
+  if (!session.cachedFormSchemas) session.cachedFormSchemas = new Map()
+  session.cachedFormSchemas.set(key, {
+    revision: session.updateRevision,
+    forms,
+  })
+  return forms
+}
+
+function packedFormSchemas(forms: FormSchemaModel[]): Array<Record<string, unknown>> {
+  return forms.map(form => ({
+    i: form.formId,
+    ...(form.name ? { n: form.name } : {}),
+    fc: form.fieldCount,
+    rc: form.requiredCount,
+    ic: form.invalidCount,
+    f: form.fields.map(field => ({
+      i: field.id,
+      k: field.kind,
+      l: field.label,
+      ...(field.required ? { r: 1 } : {}),
+      ...(field.invalid ? { iv: 1 } : {}),
+      ...(field.choiceType ? { ch: field.choiceType } : {}),
+      ...(field.booleanChoice ? { b: 1 } : {}),
+      ...(field.controlType ? { t: field.controlType } : {}),
+      ...(field.optionCount !== undefined ? { oc: field.optionCount } : {}),
+      ...(field.value ? { v: field.value } : {}),
+      ...(field.valueLength !== undefined ? { vl: field.valueLength } : {}),
+      ...(field.checked !== undefined ? { c: field.checked ? 1 : 0 } : {}),
+      ...(field.values && field.values.length > 0 ? { vs: field.values } : {}),
+      ...(field.context ? { x: field.context } : {}),
+    })),
+  }))
+}
+
+function formSchemaResponsePayload(
+  session: Session,
+  opts: FormSchemaBuildOptions & { sinceSchemaId?: string; format?: FormSchemaFormat },
+): Record<string, unknown> {
+  const forms = getSessionFormSchemas(session, opts)
+  const schemaJson = JSON.stringify(forms)
+  const schemaId = `fs:${shortHash(schemaJson)}`
+  if (opts.sinceSchemaId && opts.sinceSchemaId === schemaId) {
+    return {
+      schemaId,
+      changed: false,
+      formCount: forms.length,
+      format: opts.format ?? 'compact',
+    }
+  }
+
+  return {
+    schemaId,
+    changed: true,
+    formCount: forms.length,
+    format: opts.format ?? 'compact',
+    forms: (opts.format ?? 'compact') === 'packed' ? packedFormSchemas(forms) : forms,
+  }
+}
+
+function totalReturnedSchemaFields(forms: FormSchemaModel[]): number {
+  return forms.reduce((sum, form) => sum + form.fields.length, 0)
+}
+
+function expectedReturnedSchemaFields(forms: FormSchemaModel[], maxFields?: number): number {
+  return forms.reduce((sum, form) => sum + Math.min(form.fieldCount, maxFields ?? form.fieldCount), 0)
+}
+
+function schemaShapeSignature(forms: FormSchemaModel[]): string {
+  return JSON.stringify(forms.map(form => ({
+    formId: form.formId,
+    fieldCount: form.fieldCount,
+    fields: form.fields.map(field => field.id),
+  })))
+}
+
+async function stabilizeInlineFormSchemas(
+  session: Session,
+  options: FormSchemaBuildOptions,
+  opts?: {
+    timeoutMs?: number
+    pollMs?: number
+    stableMs?: number
+  },
+): Promise<void> {
+  const timeoutMs = opts?.timeoutMs ?? 2_000
+  const pollMs = opts?.pollMs ?? 60
+  const stableMs = opts?.stableMs ?? 120
+  const deadline = Date.now() + timeoutMs
+
+  let forms = getSessionFormSchemas(session, options)
+  let lastSignature = schemaShapeSignature(forms)
+  let stableSince = Date.now()
+
+  while (Date.now() < deadline) {
+    const expectedFields = expectedReturnedSchemaFields(forms, options.maxFields)
+    if (forms.length > 0 && totalReturnedSchemaFields(forms) >= expectedFields && Date.now() - stableSince >= stableMs) {
+      return
+    }
+
+    await new Promise(resolve => setTimeout(resolve, pollMs))
+
+    forms = getSessionFormSchemas(session, options)
+    const signature = schemaShapeSignature(forms)
+    if (signature !== lastSignature) {
+      lastSignature = signature
+      stableSince = Date.now()
+    }
+  }
+}
+
+function connectResponsePayload(
+  session: Session,
+  opts: {
+    transport: 'proxy' | 'ws'
+    requestedPageUrl?: string
+    requestedWsUrl?: string
+    autoCoercedFromUrl?: boolean
+    detail?: ResponseDetail
+    returnForms?: boolean
+    formSchema?: FormSchemaBuildOptions & { sinceSchemaId?: string; format?: FormSchemaFormat }
+  },
+): Record<string, unknown> {
+  const payload = connectPayload(session, opts)
+  if (!opts.returnForms) return payload
+  return {
+    ...payload,
+    formSchema: formSchemaResponsePayload(session, opts.formSchema ?? {}),
+  }
+}
+
+async function ensureToolSession(
+  target: {
+    url?: string
+    pageUrl?: string
+    port?: number
+    headless?: boolean
+    width?: number
+    height?: number
+    slowMo?: number
+    awaitInitialFrame?: boolean
+  },
+  missingConnectionMessage = 'Not connected. Call geometra_connect first.',
+): Promise<
+  | {
+      ok: true
+      session: Session
+      autoConnected: boolean
+      transport?: 'proxy' | 'ws'
+      requestedPageUrl?: string
+      requestedWsUrl?: string
+      autoCoercedFromUrl?: boolean
+    }
+  | {
+      ok: false
+      error: string
+    }
+> {
+  if (!target.url && !target.pageUrl) {
+    const session = getSession()
+    if (!session) return { ok: false, error: missingConnectionMessage }
+    return { ok: true, session, autoConnected: false }
+  }
+
+  const normalized = normalizeConnectTarget({ url: target.url, pageUrl: target.pageUrl })
+  if (!normalized.ok) return { ok: false, error: normalized.error }
+  const resolvedTarget = normalized.value
+
+  try {
+    if (resolvedTarget.kind === 'proxy') {
+      const session = await connectThroughProxy({
+        pageUrl: resolvedTarget.pageUrl!,
+        port: target.port,
+        headless: target.headless,
+        width: target.width,
+        height: target.height,
+        slowMo: target.slowMo,
+        awaitInitialFrame: target.awaitInitialFrame,
+      })
+      return {
+        ok: true,
+        session,
+        autoConnected: true,
+        transport: 'proxy',
+        requestedPageUrl: resolvedTarget.pageUrl,
+        autoCoercedFromUrl: resolvedTarget.autoCoercedFromUrl,
+      }
+    }
+
+    const session = await connect(resolvedTarget.wsUrl!, {
+      width: target.width,
+      height: target.height,
+      awaitInitialFrame: target.awaitInitialFrame,
+    })
+    return {
+      ok: true,
+      session,
+      autoConnected: true,
+      transport: 'ws',
+      requestedWsUrl: resolvedTarget.wsUrl,
+    }
+  } catch (e) {
+    return { ok: false, error: `Failed to connect: ${formatConnectFailureMessage(e, resolvedTarget)}` }
+  }
+}
+
+function autoConnectionPayload(
+  target:
+    | {
+        autoConnected: boolean
+        transport?: 'proxy' | 'ws'
+        requestedPageUrl?: string
+        requestedWsUrl?: string
+        autoCoercedFromUrl?: boolean
+      }
+    | undefined,
+): Record<string, unknown> {
+  if (!target?.autoConnected) return {}
+  return {
+    autoConnected: true,
+    ...(target.transport ? { transport: target.transport } : {}),
+    ...(target.requestedPageUrl ? { pageUrl: target.requestedPageUrl } : {}),
+    ...(target.requestedWsUrl ? { requestedWsUrl: target.requestedWsUrl } : {}),
+    ...(target.autoCoercedFromUrl ? { autoCoercedFromUrl: true } : {}),
+  }
 }
 
 function sessionOverviewFromA11y(a11y: A11yNode): string {
@@ -1627,6 +2050,7 @@ function resolveTargetFormSchema(
 function coerceChoiceValue(field: FormSchemaField, value: FormValueInput): string | null {
   if (typeof value === 'string') return value
   if (typeof value !== 'boolean') return null
+  if (field.booleanChoice) return value ? 'Yes' : 'No'
   const desired = value ? 'yes' : 'no'
   const option = field.options?.find(option => normalizeLookupKey(option) === desired)
   return option ?? (value ? 'Yes' : 'No')
@@ -1635,18 +2059,24 @@ function coerceChoiceValue(field: FormSchemaField, value: FormValueInput): strin
 function plannedFillInputsForField(field: FormSchemaField, value: FormValueInput): FillFieldInput[] | { error: string } {
   if (field.kind === 'text') {
     if (typeof value !== 'string') return { error: `Field "${field.label}" expects a string value` }
-    return [{ kind: 'text', fieldLabel: field.label, value }]
+    return [{ kind: 'text', fieldId: field.id, fieldLabel: field.label, value }]
   }
 
   if (field.kind === 'choice') {
     const coerced = coerceChoiceValue(field, value)
     if (!coerced) return { error: `Field "${field.label}" expects a string value` }
-    return [{ kind: 'choice', fieldLabel: field.label, value: coerced, ...(field.choiceType ? { choiceType: field.choiceType } : {}) }]
+    return [{
+      kind: 'choice',
+      fieldId: field.id,
+      fieldLabel: field.label,
+      value: coerced,
+      ...(field.choiceType ? { choiceType: field.choiceType } : {}),
+    }]
   }
 
   if (field.kind === 'toggle') {
     if (typeof value !== 'boolean') return { error: `Field "${field.label}" expects a boolean value` }
-    return [{ kind: 'toggle', label: field.label, checked: value, controlType: field.controlType }]
+    return [{ kind: 'toggle', fieldId: field.id, label: field.label, checked: value, controlType: field.controlType }]
   }
 
   const selected = Array.isArray(value) ? value : typeof value === 'string' ? [value] : null
@@ -1657,6 +2087,7 @@ function plannedFillInputsForField(field: FormSchemaField, value: FormValueInput
   const selectedKeys = new Set(selected.map(normalizeLookupKey))
   return field.options.map(option => ({
     kind: 'toggle',
+    fieldId: field.id,
     label: option,
     checked: selectedKeys.has(normalizeLookupKey(option)),
     controlType: 'checkbox',
@@ -1714,7 +2145,14 @@ function canFallbackToSequentialFill(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error)
   return (
     message.includes('Unsupported client message type "fillFields"') ||
-    message.includes('Client message type "fillFields" is not supported')
+    message.includes('Client message type "fillFields" is not supported') ||
+    message.startsWith('setFieldText:') ||
+    message.startsWith('setFieldChoice:') ||
+    message.startsWith('setChecked:') ||
+    message.startsWith('attachFiles:') ||
+    message.startsWith('pickListboxOption:') ||
+    message.startsWith('Could not find a') ||
+    message.startsWith('No visible')
   )
 }
 
@@ -1736,6 +2174,19 @@ function parseProxyFillAckResult(value: unknown): ProxyFillAckResult | undefined
     dialogCount: candidate.dialogCount,
     busyCount: candidate.busyCount,
   }
+}
+
+function directLabelBatchFields(
+  valuesByLabel: Record<string, FormValueInput> | undefined,
+): Array<{ kind: 'auto'; fieldLabel: string; value: string | boolean }> | null {
+  const entries = Object.entries(valuesByLabel ?? {})
+  if (entries.length === 0) return null
+  const fields: Array<{ kind: 'auto'; fieldLabel: string; value: string | boolean }> = []
+  for (const [fieldLabel, value] of entries) {
+    if (typeof value !== 'string' && typeof value !== 'boolean') return null
+    fields.push({ kind: 'auto', fieldLabel, value })
+  }
+  return fields
 }
 
 async function waitForDeferredBatchUpdate(
@@ -1947,8 +2398,8 @@ async function executeBatchAction(
       const timeoutMs = action.timeoutMs ?? 10_000
       const startedAt = Date.now()
       const matched = await waitForUiCondition(session, () => {
-        if (!session.tree || !session.layout) return false
-        const a11y = buildA11yTree(session.tree, session.layout)
+        const a11y = sessionA11y(session)
+        if (!a11y) return false
         const matches = findNodes(a11y, filter)
         return present ? matches.length > 0 : matches.length === 0
       }, timeoutMs)
@@ -2023,7 +2474,13 @@ async function executeFillField(session: Session, field: FillFieldInput, detail:
   switch (field.kind) {
     case 'text': {
       const before = sessionA11y(session)
-      const wait = await sendFieldText(session, field.fieldLabel, field.value, { exact: field.exact }, field.timeoutMs)
+      const wait = await sendFieldText(
+        session,
+        field.fieldLabel,
+        field.value,
+        { exact: field.exact, fieldId: field.fieldId },
+        field.timeoutMs,
+      )
       const fieldSummary = summarizeFieldLabelState(session, field.fieldLabel)
       return {
         summary: [
@@ -2032,6 +2489,7 @@ async function executeFillField(session: Session, field: FillFieldInput, detail:
           postActionSummary(session, before, wait, detail),
         ].filter(Boolean).join('\n'),
         compact: {
+          ...(field.fieldId ? { fieldId: field.fieldId } : {}),
           fieldLabel: field.fieldLabel,
           ...compactTextValue(field.value),
           ...waitStatusPayload(wait),
@@ -2045,7 +2503,7 @@ async function executeFillField(session: Session, field: FillFieldInput, detail:
         session,
         field.fieldLabel,
         field.value,
-        { exact: field.exact, query: field.query, choiceType: field.choiceType },
+        { exact: field.exact, query: field.query, choiceType: field.choiceType, fieldId: field.fieldId },
         field.timeoutMs,
       )
       const fieldSummary = summarizeFieldLabelState(session, field.fieldLabel)
@@ -2056,6 +2514,7 @@ async function executeFillField(session: Session, field: FillFieldInput, detail:
           postActionSummary(session, before, wait, detail),
         ].filter(Boolean).join('\n'),
         compact: {
+          ...(field.fieldId ? { fieldId: field.fieldId } : {}),
           fieldLabel: field.fieldLabel,
           value: field.value,
           ...(field.choiceType ? { choiceType: field.choiceType } : {}),

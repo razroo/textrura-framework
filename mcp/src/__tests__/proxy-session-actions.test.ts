@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest'
 import { WebSocketServer } from 'ws'
-import { connect, disconnect, sendClick, sendFillFields, sendListboxPick } from '../session.js'
+import { connect, disconnect, sendClick, sendFillFields, sendListboxPick, sendNavigate } from '../session.js'
 
 describe('proxy-backed MCP actions', () => {
   afterAll(() => {
@@ -162,8 +162,8 @@ describe('proxy-backed MCP actions', () => {
       const session = await connect(`ws://127.0.0.1:${port}`)
       await expect(
         sendFillFields(session, [
-          { kind: 'text', fieldLabel: 'Full name', value: 'Taylor Applicant' },
-          { kind: 'choice', fieldLabel: 'Country', value: 'Germany' },
+          { kind: 'text', fieldId: 'ff:0.0', fieldLabel: 'Full name', value: 'Taylor Applicant' },
+          { kind: 'choice', fieldId: 'ff:0.1', fieldLabel: 'Country', value: 'Germany' },
         ], 80),
       ).resolves.toMatchObject({
         status: 'updated',
@@ -177,8 +177,8 @@ describe('proxy-backed MCP actions', () => {
       expect(seenMessage).toMatchObject({
         type: 'fillFields',
         fields: [
-          { kind: 'text', fieldLabel: 'Full name', value: 'Taylor Applicant' },
-          { kind: 'choice', fieldLabel: 'Country', value: 'Germany' },
+          { kind: 'text', fieldId: 'ff:0.0', fieldLabel: 'Full name', value: 'Taylor Applicant' },
+          { kind: 'choice', fieldId: 'ff:0.1', fieldLabel: 'Country', value: 'Germany' },
         ],
       })
     } finally {
@@ -236,6 +236,65 @@ describe('proxy-backed MCP actions', () => {
         y: 0,
         children: [{ x: 10, y: 20 }],
       })
+    } finally {
+      disconnect()
+      await new Promise<void>((resolve, reject) => wss.close(err => (err ? reject(err) : resolve())))
+    }
+  })
+
+  it('supports in-session navigation and waits for the resulting frame', async () => {
+    const wss = new WebSocketServer({ port: 0 })
+    const received: Array<Record<string, unknown>> = []
+    wss.on('connection', ws => {
+      ws.on('message', raw => {
+        const msg = JSON.parse(String(raw)) as { type?: string; url?: string; requestId?: string }
+        received.push(msg as Record<string, unknown>)
+
+        if (msg.type === 'resize') {
+          ws.send(JSON.stringify({
+            type: 'frame',
+            layout: { x: 0, y: 0, width: 1024, height: 768, children: [] },
+            tree: { kind: 'box', props: {}, semantic: { tag: 'body', role: 'group' }, children: [] },
+          }))
+          return
+        }
+
+        if (msg.type === 'navigate') {
+          ws.send(JSON.stringify({
+            type: 'frame',
+            layout: { x: 0, y: 0, width: 1024, height: 768, children: [] },
+            tree: {
+              kind: 'box',
+              props: {},
+              semantic: { tag: 'body', role: 'group' },
+              children: [],
+            },
+          }))
+          ws.send(JSON.stringify({
+            type: 'ack',
+            requestId: msg.requestId,
+            result: { pageUrl: msg.url },
+          }))
+        }
+      })
+    })
+    const port = await new Promise<number>((resolve, reject) => {
+      wss.once('listening', () => {
+        const address = wss.address()
+        if (typeof address === 'object' && address) resolve(address.port)
+        else reject(new Error('Failed to resolve ephemeral WebSocket port'))
+      })
+      wss.once('error', reject)
+    })
+
+    try {
+      const session = await connect(`ws://127.0.0.1:${port}`)
+      await expect(sendNavigate(session, 'https://jobs.example.com/application', 80)).resolves.toMatchObject({
+        status: 'updated',
+        timeoutMs: 80,
+        result: { pageUrl: 'https://jobs.example.com/application' },
+      })
+      expect(received.some(message => message.type === 'navigate' && message.url === 'https://jobs.example.com/application')).toBe(true)
     } finally {
       disconnect()
       await new Promise<void>((resolve, reject) => wss.close(err => (err ? reject(err) : resolve())))

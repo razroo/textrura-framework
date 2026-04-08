@@ -20,13 +20,13 @@ interface AnchorPoint {
   y?: number
 }
 
-interface FillLookupCache {
+export interface FillLookupCache {
   control: Map<string, Locator | null>
   editable: Map<string, Locator | null>
   fileInput: Map<string, Locator | null>
 }
 
-function createFillLookupCache(): FillLookupCache {
+export function createFillLookupCache(): FillLookupCache {
   return {
     control: new Map(),
     editable: new Map(),
@@ -34,12 +34,71 @@ function createFillLookupCache(): FillLookupCache {
   }
 }
 
+export function clearFillLookupCache(cache: FillLookupCache): void {
+  cache.control.clear()
+  cache.editable.clear()
+  cache.fileInput.clear()
+}
+
 function lookupCacheKey(kind: 'control' | 'editable' | 'file', label: string, exact: boolean): string {
   return `${kind}:${exact ? 'exact' : 'fuzzy'}:${normalizedOptionLabel(label)}`
 }
 
+function lookupCacheKeys(kind: 'control' | 'editable' | 'file', label: string, exact: boolean, fieldId?: string): string[] {
+  const keys = [lookupCacheKey(kind, label, exact)]
+  if (fieldId) keys.unshift(`${kind}:id:${fieldId}`)
+  return keys
+}
+
+function cacheMapForKind(cache: FillLookupCache, kind: 'control' | 'editable' | 'file'): Map<string, Locator | null> {
+  if (kind === 'control') return cache.control
+  if (kind === 'editable') return cache.editable
+  return cache.fileInput
+}
+
+function readCachedLocator(
+  cache: FillLookupCache | undefined,
+  kind: 'control' | 'editable' | 'file',
+  label: string,
+  exact: boolean,
+  fieldId?: string,
+): Locator | null | undefined {
+  if (!cache) return undefined
+  const map = cacheMapForKind(cache, kind)
+  for (const key of lookupCacheKeys(kind, label, exact, fieldId)) {
+    if (map.has(key)) return map.get(key) ?? null
+  }
+  return undefined
+}
+
+function writeCachedLocator(
+  cache: FillLookupCache | undefined,
+  kind: 'control' | 'editable' | 'file',
+  label: string,
+  exact: boolean,
+  fieldId: string | undefined,
+  locator: Locator | null,
+): void {
+  if (!cache) return
+  const map = cacheMapForKind(cache, kind)
+  for (const key of lookupCacheKeys(kind, label, exact, fieldId)) {
+    map.set(key, locator)
+  }
+}
+
 function normalizedOptionLabel(value: string): string {
   return value.replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+function prefersGroupedChoiceValue(value: string): boolean {
+  const normalized = normalizedOptionLabel(value)
+  return normalized === 'yes' ||
+    normalized === 'no' ||
+    normalized === 'true' ||
+    normalized === 'false' ||
+    normalized === 'decline' ||
+    normalized === 'prefer not' ||
+    normalized === 'opt out'
 }
 
 function semanticSelectionAliases(value: string): string[] {
@@ -433,22 +492,22 @@ async function findLabeledControlInPage(
   page: Page,
   fieldLabel: string,
   exact: boolean,
-  opts?: { preferredAnchor?: AnchorPoint; cache?: FillLookupCache },
+  opts?: { preferredAnchor?: AnchorPoint; cache?: FillLookupCache; fieldId?: string },
 ): Promise<Locator | null> {
   const cacheable = !opts?.preferredAnchor
-  const cacheKey = lookupCacheKey('control', fieldLabel, exact)
-  if (cacheable && opts?.cache?.control.has(cacheKey)) {
-    return opts.cache.control.get(cacheKey) ?? null
+  const cached = cacheable ? readCachedLocator(opts?.cache, 'control', fieldLabel, exact, opts?.fieldId) : undefined
+  if (cached !== undefined) {
+    return cached
   }
 
   for (const frame of page.frames()) {
     const locator = await findLabeledControl(frame, fieldLabel, exact, { preferredAnchor: opts?.preferredAnchor })
     if (!locator) continue
-    if (cacheable) opts?.cache?.control.set(cacheKey, locator)
+    if (cacheable) writeCachedLocator(opts?.cache, 'control', fieldLabel, exact, opts?.fieldId, locator)
     return locator
   }
 
-  if (cacheable) opts?.cache?.control.set(cacheKey, null)
+  if (cacheable) writeCachedLocator(opts?.cache, 'control', fieldLabel, exact, opts?.fieldId, null)
   return null
 }
 
@@ -479,8 +538,9 @@ async function openDropdownControl(
   fieldLabel: string,
   exact: boolean,
   cache?: FillLookupCache,
+  fieldId?: string,
 ): Promise<{ locator: Locator; handle: ElementHandle<Element> | null; editable: boolean; anchorX?: number; anchorY?: number }> {
-  const locator = await findLabeledControlInPage(page, fieldLabel, exact, { cache })
+  const locator = await findLabeledControlInPage(page, fieldLabel, exact, { cache, fieldId })
   if (locator) {
     await locator.scrollIntoViewIfNeeded()
     const handle = await locator.elementHandle()
@@ -916,28 +976,29 @@ async function findLabeledFileInputInPage(
   fieldLabel: string,
   exact: boolean,
   cache?: FillLookupCache,
+  fieldId?: string,
 ): Promise<Locator | null> {
-  const cacheKey = lookupCacheKey('file', fieldLabel, exact)
-  if (cache?.fileInput.has(cacheKey)) return cache.fileInput.get(cacheKey) ?? null
+  const cached = readCachedLocator(cache, 'file', fieldLabel, exact, fieldId)
+  if (cached !== undefined) return cached
 
   for (const frame of page.frames()) {
     const locator = await findLabeledFileInput(frame, fieldLabel, exact)
     if (!locator) continue
-    cache?.fileInput.set(cacheKey, locator)
+    writeCachedLocator(cache, 'file', fieldLabel, exact, fieldId, locator)
     return locator
   }
 
-  cache?.fileInput.set(cacheKey, null)
+  writeCachedLocator(cache, 'file', fieldLabel, exact, fieldId, null)
   return null
 }
 
 async function attachHiddenInAllFrames(
   page: Page,
   paths: string[],
-  opts?: { fieldLabel?: string; exact?: boolean; cache?: FillLookupCache },
+  opts?: { fieldLabel?: string; exact?: boolean; cache?: FillLookupCache; fieldId?: string },
 ): Promise<boolean> {
   if (opts?.fieldLabel) {
-    const labeled = await findLabeledFileInputInPage(page, opts.fieldLabel, opts.exact ?? false, opts.cache)
+    const labeled = await findLabeledFileInputInPage(page, opts.fieldLabel, opts.exact ?? false, opts.cache, opts.fieldId)
     if (labeled) {
       try {
         await labeled.setInputFiles(paths)
@@ -1016,6 +1077,7 @@ export async function attachFiles(
   page: Page,
   paths: string[],
   opts?: {
+    fieldId?: string
     clickX?: number
     clickY?: number
     fieldLabel?: string
@@ -1043,7 +1105,7 @@ export async function attachFiles(
   }
 
   if (strategy === 'hidden' || strategy === 'auto') {
-    if (await attachHiddenInAllFrames(page, paths, { fieldLabel, exact, cache: opts?.cache })) return
+    if (await attachHiddenInAllFrames(page, paths, { fieldId: opts?.fieldId, fieldLabel, exact, cache: opts?.cache })) return
     if (strategy === 'hidden') {
       if (fieldLabel) {
         throw new Error(`file: hidden strategy could not find input[type=file] for field "${fieldLabel}"`)
@@ -1081,9 +1143,10 @@ async function findLabeledEditableField(
   fieldLabel: string,
   exact: boolean,
   cache?: FillLookupCache,
+  fieldId?: string,
 ): Promise<Locator | null> {
-  const cacheKey = lookupCacheKey('editable', fieldLabel, exact)
-  if (cache?.editable.has(cacheKey)) return cache.editable.get(cacheKey) ?? null
+  const cached = readCachedLocator(cache, 'editable', fieldLabel, exact, fieldId)
+  if (cached !== undefined) return cached
 
   for (const frame of page.frames()) {
     const candidates = [
@@ -1095,19 +1158,19 @@ async function findLabeledEditableField(
       const visible = await firstVisible(candidate, { minWidth: 1, minHeight: 1 })
       if (!visible) continue
       if (await locatorIsEditable(visible)) {
-        cache?.editable.set(cacheKey, visible)
+        writeCachedLocator(cache, 'editable', fieldLabel, exact, fieldId, visible)
         return visible
       }
     }
 
     const fallback = await findLabeledControl(frame, fieldLabel, exact)
     if (fallback && await locatorIsEditable(fallback)) {
-      cache?.editable.set(cacheKey, fallback)
+      writeCachedLocator(cache, 'editable', fieldLabel, exact, fieldId, fallback)
       return fallback
     }
   }
 
-  cache?.editable.set(cacheKey, null)
+  writeCachedLocator(cache, 'editable', fieldLabel, exact, fieldId, null)
   return null
 }
 
@@ -1199,6 +1262,7 @@ async function setLocatorTextValue(locator: Locator, value: string): Promise<boo
 
 async function attemptNativeBatchFill(page: Page, fields: FormFieldFill[]): Promise<boolean[]> {
   type NativeBatchPendingField =
+    | { index: number; kind: 'auto'; fieldLabel: string; value: string | boolean; exact: boolean }
     | { index: number; kind: 'text'; fieldLabel: string; value: string; exact: boolean }
     | { index: number; kind: 'choice'; fieldLabel: string; value: string; exact: boolean; choiceType: ClientChoiceType | null }
     | { index: number; kind: 'toggle'; label: string; checked: boolean; exact: boolean; controlType: 'checkbox' | 'radio' | null }
@@ -1211,6 +1275,16 @@ async function attemptNativeBatchFill(page: Page, fields: FormFieldFill[]): Prom
       if (results[index]) continue
       const field = fields[index]!
       if (field.kind === 'file') continue
+      if (field.kind === 'auto') {
+        pending.push({
+          index,
+          kind: 'auto',
+          fieldLabel: field.fieldLabel,
+          value: field.value,
+          exact: field.exact ?? false,
+        })
+        continue
+      }
       if (field.kind === 'text') {
         pending.push({
           index,
@@ -1247,6 +1321,7 @@ async function attemptNativeBatchFill(page: Page, fields: FormFieldFill[]): Prom
     const frameResults = await frame.evaluate((items) => {
       type ChoiceType = 'select' | 'group' | 'listbox' | null
       type NativeBatchField =
+        | { index: number; kind: 'auto'; fieldLabel: string; value: string | boolean; exact: boolean }
         | { index: number; kind: 'text'; fieldLabel: string; value: string; exact: boolean }
         | { index: number; kind: 'choice'; fieldLabel: string; value: string; exact: boolean; choiceType: ChoiceType }
         | { index: number; kind: 'toggle'; label: string; checked: boolean; exact: boolean; controlType: 'checkbox' | 'radio' | null }
@@ -1321,6 +1396,17 @@ async function attemptNativeBatchFill(page: Page, fields: FormFieldFill[]): Prom
         if (el instanceof HTMLSelectElement) return el.selectedOptions[0]?.textContent?.trim() || el.value
         if (el instanceof HTMLElement && el.isContentEditable) return el.innerText || el.textContent || ''
         return ''
+      }
+
+      function prefersGroupedChoice(input: string): boolean {
+        const normalized = normalize(input)
+        return normalized === 'yes' ||
+          normalized === 'no' ||
+          normalized === 'true' ||
+          normalized === 'false' ||
+          normalized === 'decline' ||
+          normalized === 'prefer not' ||
+          normalized === 'opt out'
       }
 
       function setTextField(fieldLabel: string, value: string, exact: boolean): boolean {
@@ -1452,7 +1538,23 @@ async function attemptNativeBatchFill(page: Page, fields: FormFieldFill[]): Prom
         return false
       }
 
+      function setAutoField(fieldLabel: string, value: string | boolean, exact: boolean): boolean {
+        if (typeof value === 'boolean') {
+          if (setGroupedChoice(fieldLabel, value ? 'Yes' : 'No', exact)) return true
+          if (setToggle(fieldLabel, value, exact, null)) return true
+          return setSelectField(fieldLabel, value ? 'Yes' : 'No', exact)
+        }
+
+        if (prefersGroupedChoice(value) && setGroupedChoice(fieldLabel, value, exact)) return true
+        if (setSelectField(fieldLabel, value, exact)) return true
+        if (setTextField(fieldLabel, value, exact)) return true
+        return setGroupedChoice(fieldLabel, value, exact)
+      }
+
       return items.map((field: NativeBatchField) => {
+        if (field.kind === 'auto') {
+          return { index: field.index, ok: setAutoField(field.fieldLabel, field.value, field.exact) }
+        }
         if (field.kind === 'text') return { index: field.index, ok: setTextField(field.fieldLabel, field.value, field.exact) }
         if (field.kind === 'choice') {
           if (field.choiceType === 'group') {
@@ -1481,10 +1583,10 @@ export async function setFieldText(
   page: Page,
   fieldLabel: string,
   value: string,
-  opts?: { exact?: boolean; cache?: FillLookupCache },
+  opts?: { exact?: boolean; cache?: FillLookupCache; fieldId?: string },
 ): Promise<void> {
   const exact = opts?.exact ?? false
-  const locator = await findLabeledEditableField(page, fieldLabel, exact, opts?.cache)
+  const locator = await findLabeledEditableField(page, fieldLabel, exact, opts?.cache, opts?.fieldId)
   if (!locator) {
     throw new Error(`setFieldText: no visible editable field matching "${fieldLabel}"`)
   }
@@ -1672,15 +1774,98 @@ async function chooseValueFromLabeledGroup(
   return false
 }
 
+async function autoFieldLocatorKind(locator: Locator): Promise<'select' | 'text' | 'choice' | 'unknown'> {
+  try {
+    return await locator.evaluate((el) => {
+      if (el instanceof HTMLSelectElement) return 'select'
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return 'text'
+      if (el instanceof HTMLElement && el.isContentEditable) return 'text'
+      const role = el.getAttribute('role')
+      if (role === 'combobox' || role === 'listbox') return 'choice'
+      if (el instanceof HTMLButtonElement) return 'choice'
+      if (el.getAttribute('aria-haspopup') === 'listbox') return 'choice'
+      return 'unknown'
+    })
+  } catch {
+    return 'unknown'
+  }
+}
+
+export async function setAutoFieldValue(
+  page: Page,
+  fieldLabel: string,
+  value: string | boolean,
+  opts?: { exact?: boolean; cache?: FillLookupCache; fieldId?: string },
+): Promise<void> {
+  const exact = opts?.exact ?? false
+
+  if (typeof value === 'boolean') {
+    if (await chooseValueFromLabeledGroup(page, fieldLabel, value ? 'Yes' : 'No', exact)) return
+    await setCheckedControl(page, fieldLabel, { checked: value, exact })
+    return
+  }
+
+  if (prefersGroupedChoiceValue(value) && await chooseValueFromLabeledGroup(page, fieldLabel, value, exact)) {
+    return
+  }
+
+  const locator = await findLabeledControlInPage(page, fieldLabel, exact, { cache: opts?.cache, fieldId: opts?.fieldId })
+  if (locator) {
+    const kind = await autoFieldLocatorKind(locator)
+    if (kind === 'select') {
+      await setFieldChoice(page, fieldLabel, value, {
+        fieldId: opts?.fieldId,
+        exact,
+        choiceType: 'select',
+        cache: opts?.cache,
+      })
+      return
+    }
+    if (kind === 'text') {
+      await setFieldText(page, fieldLabel, value, {
+        fieldId: opts?.fieldId,
+        exact,
+        cache: opts?.cache,
+      })
+      return
+    }
+    if (kind === 'choice') {
+      await setFieldChoice(page, fieldLabel, value, {
+        fieldId: opts?.fieldId,
+        exact,
+        cache: opts?.cache,
+      })
+      return
+    }
+  }
+
+  if (await chooseValueFromLabeledGroup(page, fieldLabel, value, exact)) return
+
+  try {
+    await setFieldText(page, fieldLabel, value, {
+      fieldId: opts?.fieldId,
+      exact,
+      cache: opts?.cache,
+    })
+    return
+  } catch {
+    await setFieldChoice(page, fieldLabel, value, {
+      fieldId: opts?.fieldId,
+      exact,
+      cache: opts?.cache,
+    })
+  }
+}
+
 export async function setFieldChoice(
   page: Page,
   fieldLabel: string,
   value: string,
-  opts?: { exact?: boolean; query?: string; choiceType?: ClientChoiceType; cache?: FillLookupCache },
+  opts?: { exact?: boolean; query?: string; choiceType?: ClientChoiceType; cache?: FillLookupCache; fieldId?: string },
 ): Promise<void> {
   const exact = opts?.exact ?? false
 
-  const locator = await findLabeledControlInPage(page, fieldLabel, exact, { cache: opts?.cache })
+  const locator = await findLabeledControlInPage(page, fieldLabel, exact, { cache: opts?.cache, fieldId: opts?.fieldId })
   if (locator) {
     await locator.scrollIntoViewIfNeeded()
     if (await setNativeSelectByLabel(locator, value, exact)) {
@@ -1697,6 +1882,7 @@ export async function setFieldChoice(
 
   try {
     await pickListboxOption(page, value, {
+      fieldId: opts?.fieldId,
       fieldLabel,
       exact,
       query: opts?.query,
@@ -1711,19 +1897,27 @@ export async function setFieldChoice(
 
 export type FormFieldFill = ClientFillField
 
-export async function fillFields(page: Page, fields: FormFieldFill[]): Promise<void> {
-  const cache = createFillLookupCache()
+export async function fillFields(page: Page, fields: FormFieldFill[], cache = createFillLookupCache()): Promise<void> {
   const nativeResults = await attemptNativeBatchFill(page, fields)
 
   for (let index = 0; index < fields.length; index++) {
     const field = fields[index]!
     if (nativeResults[index]) continue
+    if (field.kind === 'auto') {
+      await setAutoFieldValue(page, field.fieldLabel, field.value, {
+        fieldId: field.fieldId,
+        exact: field.exact,
+        cache,
+      })
+      continue
+    }
     if (field.kind === 'text') {
-      await setFieldText(page, field.fieldLabel, field.value, { exact: field.exact, cache })
+      await setFieldText(page, field.fieldLabel, field.value, { fieldId: field.fieldId, exact: field.exact, cache })
       continue
     }
     if (field.kind === 'choice') {
       await setFieldChoice(page, field.fieldLabel, field.value, {
+        fieldId: field.fieldId,
         exact: field.exact,
         query: field.query,
         choiceType: field.choiceType,
@@ -1739,7 +1933,7 @@ export async function fillFields(page: Page, fields: FormFieldFill[]): Promise<v
       })
       continue
     }
-    await attachFiles(page, field.paths, { fieldLabel: field.fieldLabel, exact: field.exact, cache })
+    await attachFiles(page, field.paths, { fieldId: field.fieldId, fieldLabel: field.fieldLabel, exact: field.exact, cache })
   }
 }
 
@@ -1799,7 +1993,7 @@ export async function selectNativeOption(page: Page, x: number, y: number, opt: 
 export async function pickListboxOption(
   page: Page,
   label: string,
-  opts?: { exact?: boolean; openX?: number; openY?: number; fieldLabel?: string; query?: string; cache?: FillLookupCache },
+  opts?: { exact?: boolean; openX?: number; openY?: number; fieldId?: string; fieldLabel?: string; query?: string; cache?: FillLookupCache },
 ): Promise<void> {
   let anchor: AnchorPoint | undefined
   const exact = opts?.exact ?? false
@@ -1808,7 +2002,7 @@ export async function pickListboxOption(
   let openedHandle: ElementHandle<Element> | null | undefined
 
   if (opts?.fieldLabel) {
-    const opened = await openDropdownControl(page, opts.fieldLabel, exact, opts.cache)
+    const opened = await openDropdownControl(page, opts.fieldLabel, exact, opts.cache, opts.fieldId)
     anchor = { x: opened.anchorX, y: opened.anchorY }
     openedHandle = opened.handle
     const query = opts.query ?? label

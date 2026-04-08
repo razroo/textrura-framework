@@ -2,6 +2,8 @@ import type { Page } from 'playwright'
 import { WebSocketServer, type WebSocket } from 'ws'
 import {
   attachFiles,
+  clearFillLookupCache,
+  createFillLookupCache,
   fillFields,
   pickListboxOption,
   resolveExistingFiles,
@@ -21,6 +23,7 @@ import {
   isFileMessage,
   isKeyMessage,
   isListboxPickMessage,
+  isNavigateMessage,
   isResizeMessage,
   isSetFieldChoiceMessage,
   isSetFieldTextMessage,
@@ -93,6 +96,7 @@ async function handleClientMessage(
   page: Page,
   ws: WebSocket,
   raw: unknown,
+  fieldLookupCache: ReturnType<typeof createFillLookupCache>,
   onViewportOrInput: (kind: 'resize' | 'input', requestId?: string, result?: unknown) => void,
   onHandlerError: (err: unknown) => void,
 ): Promise<void> {
@@ -137,6 +141,13 @@ async function handleClientMessage(
       return
     }
 
+    if (isNavigateMessage(msg)) {
+      clearFillLookupCache(fieldLookupCache)
+      await page.goto(msg.url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+      onViewportOrInput('input', requestId, { pageUrl: page.url() })
+      return
+    }
+
     if (isClickEventMessage(msg)) {
       const x = msg.x
       const y = msg.y
@@ -167,6 +178,7 @@ async function handleClientMessage(
       await attachFiles(page, paths, {
         clickX: msg.x,
         clickY: msg.y,
+        fieldId: msg.fieldId,
         fieldLabel: msg.fieldLabel,
         exact: msg.exact,
         strategy: msg.strategy,
@@ -178,23 +190,29 @@ async function handleClientMessage(
     }
 
     if (isSetFieldTextMessage(msg)) {
-      await setFieldText(page, msg.fieldLabel, msg.value, { exact: msg.exact })
+      await setFieldText(page, msg.fieldLabel, msg.value, {
+        fieldId: msg.fieldId,
+        exact: msg.exact,
+        cache: fieldLookupCache,
+      })
       onViewportOrInput('input', requestId)
       return
     }
 
     if (isSetFieldChoiceMessage(msg)) {
       await setFieldChoice(page, msg.fieldLabel, msg.value, {
+        fieldId: msg.fieldId,
         exact: msg.exact,
         query: msg.query,
         choiceType: msg.choiceType,
+        cache: fieldLookupCache,
       })
       onViewportOrInput('input', requestId)
       return
     }
 
     if (isFillFieldsMessage(msg)) {
-      await fillFields(page, msg.fields)
+      await fillFields(page, msg.fields, fieldLookupCache)
       const result = await fillFieldsAckResult(page)
       onViewportOrInput('input', requestId, result)
       return
@@ -205,8 +223,10 @@ async function handleClientMessage(
         exact: msg.exact,
         openX: msg.openX,
         openY: msg.openY,
+        fieldId: msg.fieldId,
         fieldLabel: msg.fieldLabel,
         query: msg.query,
+        cache: fieldLookupCache,
       })
       onViewportOrInput('input', requestId)
       return
@@ -299,6 +319,13 @@ export function startGeometryWebSocket(options: {
   let pendingExtract = false
   let actionQueue: Promise<void> = Promise.resolve()
   let pendingInputAcks: PendingInputAck[] = []
+  const fieldLookupCache = createFillLookupCache()
+
+  options.page.on('framenavigated', frame => {
+    if (frame === options.page.mainFrame()) {
+      clearFillLookupCache(fieldLookupCache)
+    }
+  })
 
   function sendPendingInputAcks() {
     if (pendingInputAcks.length === 0) return
@@ -459,6 +486,7 @@ export function startGeometryWebSocket(options: {
             options.page,
             ws,
             raw,
+            fieldLookupCache,
             (kind, requestId, result) => {
               if (kind === 'resize') {
                 void runExtractQueued()

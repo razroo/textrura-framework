@@ -363,7 +363,7 @@ describe('buildFormSchemas', () => {
         choiceType: 'group',
         required: true,
         optionCount: 2,
-        options: ['Yes', 'No'],
+        booleanChoice: true,
       }),
       expect.objectContaining({
         kind: 'toggle',
@@ -379,9 +379,10 @@ describe('buildFormSchemas', () => {
         valueLength: longEssay.length,
       }),
     ])
+    expect(schemas[0]?.fields[2]).not.toHaveProperty('options')
   })
 
-  it('prefers question prompts over nearby explanatory copy for grouped choices', () => {
+  it('includes explicit options when requested and prefers question prompts over nearby explanatory copy', () => {
     const tree = node('group', undefined, { x: 0, y: 0, width: 900, height: 700 }, {
       children: [
         node('form', 'Application', { x: 20, y: 20, width: 760, height: 480 }, {
@@ -411,12 +412,16 @@ describe('buildFormSchemas', () => {
       ],
     })
 
-    const schema = buildFormSchemas(tree)[0]
+    const schema = buildFormSchemas(tree, { includeOptions: true, includeContext: 'always' })[0]
     expect(schema?.fields[0]).toMatchObject({
       kind: 'choice',
       choiceType: 'group',
       label: 'Will you now or in the future require sponsorship?',
       options: ['Yes', 'No'],
+      booleanChoice: true,
+      context: {
+        section: 'Application',
+      },
     })
   })
 })

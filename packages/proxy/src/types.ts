@@ -58,6 +58,13 @@ export type ClientResizeMessage = {
   protocolVersion?: number
 }
 
+export type ClientNavigateMessage = {
+  type: 'navigate'
+  url: string
+  requestId?: string
+  protocolVersion?: number
+}
+
 export type ClientCompositionMessage = {
   type: 'composition'
   eventType: 'onCompositionStart' | 'onCompositionUpdate' | 'onCompositionEnd'
@@ -69,6 +76,7 @@ export type ClientCompositionMessage = {
 export type ClientFileMessage = {
   type: 'file'
   paths: string[]
+  fieldId?: string
   x?: number
   y?: number
   fieldLabel?: string
@@ -82,6 +90,7 @@ export type ClientFileMessage = {
 
 export type ClientSetFieldTextMessage = {
   type: 'setFieldText'
+  fieldId?: string
   fieldLabel: string
   value: string
   exact?: boolean
@@ -91,6 +100,7 @@ export type ClientSetFieldTextMessage = {
 
 export type ClientSetFieldChoiceMessage = {
   type: 'setFieldChoice'
+  fieldId?: string
   fieldLabel: string
   value: string
   query?: string
@@ -101,10 +111,11 @@ export type ClientSetFieldChoiceMessage = {
 }
 
 export type ClientFillField =
-  | { kind: 'text'; fieldLabel: string; value: string; exact?: boolean }
-  | { kind: 'choice'; fieldLabel: string; value: string; query?: string; exact?: boolean; choiceType?: ClientChoiceType }
-  | { kind: 'toggle'; label: string; checked?: boolean; exact?: boolean; controlType?: 'checkbox' | 'radio' }
-  | { kind: 'file'; fieldLabel: string; paths: string[]; exact?: boolean }
+  | { kind: 'auto'; fieldId?: string; fieldLabel: string; value: string | boolean; exact?: boolean }
+  | { kind: 'text'; fieldId?: string; fieldLabel: string; value: string; exact?: boolean }
+  | { kind: 'choice'; fieldId?: string; fieldLabel: string; value: string; query?: string; exact?: boolean; choiceType?: ClientChoiceType }
+  | { kind: 'toggle'; fieldId?: string; label: string; checked?: boolean; exact?: boolean; controlType?: 'checkbox' | 'radio' }
+  | { kind: 'file'; fieldId?: string; fieldLabel: string; paths: string[]; exact?: boolean }
 
 export type ClientFillFieldsMessage = {
   type: 'fillFields'
@@ -119,6 +130,7 @@ export type ClientListboxPickMessage = {
   exact?: boolean
   openX?: number
   openY?: number
+  fieldId?: string
   fieldLabel?: string
   query?: string
   requestId?: string
@@ -160,6 +172,7 @@ export type ParsedClientMessage =
   | ClientEventMessage
   | ClientKeyMessage
   | ClientResizeMessage
+  | ClientNavigateMessage
   | ClientCompositionMessage
   | ClientFileMessage
   | ClientSetFieldTextMessage
@@ -177,6 +190,10 @@ export function isKeyMessage(msg: ParsedClientMessage): msg is ClientKeyMessage 
 
 export function isResizeMessage(msg: ParsedClientMessage): msg is ClientResizeMessage {
   return msg.type === 'resize' && 'width' in msg && 'height' in msg
+}
+
+export function isNavigateMessage(msg: ParsedClientMessage): msg is ClientNavigateMessage {
+  return msg.type === 'navigate' && 'url' in msg && typeof (msg as ClientNavigateMessage).url === 'string'
 }
 
 export function isClickEventMessage(msg: ParsedClientMessage): msg is ClientEventMessage {

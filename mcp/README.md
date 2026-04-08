@@ -21,8 +21,8 @@ Geometra proxy:       Chromium → DOM geometry → same WebSocket as native →
 | `geometra_connect` | Connect with `url` (ws://…) **or** `pageUrl` (https://…) to auto-start geometra-proxy; `url: "https://…"` is auto-coerced onto the proxy path |
 | `geometra_query` | Find elements by stable id, role, name, text content, ancestor/prompt context, current value, or semantic state such as `invalid`, `required`, or `busy` |
 | `geometra_wait_for` | Wait for a semantic condition instead of guessing sleeps (`busy`, `disabled`, alerts, values, etc.) |
-| `geometra_form_schema` | Compact, fill-oriented form schema with stable field ids and collapsed radio/button groups |
-| `geometra_fill_form` | Fill a form from `valuesById` / `valuesByLabel` in one MCP call; preferred low-token happy path for standard forms |
+| `geometra_form_schema` | Compact, fill-oriented form schema with stable field ids and collapsed radio/button groups; can auto-connect from `pageUrl` / `url` |
+| `geometra_fill_form` | Fill a form from `valuesById` / `valuesByLabel` in one MCP call; can auto-connect from `pageUrl` / `url` for the lowest-token known-form path |
 | `geometra_fill_fields` | Fill labeled text/choice/toggle/file fields in one MCP call; can return final-only status for the smallest responses |
 | `geometra_run_actions` | Execute a batch of high-level actions in one MCP round trip and get one consolidated result, with optional final-only output |
 | `geometra_page_model` | Summary-first webpage model: archetypes, stable section ids, counts, top-level sections, primary actions |
@@ -297,8 +297,8 @@ Agent:  geometra_query({ role: "button", name: "Save" })
 2. It receives the computed layout (`{ x, y, width, height }` for every node) and the UI tree (`kind`, `semantic`, `props`, `handlers`, `children`).
 3. It builds an accessibility tree from that data — roles, names, focusable state, bounds.
 4. **`geometra_snapshot`** defaults to a **compact** flat list of viewport-visible actionable nodes (minified JSON) to reduce LLM tokens; use `view: "full"` for the complete nested tree.
-5. **`geometra_form_schema`** is the compact form-specific path: stable field ids, required/invalid state, current values, and collapsed choice groups without layout-heavy section detail.
-6. **`geometra_fill_form`** turns a compact values object into semantic field operations server-side, so the model does not need to emit one tool call per field.
+5. **`geometra_form_schema`** is the compact form-specific path: stable field ids, required/invalid state, current values, and collapsed choice groups without layout-heavy section detail. It can auto-connect when you pass `pageUrl` / `url`.
+6. **`geometra_fill_form`** turns a compact values object into semantic field operations server-side, so the model does not need to emit one tool call per field. It can also auto-connect, which collapses “open page + fill known values” into a single tool call.
 7. **`geometra_page_model`** is still the right summary-first path for non-form exploration: page archetypes, stable section ids, counts, top-level landmarks/forms/dialogs/lists, and a few primary actions.
 8. **`geometra_expand_section`** fetches richer details only for the section you care about (fields, actions, headings, nested lists, list items, text preview).
 9. After interactions, action tools return a **semantic delta** when possible (dialogs opened/closed, forms appeared/removed, list counts changed, named/focusable nodes added/removed/updated). If nothing meaningful changed, they fall back to a short current-UI overview.
@@ -308,8 +308,9 @@ Agent:  geometra_query({ role: "button", name: "Save" })
 
 For long application flows, prefer one of these patterns:
 
-1. `geometra_form_schema`
-2. `geometra_fill_form`
+1. `geometra_fill_form({ pageUrl, valuesByLabel })` when you already know the fields you want to set
+2. otherwise `geometra_form_schema`
+3. then `geometra_fill_form`
 3. `geometra_reveal` for far-below-fold targets such as submit buttons
 4. `geometra_run_actions` when you need mixed navigation + waits + field entry
 5. `geometra_page_model` + `geometra_expand_section` when you are still exploring the page rather than filling it

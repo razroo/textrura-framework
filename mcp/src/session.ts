@@ -195,6 +195,7 @@ export interface PageSectionDetail {
 
 export type FormSchemaFieldKind = 'text' | 'choice' | 'toggle' | 'multi_choice'
 export type FormSchemaChoiceType = 'select' | 'group' | 'listbox'
+export type FormSchemaContextMode = 'auto' | 'always' | 'none'
 
 export interface FormSchemaField {
   id: string
@@ -203,6 +204,7 @@ export interface FormSchemaField {
   required?: boolean
   invalid?: boolean
   choiceType?: FormSchemaChoiceType
+  booleanChoice?: boolean
   controlType?: 'checkbox' | 'radio'
   value?: string
   valueLength?: number
@@ -220,6 +222,15 @@ export interface FormSchemaModel {
   requiredCount: number
   invalidCount: number
   fields: FormSchemaField[]
+}
+
+export interface FormSchemaBuildOptions {
+  formId?: string
+  maxFields?: number
+  onlyRequiredFields?: boolean
+  onlyInvalidFields?: boolean
+  includeOptions?: boolean
+  includeContext?: FormSchemaContextMode
 }
 
 export interface UiNodeUpdate {
@@ -275,6 +286,10 @@ export interface Session {
   updateRevision: number
   /** Present when this session owns a child geometra-proxy process (pageUrl connect). */
   proxyChild?: ChildProcess
+  proxyReusable?: boolean
+  cachedA11y?: A11yNode | null
+  cachedA11yRevision?: number
+  cachedFormSchemas?: Map<string, { revision: number; forms: FormSchemaModel[] }>
 }
 
 export interface UpdateWaitResult {
@@ -284,6 +299,17 @@ export interface UpdateWaitResult {
 }
 
 let activeSession: Session | null = null
+let reusableProxy:
+  | {
+      child: ChildProcess
+      wsUrl: string
+      headless: boolean
+      slowMo: number
+      width: number
+      height: number
+      pageUrl?: string
+    }
+  | null = null
 const ACTION_UPDATE_TIMEOUT_MS = 2000
 const LISTBOX_UPDATE_TIMEOUT_MS = 4500
 const FILL_BATCH_BASE_TIMEOUT_MS = 2500
@@ -297,12 +323,68 @@ const FILL_BATCH_MAX_TIMEOUT_MS = 60_000
 let nextRequestSequence = 0
 
 export type ProxyFillField =
-  | { kind: 'text'; fieldLabel: string; value: string; exact?: boolean }
-  | { kind: 'choice'; fieldLabel: string; value: string; query?: string; exact?: boolean; choiceType?: FormSchemaChoiceType }
+  | { kind: 'auto'; fieldId?: string; fieldLabel: string; value: string | boolean; exact?: boolean }
+  | { kind: 'text'; fieldId?: string; fieldLabel: string; value: string; exact?: boolean }
+  | { kind: 'choice'; fieldId?: string; fieldLabel: string; value: string; query?: string; exact?: boolean; choiceType?: FormSchemaChoiceType }
   | { kind: 'toggle'; label: string; checked?: boolean; exact?: boolean; controlType?: 'checkbox' | 'radio' }
-  | { kind: 'file'; fieldLabel: string; paths: string[]; exact?: boolean }
+  | { kind: 'file'; fieldId?: string; fieldLabel: string; paths: string[]; exact?: boolean }
 
-function shutdownPreviousSession(): void {
+function invalidateSessionCaches(session: Session): void {
+  session.cachedA11y = null
+  session.cachedA11yRevision = -1
+  session.cachedFormSchemas?.clear()
+}
+
+function clearReusableProxyIfExited(): void {
+  if (!reusableProxy?.child.killed && reusableProxy?.child.exitCode === null && reusableProxy?.child.signalCode === null) {
+    return
+  }
+  reusableProxy = null
+}
+
+function setReusableProxy(
+  child: ChildProcess,
+  wsUrl: string,
+  opts: { headless?: boolean; slowMo?: number; width?: number; height?: number; pageUrl?: string },
+): void {
+  reusableProxy = {
+    child,
+    wsUrl,
+    headless: opts.headless === true,
+    slowMo: opts.slowMo ?? 0,
+    width: opts.width ?? 1280,
+    height: opts.height ?? 720,
+    pageUrl: opts.pageUrl,
+  }
+  const clear = () => {
+    if (reusableProxy?.child === child) reusableProxy = null
+  }
+  child.once('exit', clear)
+  child.once('close', clear)
+  child.once('error', clear)
+}
+
+function closeReusableProxy(): void {
+  clearReusableProxyIfExited()
+  const proxy = reusableProxy
+  reusableProxy = null
+  if (!proxy) return
+  try {
+    proxy.child.kill('SIGTERM')
+  } catch {
+    /* ignore */
+  }
+}
+
+function rememberReusableProxyPageUrl(session: Session): void {
+  const pageUrl = session.cachedA11y?.meta?.pageUrl
+  if (!pageUrl) return
+  if (session.proxyChild && reusableProxy?.child === session.proxyChild) {
+    reusableProxy.pageUrl = pageUrl
+  }
+}
+
+function shutdownPreviousSession(opts?: { closeProxy?: boolean }): void {
   const prev = activeSession
   if (!prev) return
   activeSession = null
@@ -312,6 +394,10 @@ function shutdownPreviousSession(): void {
     /* ignore */
   }
   if (prev.proxyChild) {
+    const shouldKeepProxy = prev.proxyReusable && opts?.closeProxy === false
+    rememberReusableProxyPageUrl(prev)
+    if (shouldKeepProxy) return
+    if (reusableProxy?.child === prev.proxyChild) reusableProxy = null
     try {
       prev.proxyChild.kill('SIGTERM')
     } catch {
@@ -326,13 +412,26 @@ function shutdownPreviousSession(): void {
  */
 export function connect(
   url: string,
-  opts?: { width?: number; height?: number; skipInitialResize?: boolean },
+  opts?: { width?: number; height?: number; skipInitialResize?: boolean; closePreviousProxy?: boolean; awaitInitialFrame?: boolean },
 ): Promise<Session> {
   return new Promise((resolve, reject) => {
-    shutdownPreviousSession()
+    clearReusableProxyIfExited()
+    if (reusableProxy && reusableProxy.wsUrl !== url) {
+      closeReusableProxy()
+    }
+    shutdownPreviousSession({ closeProxy: opts?.closePreviousProxy ?? true })
 
     const ws = new WebSocket(url)
-    const session: Session = { ws, layout: null, tree: null, url, updateRevision: 0 }
+    const session: Session = {
+      ws,
+      layout: null,
+      tree: null,
+      url,
+      updateRevision: 0,
+      cachedA11y: null,
+      cachedA11yRevision: -1,
+      cachedFormSchemas: new Map(),
+    }
     let resolved = false
 
     const timeout = setTimeout(() => {
@@ -344,10 +443,17 @@ export function connect(
     }, 10_000)
 
     ws.on('open', () => {
-      if (opts?.skipInitialResize) return
-      const width = opts?.width ?? 1024
-      const height = opts?.height ?? 768
-      ws.send(JSON.stringify({ type: 'resize', width, height }))
+      if (!opts?.skipInitialResize) {
+        const width = opts?.width ?? 1024
+        const height = opts?.height ?? 768
+        ws.send(JSON.stringify({ type: 'resize', width, height }))
+      }
+      if (opts?.awaitInitialFrame === false && !resolved) {
+        resolved = true
+        clearTimeout(timeout)
+        activeSession = session
+        resolve(session)
+      }
     })
 
     ws.on('message', (data) => {
@@ -357,6 +463,7 @@ export function connect(
           session.layout = msg.layout
           session.tree = msg.tree
           session.updateRevision++
+          invalidateSessionCaches(session)
           if (!resolved) {
             resolved = true
             clearTimeout(timeout)
@@ -366,6 +473,7 @@ export function connect(
         } else if (msg.type === 'patch' && session.layout) {
           applyPatches(session.layout, msg.patches)
           session.updateRevision++
+          invalidateSessionCaches(session)
         }
       } catch { /* ignore malformed messages */ }
     })
@@ -381,7 +489,7 @@ export function connect(
     ws.on('close', () => {
       if (activeSession === session) {
         activeSession = null
-        if (session.proxyChild) {
+        if (session.proxyChild && !session.proxyReusable) {
           try {
             session.proxyChild.kill('SIGTERM')
           } catch {
@@ -409,7 +517,54 @@ export async function connectThroughProxy(options: {
   width?: number
   height?: number
   slowMo?: number
+  awaitInitialFrame?: boolean
 }): Promise<Session> {
+  clearReusableProxyIfExited()
+  const desiredHeadless = options.headless === true
+  const desiredSlowMo = options.slowMo ?? 0
+
+  if (
+    reusableProxy &&
+    reusableProxy.headless === desiredHeadless &&
+    reusableProxy.slowMo === desiredSlowMo
+  ) {
+    const session = activeSession?.proxyChild === reusableProxy.child
+      ? activeSession
+      : await connect(reusableProxy.wsUrl, {
+          skipInitialResize: true,
+          closePreviousProxy: false,
+          awaitInitialFrame: options.awaitInitialFrame,
+        })
+
+    if (!session) {
+      throw new Error('Failed to attach to reusable proxy session')
+    }
+    session.proxyChild = reusableProxy.child
+    session.proxyReusable = true
+    const desiredWidth = options.width ?? reusableProxy.width
+    const desiredHeight = options.height ?? reusableProxy.height
+    if (desiredWidth !== reusableProxy.width || desiredHeight !== reusableProxy.height) {
+      await sendAndWaitForUpdate(session, {
+        type: 'resize',
+        width: desiredWidth,
+        height: desiredHeight,
+      }, 5_000)
+      reusableProxy.width = desiredWidth
+      reusableProxy.height = desiredHeight
+    }
+    if (options.pageUrl) {
+      const currentUrl = session.cachedA11y?.meta?.pageUrl ?? reusableProxy.pageUrl
+      if (currentUrl !== options.pageUrl) {
+        await sendNavigate(session, options.pageUrl, 15_000)
+        if (reusableProxy?.child === session.proxyChild) {
+          reusableProxy.pageUrl = options.pageUrl
+        }
+      }
+    }
+    return session
+  }
+
+  closeReusableProxy()
   const { child, wsUrl } = await spawnGeometraProxy({
     pageUrl: options.pageUrl,
     port: options.port ?? 0,
@@ -419,8 +574,20 @@ export async function connectThroughProxy(options: {
     slowMo: options.slowMo,
   })
   try {
-    const session = await connect(wsUrl, { skipInitialResize: true })
+    const session = await connect(wsUrl, {
+      skipInitialResize: true,
+      closePreviousProxy: false,
+      awaitInitialFrame: options.awaitInitialFrame,
+    })
     session.proxyChild = child
+    session.proxyReusable = true
+    setReusableProxy(child, wsUrl, {
+      headless: options.headless,
+      slowMo: options.slowMo,
+      width: options.width,
+      height: options.height,
+      pageUrl: options.pageUrl,
+    })
     return session
   } catch (e) {
     try {
@@ -436,8 +603,9 @@ export function getSession(): Session | null {
   return activeSession
 }
 
-export function disconnect(): void {
-  shutdownPreviousSession()
+export function disconnect(opts?: { closeProxy?: boolean }): void {
+  shutdownPreviousSession({ closeProxy: opts?.closeProxy ?? false })
+  if (opts?.closeProxy) closeReusableProxy()
 }
 
 function estimateFillBatchTimeout(fields: ProxyFillField[]): number {
@@ -445,6 +613,9 @@ function estimateFillBatchTimeout(fields: ProxyFillField[]): number {
   let totalTextLength = 0
   for (const field of fields) {
     switch (field.kind) {
+      case 'auto':
+        total += typeof field.value === 'boolean' ? FILL_BATCH_TOGGLE_FIELD_TIMEOUT_MS : FILL_BATCH_CHOICE_FIELD_TIMEOUT_MS
+        break
       case 'text':
         totalTextLength += field.value.length
         total += FILL_BATCH_TEXT_FIELD_TIMEOUT_MS
@@ -612,7 +783,7 @@ export function sendFieldText(
   session: Session,
   fieldLabel: string,
   value: string,
-  opts?: { exact?: boolean },
+  opts?: { exact?: boolean; fieldId?: string },
   timeoutMs?: number,
 ): Promise<UpdateWaitResult> {
   const payload: Record<string, unknown> = {
@@ -621,6 +792,7 @@ export function sendFieldText(
     value,
   }
   if (opts?.exact !== undefined) payload.exact = opts.exact
+  if (opts?.fieldId) payload.fieldId = opts.fieldId
   return sendAndWaitForUpdate(session, payload, timeoutMs)
 }
 
@@ -629,7 +801,7 @@ export function sendFieldChoice(
   session: Session,
   fieldLabel: string,
   value: string,
-  opts?: { exact?: boolean; query?: string; choiceType?: FormSchemaChoiceType },
+  opts?: { exact?: boolean; query?: string; choiceType?: FormSchemaChoiceType; fieldId?: string },
   timeoutMs = LISTBOX_UPDATE_TIMEOUT_MS,
 ): Promise<UpdateWaitResult> {
   const payload: Record<string, unknown> = {
@@ -640,6 +812,7 @@ export function sendFieldChoice(
   if (opts?.exact !== undefined) payload.exact = opts.exact
   if (opts?.query) payload.query = opts.query
   if (opts?.choiceType) payload.choiceType = opts.choiceType
+  if (opts?.fieldId) payload.fieldId = opts.fieldId
   return sendAndWaitForUpdate(session, payload, timeoutMs)
 }
 
@@ -714,6 +887,18 @@ export function sendWheel(
     ...(opts?.x !== undefined ? { x: opts.x } : {}),
     ...(opts?.y !== undefined ? { y: opts.y } : {}),
   }, timeoutMs)
+}
+
+/** Navigate the proxy page to a new URL while keeping the browser process alive. */
+export function sendNavigate(
+  session: Session,
+  url: string,
+  timeoutMs = 15_000,
+): Promise<UpdateWaitResult> {
+  return sendAndWaitForUpdate(session, {
+    type: 'navigate',
+    url,
+  }, timeoutMs, { requireUpdateOnAck: true })
 }
 
 /**
@@ -1463,11 +1648,7 @@ function toggleSchemaField(root: A11yNode, node: A11yNode): FormSchemaField | nu
 function buildFormSchemaForNode(
   root: A11yNode,
   formNode: A11yNode,
-  options?: {
-    maxFields?: number
-    onlyRequiredFields?: boolean
-    onlyInvalidFields?: boolean
-  },
+  options?: FormSchemaBuildOptions,
 ): FormSchemaModel {
   const candidates = sortByBounds(
     collectDescendants(
@@ -1510,7 +1691,7 @@ function buildFormSchemaForNode(
     }
   }
 
-  const compactFields = trimSchemaFieldContexts(fields)
+  const compactFields = presentFormSchemaFields(fields, options)
 
   const filteredFields = compactFields.filter(field => {
     if (options?.onlyRequiredFields && !field.required) return false
@@ -1532,6 +1713,15 @@ function buildFormSchemaForNode(
 }
 
 function trimSchemaFieldContexts(fields: FormSchemaField[]): FormSchemaField[] {
+  return presentFormSchemaFields(fields, { includeOptions: true, includeContext: 'auto' })
+}
+
+function presentFormSchemaFields(
+  fields: FormSchemaField[],
+  options?: Pick<FormSchemaBuildOptions, 'includeOptions' | 'includeContext'>,
+): FormSchemaField[] {
+  const includeOptions = options?.includeOptions ?? false
+  const includeContext = options?.includeContext ?? 'auto'
   const labelCounts = new Map<string, number>()
   for (const field of fields) {
     const key = normalizeUiText(field.label)
@@ -1539,7 +1729,24 @@ function trimSchemaFieldContexts(fields: FormSchemaField[]): FormSchemaField[] {
   }
 
   return fields.map(field => {
-    if (!field.context) return field
+    const booleanChoice =
+      field.kind === 'choice' &&
+      field.choiceType === 'group' &&
+      field.optionCount === 2 &&
+      field.options?.length === 2 &&
+      field.options.every(option => ['yes', 'no'].includes(normalizeUiText(option).toLowerCase()))
+
+    const next: FormSchemaField = { ...field }
+    if (booleanChoice) next.booleanChoice = true
+    if (!includeOptions) delete next.options
+
+    if (includeContext === 'none') {
+      delete next.context
+      return next
+    }
+
+    if (!field.context) return next
+    if (includeContext === 'always') return next
 
     const trimmed: NodeContextModel = {}
     if (field.context.prompt && normalizeUiText(field.context.prompt) !== normalizeUiText(field.label)) {
@@ -1550,10 +1757,11 @@ function trimSchemaFieldContexts(fields: FormSchemaField[]): FormSchemaField[] {
     }
 
     if (Object.keys(trimmed).length === 0) {
-      const { context: _context, ...rest } = field
-      return rest
+      delete next.context
+      return next
     }
-    return { ...field, context: trimmed }
+    next.context = trimmed
+    return next
   })
 }
 
@@ -1704,12 +1912,7 @@ export function buildPageModel(
 
 export function buildFormSchemas(
   root: A11yNode,
-  options?: {
-    formId?: string
-    maxFields?: number
-    onlyRequiredFields?: boolean
-    onlyInvalidFields?: boolean
-  },
+  options?: FormSchemaBuildOptions,
 ): FormSchemaModel[] {
   const forms = sortByBounds([
     ...(root.role === 'form' ? [root] : []),
@@ -2338,6 +2541,7 @@ function sendAndWaitForUpdate(
   session: Session,
   message: Record<string, unknown>,
   timeoutMs = ACTION_UPDATE_TIMEOUT_MS,
+  opts?: { requireUpdateOnAck?: boolean },
 ): Promise<UpdateWaitResult> {
   return new Promise((resolve, reject) => {
     if (session.ws.readyState !== WebSocket.OPEN) {
@@ -2347,7 +2551,7 @@ function sendAndWaitForUpdate(
     const requestId = `req-${++nextRequestSequence}`
     const startRevision = session.updateRevision
     session.ws.send(JSON.stringify({ ...message, requestId }))
-    waitForNextUpdate(session, timeoutMs, requestId, startRevision).then(resolve).catch(reject)
+    waitForNextUpdate(session, timeoutMs, requestId, startRevision, opts).then(resolve).catch(reject)
   })
 }
 
@@ -2356,8 +2560,16 @@ function waitForNextUpdate(
   timeoutMs = ACTION_UPDATE_TIMEOUT_MS,
   requestId?: string,
   startRevision = session.updateRevision,
+  opts?: { requireUpdateOnAck?: boolean },
 ): Promise<UpdateWaitResult> {
   return new Promise((resolve, reject) => {
+    let ackSeen = false
+    let ackResult: unknown
+
+    const ackPayload = (): Omit<UpdateWaitResult, 'status' | 'timeoutMs'> => (
+      ackSeen && ackResult !== undefined ? { result: ackResult } : {}
+    )
+
     const onMessage = (data: WebSocket.Data) => {
       try {
         const msg = JSON.parse(String(data))
@@ -2369,13 +2581,26 @@ function waitForNextUpdate(
             reject(new Error(typeof msg.message === 'string' ? msg.message : 'Geometra server error'))
             return
           }
-          if (msg.type === 'ack' && messageRequestId === requestId) {
+          if ((msg.type === 'frame' || (msg.type === 'patch' && session.layout)) && ackSeen && session.updateRevision > startRevision) {
             cleanup()
             resolve({
-              status: session.updateRevision > startRevision ? 'updated' : 'acknowledged',
+              status: 'updated',
               timeoutMs,
-              ...(msg.result !== undefined ? { result: msg.result } : {}),
+              ...ackPayload(),
             })
+            return
+          }
+          if (msg.type === 'ack' && messageRequestId === requestId) {
+            ackSeen = true
+            ackResult = msg.result
+            if (!opts?.requireUpdateOnAck || session.updateRevision > startRevision) {
+              cleanup()
+              resolve({
+                status: session.updateRevision > startRevision ? 'updated' : 'acknowledged',
+                timeoutMs,
+                ...ackPayload(),
+              })
+            }
           }
           return
         }
@@ -2406,7 +2631,11 @@ function waitForNextUpdate(
     const timeout = setTimeout(() => {
       cleanup()
       if (requestId && session.updateRevision > startRevision) {
-        resolve({ status: 'updated', timeoutMs })
+        resolve({ status: 'updated', timeoutMs, ...ackPayload() })
+        return
+      }
+      if (requestId && ackSeen) {
+        resolve({ status: 'acknowledged', timeoutMs, ...ackPayload() })
         return
       }
       resolve({ status: 'timed_out', timeoutMs })

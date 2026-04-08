@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { chromium, type Browser } from 'playwright'
-import { attachFiles, pickListboxOption, setFieldChoice, setFieldText, wheelAt } from '../dom-actions.ts'
+import { attachFiles, fillFields, pickListboxOption, setFieldChoice, setFieldText, wheelAt } from '../dom-actions.ts'
 
 describe('pickListboxOption', () => {
   let browser: Browser
@@ -494,6 +494,79 @@ describe('wheelAt', () => {
 
     expect(result.innerY).toBeGreaterThan(0)
     expect(result.pageY).toBe(0)
+    await page.close()
+  })
+})
+
+describe('fillFields auto', () => {
+  let browser: Browser
+
+  beforeAll(async () => {
+    browser = await chromium.launch({ headless: true })
+  })
+
+  afterAll(async () => {
+    await browser.close()
+  })
+
+  it('fills native text, select, checkbox, and grouped radio fields from labels without prior schema hints', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; display: grid; gap: 16px; width: 420px; }
+        label, fieldset { display: grid; gap: 8px; }
+      </style>
+      <label>
+        Full name
+        <input id="full-name" />
+      </label>
+      <label>
+        Preferred location
+        <select id="location">
+          <option value="">Choose one</option>
+          <option>Berlin, Germany</option>
+          <option>London, United Kingdom</option>
+        </select>
+      </label>
+      <label>
+        Share my profile for future roles
+        <input id="share-profile" type="checkbox" />
+      </label>
+      <fieldset>
+        <legend>Will you now or in the future require sponsorship?</legend>
+        <label><input type="radio" name="sponsor" value="yes" /> Yes</label>
+        <label><input type="radio" name="sponsor" value="no" /> No</label>
+      </fieldset>
+      <fieldset>
+        <legend>Can you work a hybrid schedule in Berlin three days a week?</legend>
+        <label><input type="radio" name="hybrid" value="yes" /> Yes</label>
+        <label><input type="radio" name="hybrid" value="no" /> No</label>
+      </fieldset>
+    `)
+
+    await fillFields(page, [
+      { kind: 'auto', fieldLabel: 'Full name', value: 'Taylor Applicant' },
+      { kind: 'auto', fieldLabel: 'Preferred location', value: 'Berlin, Germany' },
+      { kind: 'auto', fieldLabel: 'Share my profile for future roles', value: true },
+      { kind: 'auto', fieldLabel: 'Will you now or in the future require sponsorship?', value: false },
+      { kind: 'auto', fieldLabel: 'Can you work a hybrid schedule in Berlin three days a week?', value: 'No' },
+    ])
+
+    const result = await page.evaluate(() => ({
+      fullName: (document.getElementById('full-name') as HTMLInputElement).value,
+      location: (document.getElementById('location') as HTMLSelectElement).value,
+      shareProfile: (document.getElementById('share-profile') as HTMLInputElement).checked,
+      sponsorshipNo: (document.querySelector('input[name="sponsor"][value="no"]') as HTMLInputElement).checked,
+      hybridNo: (document.querySelector('input[name="hybrid"][value="no"]') as HTMLInputElement).checked,
+    }))
+
+    expect(result).toEqual({
+      fullName: 'Taylor Applicant',
+      location: 'Berlin, Germany',
+      shareProfile: true,
+      sponsorshipNo: true,
+      hybridNo: true,
+    })
     await page.close()
   })
 })

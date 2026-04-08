@@ -37,6 +37,9 @@ const mockState = vi.hoisted(() => ({
     layout: { x: 0, y: 0, width: 1280, height: 800, children: [] },
     url: 'ws://127.0.0.1:3200',
     updateRevision: 1,
+    cachedA11y: undefined as unknown,
+    cachedA11yRevision: undefined as unknown,
+    cachedFormSchemas: undefined as unknown,
   },
   formSchemas: [] as Array<Record<string, unknown>>,
   connect: vi.fn(),
@@ -58,6 +61,20 @@ const mockState = vi.hoisted(() => ({
   sendWheel: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 2000 })),
   waitForUiCondition: vi.fn(async () => true),
 }))
+
+function resetMockSessionCaches() {
+  mockState.session.updateRevision = 1
+  mockState.session.cachedA11y = undefined
+  mockState.session.cachedA11yRevision = undefined
+  mockState.session.cachedFormSchemas = undefined
+}
+
+function bumpMockUiRevision() {
+  mockState.session.updateRevision += 1
+  mockState.session.cachedA11y = undefined
+  mockState.session.cachedA11yRevision = undefined
+  mockState.session.cachedFormSchemas = undefined
+}
 
 vi.mock('../session.js', () => ({
   connect: mockState.connect,
@@ -110,6 +127,7 @@ function getToolHandler(name: string) {
 describe('batch MCP result shaping', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    resetMockSessionCaches()
     mockState.connect.mockResolvedValue(mockState.session)
     mockState.connectThroughProxy.mockResolvedValue(mockState.session)
     mockState.formSchemas = []
@@ -266,6 +284,56 @@ describe('batch MCP result shaping', () => {
     expect(payload).not.toHaveProperty('currentUi')
   })
 
+  it('can inline a packed form schema into connect for the low-turn form path', async () => {
+    const handler = getToolHandler('geometra_connect')
+    mockState.formSchemas = [
+      {
+        formId: 'fm:0',
+        name: 'Application',
+        fieldCount: 2,
+        requiredCount: 1,
+        invalidCount: 0,
+        fields: [
+          { id: 'ff:0.0', kind: 'text', label: 'Full name', required: true },
+          { id: 'ff:0.1', kind: 'choice', label: 'Work authorization', choiceType: 'group', booleanChoice: true, optionCount: 2 },
+        ],
+      },
+    ]
+
+    const result = await handler({
+      pageUrl: 'https://jobs.example.com/application',
+      headless: true,
+      returnForms: true,
+      includeContext: 'none',
+      schemaFormat: 'packed',
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    expect(payload).toMatchObject({
+      connected: true,
+      transport: 'proxy',
+      pageUrl: 'https://jobs.example.com/application',
+      formSchema: {
+        changed: true,
+        formCount: 1,
+        format: 'packed',
+        schemaId: expect.any(String),
+        forms: [
+          {
+            i: 'fm:0',
+            fc: 2,
+            rc: 1,
+            ic: 0,
+            f: [
+              { i: 'ff:0.0', k: 'text', l: 'Full name', r: 1 },
+              { i: 'ff:0.1', k: 'choice', l: 'Work authorization', ch: 'group', b: 1, oc: 2 },
+            ],
+          },
+        ],
+      },
+    })
+  })
+
   it('returns compact form schemas without requiring section expansion', async () => {
     const handler = getToolHandler('geometra_form_schema')
     mockState.formSchemas = [
@@ -278,23 +346,77 @@ describe('batch MCP result shaping', () => {
         fields: [
           { id: 'ff:0.0', kind: 'text', label: 'Full name', required: true },
           { id: 'ff:0.1', kind: 'choice', label: 'Preferred location', required: true, choiceType: 'select' },
-          { id: 'ff:0.2', kind: 'choice', label: 'Are you legally authorized to work in Germany?', choiceType: 'group', options: ['Yes', 'No'], optionCount: 2 },
+          { id: 'ff:0.2', kind: 'choice', label: 'Are you legally authorized to work in Germany?', choiceType: 'group', booleanChoice: true, optionCount: 2 },
           { id: 'ff:0.3', kind: 'toggle', label: 'Share my profile for future roles', controlType: 'checkbox' },
         ],
       },
     ]
 
     const result = await handler({ maxFields: 20 })
-    const payload = JSON.parse(result.content[0]!.text) as { forms: Array<Record<string, unknown>> }
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
 
-    expect(payload.forms).toEqual([
-      expect.objectContaining({
+    expect(payload).toMatchObject({
+      changed: true,
+      formCount: 1,
+      format: 'compact',
+      schemaId: expect.any(String),
+      forms: [
+        expect.objectContaining({
+          formId: 'fm:0',
+          fieldCount: 4,
+          requiredCount: 3,
+          invalidCount: 0,
+        }),
+      ],
+    })
+    const forms = payload.forms as Array<Record<string, unknown>>
+    const fields = forms[0]?.fields as Array<Record<string, unknown>>
+    expect(fields[2]).toMatchObject({
+      id: 'ff:0.2',
+      kind: 'choice',
+      label: 'Are you legally authorized to work in Germany?',
+      choiceType: 'group',
+      booleanChoice: true,
+      optionCount: 2,
+    })
+    expect(fields[2]).not.toHaveProperty('options')
+  })
+
+  it('can auto-connect inside form_schema when given a pageUrl', async () => {
+    const handler = getToolHandler('geometra_form_schema')
+    mockState.formSchemas = [
+      {
         formId: 'fm:0',
-        fieldCount: 4,
-        requiredCount: 3,
+        name: 'Application',
+        fieldCount: 1,
+        requiredCount: 1,
         invalidCount: 0,
-      }),
-    ])
+        fields: [{ id: 'ff:0.0', kind: 'text', label: 'Full name', required: true }],
+      },
+    ]
+
+    const result = await handler({
+      pageUrl: 'https://jobs.example.com/application',
+      headless: true,
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    expect(mockState.connectThroughProxy).toHaveBeenCalledWith({
+      pageUrl: 'https://jobs.example.com/application',
+      port: undefined,
+      headless: true,
+      width: undefined,
+      height: undefined,
+      slowMo: undefined,
+      awaitInitialFrame: undefined,
+    })
+    expect(payload).toMatchObject({
+      autoConnected: true,
+      transport: 'proxy',
+      pageUrl: 'https://jobs.example.com/application',
+      changed: true,
+      formCount: 1,
+    })
   })
 
   it('fills a form from ids and labels without echoing long essay content', async () => {
@@ -309,7 +431,7 @@ describe('batch MCP result shaping', () => {
         invalidCount: 0,
         fields: [
           { id: 'ff:0.0', kind: 'text', label: 'Full name', required: true },
-          { id: 'ff:0.1', kind: 'choice', label: 'Are you legally authorized to work in Germany?', choiceType: 'group', options: ['Yes', 'No'], optionCount: 2 },
+          { id: 'ff:0.1', kind: 'choice', label: 'Are you legally authorized to work in Germany?', choiceType: 'group', booleanChoice: true, optionCount: 2 },
           { id: 'ff:0.2', kind: 'toggle', label: 'Share my profile for future roles', controlType: 'checkbox' },
           { id: 'ff:0.3', kind: 'text', label: 'Why Geometra?' },
         ],
@@ -349,7 +471,7 @@ describe('batch MCP result shaping', () => {
       mockState.session,
       'Are you legally authorized to work in Germany?',
       'Yes',
-      { exact: undefined, query: undefined, choiceType: 'group' },
+      { exact: undefined, query: undefined, choiceType: 'group', fieldId: 'ff:0.1' },
       undefined,
     )
     expect(payload).toMatchObject({
@@ -422,10 +544,11 @@ describe('batch MCP result shaping', () => {
     expect(mockState.sendFillFields).toHaveBeenCalledWith(
       mockState.session,
       [
-        { kind: 'text', fieldLabel: 'Full name', value: 'Taylor Applicant' },
-        { kind: 'choice', fieldLabel: 'Preferred location', value: 'Berlin, Germany', choiceType: 'select' },
+        { kind: 'text', fieldId: 'ff:0.0', fieldLabel: 'Full name', value: 'Taylor Applicant' },
+        { kind: 'choice', fieldId: 'ff:0.1', fieldLabel: 'Preferred location', value: 'Berlin, Germany', choiceType: 'select' },
         {
           kind: 'toggle',
+          fieldId: 'ff:0.2',
           label: 'Share my profile for future roles',
           checked: true,
           controlType: 'checkbox',
@@ -450,11 +573,84 @@ describe('batch MCP result shaping', () => {
     })
     expect(payload).not.toHaveProperty('steps')
   })
+
+  it('can auto-connect inside fill_form for known-label one-turn flows', async () => {
+    const handler = getToolHandler('geometra_fill_form')
+    mockState.sendFillFields.mockResolvedValueOnce({
+      status: 'acknowledged',
+      timeoutMs: 6000,
+      result: {
+        pageUrl: 'https://jobs.example.com/application',
+        invalidCount: 0,
+        alertCount: 0,
+        dialogCount: 0,
+        busyCount: 0,
+      },
+    })
+    mockState.formSchemas = [
+      {
+        formId: 'fm:0',
+        name: 'Application',
+        fieldCount: 2,
+        requiredCount: 2,
+        invalidCount: 0,
+        fields: [
+          { id: 'ff:0.0', kind: 'text', label: 'Full name', required: true },
+          { id: 'ff:0.1', kind: 'choice', label: 'Are you legally authorized to work in Germany?', choiceType: 'group', booleanChoice: true, optionCount: 2 },
+        ],
+      },
+    ]
+
+    const result = await handler({
+      pageUrl: 'https://jobs.example.com/application',
+      headless: true,
+      valuesByLabel: {
+        'Full name': 'Taylor Applicant',
+        'Are you legally authorized to work in Germany?': true,
+      },
+      includeSteps: false,
+      detail: 'minimal',
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    expect(mockState.connectThroughProxy).toHaveBeenCalledWith({
+      pageUrl: 'https://jobs.example.com/application',
+      port: undefined,
+      headless: true,
+      width: undefined,
+      height: undefined,
+      slowMo: undefined,
+      awaitInitialFrame: false,
+    })
+    expect(mockState.sendFillFields).toHaveBeenCalledWith(
+      mockState.session,
+      [
+        { kind: 'auto', fieldLabel: 'Full name', value: 'Taylor Applicant' },
+        { kind: 'auto', fieldLabel: 'Are you legally authorized to work in Germany?', value: true },
+      ],
+    )
+    expect(payload).toMatchObject({
+      autoConnected: true,
+      transport: 'proxy',
+      pageUrl: 'https://jobs.example.com/application',
+      completed: true,
+      execution: 'batched-direct',
+      finalSource: 'proxy',
+      fieldCount: 2,
+      successCount: 2,
+      errorCount: 0,
+      final: {
+        invalidCount: 0,
+        alertCount: 0,
+      },
+    })
+  })
 })
 
 describe('query and reveal tools', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    resetMockSessionCaches()
   })
 
   it('lets query disambiguate repeated controls by context text', async () => {
@@ -557,14 +753,14 @@ describe('query and reveal tools', () => {
       mockState.session,
       'Full name',
       'Taylor Applicant',
-      { exact: undefined },
+      { exact: undefined, fieldId: 'ff:0.0' },
       undefined,
     )
     expect(mockState.sendFieldChoice).toHaveBeenCalledWith(
       mockState.session,
       'Preferred location',
       'Berlin, Germany',
-      { exact: undefined, query: undefined, choiceType: 'select' },
+      { exact: undefined, query: undefined, choiceType: 'select', fieldId: 'ff:0.1' },
       undefined,
     )
     expect(payload).toMatchObject({
@@ -615,6 +811,7 @@ describe('query and reveal tools', () => {
           }),
         ],
       })
+      bumpMockUiRevision()
       return { status: 'updated' as const, timeoutMs: 2500 }
     })
 

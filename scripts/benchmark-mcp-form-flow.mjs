@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Compare semantic form workflows:
- * - Geometra MCP: connect + form_schema + fill_form
+ * - Geometra MCP: fill_form(auto-connect, known labels)
  * - Playwright MCP style: navigate + aria snapshot + browser_run_code
  *
  * This measures model-facing payload size (tool inputs + outputs), tool turns, and wall-clock time.
@@ -231,12 +231,13 @@ function withApproxTokens(totals) {
 async function startStaticServer(filePath) {
   const html = await readFile(filePath, 'utf8')
   const server = http.createServer((req, res) => {
-    if (req.url === '/' || req.url === '/index.html') {
+    const pathname = new URL(req.url ?? '/', 'http://127.0.0.1').pathname
+    if (pathname === '/' || pathname === '/index.html') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
       res.end(html)
       return
     }
-    if (req.url === '/favicon.ico') {
+    if (pathname === '/favicon.ico') {
       res.writeHead(204)
       res.end()
       return
@@ -296,65 +297,69 @@ function scenarioStepsToProxyFields(steps) {
   })
 }
 
+function variantUrl(rawUrl, variant) {
+  const next = new URL(rawUrl)
+  next.searchParams.set('bench', variant)
+  return next.toString()
+}
+
 async function runGeometraFlow(url, createServer, scenario) {
   const server = createServer()
-  const connect = getToolHandler(server, 'geometra_connect')
   const disconnect = getToolHandler(server, 'geometra_disconnect')
-  const formSchema = getToolHandler(server, 'geometra_form_schema')
   const fillForm = getToolHandler(server, 'geometra_fill_form')
-
-  let connected = false
+  const warmUrl = variantUrl(url, 'warm')
+  let browserOpen = false
   try {
-    const connectStep = await invokeTool(connect, 'geometra_connect', {
+    const fillStep = await invokeTool(fillForm, 'geometra_fill_form', {
       pageUrl: url,
       port: 0,
       headless: true,
       width: VIEWPORT.width,
       height: VIEWPORT.height,
-      detail: 'minimal',
-    })
-    if (/^Failed to connect:/i.test(connectStep.outputText)) {
-      throw new Error(connectStep.outputText)
-    }
-    connected = true
-
-    const formSchemaStep = await invokeTool(formSchema, 'geometra_form_schema', {})
-    if (!formSchemaStep.outputText.startsWith('{')) {
-      throw new Error(`geometra_form_schema failed: ${formSchemaStep.outputText}`)
-    }
-    const formSchemaPayload = JSON.parse(formSchemaStep.outputText)
-    const form = formSchemaPayload.forms?.[0]
-    if (!form?.formId) throw new Error('Geometra form schema did not return a form id')
-
-    const fieldIdsByLabel = Object.fromEntries(form.fields.map(field => [field.label, field.id]))
-    const valuesByLabel = scenarioValuesByLabel(scenario)
-    const missingLabels = Object.keys(valuesByLabel).filter(label => !fieldIdsByLabel[label])
-    if (missingLabels.length > 0) {
-      throw new Error(`Scenario ${scenario.id} is missing form schema labels: ${missingLabels.join(', ')}`)
-    }
-
-    const fillStep = await invokeTool(fillForm, 'geometra_fill_form', {
-      formId: form.formId,
-      valuesById: Object.fromEntries(
-        Object.entries(valuesByLabel).map(([label, value]) => [fieldIdsByLabel[label], value]),
-      ),
+      valuesByLabel: scenarioValuesByLabel(scenario),
       includeSteps: false,
       detail: 'minimal',
       failOnInvalid: true,
     })
+    if (!fillStep.outputText.startsWith('{')) {
+      throw new Error(`geometra_fill_form failed: ${fillStep.outputText}`)
+    }
+    browserOpen = true
 
     const fillPayload = JSON.parse(fillStep.outputText)
+    await disconnect({})
+
+    const warmStep = await invokeTool(fillForm, 'geometra_fill_form', {
+      pageUrl: warmUrl,
+      port: 0,
+      headless: true,
+      width: VIEWPORT.width,
+      height: VIEWPORT.height,
+      valuesByLabel: scenarioValuesByLabel(scenario),
+      includeSteps: false,
+      detail: 'minimal',
+      failOnInvalid: true,
+    })
+    if (!warmStep.outputText.startsWith('{')) {
+      throw new Error(`warm geometra_fill_form failed: ${warmStep.outputText}`)
+    }
+
+    const warmPayload = JSON.parse(warmStep.outputText)
 
     return {
-      steps: [connectStep, formSchemaStep, fillStep],
-      semanticSteps: [formSchemaStep, fillStep],
+      steps: [fillStep],
+      semanticSteps: [fillStep],
       fillPayload,
-      formId: form.formId,
+      warm: {
+        url: warmUrl,
+        step: warmStep,
+        fillPayload: warmPayload,
+      },
     }
   } finally {
-    if (connected) {
+    if (browserOpen) {
       try {
-        await disconnect({})
+        await disconnect({ closeBrowser: true })
       } catch {
         /* best effort cleanup */
       }
@@ -522,11 +527,6 @@ function assertBenchmark(geometra, playwright, scenario) {
       `[${scenario.id}] Expected Playwright to finish with invalidCount=0, received ${String(playwrightInvalidCount ?? 'unknown')}.`,
     )
   }
-  if (geometra.steps[1].outputBytes >= playwright.steps[1].outputBytes) {
-    failures.push(
-      `[${scenario.id}] Expected geometra_form_schema output (${geometra.steps[1].outputBytes} B) to be smaller than the Playwright snapshot (${playwright.steps[1].outputBytes} B).`,
-    )
-  }
   if (geometraSemanticTotals.totalBytes >= playwrightSemanticTotals.totalBytes) {
     failures.push(
       `[${scenario.id}] Expected Geometra semantic flow (${geometraSemanticTotals.totalBytes} B) to beat Playwright (${playwrightSemanticTotals.totalBytes} B).`,
@@ -574,6 +574,9 @@ async function runScenario(scenario, createServer, proxyFillFields, assert) {
     printTotals('Geometra end-to-end', geometraTotals)
     printTotals('Playwright-style end-to-end', playwrightTotals)
     console.log(
+      `Geometra warm reuse runtime: ${geometra.warm.step.elapsedMs.toFixed(1)} ms on ${geometra.warm.url}`,
+    )
+    console.log(
       `Playwright-style cold start: ${playwright.launchMs.toFixed(1)} ms browser launch + page setup (not counted in model-facing bytes/turns)`,
     )
     console.log(
@@ -588,13 +591,16 @@ async function runScenario(scenario, createServer, proxyFillFields, assert) {
 
     console.log('\nKey payloads')
     console.log(
-      `Geometra form_schema output: ${geometra.steps[1].outputBytes} B (~${approxTokens(geometra.steps[1].outputBytes)} tokens)`,
+      `Geometra fill_form input: ${geometra.steps[0].inputBytes} B (~${approxTokens(geometra.steps[0].inputBytes)} tokens), autoConnected=${geometra.fillPayload.autoConnected === true}`,
     )
     console.log(
       `Playwright aria snapshot output: ${playwright.steps[1].outputBytes} B (~${approxTokens(playwright.steps[1].outputBytes)} tokens)`,
     )
     console.log(
-      `Geometra fill_form output: ${geometra.steps[2].outputBytes} B (~${approxTokens(geometra.steps[2].outputBytes)} tokens), invalidCount=${geometra.fillPayload.final?.invalidCount ?? 'n/a'}`,
+      `Geometra fill_form output: ${geometra.steps[0].outputBytes} B (~${approxTokens(geometra.steps[0].outputBytes)} tokens), invalidCount=${geometra.fillPayload.final?.invalidCount ?? 'n/a'}`,
+    )
+    console.log(
+      `Geometra warm fill_form output: ${geometra.warm.step.outputBytes} B (~${approxTokens(geometra.warm.step.outputBytes)} tokens), invalidCount=${geometra.warm.fillPayload.final?.invalidCount ?? 'n/a'}`,
     )
     console.log(`Geometra fill_form execution: ${geometra.fillPayload.execution ?? 'unknown'}`)
     console.log(

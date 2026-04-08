@@ -132,8 +132,7 @@ async function main(): Promise<void> {
   if (slowMo > 0) launchOpts.slowMo = slowMo
 
   const browser = await chromium.launch(launchOpts)
-  const page = await browser.newPage()
-  await page.setViewportSize({ width, height })
+  const page = await browser.newPage({ viewport: { width, height } })
 
   let listeningWsUrl = port === 0 ? '' : `ws://127.0.0.1:${port}`
   let resolveListening: ((wsUrl: string) => void) | undefined
@@ -172,9 +171,9 @@ async function main(): Promise<void> {
 
   const navigation = page.goto(url, { waitUntil: 'domcontentloaded' })
   const wsUrl = await listeningPromise
+  await navigation
   console.error(`[geometra-proxy] Ready. Connect MCP with geometra_connect({ url: "${wsUrl}" })`)
   emitReadySignal(wsUrl, url)
-  await navigation
   await hub.flushExtract()
   await installDomObserver(page, hub.scheduleExtract)
   page.on('domcontentloaded', () => {

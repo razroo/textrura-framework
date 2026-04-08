@@ -166,7 +166,11 @@ That keeps multi-step flows smaller than repeatedly asking for a full fresh snap
 
 `geometra_fill_form` is the preferred primitive when the task is “apply these values to this form”.
 
-Use `geometra_form_schema` first, then send either:
+If you already know the field labels and values, the lowest-token path is:
+
+- `geometra_fill_form({ pageUrl, valuesByLabel, includeSteps: false, detail: "minimal" })`
+
+Use `geometra_form_schema` first when you still need discovery, then send either:
 
 - `valuesById` for maximum stability
 - `valuesByLabel` when labels are unique enough
@@ -216,16 +220,17 @@ This is the preferred path for “bring Submit into view”, “jump to the next
 
 For most DOM-heavy pages, the best order is:
 
-1. `geometra_connect`
-2. `geometra_form_schema` when the page is clearly a form you intend to fill
-3. `geometra_fill_form` for the lowest-token happy path
-4. `geometra_page_model` when you still need broader page orientation
-5. `geometra_expand_section` for one important section if needed
-6. `geometra_query` or `geometra_wait_for`
-7. `geometra_reveal` when the target is offscreen
-8. `geometra_fill_fields` when you need field-level control instead of schema-driven values
-9. `geometra_run_actions` for predictable mixed flows, otherwise a single action tool (`geometra_click`, `geometra_type`, etc.)
-10. consume the returned semantic delta / terse state summary
+1. `geometra_fill_form({ pageUrl, valuesByLabel })` when the page is clearly a known form and you already have the answers
+2. otherwise `geometra_connect`
+3. `geometra_form_schema` when the page is clearly a form you intend to fill
+4. `geometra_fill_form` for the lowest-token happy path after discovery
+5. `geometra_page_model` when you still need broader page orientation
+6. `geometra_expand_section` for one important section if needed
+7. `geometra_query` or `geometra_wait_for`
+8. `geometra_reveal` when the target is offscreen
+9. `geometra_fill_fields` when you need field-level control instead of schema-driven values
+10. `geometra_run_actions` for predictable mixed flows, otherwise a single action tool (`geometra_click`, `geometra_type`, etc.)
+11. consume the returned semantic delta / terse state summary
 
 Use `geometra_snapshot` compact when:
 
@@ -239,11 +244,12 @@ Action tools default to terse summaries. Use `detail: "verbose"` when you need a
 
 For the lowest-token batch pattern:
 
-1. `geometra_form_schema`
-2. `geometra_fill_form`
-3. `detail: "minimal"`
-4. `includeSteps: false`
-5. inspect the returned `final.invalidCount`, `final.alertCount`, and any sampled `invalidFields`
+1. if labels are already known: `geometra_fill_form({ pageUrl, valuesByLabel, detail: "minimal", includeSteps: false })`
+2. otherwise `geometra_form_schema`
+3. then `geometra_fill_form`
+4. `detail: "minimal"`
+5. `includeSteps: false`
+6. inspect the returned `final.invalidCount`, `final.alertCount`, and any sampled `invalidFields`
 
 If you need direct field-level control instead of schema-driven ids:
 
