@@ -11,6 +11,16 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
   const SKIP_TAGS = new Set(['script', 'style', 'noscript', 'template'])
   const LEAF_FORM_TAGS = new Set(['input', 'textarea', 'select'])
 
+  function textWithoutNestedControls(node: Node): string {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? ''
+    if (!(node instanceof Element)) return ''
+    const tag = node.tagName.toLowerCase()
+    if (LEAF_FORM_TAGS.has(tag) || tag === 'button') return ''
+    let out = ''
+    for (const child of node.childNodes) out += textWithoutNestedControls(child)
+    return out
+  }
+
   function getAccessibleName(el: Element): string | undefined {
     const aria = el.getAttribute('aria-label')
     if (aria) return aria.trim() || undefined
@@ -23,7 +33,7 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
       el.labels &&
       el.labels.length > 0
     ) {
-      const t = el.labels[0]!.textContent?.trim()
+      const t = textWithoutNestedControls(el.labels[0]!).replace(/\s+/g, ' ').trim()
       if (t) return t
     }
     const ph = el.getAttribute('placeholder')

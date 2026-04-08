@@ -38,6 +38,9 @@ const mockState = vi.hoisted(() => ({
     url: 'ws://127.0.0.1:3200',
     updateRevision: 1,
   },
+  formSchemas: [] as Array<Record<string, unknown>>,
+  connect: vi.fn(),
+  connectThroughProxy: vi.fn(),
   sendClick: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 2000 })),
   sendType: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 2000 })),
   sendKey: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 2000 })),
@@ -52,8 +55,8 @@ const mockState = vi.hoisted(() => ({
 }))
 
 vi.mock('../session.js', () => ({
-  connect: vi.fn(),
-  connectThroughProxy: vi.fn(),
+  connect: mockState.connect,
+  connectThroughProxy: mockState.connectThroughProxy,
   disconnect: vi.fn(),
   getSession: vi.fn(() => mockState.session),
   sendClick: mockState.sendClick,
@@ -78,6 +81,7 @@ vi.mock('../session.js', () => ({
     dialogs: [],
     lists: [],
   })),
+  buildFormSchemas: vi.fn(() => mockState.formSchemas),
   expandPageSection: vi.fn(() => null),
   buildUiDelta: vi.fn(() => ({})),
   hasUiDelta: vi.fn(() => false),
@@ -100,6 +104,9 @@ function getToolHandler(name: string) {
 describe('batch MCP result shaping', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockState.connect.mockResolvedValue(mockState.session)
+    mockState.connectThroughProxy.mockResolvedValue(mockState.session)
+    mockState.formSchemas = []
     mockState.currentA11yRoot = node('group', undefined, {
       meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 420 },
       children: [
@@ -233,6 +240,126 @@ describe('batch MCP result shaping', () => {
     })
     expect((final.invalidFields as unknown[]).length).toBe(4)
     expect((final.alerts as unknown[]).length).toBe(1)
+  })
+
+  it('returns a compact structured connect payload by default', async () => {
+    const handler = getToolHandler('geometra_connect')
+
+    const result = await handler({
+      pageUrl: 'https://jobs.example.com/application',
+      headless: true,
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    expect(payload).toMatchObject({
+      connected: true,
+      transport: 'proxy',
+      wsUrl: 'ws://127.0.0.1:3200',
+      pageUrl: 'https://jobs.example.com/application',
+    })
+    expect(payload).not.toHaveProperty('currentUi')
+  })
+
+  it('returns compact form schemas without requiring section expansion', async () => {
+    const handler = getToolHandler('geometra_form_schema')
+    mockState.formSchemas = [
+      {
+        formId: 'fm:0',
+        name: 'Application',
+        fieldCount: 4,
+        requiredCount: 3,
+        invalidCount: 0,
+        fields: [
+          { id: 'ff:0.0', kind: 'text', label: 'Full name', required: true },
+          { id: 'ff:0.1', kind: 'choice', label: 'Preferred location', required: true },
+          { id: 'ff:0.2', kind: 'choice', label: 'Are you legally authorized to work in Germany?', options: ['Yes', 'No'], optionCount: 2 },
+          { id: 'ff:0.3', kind: 'toggle', label: 'Share my profile for future roles', controlType: 'checkbox' },
+        ],
+      },
+    ]
+
+    const result = await handler({ maxFields: 20 })
+    const payload = JSON.parse(result.content[0]!.text) as { forms: Array<Record<string, unknown>> }
+
+    expect(payload.forms).toEqual([
+      expect.objectContaining({
+        formId: 'fm:0',
+        fieldCount: 4,
+        requiredCount: 3,
+        invalidCount: 0,
+      }),
+    ])
+  })
+
+  it('fills a form from ids and labels without echoing long essay content', async () => {
+    const longAnswer = 'B'.repeat(220)
+    const handler = getToolHandler('geometra_fill_form')
+    mockState.formSchemas = [
+      {
+        formId: 'fm:0',
+        name: 'Application',
+        fieldCount: 4,
+        requiredCount: 3,
+        invalidCount: 0,
+        fields: [
+          { id: 'ff:0.0', kind: 'text', label: 'Full name', required: true },
+          { id: 'ff:0.1', kind: 'choice', label: 'Are you legally authorized to work in Germany?', options: ['Yes', 'No'], optionCount: 2 },
+          { id: 'ff:0.2', kind: 'toggle', label: 'Share my profile for future roles', controlType: 'checkbox' },
+          { id: 'ff:0.3', kind: 'text', label: 'Why Geometra?' },
+        ],
+      },
+    ]
+    mockState.currentA11yRoot = node('group', undefined, {
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 640 },
+      children: [
+        node('textbox', 'Full name', { value: 'Taylor Applicant', path: [0] }),
+        node('textbox', 'Why Geometra?', { value: longAnswer, path: [1] }),
+        node('checkbox', 'Share my profile for future roles', {
+          path: [2],
+          state: { checked: true },
+        }),
+      ],
+    })
+
+    const result = await handler({
+      valuesById: {
+        'ff:0.0': 'Taylor Applicant',
+      },
+      valuesByLabel: {
+        'Are you legally authorized to work in Germany?': true,
+        'Share my profile for future roles': true,
+        'Why Geometra?': longAnswer,
+      },
+      includeSteps: true,
+      detail: 'minimal',
+    })
+
+    const text = result.content[0]!.text
+    const payload = JSON.parse(text) as Record<string, unknown>
+    const steps = payload.steps as Array<Record<string, unknown>>
+
+    expect(text).not.toContain(longAnswer)
+    expect(mockState.sendFieldChoice).toHaveBeenCalledWith(
+      mockState.session,
+      'Are you legally authorized to work in Germany?',
+      'Yes',
+      { exact: undefined, query: undefined },
+      undefined,
+    )
+    expect(payload).toMatchObject({
+      completed: true,
+      formId: 'fm:0',
+      requestedValueCount: 4,
+      fieldCount: 4,
+      successCount: 4,
+      errorCount: 0,
+    })
+    expect(steps[3]).toMatchObject({
+      kind: 'text',
+      fieldLabel: 'Why Geometra?',
+      valueLength: 220,
+      readback: { role: 'textbox', valueLength: 220 },
+    })
   })
 })
 

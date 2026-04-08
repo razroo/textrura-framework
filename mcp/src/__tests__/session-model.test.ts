@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildA11yTree,
   buildCompactUiIndex,
+  buildFormSchemas,
   buildPageModel,
   expandPageSection,
   buildUiDelta,
@@ -279,6 +280,140 @@ describe('buildPageModel', () => {
 
     expect(model.forms[0]?.id).toBe('fm:0')
     expect(model.forms[0]?.name).toBeUndefined()
+  })
+})
+
+describe('buildFormSchemas', () => {
+  it('builds a compact fill-oriented schema and collapses repeated answer groups', () => {
+    const longEssay = 'Semantic browser automation should be reliable, compact, and predictable across large forms.'
+    const tree = node('group', undefined, { x: 0, y: 0, width: 1024, height: 768 }, {
+      children: [
+        node('form', 'Application', { x: 32, y: 32, width: 760, height: 1500 }, {
+          path: [0],
+          children: [
+            node('textbox', 'Full name', { x: 48, y: 120, width: 320, height: 36 }, {
+              path: [0, 0],
+              state: { required: true },
+            }),
+            node('combobox', 'Preferred location', { x: 48, y: 180, width: 320, height: 36 }, {
+              path: [0, 1],
+              state: { required: true },
+              value: 'Berlin, Germany',
+            }),
+            node('group', undefined, { x: 40, y: 260, width: 520, height: 96 }, {
+              path: [0, 2],
+              children: [
+                node('text', 'Are you legally authorized to work in Germany?', { x: 48, y: 260, width: 360, height: 24 }, {
+                  path: [0, 2, 0],
+                }),
+                node('button', 'Yes', { x: 48, y: 300, width: 88, height: 40 }, {
+                  path: [0, 2, 1],
+                  focusable: true,
+                  state: { required: true },
+                }),
+                node('button', 'No', { x: 148, y: 300, width: 88, height: 40 }, {
+                  path: [0, 2, 2],
+                  focusable: true,
+                }),
+              ],
+            }),
+            node('checkbox', 'Share my profile for future roles', { x: 48, y: 400, width: 24, height: 24 }, {
+              path: [0, 3],
+              focusable: true,
+              state: { checked: true },
+            }),
+            node('textbox', 'Why Geometra?', { x: 48, y: 480, width: 520, height: 180 }, {
+              path: [0, 4],
+              state: { required: true, invalid: true },
+              validation: { error: 'Please enter at least 40 characters.' },
+              value: longEssay,
+            }),
+          ],
+        }),
+      ],
+    })
+
+    const schemas = buildFormSchemas(tree)
+
+    expect(schemas).toHaveLength(1)
+    expect(schemas[0]).toMatchObject({
+      formId: 'fm:0',
+      name: 'Application',
+      fieldCount: 5,
+      requiredCount: 4,
+      invalidCount: 1,
+    })
+    expect(schemas[0]?.fields).toEqual([
+      expect.objectContaining({
+        kind: 'text',
+        label: 'Full name',
+        required: true,
+      }),
+      expect.objectContaining({
+        kind: 'choice',
+        label: 'Preferred location',
+        required: true,
+        value: 'Berlin, Germany',
+      }),
+      expect.objectContaining({
+        kind: 'choice',
+        label: 'Are you legally authorized to work in Germany?',
+        required: true,
+        optionCount: 2,
+        options: ['Yes', 'No'],
+      }),
+      expect.objectContaining({
+        kind: 'toggle',
+        label: 'Share my profile for future roles',
+        checked: true,
+        controlType: 'checkbox',
+      }),
+      expect.objectContaining({
+        kind: 'text',
+        label: 'Why Geometra?',
+        required: true,
+        invalid: true,
+        valueLength: longEssay.length,
+      }),
+    ])
+  })
+
+  it('prefers question prompts over nearby explanatory copy for grouped choices', () => {
+    const tree = node('group', undefined, { x: 0, y: 0, width: 900, height: 700 }, {
+      children: [
+        node('form', 'Application', { x: 20, y: 20, width: 760, height: 480 }, {
+          path: [0],
+          children: [
+            node('group', undefined, { x: 32, y: 80, width: 520, height: 120 }, {
+              path: [0, 0],
+              children: [
+                node('text', 'Will you now or in the future require sponsorship?', { x: 40, y: 80, width: 420, height: 24 }, {
+                  path: [0, 0, 0],
+                }),
+                node('text', 'This intentionally repeats Yes / No labels to test contextual disambiguation.', { x: 40, y: 112, width: 520, height: 24 }, {
+                  path: [0, 0, 1],
+                }),
+                node('button', 'Yes', { x: 40, y: 152, width: 88, height: 40 }, {
+                  path: [0, 0, 2],
+                  focusable: true,
+                }),
+                node('button', 'No', { x: 140, y: 152, width: 88, height: 40 }, {
+                  path: [0, 0, 3],
+                  focusable: true,
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+    })
+
+    const schema = buildFormSchemas(tree)[0]
+    expect(schema?.fields[0]).toMatchObject({
+      kind: 'choice',
+      label: 'Will you now or in the future require sponsorship?',
+      options: ['Yes', 'No'],
+    })
   })
 })
 

@@ -19,6 +19,7 @@ import {
   buildA11yTree,
   buildCompactUiIndex,
   buildPageModel,
+  buildFormSchemas,
   expandPageSection,
   buildUiDelta,
   hasUiDelta,
@@ -28,7 +29,7 @@ import {
   summarizeUiDelta,
   waitForUiCondition,
 } from './session.js'
-import type { A11yNode, Session, UpdateWaitResult } from './session.js'
+import type { A11yNode, FormSchemaField, FormSchemaModel, Session, UpdateWaitResult } from './session.js'
 
 type NodeStateFilterValue = boolean | 'mixed'
 type ResponseDetail = 'minimal' | 'verbose'
@@ -156,6 +157,14 @@ const fillFieldSchema = z.discriminatedUnion('kind', [
 
 type FillFieldInput = z.infer<typeof fillFieldSchema>
 
+const formValueSchema = z.union([
+  z.string(),
+  z.boolean(),
+  z.array(z.string()).min(1),
+])
+
+type FormValueInput = z.infer<typeof formValueSchema>
+
 const batchActionSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('click'),
@@ -240,7 +249,7 @@ type BatchAction = z.infer<typeof batchActionSchema>
 
 export function createServer(): McpServer {
   const server = new McpServer(
-    { name: 'geometra', version: '1.19.11' },
+    { name: 'geometra', version: '1.19.13' },
     { capabilities: { tools: {} } },
   )
 
@@ -288,6 +297,7 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
         .nonnegative()
         .optional()
         .describe('Playwright slowMo (ms) on spawned proxy for easier visual following.'),
+      detail: detailInput(),
     },
     async input => {
       const normalized = normalizeConnectTarget({ url: input.url, pageUrl: input.pageUrl })
@@ -304,15 +314,20 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
             height: input.height,
             slowMo: input.slowMo,
           })
-          const summary = compactSessionSummary(session)
-          const inferred = target.autoCoercedFromUrl ? ' inferred from url input' : ''
-          return ok(
-            `Started geometra-proxy and connected at ${session.url} (page: ${target.pageUrl}${inferred}). UI state:\n${summary}`,
-          )
+          return ok(JSON.stringify(connectPayload(session, {
+            transport: 'proxy',
+            requestedPageUrl: target.pageUrl,
+            autoCoercedFromUrl: target.autoCoercedFromUrl,
+            detail: input.detail,
+          }), null, input.detail === 'verbose' ? 2 : undefined))
         }
         const session = await connect(target.wsUrl!)
-        const summary = compactSessionSummary(session)
-        return ok(`Connected to ${target.wsUrl}. UI state:\n${summary}`)
+        return ok(JSON.stringify(connectPayload(session, {
+          transport: 'ws',
+          requestedWsUrl: target.wsUrl,
+          autoCoercedFromUrl: false,
+          detail: input.detail,
+        }), null, input.detail === 'verbose' ? 2 : undefined))
       } catch (e) {
         return err(`Failed to connect: ${formatConnectFailureMessage(e, target)}`)
       }
@@ -494,6 +509,94 @@ Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / combo
   )
 
   server.tool(
+    'geometra_fill_form',
+    `Fill a form from a compact values object instead of expanding sections first. This is the lowest-token happy path for standard application flows.
+
+Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most stable matching, or \`valuesByLabel\` when labels are unique enough. MCP resolves the form schema, executes the semantic field operations server-side, and returns one consolidated result.`,
+    {
+      formId: z.string().optional().describe('Optional form id from geometra_form_schema or geometra_page_model'),
+      valuesById: z.record(formValueSchema).optional().describe('Form values keyed by stable field id from geometra_form_schema'),
+      valuesByLabel: z.record(formValueSchema).optional().describe('Form values keyed by schema field label'),
+      stopOnError: z.boolean().optional().default(true).describe('Stop at the first failing field (default true)'),
+      failOnInvalid: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('Return an error if invalid fields remain after filling'),
+      includeSteps: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('Include per-field step results in the JSON payload (default false for the smallest response)'),
+      detail: detailInput(),
+    },
+    async ({ formId, valuesById, valuesByLabel, stopOnError, failOnInvalid, includeSteps, detail }) => {
+      const session = getSession()
+      if (!session) return err('Not connected. Call geometra_connect first.')
+
+      const entryCount = Object.keys(valuesById ?? {}).length + Object.keys(valuesByLabel ?? {}).length
+      if (entryCount === 0) {
+        return err('Provide at least one value in valuesById or valuesByLabel')
+      }
+
+      const afterConnect = sessionA11y(session)
+      if (!afterConnect) return err('No UI tree available for form filling')
+      const schemas = buildFormSchemas(afterConnect)
+      if (schemas.length === 0) return err('No forms found in the current UI')
+
+      const resolution = resolveTargetFormSchema(schemas, { formId, valuesById, valuesByLabel })
+      if (!resolution.ok) return err(resolution.error)
+      const schema = resolution.schema
+
+      const planned = planFormFill(schema, { valuesById, valuesByLabel })
+      if (!planned.ok) return err(planned.error)
+
+      const steps: Array<Record<string, unknown>> = []
+      let stoppedAt: number | undefined
+
+      for (let index = 0; index < planned.fields.length; index++) {
+        const field = planned.fields[index]!
+        try {
+          const result = await executeFillField(session, field, detail)
+          steps.push(detail === 'verbose'
+            ? { index, kind: field.kind, ok: true, summary: result.summary }
+            : { index, kind: field.kind, ok: true, ...result.compact })
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e)
+          steps.push({ index, kind: field.kind, ok: false, error: message })
+          if (stopOnError) {
+            stoppedAt = index
+            break
+          }
+        }
+      }
+
+      const after = sessionA11y(session)
+      const signals = after ? collectSessionSignals(after) : undefined
+      const invalidRemaining = signals?.invalidFields.length ?? 0
+      const successCount = steps.filter(step => step.ok === true).length
+      const errorCount = steps.length - successCount
+      const payload = {
+        completed: stoppedAt === undefined && steps.length === planned.fields.length,
+        formId: schema.formId,
+        requestedValueCount: entryCount,
+        fieldCount: planned.fields.length,
+        successCount,
+        errorCount,
+        ...(includeSteps ? { steps } : {}),
+        ...(stoppedAt !== undefined ? { stoppedAt } : {}),
+        ...(signals ? { final: sessionSignalsPayload(signals, detail) } : {}),
+      }
+
+      if (failOnInvalid && invalidRemaining > 0) {
+        return err(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
+      }
+
+      return ok(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
+    }
+  )
+
+  server.tool(
     'geometra_run_actions',
     `Execute several Geometra actions in one MCP round trip and return one consolidated result. This is the preferred path for long, multi-step form fills where one-tool-per-field would otherwise create too much chatter.
 
@@ -579,6 +682,35 @@ Use this first on normal HTML pages when you want to understand the page shape w
       const a11y = buildA11yTree(session.tree, session.layout)
       const model = buildPageModel(a11y, { maxPrimaryActions, maxSectionsPerKind })
       return ok(JSON.stringify(model))
+    }
+  )
+
+  server.tool(
+    'geometra_form_schema',
+    `Get a compact, fill-oriented schema for forms on the page. This is the preferred discovery step before geometra_fill_form.
+
+Unlike geometra_expand_section, this collapses repeated radio/button groups into single logical fields, keeps output compact, and omits layout-heavy detail by default.`,
+    {
+      formId: z.string().optional().describe('Optional form id from geometra_page_model. If omitted, returns every form schema on the page.'),
+      maxFields: z.number().int().min(1).max(120).optional().default(80).describe('Cap returned fields per form'),
+      onlyRequiredFields: z.boolean().optional().default(false).describe('Only include required fields'),
+      onlyInvalidFields: z.boolean().optional().default(false).describe('Only include invalid fields'),
+    },
+    async ({ formId, maxFields, onlyRequiredFields, onlyInvalidFields }) => {
+      const session = getSession()
+      if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
+
+      const a11y = buildA11yTree(session.tree, session.layout)
+      const forms = buildFormSchemas(a11y, {
+        formId,
+        maxFields,
+        onlyRequiredFields,
+        onlyInvalidFields,
+      })
+      if (forms.length === 0) {
+        return err(formId ? `No form schema found for id ${formId}` : 'No forms found in the current UI')
+      }
+      return ok(JSON.stringify({ forms }))
     }
   )
 
@@ -1100,6 +1232,28 @@ function compactSessionSummary(session: Session): string {
   return sessionOverviewFromA11y(a11y)
 }
 
+function connectPayload(
+  session: Session,
+  opts: {
+    transport: 'proxy' | 'ws'
+    requestedPageUrl?: string
+    requestedWsUrl?: string
+    autoCoercedFromUrl?: boolean
+    detail?: ResponseDetail
+  },
+): Record<string, unknown> {
+  const a11y = sessionA11y(session)
+  return {
+    connected: true,
+    transport: opts.transport,
+    wsUrl: session.url,
+    ...(a11y?.meta?.pageUrl || opts.requestedPageUrl ? { pageUrl: a11y?.meta?.pageUrl ?? opts.requestedPageUrl } : {}),
+    ...(opts.requestedWsUrl ? { requestedWsUrl: opts.requestedWsUrl } : {}),
+    ...(opts.autoCoercedFromUrl ? { autoCoercedFromUrl: true } : {}),
+    ...(opts.detail === 'verbose' && a11y ? { currentUi: sessionOverviewFromA11y(a11y) } : {}),
+  }
+}
+
 function sessionA11y(session: Session): A11yNode | null {
   if (!session.tree || !session.layout) return null
   return buildA11yTree(session.tree, session.layout)
@@ -1342,6 +1496,134 @@ function waitStatusPayload(wait: UpdateWaitResult | undefined): Record<string, u
 
 function compactFilterPayload(filter: NodeFilter): Record<string, unknown> {
   return Object.fromEntries(Object.entries(filter).filter(([, value]) => value !== undefined))
+}
+
+function normalizeLookupKey(value: string): string {
+  return value.replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+function resolveTargetFormSchema(
+  schemas: FormSchemaModel[],
+  opts: {
+    formId?: string
+    valuesById?: Record<string, FormValueInput>
+    valuesByLabel?: Record<string, FormValueInput>
+  },
+): { ok: true; schema: FormSchemaModel } | { ok: false; error: string } {
+  if (opts.formId) {
+    const matched = schemas.find(schema => schema.formId === opts.formId)
+    return matched
+      ? { ok: true, schema: matched }
+      : { ok: false, error: `No form schema found for id ${opts.formId}` }
+  }
+
+  if (schemas.length === 1) return { ok: true, schema: schemas[0]! }
+
+  const idKeys = Object.keys(opts.valuesById ?? {})
+  const labelKeys = Object.keys(opts.valuesByLabel ?? {}).map(normalizeLookupKey)
+  const matches = schemas.filter(schema => {
+    const ids = new Set(schema.fields.map(field => field.id))
+    const labels = new Set(schema.fields.map(field => normalizeLookupKey(field.label)))
+    return idKeys.every(id => ids.has(id)) && labelKeys.every(label => labels.has(label))
+  })
+
+  if (matches.length === 1) return { ok: true, schema: matches[0]! }
+  if (matches.length === 0) {
+    return {
+      ok: false,
+      error: 'Could not infer which form to fill from the provided field ids/labels. Pass formId from geometra_form_schema.',
+    }
+  }
+  return {
+    ok: false,
+    error: 'Multiple forms match the provided field ids/labels. Pass formId from geometra_form_schema.',
+  }
+}
+
+function coerceChoiceValue(field: FormSchemaField, value: FormValueInput): string | null {
+  if (typeof value === 'string') return value
+  if (typeof value !== 'boolean') return null
+  const desired = value ? 'yes' : 'no'
+  const option = field.options?.find(option => normalizeLookupKey(option) === desired)
+  return option ?? (value ? 'Yes' : 'No')
+}
+
+function plannedFillInputsForField(field: FormSchemaField, value: FormValueInput): FillFieldInput[] | { error: string } {
+  if (field.kind === 'text') {
+    if (typeof value !== 'string') return { error: `Field "${field.label}" expects a string value` }
+    return [{ kind: 'text', fieldLabel: field.label, value }]
+  }
+
+  if (field.kind === 'choice') {
+    const coerced = coerceChoiceValue(field, value)
+    if (!coerced) return { error: `Field "${field.label}" expects a string value` }
+    return [{ kind: 'choice', fieldLabel: field.label, value: coerced }]
+  }
+
+  if (field.kind === 'toggle') {
+    if (typeof value !== 'boolean') return { error: `Field "${field.label}" expects a boolean value` }
+    return [{ kind: 'toggle', label: field.label, checked: value, controlType: field.controlType }]
+  }
+
+  const selected = Array.isArray(value) ? value : typeof value === 'string' ? [value] : null
+  if (!selected || selected.length === 0) return { error: `Field "${field.label}" expects a string array value` }
+  if (!field.options || field.options.length === 0) {
+    return { error: `Field "${field.label}" does not expose checkbox options; use geometra_fill_fields for this field` }
+  }
+  const selectedKeys = new Set(selected.map(normalizeLookupKey))
+  return field.options.map(option => ({
+    kind: 'toggle',
+    label: option,
+    checked: selectedKeys.has(normalizeLookupKey(option)),
+    controlType: 'checkbox',
+  }))
+}
+
+function planFormFill(
+  schema: FormSchemaModel,
+  opts: {
+    valuesById?: Record<string, FormValueInput>
+    valuesByLabel?: Record<string, FormValueInput>
+  },
+): { ok: true; fields: FillFieldInput[] } | { ok: false; error: string } {
+  const fieldById = new Map(schema.fields.map(field => [field.id, field]))
+  const fieldsByLabel = new Map<string, FormSchemaField[]>()
+  for (const field of schema.fields) {
+    const key = normalizeLookupKey(field.label)
+    const existing = fieldsByLabel.get(key)
+    if (existing) existing.push(field)
+    else fieldsByLabel.set(key, [field])
+  }
+
+  const planned: FillFieldInput[] = []
+  const seenFieldIds = new Set<string>()
+
+  for (const [fieldId, value] of Object.entries(opts.valuesById ?? {})) {
+    const field = fieldById.get(fieldId)
+    if (!field) return { ok: false, error: `Unknown form field id ${fieldId}. Refresh geometra_form_schema and try again.` }
+    const next = plannedFillInputsForField(field, value)
+    if ('error' in next) return { ok: false, error: next.error }
+    planned.push(...next)
+    seenFieldIds.add(field.id)
+  }
+
+  for (const [label, value] of Object.entries(opts.valuesByLabel ?? {})) {
+    const matches = fieldsByLabel.get(normalizeLookupKey(label)) ?? []
+    if (matches.length === 0) return { ok: false, error: `Unknown form field label "${label}". Refresh geometra_form_schema and try again.` }
+    if (matches.length > 1) {
+      return { ok: false, error: `Label "${label}" is ambiguous in form ${schema.formId}. Use valuesById for this field.` }
+    }
+    const field = matches[0]!
+    if (seenFieldIds.has(field.id)) {
+      return { ok: false, error: `Field "${label}" was provided in both valuesById and valuesByLabel` }
+    }
+    const next = plannedFillInputsForField(field, value)
+    if ('error' in next) return { ok: false, error: next.error }
+    planned.push(...next)
+    seenFieldIds.add(field.id)
+  }
+
+  return { ok: true, fields: planned }
 }
 
 async function executeBatchAction(

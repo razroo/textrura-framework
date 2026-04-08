@@ -16,9 +16,15 @@ export function resolveProxyScriptPath(): string {
 
 export function resolveProxyScriptPathWith(customRequire: NodeRequire, moduleDir = MODULE_DIR): string {
   const errors: string[] = []
+  const workspaceDist = path.resolve(moduleDir, '../../packages/proxy/dist/index.js')
+  const bundledDependencyDir = path.resolve(moduleDir, '../node_modules/@geometra/proxy')
 
   const packageDir = resolveProxyPackageDir(customRequire)
   if (packageDir) {
+    if (shouldPreferWorkspaceDist(packageDir, bundledDependencyDir) && existsSync(workspaceDist)) {
+      return workspaceDist
+    }
+
     const packagedDist = path.join(packageDir, 'dist/index.js')
     if (existsSync(packagedDist)) return packagedDist
 
@@ -56,7 +62,6 @@ export function resolveProxyScriptPathWith(customRequire: NodeRequire, moduleDir
   }
   errors.push(`Packaged sibling fallback not found at ${packagedSiblingDist}`)
 
-  const workspaceDist = path.resolve(moduleDir, '../../packages/proxy/dist/index.js')
   if (existsSync(workspaceDist)) {
     return workspaceDist
   }
@@ -74,6 +79,14 @@ function resolveProxyPackageDir(customRequire: NodeRequire): string | undefined 
     if (existsSync(path.join(packageDir, 'package.json'))) return packageDir
   }
   return undefined
+}
+
+function shouldPreferWorkspaceDist(packageDir: string, bundledDependencyDir: string): boolean {
+  try {
+    return realpathSync(packageDir) === realpathSync(bundledDependencyDir)
+  } catch {
+    return false
+  }
 }
 
 function buildLocalProxyDistIfPossible(packageDir: string, errors: string[]): string | undefined {

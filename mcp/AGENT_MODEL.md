@@ -31,14 +31,14 @@ Normal webpage -> @geometra/proxy (CLI or MCP-spawned) -> Chromium (headed by de
         +---------------+------------------+
         |               |                  |
         v               v                  v
-  page_model      expand_section      snapshot/query
-  (cheap map)     (one section)       (precise target)
+ form_schema      page_model         snapshot/query
+ (cheap fill map) (cheap map)        (precise target)
         \               |                  /
          \              |                 /
           +-------------+----------------+
                         |
                         v
-       click / type / set_checked / wheel / upload / select
+    fill_form / fill_fields / click / type / set_checked / wheel / upload / select
                         |
                         v
                  semantic delta
@@ -98,7 +98,26 @@ It includes things like:
 
 This is meant for **orientation**, not detailed inspection.
 
-### 2. Expand only the section you need
+### 2. Use the compact form path when the task is obviously form filling
+
+`geometra_form_schema` returns a fill-oriented schema instead of a layout-heavy section dump.
+
+It includes:
+
+- stable field ids
+- compact field labels
+- required / invalid state
+- current values
+- collapsed radio / button groups
+
+Typical pattern:
+
+1. `geometra_form_schema`
+2. `geometra_fill_form({ valuesById: ... })`
+
+This is the cheapest happy path for standard application flows.
+
+### 3. Expand only the section you need
 
 `geometra_expand_section` turns one section id into a richer payload.
 
@@ -110,7 +129,7 @@ Typical pattern:
 
 This avoids paying for every section on the page up front.
 
-### 3. Stable ids instead of repeated structure
+### 4. Stable ids instead of repeated structure
 
 Sections use stable ids like:
 
@@ -122,16 +141,17 @@ Sections use stable ids like:
 Nodes use ids like:
 
 - `n:...`
+- `ff:...` for fill-oriented form fields
 
 This means later tool calls can refer to ids instead of repeatedly sending large paths or rediscovering the same subtree.
 
-### 4. Compact visible-node snapshot as a fallback
+### 5. Compact visible-node snapshot as a fallback
 
 `geometra_snapshot` defaults to a compact, minified JSON view of viewport-visible actionable nodes.
 
 This is useful when the whole visible UI matters more than page sections.
 
-### 5. Semantic deltas after actions
+### 6. Semantic deltas after actions
 
 After clicks, typing, wheel events, uploads, etc., the MCP tries to return **what changed**:
 
@@ -142,7 +162,16 @@ After clicks, typing, wheel events, uploads, etc., the MCP tries to return **wha
 
 That keeps multi-step flows smaller than repeatedly asking for a full fresh snapshot.
 
-### 6. Use field-native fills when the task is obviously a form
+### 7. Use field-native fills when the task is obviously a form
+
+`geometra_fill_form` is the preferred primitive when the task is “apply these values to this form”.
+
+Use `geometra_form_schema` first, then send either:
+
+- `valuesById` for maximum stability
+- `valuesByLabel` when labels are unique enough
+
+This lets the MCP server resolve fields and execute the semantic fills internally, which is much cheaper than expanding a section and then emitting one tool call per field.
 
 `geometra_fill_fields` is the preferred primitive when the next step is “fill this form”, not “drive these exact controls”.
 
@@ -157,15 +186,15 @@ This keeps the agent at the field-intent level and avoids repeated control-speci
 
 When the page is long and the text payload is large, keep `detail: "minimal"` so Geometra returns compact structured step results instead of verbose action narration.
 
-### 7. Batch obvious multi-step flows
+### 8. Batch obvious multi-step flows
 
 `geometra_run_actions` exists for longer predictable workflows where you need to mix navigation, waits, and field entry in one MCP round trip.
 
-It complements `page_model` / `expand_section`; it does not replace them.
+It complements `form_schema` / `fill_form` and `page_model` / `expand_section`; it does not replace them.
 
 For token-sensitive automation loops, add `includeSteps: false` so the response is mostly aggregate status plus the final validation/state payload.
 
-### 8. Query only when you know the target
+### 9. Query only when you know the target
 
 `geometra_query` is the precise lookup step:
 
@@ -177,7 +206,7 @@ For token-sensitive automation loops, add `includeSteps: false` so the response 
 
 Use it when you already know what you are looking for and want exact bounds.
 
-### 9. Reveal offscreen targets semantically
+### 10. Reveal offscreen targets semantically
 
 Use `geometra_reveal` when the target is below the fold or inside a long form and you do not want to guess wheel deltas.
 
@@ -188,13 +217,15 @@ This is the preferred path for “bring Submit into view”, “jump to the next
 For most DOM-heavy pages, the best order is:
 
 1. `geometra_connect`
-2. `geometra_page_model`
-3. `geometra_expand_section` for one important section if needed
-4. `geometra_query` or `geometra_wait_for`
-5. `geometra_reveal` when the target is offscreen
-6. `geometra_fill_fields` when the task is straightforward field entry
-7. `geometra_run_actions` for predictable mixed flows, otherwise a single action tool (`geometra_click`, `geometra_type`, etc.)
-8. consume the returned semantic delta / terse state summary
+2. `geometra_form_schema` when the page is clearly a form you intend to fill
+3. `geometra_fill_form` for the lowest-token happy path
+4. `geometra_page_model` when you still need broader page orientation
+5. `geometra_expand_section` for one important section if needed
+6. `geometra_query` or `geometra_wait_for`
+7. `geometra_reveal` when the target is offscreen
+8. `geometra_fill_fields` when you need field-level control instead of schema-driven values
+9. `geometra_run_actions` for predictable mixed flows, otherwise a single action tool (`geometra_click`, `geometra_type`, etc.)
+10. consume the returned semantic delta / terse state summary
 
 Use `geometra_snapshot` compact when:
 
@@ -207,6 +238,14 @@ Use `geometra_snapshot({ view: "full" })` only for deeper debugging.
 Action tools default to terse summaries. Use `detail: "verbose"` when you need a fuller fallback view for debugging.
 
 For the lowest-token batch pattern:
+
+1. `geometra_form_schema`
+2. `geometra_fill_form`
+3. `detail: "minimal"`
+4. `includeSteps: false`
+5. inspect the returned `final.invalidCount`, `final.alertCount`, and any sampled `invalidFields`
+
+If you need direct field-level control instead of schema-driven ids:
 
 1. `geometra_fill_fields` or `geometra_run_actions`
 2. `detail: "minimal"`

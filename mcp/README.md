@@ -21,6 +21,8 @@ Geometra proxy:       Chromium → DOM geometry → same WebSocket as native →
 | `geometra_connect` | Connect with `url` (ws://…) **or** `pageUrl` (https://…) to auto-start geometra-proxy; `url: "https://…"` is auto-coerced onto the proxy path |
 | `geometra_query` | Find elements by stable id, role, name, text content, ancestor/prompt context, current value, or semantic state such as `invalid`, `required`, or `busy` |
 | `geometra_wait_for` | Wait for a semantic condition instead of guessing sleeps (`busy`, `disabled`, alerts, values, etc.) |
+| `geometra_form_schema` | Compact, fill-oriented form schema with stable field ids and collapsed radio/button groups |
+| `geometra_fill_form` | Fill a form from `valuesById` / `valuesByLabel` in one MCP call; preferred low-token happy path for standard forms |
 | `geometra_fill_fields` | Fill labeled text/choice/toggle/file fields in one MCP call; can return final-only status for the smallest responses |
 | `geometra_run_actions` | Execute a batch of high-level actions in one MCP round trip and get one consolidated result, with optional final-only output |
 | `geometra_page_model` | Summary-first webpage model: archetypes, stable section ids, counts, top-level sections, primary actions |
@@ -275,19 +277,15 @@ With `python3 -m http.server 8080` in `demos/proxy-mcp-sample` and `npx geometra
 Agent:  geometra_connect({ url: "ws://127.0.0.1:3200" })
         → Connected. UI includes textbox "Email", button "Save", …
 
-Agent:  geometra_page_model({})
-        → {"viewport":{"width":1024,"height":768},"archetypes":["shell","form"],"summary":{...},"forms":[{"id":"fm:1.0","fieldCount":3,"actionCount":1}], ...}
+Agent:  geometra_form_schema({})
+        → {"forms":[{"formId":"fm:1.0","fields":[{"id":"ff:1.0.0","label":"Email"}, ...]}]}
 
-Agent:  geometra_expand_section({ id: "fm:1.0" })
-        → {"id":"fm:1.0","kind":"form","fields":[{"id":"n:1.0.0","name":"Email"}, ...], "actions":[...]}
-
-Agent:  geometra_query({ role: "textbox", name: "Email" })
-        → bounds for the email field (viewport coordinates)
-
-Agent:  geometra_click({ x: <center-x>, y: <center-y> })
-        → Focuses the input
-
-Agent:  geometra_type({ text: "hello@example.com" })
+Agent:  geometra_fill_form({
+          formId: "fm:1.0",
+          valuesByLabel: { "Email": "hello@example.com" },
+          failOnInvalid: true
+        })
+        → {"completed":true,"successCount":1,"errorCount":0,"final":{"invalidCount":0,...}}
 
 Agent:  geometra_query({ role: "button", name: "Save" })
         → Click center to submit the sample form; status text updates in the DOM
@@ -299,21 +297,22 @@ Agent:  geometra_query({ role: "button", name: "Save" })
 2. It receives the computed layout (`{ x, y, width, height }` for every node) and the UI tree (`kind`, `semantic`, `props`, `handlers`, `children`).
 3. It builds an accessibility tree from that data — roles, names, focusable state, bounds.
 4. **`geometra_snapshot`** defaults to a **compact** flat list of viewport-visible actionable nodes (minified JSON) to reduce LLM tokens; use `view: "full"` for the complete nested tree.
-5. **`geometra_page_model`** is summary-first: page archetypes, stable section ids, counts, top-level landmarks/forms/dialogs/lists, and a few primary actions. It is designed to be cheaper than dumping full previews for every section.
-6. **`geometra_expand_section`** fetches richer details only for the section you care about (fields, actions, headings, nested lists, list items, text preview).
-7. After interactions, action tools return a **semantic delta** when possible (dialogs opened/closed, forms appeared/removed, list counts changed, named/focusable nodes added/removed/updated). If nothing meaningful changed, they fall back to a short current-UI overview.
-8. Tools expose query, click, type, snapshot, page-model, and section-expansion operations over this structured data.
-9. After each interaction, the peer sends updated geometry (full `frame` or `patch`) — the MCP tools interpret that into compact summaries.
+5. **`geometra_form_schema`** is the compact form-specific path: stable field ids, required/invalid state, current values, and collapsed choice groups without layout-heavy section detail.
+6. **`geometra_fill_form`** turns a compact values object into semantic field operations server-side, so the model does not need to emit one tool call per field.
+7. **`geometra_page_model`** is still the right summary-first path for non-form exploration: page archetypes, stable section ids, counts, top-level landmarks/forms/dialogs/lists, and a few primary actions.
+8. **`geometra_expand_section`** fetches richer details only for the section you care about (fields, actions, headings, nested lists, list items, text preview).
+9. After interactions, action tools return a **semantic delta** when possible (dialogs opened/closed, forms appeared/removed, list counts changed, named/focusable nodes added/removed/updated). If nothing meaningful changed, they fall back to a short current-UI overview.
+10. After each interaction, the peer sends updated geometry (full `frame` or `patch`) — the MCP tools interpret that into compact summaries.
 
 ## Long Forms
 
 For long application flows, prefer one of these patterns:
 
-1. `geometra_page_model`
-2. `geometra_expand_section`
+1. `geometra_form_schema`
+2. `geometra_fill_form`
 3. `geometra_reveal` for far-below-fold targets such as submit buttons
-4. `geometra_fill_fields` for obvious field entry
-5. `geometra_run_actions` when you need mixed navigation + waits + field entry
+4. `geometra_run_actions` when you need mixed navigation + waits + field entry
+5. `geometra_page_model` + `geometra_expand_section` when you are still exploring the page rather than filling it
 
 Typical batch:
 
@@ -334,6 +333,23 @@ For the smallest long-form responses, prefer:
 
 1. `detail: "minimal"` for structured step metadata instead of narrated deltas
 2. `includeSteps: false` when you only need aggregate success/error counts plus the final validation/state payload
+
+Typical low-token form fill:
+
+```json
+{
+  "formId": "fm:1.0",
+  "valuesById": {
+    "ff:1.0.0": "Taylor Applicant",
+    "ff:1.0.1": "taylor@example.com",
+    "ff:1.0.2": "Germany",
+    "ff:1.0.3": "No"
+  },
+  "failOnInvalid": true,
+  "includeSteps": false,
+  "detail": "minimal"
+}
+```
 
 For long single-page forms:
 

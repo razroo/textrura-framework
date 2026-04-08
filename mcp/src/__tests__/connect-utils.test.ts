@@ -136,6 +136,41 @@ describe('proxy ready helpers', () => {
     }
   })
 
+  it('prefers the current workspace proxy dist over a bundled nested dependency in source checkouts', () => {
+    const tempRoot = mkdtempSync(path.join(tmpdir(), 'geometra-proxy-workspace-prefer-'))
+
+    try {
+      const workspaceDistDir = path.join(tempRoot, 'packages', 'proxy', 'dist')
+      const bundledProxyDir = path.join(tempRoot, 'mcp', 'node_modules', '@geometra', 'proxy')
+      const bundledDistDir = path.join(bundledProxyDir, 'dist')
+      const mcpDistDir = path.join(tempRoot, 'mcp', 'dist')
+      const probePath = path.join(mcpDistDir, 'proxy-spawn.cjs')
+
+      mkdirSync(workspaceDistDir, { recursive: true })
+      mkdirSync(bundledDistDir, { recursive: true })
+      mkdirSync(mcpDistDir, { recursive: true })
+
+      writeFileSync(path.join(workspaceDistDir, 'index.js'), 'export const source = "workspace";\n')
+      writeFileSync(path.join(bundledDistDir, 'index.js'), 'export const source = "bundled";\n')
+      writeFileSync(
+        path.join(bundledProxyDir, 'package.json'),
+        JSON.stringify({
+          name: '@geometra/proxy',
+          version: '0.0.0-test',
+          type: 'module',
+        }),
+      )
+      writeFileSync(probePath, 'module.exports = {};\n')
+
+      const customRequire = createRequire(probePath)
+      const scriptPath = resolveProxyScriptPathWith(customRequire, mcpDistDir)
+
+      expect(scriptPath).toBe(path.join(workspaceDistDir, 'index.js'))
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true })
+    }
+  })
+
   it('falls back to the packaged sibling proxy dist when package exports are stale', () => {
     const tempRoot = mkdtempSync(path.join(tmpdir(), 'geometra-proxy-stale-exports-'))
 

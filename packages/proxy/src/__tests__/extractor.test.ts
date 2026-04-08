@@ -113,6 +113,32 @@ describe('extractGeometry', () => {
     await page.close()
   })
 
+  it('strips nested option text from wrapped select labels', async () => {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } })
+    await page.setContent(`
+      <label>
+        Preferred location
+        <select>
+          <option>Choose a location</option>
+          <option>Berlin, Germany</option>
+          <option>Austin, Texas</option>
+        </select>
+      </label>
+    `)
+
+    const snapshot = await extractGeometry(page)
+    const nodes = flattenSnapshot(snapshot.tree, snapshot.layout)
+    const select = nodes.find(node =>
+      node.tree.semantic?.role === 'combobox' &&
+      node.tree.semantic?.ariaLabel === 'Preferred location',
+    )
+
+    expect(select).toBeDefined()
+    expect(select?.tree.semantic?.ariaLabel).toBe('Preferred location')
+
+    await page.close()
+  })
+
   it('expands tiny text-control bounds to the visible control wrapper', async () => {
     const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
     await page.setContent(`

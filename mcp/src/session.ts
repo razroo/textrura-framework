@@ -193,6 +193,33 @@ export interface PageSectionDetail {
   textPreview: string[]
 }
 
+export type FormSchemaFieldKind = 'text' | 'choice' | 'toggle' | 'multi_choice'
+
+export interface FormSchemaField {
+  id: string
+  kind: FormSchemaFieldKind
+  label: string
+  required?: boolean
+  invalid?: boolean
+  controlType?: 'checkbox' | 'radio'
+  value?: string
+  valueLength?: number
+  checked?: boolean
+  values?: string[]
+  optionCount?: number
+  options?: string[]
+  context?: NodeContextModel
+}
+
+export interface FormSchemaModel {
+  formId: string
+  name?: string
+  fieldCount: number
+  requiredCount: number
+  invalidCount: number
+  fields: FormSchemaField[]
+}
+
 export interface UiNodeUpdate {
   before: CompactUiNode
   after: CompactUiNode
@@ -718,6 +745,10 @@ export function nodeIdForPath(path: number[]): string {
   return `n:${encodePath(path)}`
 }
 
+function formFieldIdForPath(path: number[]): string {
+  return `ff:${encodePath(path)}`
+}
+
 function sectionPrefix(kind: PageSectionKind): string {
   if (kind === 'landmark') return 'lm'
   if (kind === 'form') return 'fm'
@@ -1155,7 +1186,9 @@ function nearestPromptText(container: A11yNode, target: A11yNode): string | unde
       const dy = Math.max(0, target.bounds.y - candidate.bounds.y)
       const dx = Math.abs(target.bounds.x - candidate.bounds.x)
       const headingBonus = candidate.role === 'heading' ? -32 : 0
-      return { text, score: dy * 4 + dx + headingBonus }
+      const questionBonus = /\?\s*$/.test(text) ? -160 : 0
+      const lengthPenalty = text.length > 90 ? 80 : text.length > 60 ? 40 : text.length > 45 ? 20 : 0
+      return { text, score: dy * 4 + dx + headingBonus + questionBonus + lengthPenalty }
     })
     .filter((candidate): candidate is { text: string; score: number } => !!candidate)
     .sort((a, b) => a.score - b.score)[0]
@@ -1166,12 +1199,19 @@ function nearestPromptText(container: A11yNode, target: A11yNode): string | unde
 function nodeContext(root: A11yNode, node: A11yNode): NodeContextModel | undefined {
   const ancestors = ancestorNodes(root, node.path)
   let prompt: string | undefined
-  for (let index = ancestors.length - 1; index >= 0; index--) {
-    const ancestor = ancestors[index]!
-    const grouped = countGroupedChoiceControls(ancestor) >= 2
-    if (grouped || ancestor.role === 'group' || ancestor.role === 'form' || ancestor.role === 'dialog') {
-      prompt = nearestPromptText(ancestor, node)
-      if (prompt) break
+  const promptEligibleNode = node.role === 'radio' || node.role === 'button'
+  if (promptEligibleNode) {
+    for (let index = ancestors.length - 1; index >= 0; index--) {
+      const ancestor = ancestors[index]!
+      const grouped = countGroupedChoiceControls(ancestor) >= 2
+      const eligiblePromptContainer =
+        (ancestor.role === 'group' && ancestor.path.length > 0) ||
+        ancestor.role === 'dialog' ||
+        (ancestor.role === 'form' && grouped)
+      if (eligiblePromptContainer) {
+        prompt = nearestPromptText(ancestor, node)
+        if (prompt) break
+      }
     }
   }
 
@@ -1223,6 +1263,202 @@ function toActionModel(root: A11yNode, node: A11yNode, includeBounds = true): Pa
     visibility,
     scrollHint,
     ...(includeBounds ? { bounds: cloneBounds(node.bounds) } : {}),
+  }
+}
+
+function compactSchemaContext(context: NodeContextModel | undefined, label: string): NodeContextModel | undefined {
+  if (!context) return undefined
+  const out: NodeContextModel = {}
+  if (context.prompt && normalizeUiText(context.prompt) !== normalizeUiText(label)) out.prompt = context.prompt
+  if (context.section) out.section = context.section
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
+function compactSchemaValue(value: string | undefined, inlineLimit = 80): { value?: string; valueLength?: number } {
+  const normalized = sanitizeInlineName(value, Math.max(120, inlineLimit + 32))
+  if (!normalized) return {}
+  return normalized.length <= inlineLimit
+    ? { value: normalized }
+    : { valueLength: normalized.length }
+}
+
+function schemaOptionLabel(node: A11yNode): string | undefined {
+  return sanitizeFieldName(node.name, 80) ?? sanitizeInlineName(node.name, 80)
+}
+
+function isGroupedChoiceControl(node: A11yNode): boolean {
+  return node.role === 'radio' || node.role === 'checkbox' || (node.role === 'button' && node.focusable)
+}
+
+function groupedChoiceForNode(root: A11yNode, formNode: A11yNode, seed: A11yNode): {
+  container: A11yNode
+  prompt: string
+  controls: A11yNode[]
+} | null {
+  const context = nodeContext(root, seed)
+  const prompt = context?.prompt
+  if (!prompt) return null
+
+  const matchesPrompt = (candidate: A11yNode): boolean => {
+    if (!isGroupedChoiceControl(candidate)) return false
+    return nodeContext(root, candidate)?.prompt === prompt
+  }
+
+  const ancestors = ancestorNodes(root, seed.path)
+  for (let index = ancestors.length - 1; index >= 0; index--) {
+    const ancestor = ancestors[index]!
+    if (ancestor.role === 'form') continue
+    const controls = sortByBounds(collectDescendants(ancestor, matchesPrompt))
+    if (controls.length >= 2) {
+      return { container: ancestor, prompt, controls }
+    }
+  }
+
+  if (seed.role !== 'radio' && seed.role !== 'button') return null
+  const controls = sortByBounds(collectDescendants(formNode, matchesPrompt))
+  return controls.length >= 2 ? { container: formNode, prompt, controls } : null
+}
+
+function simpleSchemaField(root: A11yNode, node: A11yNode): FormSchemaField | null {
+  const context = nodeContext(root, node)
+  const label = fieldLabel(node) ?? sanitizeInlineName(node.name, 80) ?? context?.prompt
+  if (!label) return null
+
+  return {
+    id: formFieldIdForPath(node.path),
+    kind: node.role === 'combobox' ? 'choice' : 'text',
+    label,
+    ...(node.state?.required ? { required: true } : {}),
+    ...(node.state?.invalid ? { invalid: true } : {}),
+    ...compactSchemaValue(node.value, 72),
+    ...(compactSchemaContext(context, label) ? { context: compactSchemaContext(context, label) } : {}),
+  }
+}
+
+function groupedSchemaField(
+  root: A11yNode,
+  grouped: { container: A11yNode; prompt: string; controls: A11yNode[] },
+): FormSchemaField | null {
+  const optionEntries = grouped.controls
+    .map(control => ({
+      label: schemaOptionLabel(control),
+      selected: control.state?.checked === true || control.state?.selected === true,
+      role: control.role,
+    }))
+    .filter((entry): entry is { label: string; selected: boolean; role: string } => !!entry.label)
+
+  if (optionEntries.length < 2) return null
+
+  const options = dedupeStrings(optionEntries.map(entry => entry.label), 16)
+  const selectedOptions = dedupeStrings(
+    optionEntries.filter(entry => entry.selected).map(entry => entry.label),
+    16,
+  )
+  const radioLike = optionEntries.every(entry => entry.role === 'radio' || entry.role === 'button')
+  const context = nodeContext(root, grouped.controls[0]!)
+
+  return {
+    id: formFieldIdForPath(grouped.container.path),
+    kind: radioLike ? 'choice' : 'multi_choice',
+    label: grouped.prompt,
+    ...(grouped.controls.some(control => control.state?.required) ? { required: true } : {}),
+    ...(grouped.controls.some(control => control.state?.invalid) ? { invalid: true } : {}),
+    ...(radioLike
+      ? {
+          ...(selectedOptions[0] ? { value: selectedOptions[0] } : {}),
+        }
+      : {
+          ...(selectedOptions.length > 0 ? { values: selectedOptions } : {}),
+        }),
+    optionCount: options.length,
+    options,
+    ...(compactSchemaContext(context, grouped.prompt) ? { context: compactSchemaContext(context, grouped.prompt) } : {}),
+  }
+}
+
+function toggleSchemaField(root: A11yNode, node: A11yNode): FormSchemaField | null {
+  const label = schemaOptionLabel(node)
+  if (!label) return null
+  const context = nodeContext(root, node)
+  const controlType = node.role === 'radio' ? 'radio' : 'checkbox'
+  return {
+    id: formFieldIdForPath(node.path),
+    kind: 'toggle',
+    label,
+    controlType,
+    ...(node.state?.required ? { required: true } : {}),
+    ...(node.state?.invalid ? { invalid: true } : {}),
+    ...(node.state?.checked !== undefined ? { checked: node.state.checked === true } : {}),
+    ...(compactSchemaContext(context, label) ? { context: compactSchemaContext(context, label) } : {}),
+  }
+}
+
+function buildFormSchemaForNode(
+  root: A11yNode,
+  formNode: A11yNode,
+  options?: {
+    maxFields?: number
+    onlyRequiredFields?: boolean
+    onlyInvalidFields?: boolean
+  },
+): FormSchemaModel {
+  const candidates = sortByBounds(
+    collectDescendants(
+      formNode,
+      candidate =>
+        candidate.role === 'textbox' ||
+        candidate.role === 'combobox' ||
+        candidate.role === 'checkbox' ||
+        candidate.role === 'radio' ||
+        (candidate.role === 'button' && candidate.focusable),
+    ),
+  )
+
+  const consumed = new Set<string>()
+  const fields: FormSchemaField[] = []
+
+  for (const candidate of candidates) {
+    const candidateKey = pathKey(candidate.path)
+    if (consumed.has(candidateKey)) continue
+
+    if (candidate.role === 'textbox' || candidate.role === 'combobox') {
+      const field = simpleSchemaField(root, candidate)
+      if (field) fields.push(field)
+      consumed.add(candidateKey)
+      continue
+    }
+
+    const grouped = groupedChoiceForNode(root, formNode, candidate)
+    if (grouped && grouped.controls.some(control => pathKey(control.path) === candidateKey)) {
+      const field = groupedSchemaField(root, grouped)
+      for (const control of grouped.controls) consumed.add(pathKey(control.path))
+      if (field) fields.push(field)
+      continue
+    }
+
+    if (candidate.role === 'checkbox' || candidate.role === 'radio') {
+      const field = toggleSchemaField(root, candidate)
+      if (field) fields.push(field)
+      consumed.add(candidateKey)
+    }
+  }
+
+  const filteredFields = fields.filter(field => {
+    if (options?.onlyRequiredFields && !field.required) return false
+    if (options?.onlyInvalidFields && !field.invalid) return false
+    return true
+  })
+  const maxFields = options?.maxFields ?? filteredFields.length
+  const pageFields = filteredFields.slice(0, maxFields)
+  const name = sectionDisplayName(formNode, 'form')
+
+  return {
+    formId: sectionIdForPath('form', formNode.path),
+    ...(name ? { name } : {}),
+    fieldCount: fields.length,
+    requiredCount: fields.filter(field => field.required).length,
+    invalidCount: fields.filter(field => field.invalid).length,
+    fields: pageFields,
   }
 }
 
@@ -1369,6 +1605,24 @@ export function buildPageModel(
     ...baseModel,
     archetypes: inferPageArchetypes(baseModel),
   }
+}
+
+export function buildFormSchemas(
+  root: A11yNode,
+  options?: {
+    formId?: string
+    maxFields?: number
+    onlyRequiredFields?: boolean
+    onlyInvalidFields?: boolean
+  },
+): FormSchemaModel[] {
+  const forms = sortByBounds([
+    ...(root.role === 'form' ? [root] : []),
+    ...collectDescendants(root, candidate => candidate.role === 'form'),
+  ])
+  return forms
+    .filter(form => !options?.formId || sectionIdForPath('form', form.path) === options.formId)
+    .map(form => buildFormSchemaForNode(root, form, options))
 }
 
 function headingModels(node: A11yNode, maxHeadings: number, includeBounds: boolean): PageHeadingModel[] {

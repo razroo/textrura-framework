@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Geometra MCP Form Benchmark</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f4ec;
+        --card: #fffdf8;
+        --ink: #182019;
+        --muted: #5f675b;
+        --border: #d9d0c3;
+        --accent: #24523a;
+        --accent-soft: #e4efe7;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+        background:
+          radial-gradient(circle at top left, rgba(36, 82, 58, 0.08), transparent 24rem),
+          linear-gradient(180deg, #fbf8f2 0%, var(--bg) 55%, #f2ecdf 100%);
+        color: var(--ink);
+      }
+
+      main {
+        width: min(58rem, calc(100vw - 2rem));
+        margin: 0 auto;
+        padding: 2rem 0 4rem;
+      }
+
+      header,
+      form,
+      aside {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 1.25rem;
+        box-shadow: 0 0.8rem 2rem rgba(31, 39, 31, 0.06);
+      }
+
+      header {
+        padding: 1.5rem;
+        margin-bottom: 1.25rem;
+      }
+
+      h1,
+      h2 {
+        margin: 0 0 0.75rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+
+      h1 {
+        font-size: clamp(2rem, 5vw, 3.2rem);
+      }
+
+      p,
+      li,
+      label,
+      legend,
+      select,
+      input,
+      textarea,
+      button,
+      output {
+        font-size: 1rem;
+        line-height: 1.5;
+      }
+
+      header p,
+      aside p {
+        margin: 0.6rem 0 0;
+        color: var(--muted);
+      }
+
+      .layout {
+        display: grid;
+        gap: 1.25rem;
+      }
+
+      form {
+        padding: 1.25rem;
+      }
+
+      section + section {
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border);
+      }
+
+      .grid {
+        display: grid;
+        gap: 1rem;
+      }
+
+      .grid.columns-2 {
+        grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+      }
+
+      label,
+      .stack > span {
+        display: grid;
+        gap: 0.4rem;
+        color: var(--ink);
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        border: 1px solid #bfb4a2;
+        border-radius: 0.8rem;
+        padding: 0.7rem 0.8rem;
+        background: #fff;
+        color: var(--ink);
+      }
+
+      textarea {
+        min-height: 8rem;
+        resize: vertical;
+      }
+
+      fieldset {
+        margin: 0;
+        border: 1px solid var(--border);
+        border-radius: 1rem;
+        padding: 0.85rem 1rem 1rem;
+      }
+
+      fieldset p {
+        margin: 0.3rem 0 0.9rem;
+        color: var(--muted);
+      }
+
+      .inline-options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.85rem 1.25rem;
+      }
+
+      .inline-options label,
+      .checkbox {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+      }
+
+      .inline-options input,
+      .checkbox input {
+        width: auto;
+        margin: 0;
+      }
+
+      .summary-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.8rem;
+        margin-top: 1.25rem;
+      }
+
+      output,
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 2.8rem;
+        padding: 0.7rem 0.95rem;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 0.8rem 1.25rem;
+        background: var(--accent);
+        color: #f6f4ee;
+        cursor: pointer;
+      }
+
+      aside {
+        padding: 1.25rem;
+      }
+
+      ul {
+        margin: 0.75rem 0 0;
+        padding-left: 1.2rem;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="layout">
+      <header>
+        <div class="pill">Benchmark surface</div>
+        <h1>Semantic application form</h1>
+        <p>
+          This page is intentionally structured like a realistic recruiting workflow: required contact fields,
+          repeated Yes / No questions, a location chooser, an opt-in toggle, and longer essay responses. It is
+          designed for comparing Geometra MCP semantic tools against a Playwright snapshot plus script flow.
+        </p>
+        <p>
+          Agents should be able to infer the form shape quickly, fill it reliably by label, and confirm that no
+          required fields remain invalid without resorting to large full-page dumps.
+        </p>
+      </header>
+
+      <form id="application-form">
+        <section aria-labelledby="contact-heading">
+          <h2 id="contact-heading">Contact details</h2>
+          <p class="intro">
+            Provide the basics first. These fields are required and should be straightforward for both semantic
+            tooling and direct browser automation.
+          </p>
+          <div class="grid columns-2">
+            <label for="full-name">
+              Full name
+              <input id="full-name" name="fullName" autocomplete="off" required />
+            </label>
+            <label for="email">
+              Email
+              <input id="email" name="email" type="email" autocomplete="off" required />
+            </label>
+            <label for="phone">
+              Phone
+              <input id="phone" name="phone" type="tel" autocomplete="off" required />
+            </label>
+            <label for="location">
+              Preferred location
+              <select id="location" name="location" required>
+                <option value="">Choose a location</option>
+                <option>Berlin, Germany</option>
+                <option>Austin, Texas</option>
+                <option>Remote, Europe</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section aria-labelledby="eligibility-heading">
+          <h2 id="eligibility-heading">Eligibility</h2>
+          <div class="grid">
+            <fieldset>
+              <legend>Are you legally authorized to work in Germany?</legend>
+              <p>Choose the answer that reflects your current work authorization.</p>
+              <div class="inline-options">
+                <label><input type="radio" name="authorization" value="yes" required /> Yes</label>
+                <label><input type="radio" name="authorization" value="no" /> No</label>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Will you now or in the future require sponsorship?</legend>
+              <p>This intentionally repeats Yes / No labels to test contextual disambiguation.</p>
+              <div class="inline-options">
+                <label><input type="radio" name="sponsorship" value="yes" required /> Yes</label>
+                <label><input type="radio" name="sponsorship" value="no" /> No</label>
+              </div>
+            </fieldset>
+
+            <label class="checkbox" for="future-roles">
+              <input id="future-roles" name="futureRoles" type="checkbox" />
+              Share my profile for future roles
+            </label>
+          </div>
+        </section>
+
+        <section aria-labelledby="essays-heading">
+          <h2 id="essays-heading">Written responses</h2>
+          <p>
+            These long-form prompts are here to make the benchmark closer to a real application flow where the
+            agent has to move beyond tiny text fields and keep payloads under control.
+          </p>
+          <div class="grid">
+            <label for="why-geometra">
+              Why Geometra?
+              <textarea id="why-geometra" name="whyGeometra" minlength="40" required></textarea>
+            </label>
+            <label for="hard-problem">
+              Describe a hard problem you solved.
+              <textarea id="hard-problem" name="hardProblem" minlength="40" required></textarea>
+            </label>
+          </div>
+        </section>
+
+        <div class="summary-row">
+          <button type="button" id="validate-draft">Validate draft</button>
+          <output id="form-status" role="status" aria-live="polite"></output>
+        </div>
+      </form>
+
+      <aside>
+        <h2>What this benchmark should highlight</h2>
+        <ul>
+          <li>Whether a summary-first page model is smaller than a full accessibility snapshot.</li>
+          <li>Whether labeled field filling reduces the need to emit a large custom browser script.</li>
+          <li>Whether repeated Yes / No groups and required-field validation can be handled generically.</li>
+        </ul>
+      </aside>
+    </main>
+
+    <script>
+      const form = document.getElementById('application-form')
+      const status = document.getElementById('form-status')
+      const validate = document.getElementById('validate-draft')
+
+      function updateStatus() {
+        const required = Array.from(form.querySelectorAll('[required]'))
+        const invalid = Array.from(form.querySelectorAll(':invalid'))
+        const completed = required.length - invalid.length
+        status.textContent = `${completed} of ${required.length} required answers valid. ${invalid.length} field(s) still need attention.`
+      }
+
+      form.addEventListener('input', updateStatus)
+      form.addEventListener('change', updateStatus)
+      validate.addEventListener('click', () => {
+        form.reportValidity()
+        updateStatus()
+      })
+
+      updateStatus()
+    </script>
+  </body>
+</html>
