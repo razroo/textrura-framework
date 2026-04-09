@@ -104,6 +104,57 @@ describe('buildPageModel', () => {
     ])
   })
 
+  it('adds nearby item context to repeated primary actions', () => {
+    const tree = node('group', undefined, { x: 0, y: 0, width: 1024, height: 768 }, {
+      children: [
+        node('main', undefined, { x: 0, y: 0, width: 1024, height: 768 }, {
+          path: [0],
+          children: [
+            node('group', undefined, { x: 40, y: 80, width: 320, height: 140 }, {
+              path: [0, 0],
+              children: [
+                node('link', 'Sauce Labs Backpack', { x: 56, y: 96, width: 180, height: 24 }, {
+                  path: [0, 0, 0],
+                  focusable: true,
+                }),
+                node('button', 'Add to cart', { x: 56, y: 156, width: 120, height: 36 }, {
+                  path: [0, 0, 1],
+                  focusable: true,
+                }),
+              ],
+            }),
+            node('group', undefined, { x: 40, y: 252, width: 320, height: 140 }, {
+              path: [0, 1],
+              children: [
+                node('link', 'Sauce Labs Bike Light', { x: 56, y: 268, width: 180, height: 24 }, {
+                  path: [0, 1, 0],
+                  focusable: true,
+                }),
+                node('button', 'Add to cart', { x: 56, y: 328, width: 120, height: 36 }, {
+                  path: [0, 1, 1],
+                  focusable: true,
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+    })
+
+    const model = buildPageModel(tree, { maxPrimaryActions: 4 })
+    const addToCartActions = model.primaryActions.filter(action => action.name === 'Add to cart')
+
+    expect(addToCartActions).toHaveLength(2)
+    expect(addToCartActions[0]).toMatchObject({
+      id: 'n:0.0.1',
+      context: { item: 'Sauce Labs Backpack' },
+    })
+    expect(addToCartActions[1]).toMatchObject({
+      id: 'n:0.1.1',
+      context: { item: 'Sauce Labs Bike Light' },
+    })
+  })
+
   it('expands a section by id on demand', () => {
     const tree = node('group', undefined, { x: 0, y: 0, width: 1024, height: 768 }, {
       children: [

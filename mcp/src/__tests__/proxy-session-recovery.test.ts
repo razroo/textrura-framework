@@ -11,7 +11,7 @@ vi.mock('../proxy-spawn.js', () => ({
   spawnGeometraProxy: mockState.spawnGeometraProxy,
 }))
 
-const { connectThroughProxy, disconnect } = await import('../session.js')
+const { connectThroughProxy, disconnect, prewarmProxy } = await import('../session.js')
 
 function frame(pageUrl: string) {
   return {
@@ -32,16 +32,28 @@ function frame(pageUrl: string) {
 
 async function createProxyPeer(options?: {
   pageUrl: string
+  sendInitialFrame?: boolean
   onNavigate?: (ws: WebSocket, msg: { requestId?: string; url?: string }) => void
+  onResize?: (ws: WebSocket, msg: { requestId?: string; width?: number; height?: number }) => void
 }) {
   const wss = new WebSocketServer({ port: 0 })
   wss.on('connection', ws => {
-    ws.send(JSON.stringify(frame(options?.pageUrl ?? 'https://jobs.example.com/original')))
+    if (options?.sendInitialFrame !== false) {
+      ws.send(JSON.stringify(frame(options?.pageUrl ?? 'https://jobs.example.com/original')))
+    }
 
     ws.on('message', raw => {
-      const msg = JSON.parse(String(raw)) as { type?: string; requestId?: string; url?: string }
+      const msg = JSON.parse(String(raw)) as {
+        type?: string
+        requestId?: string
+        url?: string
+        width?: number
+        height?: number
+      }
       if (msg.type === 'navigate') {
         options?.onNavigate?.(ws, msg)
+      } else if (msg.type === 'resize') {
+        options?.onResize?.(ws, msg)
       }
     })
   })
@@ -91,6 +103,7 @@ describe('connectThroughProxy recovery', () => {
 
     const staleRuntime = {
       wsUrl: stalePeer.wsUrl,
+      ready: Promise.resolve(),
       closed: false,
       close: vi.fn(async () => {
         staleRuntime.closed = true
@@ -98,6 +111,7 @@ describe('connectThroughProxy recovery', () => {
     }
     const freshRuntime = {
       wsUrl: freshPeer.wsUrl,
+      ready: Promise.resolve(),
       closed: false,
       close: vi.fn(async () => {
         freshRuntime.closed = true
@@ -142,6 +156,7 @@ describe('connectThroughProxy recovery', () => {
 
     const headedRuntime = {
       wsUrl: headedPeer.wsUrl,
+      ready: Promise.resolve(),
       closed: false,
       close: vi.fn(async () => {
         headedRuntime.closed = true
@@ -149,6 +164,7 @@ describe('connectThroughProxy recovery', () => {
     }
     const headlessRuntime = {
       wsUrl: headlessPeer.wsUrl,
+      ready: Promise.resolve(),
       closed: false,
       close: vi.fn(async () => {
         headlessRuntime.closed = true
@@ -194,4 +210,94 @@ describe('connectThroughProxy recovery', () => {
       await closePeer(headlessPeer.wss)
     }
   })
+
+  it('can prewarm a reusable proxy before the first measured task', async () => {
+    const preparedPeer = await createProxyPeer({
+      pageUrl: 'https://jobs.example.com/prepared',
+    })
+
+    const preparedRuntime = {
+      wsUrl: preparedPeer.wsUrl,
+      ready: Promise.resolve(),
+      closed: false,
+      close: vi.fn(async () => {
+        preparedRuntime.closed = true
+      }),
+    }
+
+    mockState.startEmbeddedGeometraProxy.mockResolvedValue({
+      runtime: preparedRuntime,
+      wsUrl: preparedPeer.wsUrl,
+    })
+    mockState.spawnGeometraProxy.mockRejectedValue(new Error('spawn fallback should not be used'))
+
+    try {
+      const prepared = await prewarmProxy({
+        pageUrl: 'https://jobs.example.com/prepared',
+        headless: true,
+      })
+      expect(prepared).toMatchObject({
+        prepared: true,
+        reused: false,
+        transport: 'embedded',
+        pageUrl: 'https://jobs.example.com/prepared',
+      })
+
+      const session = await connectThroughProxy({
+        pageUrl: 'https://jobs.example.com/prepared',
+        headless: true,
+      })
+
+      expect(session.proxyRuntime).toBe(preparedRuntime)
+      expect(mockState.startEmbeddedGeometraProxy).toHaveBeenCalledTimes(1)
+      expect(mockState.spawnGeometraProxy).not.toHaveBeenCalled()
+    } finally {
+      disconnect({ closeProxy: true })
+      expect(preparedRuntime.close).toHaveBeenCalledTimes(1)
+      await closePeer(preparedPeer.wss)
+    }
+  })
+
+  it('starts without an eager initial extract when the caller defers the first frame', async () => {
+    const lazyPeer = await createProxyPeer({
+      pageUrl: 'https://jobs.example.com/lazy',
+      sendInitialFrame: false,
+    })
+
+    const lazyRuntime = {
+      wsUrl: lazyPeer.wsUrl,
+      ready: Promise.resolve(),
+      closed: false,
+      close: vi.fn(async () => {
+        lazyRuntime.closed = true
+      }),
+    }
+
+    mockState.startEmbeddedGeometraProxy.mockResolvedValueOnce({
+      runtime: lazyRuntime,
+      wsUrl: lazyPeer.wsUrl,
+    })
+    mockState.spawnGeometraProxy.mockRejectedValue(new Error('spawn fallback should not be used'))
+
+    try {
+      const session = await connectThroughProxy({
+        pageUrl: 'https://jobs.example.com/lazy',
+        headless: true,
+        awaitInitialFrame: false,
+      })
+
+      expect(session.proxyRuntime).toBe(lazyRuntime)
+      expect(mockState.startEmbeddedGeometraProxy).toHaveBeenCalledWith(expect.objectContaining({
+        pageUrl: 'https://jobs.example.com/lazy',
+        headless: true,
+        eagerInitialExtract: false,
+      }))
+      expect(session.tree).toBeNull()
+    } finally {
+      disconnect({ closeProxy: true })
+      expect(lazyRuntime.close).toHaveBeenCalledTimes(1)
+      await closePeer(lazyPeer.wss)
+    }
+  })
+
 })

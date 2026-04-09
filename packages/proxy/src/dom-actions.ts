@@ -404,6 +404,7 @@ async function findLabeledControl(
 ): Promise<Locator | null> {
   const directCandidates = [
     frame.getByLabel(fieldLabel, { exact }),
+    frame.getByPlaceholder(fieldLabel, { exact }),
     frame.getByRole('combobox', { name: fieldLabel, exact }),
     frame.getByRole('textbox', { name: fieldLabel, exact }),
     frame.getByRole('button', { name: fieldLabel, exact }),
@@ -467,6 +468,23 @@ async function findLabeledControl(
         const text = label?.textContent?.trim()
         if (text) return text
       }
+      if (el.parentElement?.tagName.toLowerCase() === 'label') {
+        const text = el.parentElement.textContent?.trim()
+        if (text) return text
+      }
+      if (
+        (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) &&
+        !['checkbox', 'radio', 'file', 'button', 'submit', 'reset', 'hidden'].includes(el instanceof HTMLInputElement ? el.type : '')
+      ) {
+        const placeholder = el.getAttribute('aria-placeholder')?.trim() || el.getAttribute('placeholder')?.trim()
+        if (placeholder) return placeholder
+      }
+      if (el instanceof HTMLInputElement && ['button', 'submit', 'reset'].includes(el.type)) {
+        const value = el.value?.trim()
+        if (value) return value
+      }
+      const title = el.getAttribute('title')?.trim()
+      if (title) return title
       return undefined
     }
 
@@ -1490,6 +1508,12 @@ async function findLabeledFileInput(frame: Frame, fieldLabel: string, exact: boo
         const text = label?.textContent?.trim()
         if (text) return text
       }
+      if (el.parentElement?.tagName.toLowerCase() === 'label') {
+        const text = el.parentElement.textContent?.trim()
+        if (text) return text
+      }
+      const title = el.getAttribute('title')?.trim()
+      if (title) return title
       return undefined
     }
 
@@ -1684,6 +1708,7 @@ async function findLabeledEditableField(
   for (const frame of page.frames()) {
     const candidates = [
       frame.getByLabel(fieldLabel, { exact }),
+      frame.getByPlaceholder(fieldLabel, { exact }),
       frame.getByRole('textbox', { name: fieldLabel, exact }),
       frame.getByRole('combobox', { name: fieldLabel, exact }),
     ]
@@ -1909,6 +1934,19 @@ async function attemptNativeBatchFill(page: Page, fields: FormFieldFill[]): Prom
         if (el.parentElement?.tagName.toLowerCase() === 'label') {
           return el.parentElement.textContent?.trim() || undefined
         }
+        if (
+          (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) &&
+          !['checkbox', 'radio', 'file', 'button', 'submit', 'reset', 'hidden'].includes(el instanceof HTMLInputElement ? el.type : '')
+        ) {
+          const placeholder = el.getAttribute('aria-placeholder')?.trim() || el.getAttribute('placeholder')?.trim()
+          if (placeholder) return placeholder
+        }
+        if (el instanceof HTMLInputElement && ['button', 'submit', 'reset'].includes(el.type)) {
+          const value = el.value?.trim()
+          if (value) return value
+        }
+        const title = el.getAttribute('title')?.trim()
+        if (title) return title
         return undefined
       }
 
@@ -2223,6 +2261,22 @@ async function chooseValueFromLabeledGroup(
         if (el instanceof HTMLInputElement && el.labels && el.labels.length > 0) {
           return el.labels[0]?.textContent?.trim() || undefined
         }
+        if (el.parentElement?.tagName.toLowerCase() === 'label') {
+          return el.parentElement.textContent?.trim() || undefined
+        }
+        if (
+          (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) &&
+          !['checkbox', 'radio', 'file', 'button', 'submit', 'reset', 'hidden'].includes(el instanceof HTMLInputElement ? el.type : '')
+        ) {
+          const placeholder = el.getAttribute('aria-placeholder')?.trim() || el.getAttribute('placeholder')?.trim()
+          if (placeholder) return placeholder
+        }
+        if (el instanceof HTMLInputElement && ['button', 'submit', 'reset'].includes(el.type)) {
+          const value = el.value?.trim()
+          if (value) return value
+        }
+        const title = el.getAttribute('title')?.trim()
+        if (title) return title
         return undefined
       }
 

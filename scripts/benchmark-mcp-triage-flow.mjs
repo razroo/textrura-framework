@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Compare summary-first board exploration workflows:
- * - Geometra MCP: connect + page model + expand section + click
+ * - Geometra MCP: connect (with inline page model) + contextual semantic click
  * - Playwright MCP style: navigate + aria snapshot + browser_run_code
  *
  * This benchmark is meant to answer a different question than the form-flow benchmark:
@@ -210,35 +210,10 @@ async function invokeTool(handler, name, input) {
   return buildResult(name, input, contentText(result), performance.now() - started)
 }
 
-function findNamedLandmark(pageModel, sectionName) {
-  const exact = pageModel.landmarks.find(item => normalizeText(item.name) === normalizeText(sectionName))
-  if (exact) return exact
-  return pageModel.landmarks.find(item => normalizeText(item.name).includes(normalizeText(sectionName)))
-}
-
-function findTargetAction(sectionDetail, target) {
-  return sectionDetail.actions.find(action => {
-    if (normalizeText(action.name) !== normalizeText(target.actionName)) return false
-    const section = normalizeText(action.context?.section)
-    const prompt = normalizeText(action.context?.prompt)
-    return section.includes(normalizeText(target.title)) || prompt.includes(normalizeText(target.title))
-  })
-}
-
-function centerOf(bounds) {
-  return {
-    x: Math.round(bounds.x + bounds.width / 2),
-    y: Math.round(bounds.y + bounds.height / 2),
-  }
-}
-
 async function runGeometraFlow(url, createServer, scenario, options) {
   const server = createServer()
   const connect = getToolHandler(server, 'geometra_connect')
-  const pageModel = getToolHandler(server, 'geometra_page_model')
-  const expandSection = getToolHandler(server, 'geometra_expand_section')
   const click = getToolHandler(server, 'geometra_click')
-  const waitFor = getToolHandler(server, 'geometra_wait_for')
   const disconnect = getToolHandler(server, 'geometra_disconnect')
   let browserOpen = false
 
@@ -250,72 +225,37 @@ async function runGeometraFlow(url, createServer, scenario, options) {
       width: VIEWPORT.width,
       height: VIEWPORT.height,
       slowMo: options.slowMo > 0 ? options.slowMo : undefined,
-      detail: 'minimal',
+      returnPageModel: true,
+      maxPrimaryActions: 8,
+      maxSectionsPerKind: 8,
+      detail: 'terse',
     })
     const connectPayload = parseJsonOutput(connectStep)
     browserOpen = true
 
-    const pageModelStep = await invokeTool(pageModel, 'geometra_page_model', {
-      maxPrimaryActions: 6,
-      maxSectionsPerKind: 8,
-    })
-    const pageModelPayload = parseJsonOutput(pageModelStep)
-    const section = findNamedLandmark(pageModelPayload, scenario.target.listName)
-    if (!section) {
-      throw new Error(`Could not find landmark named "${scenario.target.listName}" in geometra_page_model output`)
-    }
-
-    const expandStep = await invokeTool(expandSection, 'geometra_expand_section', {
-      id: section.id,
-      maxHeadings: 4,
-      maxActions: 8,
-      maxItems: 8,
-      maxTextPreview: 6,
-      includeBounds: true,
-    })
-    const expandPayload = parseJsonOutput(expandStep)
-    const targetItemPresent =
-      expandPayload.headings.some(item => normalizeText(item.name).includes(normalizeText(scenario.target.title))) ||
-      expandPayload.textPreview.some(line => normalizeText(line).includes(normalizeText(scenario.target.title)))
-    if (!targetItemPresent) {
-      throw new Error(
-        `Expanded section ${section.id} did not include target item "${scenario.target.title}" in headings or text preview`,
-      )
-    }
-
-    const targetAction = findTargetAction(expandPayload, scenario.target)
-    if (!targetAction?.bounds) {
-      throw new Error(
-        `Could not find ${scenario.target.actionName} action scoped to "${scenario.target.title}" in expanded section ${section.id}`,
-      )
-    }
-
-    const clickPoint = centerOf(targetAction.bounds)
     const clickStep = await invokeTool(click, 'geometra_click', {
-      x: clickPoint.x,
-      y: clickPoint.y,
-      detail: 'minimal',
+      role: 'button',
+      name: scenario.target.actionName,
+      itemText: scenario.target.title,
+      sectionText: scenario.target.listName,
+      waitFor: {
+        role: 'dialog',
+        text: scenario.target.title,
+        present: true,
+        timeoutMs: 4_000,
+      },
+      detail: 'terse',
     })
-    const waitStep = await invokeTool(waitFor, 'geometra_wait_for', {
-      role: 'dialog',
-      text: scenario.target.title,
-      present: true,
-      timeoutMs: 4_000,
-    })
-    const waitPayload = parseJsonOutput(waitStep)
+    const clickPayload = parseJsonOutput(clickStep)
 
     return {
-      steps: [connectStep, pageModelStep, expandStep, clickStep, waitStep],
-      semanticSteps: [pageModelStep, expandStep, clickStep, waitStep],
-      explorationSteps: [pageModelStep, expandStep],
+      steps: [connectStep, clickStep],
+      semanticSteps: [connectStep, clickStep],
+      explorationSteps: [connectStep],
       connectPayload,
-      pageModelPayload,
-      expandPayload,
-      targetSection: section,
-      targetAction,
+      pageModelPayload: connectPayload.pageModel,
       clickStep,
-      waitStep,
-      waitPayload,
+      clickPayload,
     }
   } finally {
     if (browserOpen) {
@@ -432,14 +372,14 @@ function assertBenchmark(geometra, playwright, scenario) {
   const playwrightExplorationTotals = withApproxTokens(summarizeTotals(playwright.explorationSteps))
 
   const failures = []
-  if (!Array.isArray(geometra.waitPayload) || geometra.waitPayload.length === 0) {
+  if (geometra.connectPayload.connected !== true) {
     failures.push(
-      `[${scenario.id}] Expected Geometra wait_for to return a matching dialog for "${scenario.target.title}".`,
+      `[${scenario.id}] Expected Geometra to connect successfully.`,
     )
   }
-  if (!geometra.waitPayload.some(node => normalizeText(node.name).includes(normalizeText(scenario.target.title)))) {
+  if ((geometra.clickPayload?.postWait?.matchCount ?? 0) < 1) {
     failures.push(
-      `[${scenario.id}] Expected Geometra dialog match to mention "${scenario.target.title}", received ${JSON.stringify(geometra.waitPayload)}`,
+      `[${scenario.id}] Expected Geometra post-click wait to confirm the dialog for "${scenario.target.title}", received ${JSON.stringify(geometra.clickPayload)}`,
     )
   }
   if (normalizeText(playwright.runCodeResult.dialogTitle) !== normalizeText(scenario.target.title)) {
@@ -528,22 +468,13 @@ async function runScenario(createServer, options) {
 
     console.log('\nKey payloads')
     console.log(
-      `Geometra connect output: ${geometra.steps[0].outputBytes} B (~${approxTokens(geometra.steps[0].outputBytes)} tokens), connected=${geometra.connectPayload.connected === true}, transport=${geometra.connectPayload.transport ?? 'unknown'}`,
+      `Geometra connect+page_model output: ${geometra.steps[0].outputBytes} B (~${approxTokens(geometra.steps[0].outputBytes)} tokens), connected=${geometra.connectPayload.connected === true}, landmarks=${geometra.pageModelPayload.landmarks.length}`,
     )
     console.log(
-      `Geometra page_model output: ${geometra.steps[1].outputBytes} B (~${approxTokens(geometra.steps[1].outputBytes)} tokens), landmarks=${geometra.pageModelPayload.landmarks.length}, lists=${geometra.pageModelPayload.lists.length}`,
+      `Geometra inline page_model primary actions: ${geometra.pageModelPayload.primaryActions.length}, lists=${geometra.pageModelPayload.lists.length}`,
     )
     console.log(
-      `Geometra expand_section output: ${geometra.steps[2].outputBytes} B (~${approxTokens(geometra.steps[2].outputBytes)} tokens), targetSection=${geometra.targetSection.id}, actionsReturned=${geometra.expandPayload.actions.length}`,
-    )
-    console.log(
-      `Geometra target action prompt: ${JSON.stringify(geometra.targetAction.context?.prompt ?? 'n/a')}, section=${JSON.stringify(geometra.targetAction.context?.section ?? 'n/a')}`,
-    )
-    console.log(
-      `Geometra click output: ${geometra.steps[3].outputBytes} B (~${approxTokens(geometra.steps[3].outputBytes)} tokens)`,
-    )
-    console.log(
-      `Geometra wait_for output: ${geometra.steps[4].outputBytes} B (~${approxTokens(geometra.steps[4].outputBytes)} tokens), matches=${Array.isArray(geometra.waitPayload) ? geometra.waitPayload.length : 0}`,
+      `Geometra contextual click output: ${geometra.steps[1].outputBytes} B (~${approxTokens(geometra.steps[1].outputBytes)} tokens), postWaitMatches=${geometra.clickPayload.postWait?.matchCount ?? 0}`,
     )
     console.log(
       `Playwright aria snapshot output: ${playwright.steps[1].outputBytes} B (~${approxTokens(playwright.steps[1].outputBytes)} tokens)`,

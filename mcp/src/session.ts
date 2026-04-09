@@ -1,4 +1,5 @@
 import type { ChildProcess } from 'node:child_process'
+import { performance } from 'node:perf_hooks'
 import WebSocket from 'ws'
 import { spawnGeometraProxy, startEmbeddedGeometraProxy, type EmbeddedProxyRuntime } from './proxy-spawn.js'
 
@@ -52,6 +53,7 @@ export interface CompactUiContext {
 export interface NodeContextModel {
   prompt?: string
   section?: string
+  item?: string
 }
 
 export interface NodeVisibilityModel {
@@ -94,6 +96,7 @@ export interface PagePrimaryAction {
   role: string
   name?: string
   state?: A11yNode['state']
+  context?: NodeContextModel
   bounds: { x: number; y: number; width: number; height: number }
 }
 
@@ -302,9 +305,26 @@ export interface Session {
   proxyChild?: ChildProcess
   proxyRuntime?: EmbeddedProxyRuntime
   proxyReusable?: boolean
+  connectTrace?: SessionConnectTrace
   cachedA11y?: A11yNode | null
   cachedA11yRevision?: number
   cachedFormSchemas?: Map<string, { revision: number; forms: FormSchemaModel[] }>
+}
+
+export interface SessionConnectTrace {
+  mode: 'direct-ws' | 'fresh-proxy' | 'reused-proxy'
+  reused: boolean
+  awaitInitialFrame: boolean
+  proxyStartMode?: 'embedded' | 'child'
+  proxyStartMs?: number
+  connectMs?: number
+  wsOpenMs?: number
+  firstFrameMs?: number
+  resolvedWithoutInitialFrame?: boolean
+  snapshotKickoff?: boolean
+  resizeKickoffMs?: number
+  navigateMs?: number
+  totalMs: number
 }
 
 export interface UpdateWaitResult {
@@ -322,6 +342,7 @@ interface ReusableProxyEntry {
   width: number
   height: number
   pageUrl?: string
+  snapshotReady: boolean
   lastUsedAt: number
 }
 
@@ -388,6 +409,12 @@ function touchReusableProxy(entry: ReusableProxyEntry): void {
   entry.lastUsedAt = Date.now()
 }
 
+function updateReusableProxySnapshotState(entry: ReusableProxyEntry, session: Session): void {
+  if (session.tree && session.layout) {
+    entry.snapshotReady = true
+  }
+}
+
 function closeReusableProxy(entry: ReusableProxyEntry): void {
   reusableProxies = reusableProxies.filter(candidate => candidate !== entry)
   if (entry.child) {
@@ -435,7 +462,7 @@ function enforceReusableProxyPoolLimit(): void {
 function setReusableProxy(
   proxy: { child: ChildProcess } | { runtime: EmbeddedProxyRuntime },
   wsUrl: string,
-  opts: { headless?: boolean; slowMo?: number; width?: number; height?: number; pageUrl?: string },
+  opts: { headless?: boolean; slowMo?: number; width?: number; height?: number; pageUrl?: string; snapshotReady?: boolean },
 ): void {
   clearReusableProxiesIfExited()
   const now = Date.now()
@@ -448,6 +475,7 @@ function setReusableProxy(
     existing.width = opts.width ?? 1280
     existing.height = opts.height ?? 720
     existing.pageUrl = opts.pageUrl
+    existing.snapshotReady = opts.snapshotReady ?? existing.snapshotReady
     existing.lastUsedAt = now
     return
   }
@@ -462,6 +490,7 @@ function setReusableProxy(
       width: opts.width ?? 1280,
       height: opts.height ?? 720,
       pageUrl: opts.pageUrl,
+      snapshotReady: opts.snapshotReady === true,
       lastUsedAt: now,
     }
     reusableProxies.push(entry)
@@ -486,19 +515,21 @@ function setReusableProxy(
     width: opts.width ?? 1280,
     height: opts.height ?? 720,
     pageUrl: opts.pageUrl,
+    snapshotReady: opts.snapshotReady === true,
     lastUsedAt: now,
   })
   enforceReusableProxyPoolLimit()
 }
 
 function rememberReusableProxyPageUrl(session: Session): void {
-  const pageUrl = session.cachedA11y?.meta?.pageUrl
-  if (!pageUrl) return
   const entry = reusableProxyEntryForSession(session)
-  if (entry) {
+  if (!entry) return
+  updateReusableProxySnapshotState(entry, session)
+  const pageUrl = session.cachedA11y?.meta?.pageUrl
+  if (pageUrl) {
     entry.pageUrl = pageUrl
-    touchReusableProxy(entry)
   }
+  touchReusableProxy(entry)
 }
 
 function shutdownPreviousSession(opts?: { closeProxy?: boolean }): void {
@@ -551,6 +582,41 @@ function formatUnknownError(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
+function reusableProxyMatchesOptions(
+  entry: ReusableProxyEntry,
+  options: {
+    pageUrl: string
+    headless?: boolean
+    slowMo?: number
+    width?: number
+    height?: number
+  },
+): boolean {
+  return (
+    entry.pageUrl === options.pageUrl &&
+    entry.headless === (options.headless === true) &&
+    entry.slowMo === (options.slowMo ?? 0) &&
+    entry.width === (options.width ?? 1280) &&
+    entry.height === (options.height ?? 720)
+  )
+}
+
+function findExactReusableProxy(options: {
+  pageUrl: string
+  headless?: boolean
+  slowMo?: number
+  width?: number
+  height?: number
+}): ReusableProxyEntry | undefined {
+  clearReusableProxiesIfExited()
+  return reusableProxies
+    .filter(entry => reusableProxyMatchesOptions(entry, options))
+    .sort((a, b) => {
+      const activeBonus = reusableProxyEntryIsActive(b) ? 1 : reusableProxyEntryIsActive(a) ? -1 : 0
+      return activeBonus || b.lastUsedAt - a.lastUsedAt
+    })[0]
+}
+
 function findReusableProxy(options: {
   pageUrl: string
   headless?: boolean
@@ -578,22 +644,132 @@ function findReusableProxy(options: {
     })[0]
 }
 
+export async function prewarmProxy(options: {
+  pageUrl: string
+  port?: number
+  headless?: boolean
+  width?: number
+  height?: number
+  slowMo?: number
+}): Promise<{
+  prepared: true
+  reused: boolean
+  transport: 'embedded' | 'child'
+  pageUrl: string
+  wsUrl: string
+  headless: boolean
+  width: number
+  height: number
+}> {
+  clearReusableProxiesIfExited()
+
+  const existing = findExactReusableProxy(options)
+  if (existing) {
+    touchReusableProxy(existing)
+    return {
+      prepared: true,
+      reused: true,
+      transport: existing.runtime ? 'embedded' : 'child',
+      pageUrl: options.pageUrl,
+      wsUrl: existing.wsUrl,
+      headless: options.headless === true,
+      width: options.width ?? 1280,
+      height: options.height ?? 720,
+    }
+  }
+
+  let embeddedFailure: unknown
+  try {
+    const { runtime, wsUrl } = await startEmbeddedGeometraProxy({
+      pageUrl: options.pageUrl,
+      port: options.port ?? 0,
+      headless: options.headless,
+      width: options.width,
+      height: options.height,
+      slowMo: options.slowMo,
+    })
+    try {
+      await runtime.ready
+    } catch (err) {
+      await runtime.close().catch(() => {})
+      throw err
+    }
+    setReusableProxy({ runtime }, wsUrl, {
+      headless: options.headless,
+      slowMo: options.slowMo,
+      width: options.width,
+      height: options.height,
+      pageUrl: options.pageUrl,
+      snapshotReady: true,
+    })
+    return {
+      prepared: true,
+      reused: false,
+      transport: 'embedded',
+      pageUrl: options.pageUrl,
+      wsUrl,
+      headless: options.headless === true,
+      width: options.width ?? 1280,
+      height: options.height ?? 720,
+    }
+  } catch (err) {
+    embeddedFailure = err
+  }
+
+  try {
+    const { child, wsUrl } = await spawnGeometraProxy({
+      pageUrl: options.pageUrl,
+      port: options.port ?? 0,
+      headless: options.headless,
+      width: options.width,
+      height: options.height,
+      slowMo: options.slowMo,
+    })
+    setReusableProxy({ child }, wsUrl, {
+      headless: options.headless,
+      slowMo: options.slowMo,
+      width: options.width,
+      height: options.height,
+      pageUrl: options.pageUrl,
+    })
+    return {
+      prepared: true,
+      reused: false,
+      transport: 'child',
+      pageUrl: options.pageUrl,
+      wsUrl,
+      headless: options.headless === true,
+      width: options.width ?? 1280,
+      height: options.height ?? 720,
+    }
+  } catch (spawnFailure) {
+    throw new Error(
+      `Failed to prewarm embedded browser session: ${formatUnknownError(embeddedFailure)}\nChild-process proxy prewarm also failed: ${formatUnknownError(spawnFailure)}`,
+    )
+  }
+}
+
 async function attachToReusableProxy(proxy: ReusableProxyEntry, options: {
   pageUrl: string
   width?: number
   height?: number
   awaitInitialFrame?: boolean
 }): Promise<Session> {
-  const session = (
+  const startedAt = performance.now()
+  const desiredWidth = options.width ?? proxy.width
+  const desiredHeight = options.height ?? proxy.height
+  const needsSnapshotKickoff = options.awaitInitialFrame !== false && !proxy.snapshotReady
+  const reusedActiveSession = (
     (proxy.child && activeSession?.proxyChild === proxy.child) ||
     (proxy.runtime && activeSession?.proxyRuntime === proxy.runtime)
   )
     ? activeSession
-    : await connect(proxy.wsUrl, {
-        skipInitialResize: true,
-        closePreviousProxy: false,
-        awaitInitialFrame: options.awaitInitialFrame,
-      })
+    : null
+  const session = reusedActiveSession ?? await connect(proxy.wsUrl, {
+    skipInitialResize: true,
+    closePreviousProxy: false,
+    awaitInitialFrame: needsSnapshotKickoff ? false : options.awaitInitialFrame,
+  })
 
   if (!session) {
     throw new Error('Failed to attach to reusable proxy session')
@@ -604,24 +780,44 @@ async function attachToReusableProxy(proxy: ReusableProxyEntry, options: {
   session.proxyReusable = true
   touchReusableProxy(proxy)
 
-  const desiredWidth = options.width ?? proxy.width
-  const desiredHeight = options.height ?? proxy.height
-  if (desiredWidth !== proxy.width || desiredHeight !== proxy.height) {
-    await sendAndWaitForUpdate(session, {
-      type: 'resize',
-      width: desiredWidth,
-      height: desiredHeight,
-    }, 5_000)
+  let resizeKickoffMs: number | undefined
+  if (needsSnapshotKickoff || desiredWidth !== proxy.width || desiredHeight !== proxy.height) {
+    const resizeStartedAt = performance.now()
+    const resizeWait = await sendResizeAndWaitForUpdate(session, desiredWidth, desiredHeight, 5_000)
+    resizeKickoffMs = performance.now() - resizeStartedAt
+    if (needsSnapshotKickoff && resizeWait.status === 'timed_out' && (!session.tree || !session.layout)) {
+      throw new Error('Timed out waiting for initial proxy snapshot after resize kickoff')
+    }
     proxy.width = desiredWidth
     proxy.height = desiredHeight
+    updateReusableProxySnapshotState(proxy, session)
   }
 
   const currentUrl = session.cachedA11y?.meta?.pageUrl ?? proxy.pageUrl
+  let navigateMs: number | undefined
   if (currentUrl !== options.pageUrl) {
+    const navigateStartedAt = performance.now()
     await sendNavigate(session, options.pageUrl, 15_000)
+    navigateMs = performance.now() - navigateStartedAt
     proxy.pageUrl = options.pageUrl
+    updateReusableProxySnapshotState(proxy, session)
   }
 
+  const baseConnectTrace = !reusedActiveSession ? session.connectTrace : undefined
+  session.connectTrace = {
+    mode: 'reused-proxy',
+    reused: true,
+    awaitInitialFrame: options.awaitInitialFrame !== false,
+    connectMs: baseConnectTrace?.totalMs ?? 0,
+    wsOpenMs: baseConnectTrace?.wsOpenMs,
+    firstFrameMs: baseConnectTrace?.firstFrameMs,
+    resolvedWithoutInitialFrame: baseConnectTrace?.resolvedWithoutInitialFrame,
+    snapshotKickoff: needsSnapshotKickoff,
+    resizeKickoffMs,
+    navigateMs,
+    totalMs: performance.now() - startedAt,
+  }
+  updateReusableProxySnapshotState(proxy, session)
   return session
 }
 
@@ -634,7 +830,10 @@ async function startFreshProxySession(options: {
   slowMo?: number
   awaitInitialFrame?: boolean
 }): Promise<Session> {
+  const startedAt = performance.now()
+  const eagerInitialExtract = options.awaitInitialFrame !== false ? undefined : false
   try {
+    const proxyStartStartedAt = performance.now()
     const { runtime, wsUrl } = await startEmbeddedGeometraProxy({
       pageUrl: options.pageUrl,
       port: options.port ?? 0,
@@ -642,7 +841,9 @@ async function startFreshProxySession(options: {
       width: options.width,
       height: options.height,
       slowMo: options.slowMo,
+      eagerInitialExtract,
     })
+    const proxyStartMs = performance.now() - proxyStartStartedAt
     const session = await connect(wsUrl, {
       skipInitialResize: true,
       closePreviousProxy: false,
@@ -656,9 +857,24 @@ async function startFreshProxySession(options: {
       width: options.width,
       height: options.height,
       pageUrl: options.pageUrl,
+      snapshotReady: Boolean(session.tree && session.layout),
     })
+    const baseConnectTrace = session.connectTrace
+    session.connectTrace = {
+      mode: 'fresh-proxy',
+      reused: false,
+      awaitInitialFrame: options.awaitInitialFrame !== false,
+      proxyStartMode: 'embedded',
+      proxyStartMs,
+      connectMs: baseConnectTrace?.totalMs,
+      wsOpenMs: baseConnectTrace?.wsOpenMs,
+      firstFrameMs: baseConnectTrace?.firstFrameMs,
+      resolvedWithoutInitialFrame: baseConnectTrace?.resolvedWithoutInitialFrame,
+      totalMs: performance.now() - startedAt,
+    }
     return session
   } catch (e) {
+    const proxyStartStartedAt = performance.now()
     const { child, wsUrl } = await spawnGeometraProxy({
       pageUrl: options.pageUrl,
       port: options.port ?? 0,
@@ -666,7 +882,9 @@ async function startFreshProxySession(options: {
       width: options.width,
       height: options.height,
       slowMo: options.slowMo,
+      eagerInitialExtract,
     })
+    const proxyStartMs = performance.now() - proxyStartStartedAt
     try {
       const session = await connect(wsUrl, {
         skipInitialResize: true,
@@ -681,7 +899,21 @@ async function startFreshProxySession(options: {
         width: options.width,
         height: options.height,
         pageUrl: options.pageUrl,
+        snapshotReady: Boolean(session.tree && session.layout),
       })
+      const baseConnectTrace = session.connectTrace
+      session.connectTrace = {
+        mode: 'fresh-proxy',
+        reused: false,
+        awaitInitialFrame: options.awaitInitialFrame !== false,
+        proxyStartMode: 'child',
+        proxyStartMs,
+        connectMs: baseConnectTrace?.totalMs,
+        wsOpenMs: baseConnectTrace?.wsOpenMs,
+        firstFrameMs: baseConnectTrace?.firstFrameMs,
+        resolvedWithoutInitialFrame: baseConnectTrace?.resolvedWithoutInitialFrame,
+        totalMs: performance.now() - startedAt,
+      }
       return session
     } catch (fallbackError) {
       try {
@@ -703,6 +935,7 @@ export function connect(
   opts?: { width?: number; height?: number; skipInitialResize?: boolean; closePreviousProxy?: boolean; awaitInitialFrame?: boolean },
 ): Promise<Session> {
   return new Promise((resolve, reject) => {
+    const startedAt = performance.now()
     clearReusableProxiesIfExited()
     shutdownPreviousSession({ closeProxy: opts?.closePreviousProxy ?? true })
 
@@ -713,6 +946,12 @@ export function connect(
       tree: null,
       url,
       updateRevision: 0,
+      connectTrace: {
+        mode: 'direct-ws',
+        reused: false,
+        awaitInitialFrame: opts?.awaitInitialFrame !== false,
+        totalMs: 0,
+      },
       cachedA11y: null,
       cachedA11yRevision: -1,
       cachedFormSchemas: new Map(),
@@ -728,6 +967,9 @@ export function connect(
     }, 10_000)
 
     ws.on('open', () => {
+      if (session.connectTrace) {
+        session.connectTrace.wsOpenMs = performance.now() - startedAt
+      }
       if (!opts?.skipInitialResize) {
         const width = opts?.width ?? 1024
         const height = opts?.height ?? 768
@@ -736,6 +978,10 @@ export function connect(
       if (opts?.awaitInitialFrame === false && !resolved) {
         resolved = true
         clearTimeout(timeout)
+        if (session.connectTrace) {
+          session.connectTrace.resolvedWithoutInitialFrame = true
+          session.connectTrace.totalMs = performance.now() - startedAt
+        }
         activeSession = session
         resolve(session)
       }
@@ -749,9 +995,16 @@ export function connect(
           session.tree = msg.tree
           session.updateRevision++
           invalidateSessionCaches(session)
+          const connectTrace = session.connectTrace
+          if (connectTrace && connectTrace.firstFrameMs === undefined) {
+            connectTrace.firstFrameMs = performance.now() - startedAt
+          }
           if (!resolved) {
             resolved = true
             clearTimeout(timeout)
+            if (session.connectTrace) {
+              session.connectTrace.totalMs = performance.now() - startedAt
+            }
             activeSession = session
             resolve(session)
           }
@@ -913,6 +1166,23 @@ export function waitForUiCondition(
     session.ws.on('message', onMessage)
     session.ws.on('close', onClose)
     check()
+  })
+}
+
+function sendResizeAndWaitForUpdate(
+  session: Session,
+  width: number,
+  height: number,
+  timeoutMs = 5_000,
+): Promise<UpdateWaitResult> {
+  return new Promise((resolve, reject) => {
+    if (session.ws.readyState !== WebSocket.OPEN) {
+      reject(new Error('Not connected'))
+      return
+    }
+    const startRevision = session.updateRevision
+    session.ws.send(JSON.stringify({ type: 'resize', width, height }))
+    waitForNextUpdate(session, timeoutMs, undefined, startRevision).then(resolve).catch(reject)
   })
 }
 
@@ -1592,12 +1862,14 @@ function textPreview(node: A11yNode, maxItems: number): string[] {
   return dedupeStrings(texts.map(candidate => contentPreviewName(candidate)), maxItems)
 }
 
-function primaryAction(node: A11yNode): PagePrimaryAction {
+function primaryAction(root: A11yNode, node: A11yNode): PagePrimaryAction {
+  const context = nodeContextForNode(root, node)
   return {
     id: nodeIdForPath(node.path),
     role: node.role,
     ...(sanitizeInlineName(node.name, 80) ? { name: sanitizeInlineName(node.name, 80) } : {}),
     ...(cloneState(node.state) ? { state: cloneState(node.state) } : {}),
+    ...(context ? { context } : {}),
     bounds: cloneBounds(node.bounds),
   }
 }
@@ -1679,7 +1951,60 @@ function nearestPromptText(container: A11yNode, target: A11yNode): string | unde
   return best?.text
 }
 
-function nodeContext(root: A11yNode, node: A11yNode): NodeContextModel | undefined {
+function nearestItemText(container: A11yNode, target: A11yNode): string | undefined {
+  const normalizedTarget = normalizeUiText(target.name ?? '')
+  const best = collectDescendants(
+    container,
+    candidate =>
+      (candidate.role === 'heading' || candidate.role === 'link' || candidate.role === 'text') &&
+      !!sanitizeInlineName(candidate.name, 120) &&
+      pathKey(candidate.path) !== pathKey(target.path),
+  )
+    .filter(candidate => candidate.bounds.y <= target.bounds.y + Math.max(8, target.bounds.height))
+    .map(candidate => {
+      const text = sanitizeInlineName(candidate.name, 120)
+      if (!text) return null
+      if (normalizeUiText(text) === normalizedTarget) return null
+      const dy = Math.max(0, target.bounds.y - candidate.bounds.y)
+      const dx = Math.abs(target.bounds.x - candidate.bounds.x)
+      const headingBonus = candidate.role === 'heading' ? -36 : 0
+      const linkBonus = candidate.role === 'link' ? -24 : 0
+      const questionBonus = /\?\s*$/.test(text) ? 80 : 0
+      const longTextPenalty = text.length > 90 ? 80 : text.length > 60 ? 40 : 0
+      const pricePenalty = /^[^\p{L}\p{N}]*[$€£]/u.test(text) ? 120 : 0
+      return { text, score: dy * 4 + dx + headingBonus + linkBonus + questionBonus + longTextPenalty + pricePenalty }
+    })
+    .filter((candidate): candidate is { text: string; score: number } => candidate !== null)
+    .sort((a, b) => a.score - b.score)[0]
+
+  return best?.text
+}
+
+function itemContext(root: A11yNode, node: A11yNode): string | undefined {
+  if (node.role !== 'button' && node.role !== 'link') return undefined
+
+  const ancestors = ancestorNodes(root, node.path)
+  for (let index = ancestors.length - 1; index >= 0; index--) {
+    const ancestor = ancestors[index]!
+    if (ancestor.role === 'article') {
+      const articleName = sectionDisplayName(ancestor, 'landmark')
+      if (articleName && normalizeUiText(articleName) !== normalizeUiText(node.name ?? '')) return articleName
+    }
+    if (ancestor.role === 'form' || ancestor.role === 'dialog' || ancestor.role === 'main' || ancestor.role === 'navigation' || ancestor.role === 'region') {
+      continue
+    }
+    if (ancestor.role === 'listitem') {
+      const itemName = listItemName(ancestor)
+      if (itemName && normalizeUiText(itemName) !== normalizeUiText(node.name ?? '')) return itemName
+    }
+    const nearby = nearestItemText(ancestor, node)
+    if (nearby) return nearby
+  }
+
+  return undefined
+}
+
+export function nodeContextForNode(root: A11yNode, node: A11yNode): NodeContextModel | undefined {
   const ancestors = ancestorNodes(root, node.path)
   let prompt: string | undefined
   const promptEligibleNode = node.role === 'radio' || node.role === 'button'
@@ -1703,20 +2028,25 @@ function nodeContext(root: A11yNode, node: A11yNode): NodeContextModel | undefin
     const ancestor = ancestors[index]!
     const kind = sectionKindForNode(ancestor)
     if (!kind) continue
+    if (kind === 'list') continue
+    if (ancestor.role === 'article') continue
     section = sectionDisplayName(ancestor, kind)
     if (section) break
   }
 
-  if (!prompt && !section) return undefined
+  const item = itemContext(root, node)
+
+  if (!prompt && !section && !item) return undefined
   return {
     ...(prompt ? { prompt } : {}),
     ...(section ? { section } : {}),
+    ...(item ? { item } : {}),
   }
 }
 
 function toFieldModel(root: A11yNode, node: A11yNode, includeBounds = true): PageFieldModel {
   const value = sanitizeInlineName(node.value, 120)
-  const context = nodeContext(root, node)
+  const context = nodeContextForNode(root, node)
   const visibility = buildVisibility(node.bounds, root.bounds)
   const scrollHint = buildScrollHint(node.bounds, root.bounds)
   return {
@@ -1734,7 +2064,7 @@ function toFieldModel(root: A11yNode, node: A11yNode, includeBounds = true): Pag
 }
 
 function toActionModel(root: A11yNode, node: A11yNode, includeBounds = true): PageActionModel {
-  const context = nodeContext(root, node)
+  const context = nodeContextForNode(root, node)
   const visibility = buildVisibility(node.bounds, root.bounds)
   const scrollHint = buildScrollHint(node.bounds, root.bounds)
   return {
@@ -1778,13 +2108,13 @@ function groupedChoiceForNode(root: A11yNode, formNode: A11yNode, seed: A11yNode
   prompt: string
   controls: A11yNode[]
 } | null {
-  const context = nodeContext(root, seed)
+  const context = nodeContextForNode(root, seed)
   const prompt = context?.prompt
   if (!prompt) return null
 
   const matchesPrompt = (candidate: A11yNode): boolean => {
     if (!isGroupedChoiceControl(candidate)) return false
-    return nodeContext(root, candidate)?.prompt === prompt
+    return nodeContextForNode(root, candidate)?.prompt === prompt
   }
 
   const ancestors = ancestorNodes(root, seed.path)
@@ -1803,7 +2133,7 @@ function groupedChoiceForNode(root: A11yNode, formNode: A11yNode, seed: A11yNode
 }
 
 function simpleSchemaField(root: A11yNode, node: A11yNode): FormSchemaField | null {
-  const context = nodeContext(root, node)
+  const context = nodeContextForNode(root, node)
   const label = fieldLabel(node) ?? sanitizeInlineName(node.name, 80) ?? context?.prompt
   if (!label) return null
   const choiceType =
@@ -1845,7 +2175,7 @@ function groupedSchemaField(
     16,
   )
   const radioLike = optionEntries.every(entry => entry.role === 'radio' || entry.role === 'button')
-  const context = nodeContext(root, grouped.controls[0]!)
+  const context = nodeContextForNode(root, grouped.controls[0]!)
 
   return {
     id: formFieldIdForPath(grouped.container.path),
@@ -1870,7 +2200,7 @@ function groupedSchemaField(
 function toggleSchemaField(root: A11yNode, node: A11yNode): FormSchemaField | null {
   const label = schemaOptionLabel(node)
   if (!label) return null
-  const context = nodeContext(root, node)
+  const context = nodeContextForNode(root, node)
   const controlType = node.role === 'radio' ? 'radio' : 'checkbox'
   return {
     id: formFieldIdForPath(node.path),
@@ -2114,7 +2444,7 @@ export function buildPageModel(
   const primaryActions = compact.nodes
     .filter(node => node.focusable && ACTION_ROLES.has(node.role))
     .slice(0, maxPrimaryActions)
-    .map(node => primaryAction({
+    .map(node => primaryAction(root, findNodeByPath(root, node.path) ?? {
       role: node.role,
       name: node.name,
       state: node.state,

@@ -1,12 +1,30 @@
+import { performance } from 'node:perf_hooks'
 import { chromium, type Browser, type Page } from 'playwright'
-import { installDomObserver, startGeometryWebSocket, type GeometryWsHub } from './geometry-ws.js'
+import {
+  primeDomObserver,
+  startGeometryWebSocket,
+  type GeometryWsHub,
+  type GeometryWsTrace,
+} from './geometry-ws.js'
+
+export interface ProxyRuntimeTrace {
+  browserLaunchMs?: number
+  newPageMs?: number
+  wsListeningMs?: number
+  initialNavigationMs?: number
+  observerInstallMs?: number
+  readyMs?: number
+  geometry?: GeometryWsTrace
+}
 
 export interface ProxyRuntimeHandle {
-  browser: Browser
-  page: Page
+  browser?: Browser
+  page?: Page
   hub: GeometryWsHub
   pageUrl: string
   wsUrl: string
+  ready: Promise<void>
+  getTrace: () => ProxyRuntimeTrace
   closed: boolean
   close: () => Promise<void>
 }
@@ -19,6 +37,7 @@ export interface LaunchProxyRuntimeOptions {
   headed?: boolean
   slowMo?: number
   debounceMs?: number
+  eagerInitialExtract?: boolean
   onListening?: (wsUrl: string) => void
   onError?: (err: unknown) => void
 }
@@ -46,18 +65,26 @@ export function formatProxyFatalError(err: unknown): string {
   return base
 }
 
-export async function launchProxyRuntime(options: LaunchProxyRuntimeOptions): Promise<ProxyRuntimeHandle> {
-  const pageUrl = parseHttpPageUrl(options.url)
-  const launchOpts: Parameters<typeof chromium.launch>[0] = { headless: options.headed !== true }
-  if (options.slowMo && options.slowMo > 0) launchOpts.slowMo = options.slowMo
-
-  const browser = await chromium.launch(launchOpts)
-  const page = await browser.newPage({
-    viewport: {
-      width: options.width ?? 1280,
-      height: options.height ?? 720,
-    },
+function createDeferred<T>(): {
+  promise: Promise<T>
+  resolve: (value: T | PromiseLike<T>) => void
+  reject: (reason?: unknown) => void
+} {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
   })
+  return { promise, resolve, reject }
+}
+
+export async function launchProxyRuntime(options: LaunchProxyRuntimeOptions): Promise<ProxyRuntimeHandle> {
+  const runtimeStartedAt = performance.now()
+  const pageUrl = parseHttpPageUrl(options.url)
+  const eagerInitialExtract = options.eagerInitialExtract !== false
+  const trace: ProxyRuntimeTrace = {}
+  const pageReady = createDeferred<Page>()
 
   let resolveListening!: (wsUrl: string) => void
   let rejectListening!: (err: Error) => void
@@ -76,6 +103,8 @@ export async function launchProxyRuntime(options: LaunchProxyRuntimeOptions): Pr
   let wsUrl = options.port === 0 ? '' : `ws://127.0.0.1:${options.port}`
   let closed = false
   let closing = false
+  let browser: Browser | undefined
+  let page: Page | undefined
 
   const reportError = (err: unknown) => {
     options.onError?.(err)
@@ -86,7 +115,7 @@ export async function launchProxyRuntime(options: LaunchProxyRuntimeOptions): Pr
 
   const hub = startGeometryWebSocket({
     port: options.port,
-    page,
+    page: pageReady.promise,
     debounceMs: options.debounceMs ?? 50,
     beforeInput,
     onListening(port) {
@@ -111,35 +140,57 @@ export async function launchProxyRuntime(options: LaunchProxyRuntimeOptions): Pr
     void hub.close().catch(() => {})
   }
 
-  page.on('close', () => {
-    handleUnexpectedClosure('page')
-  })
-  browser.on('disconnected', () => {
-    handleUnexpectedClosure('browser')
-  })
+  const launchTask = (async () => {
+    const viewport = {
+      width: options.width ?? 1280,
+      height: options.height ?? 720,
+    }
+    const browserLaunchStartedAt = performance.now()
+    const launchOpts: Parameters<typeof chromium.launch>[0] = { headless: options.headed !== true }
+    if (options.slowMo && options.slowMo > 0) launchOpts.slowMo = options.slowMo
+    browser = await chromium.launch(launchOpts)
+    trace.browserLaunchMs = performance.now() - browserLaunchStartedAt
+    browser?.on('disconnected', () => {
+      handleUnexpectedClosure('browser')
+    })
 
-  const refreshObservers = () => {
-    void installDomObserver(page, hub.scheduleExtract)
-      .then(() => {
-        hub.scheduleExtract()
-      })
-      .catch(reportError)
-  }
-  page.on('domcontentloaded', refreshObservers)
+    const newPageStartedAt = performance.now()
+    page = await browser.newPage({ viewport })
+    trace.newPageMs = performance.now() - newPageStartedAt
+    page.on('close', () => {
+      handleUnexpectedClosure('page')
+    })
+    pageReady.resolve(page)
 
-  const initialNavigation = page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const observerInstallStartedAt = performance.now()
+    await primeDomObserver(page, hub.scheduleExtract)
+    trace.observerInstallMs = performance.now() - observerInstallStartedAt
 
-  void initialNavigation
-    .then(async () => {
-      resolveBeforeInput()
+    const initialNavigationStartedAt = performance.now()
+    await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    trace.initialNavigationMs = performance.now() - initialNavigationStartedAt
+    resolveBeforeInput()
+    if (eagerInitialExtract) {
       await hub.flushExtract()
-    })
-    .catch(err => {
-      rejectBeforeInput(err)
-      reportError(err)
-    })
+    }
+    trace.readyMs = performance.now() - runtimeStartedAt
+  })()
+
+  const ready = launchTask.catch(err => {
+    pageReady.reject(err)
+    rejectBeforeInput(err)
+    reportError(err)
+    void hub.close().catch(() => {})
+    throw err
+  })
 
   const listeningWsUrl = await listeningPromise
+  trace.wsListeningMs = performance.now() - runtimeStartedAt
+
+  const getTrace = (): ProxyRuntimeTrace => ({
+    ...trace,
+    geometry: hub.getTrace(),
+  })
 
   const close = async () => {
     if (closed || closing) return
@@ -150,7 +201,8 @@ export async function launchProxyRuntime(options: LaunchProxyRuntimeOptions): Pr
       /* ignore */
     }
     try {
-      if (browser.isConnected()) {
+      await ready.catch(() => {})
+      if (browser?.isConnected()) {
         await browser.close()
       }
     } catch {
@@ -161,11 +213,17 @@ export async function launchProxyRuntime(options: LaunchProxyRuntimeOptions): Pr
   }
 
   return {
-    browser,
-    page,
+    get browser() {
+      return browser
+    },
+    get page() {
+      return page
+    },
     hub,
     pageUrl,
     wsUrl: listeningWsUrl,
+    ready,
+    getTrace,
     get closed() {
       return closed
     },

@@ -19,6 +19,12 @@ interface AxSnapshotCandidate {
   focused?: boolean
 }
 
+export interface CdpAxSessionManager {
+  get(page: Page): Promise<CDPSession>
+  reset(): Promise<void>
+  close(): Promise<void>
+}
+
 const INTERACTIVE_AX_ROLES = new Set([
   'button',
   'link',
@@ -167,6 +173,134 @@ function countMeaningfulSnapshotNodes(node: TreeSnapshot, isRoot = true): number
   return count
 }
 
+function snapshotNodeLabel(node: TreeSnapshot): string | undefined {
+  const semantic = node.semantic ?? {}
+  const ariaLabel = typeof semantic.ariaLabel === 'string' ? semantic.ariaLabel.trim() : ''
+  if (ariaLabel) return ariaLabel
+  const text = typeof node.props.text === 'string' ? node.props.text.trim() : ''
+  if (text) return text
+  const valueText = typeof semantic.valueText === 'string' ? semantic.valueText.trim() : ''
+  return valueText || undefined
+}
+
+interface UnnamedInteractiveSnapshotSummary {
+  criticalCount: number
+  ignoredTinyLinkCount: number
+}
+
+function summarizeUnnamedInteractiveSnapshotNodes(
+  tree: TreeSnapshot,
+  layout: LayoutSnapshot,
+  isRoot = true,
+): UnnamedInteractiveSnapshotSummary {
+  const summary: UnnamedInteractiveSnapshotSummary = {
+    criticalCount: 0,
+    ignoredTinyLinkCount: 0,
+  }
+
+  if (!isRoot) {
+    const semantic = tree.semantic ?? {}
+    const role = typeof semantic.role === 'string' ? semantic.role : undefined
+    const interactive =
+      (role !== undefined && INTERACTIVE_AX_ROLES.has(role)) ||
+      !!tree.handlers?.onClick ||
+      !!tree.handlers?.onKeyDown ||
+      !!tree.handlers?.onKeyUp
+    if (interactive && !snapshotNodeLabel(tree)) {
+      const isTinyLink =
+        role === 'link' &&
+        layout.width > 0 &&
+        layout.height > 0 &&
+        layout.width <= 56 &&
+        layout.height <= 56 &&
+        layout.width * layout.height <= 2_500
+      if (isTinyLink) {
+        summary.ignoredTinyLinkCount += 1
+      } else {
+        summary.criticalCount += 1
+      }
+    }
+  }
+
+  const treeChildren = tree.children ?? []
+  for (let i = 0; i < treeChildren.length; i++) {
+    const childSummary = summarizeUnnamedInteractiveSnapshotNodes(treeChildren[i]!, layout.children[i]!, false)
+    summary.criticalCount += childSummary.criticalCount
+    summary.ignoredTinyLinkCount += childSummary.ignoredTinyLinkCount
+  }
+
+  return summary
+}
+
+export function shouldEnrichSnapshotWithCdpAx(snap: GeometrySnapshot): boolean {
+  if (countMeaningfulSnapshotNodes(snap.tree) <= 1) return true
+  const unnamed = summarizeUnnamedInteractiveSnapshotNodes(snap.tree, snap.layout)
+  return unnamed.criticalCount > 0 || unnamed.ignoredTinyLinkCount > 1
+}
+
+async function detachCdpSession(session: CDPSession | undefined): Promise<void> {
+  try {
+    await session?.detach()
+  } catch {
+    /* ignore */
+  }
+}
+
+async function createEnabledCdpSession(page: Page): Promise<CDPSession> {
+  const session = await page.context().newCDPSession(page)
+  try {
+    await session.send('Accessibility.enable')
+    try {
+      await session.send('DOM.enable')
+    } catch {
+      /* optional */
+    }
+    return session
+  } catch (err) {
+    await detachCdpSession(session)
+    throw err
+  }
+}
+
+function isRecoverableCdpSessionError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err)
+  return /Session closed|Target closed|Browser has been closed|page has been closed|Protocol error/i.test(message)
+}
+
+export function createCdpAxSessionManager(): CdpAxSessionManager {
+  let activeSession: CDPSession | undefined
+  let sessionPromise: Promise<CDPSession> | undefined
+
+  const clear = async (): Promise<void> => {
+    const pending = sessionPromise
+    sessionPromise = undefined
+    const session = activeSession ?? await pending?.catch(() => undefined)
+    activeSession = undefined
+    await detachCdpSession(session)
+  }
+
+  return {
+    async get(page: Page): Promise<CDPSession> {
+      if (activeSession) return activeSession
+      if (!sessionPromise) {
+        sessionPromise = createEnabledCdpSession(page)
+          .then(session => {
+            activeSession = session
+            return session
+          })
+          .catch(err => {
+            activeSession = undefined
+            sessionPromise = undefined
+            throw err
+          })
+      }
+      return sessionPromise
+    },
+    reset: clear,
+    close: clear,
+  }
+}
+
 function buildAxFallbackChildren(candidates: AxSnapshotCandidate[]): {
   layoutChildren: LayoutSnapshot[]
   treeChildren: TreeSnapshot[]
@@ -245,100 +379,117 @@ async function boundsForBackendNode(session: CDPSession, backendDOMNodeId: numbe
   }
 }
 
+async function collectAxSnapshotCandidates(
+  session: CDPSession,
+  root: LayoutSnapshot,
+): Promise<AxSnapshotCandidate[]> {
+  const res = (await session.send('Accessibility.getFullAXTree')) as {
+    nodes?: Array<{
+      ignored?: boolean
+      role?: { value?: string }
+      name?: { value?: string }
+      properties?: unknown[]
+      backendDOMNodeId?: number
+    }>
+  }
+  const nodes = res.nodes ?? []
+  const candidates: AxSnapshotCandidate[] = []
+  for (const n of nodes) {
+    if (n.ignored) continue
+    const role = normalizeAxRole(n.role?.value)
+    if (!role || !INTERESTING_AX_ROLES.has(role)) continue
+    const name = n.name?.value?.trim() || undefined
+    const b = parseAxBounds(n.properties as unknown[] | undefined) ??
+      await boundsForBackendNode(session, n.backendDOMNodeId)
+    if (!b || b.width <= 0 || b.height <= 0) continue
+    if (!boundsIntersectsViewport(b, root)) continue
+    if (!name && !INTERACTIVE_AX_ROLES.has(role) && role !== 'img') continue
+    candidates.push({
+      ...(name ? { name } : {}),
+      role,
+      bounds: b,
+      selected: parseAxBooleanProperty(n.properties as unknown[] | undefined, 'selected'),
+      expanded: parseAxBooleanProperty(n.properties as unknown[] | undefined, 'expanded'),
+      checked: parseAxCheckedProperty(n.properties as unknown[] | undefined),
+      disabled: parseAxBooleanProperty(n.properties as unknown[] | undefined, 'disabled'),
+      focused: parseAxBooleanProperty(n.properties as unknown[] | undefined, 'focused'),
+    })
+  }
+  return candidates
+}
+
+function applyAxSnapshotCandidates(snap: GeometrySnapshot, candidates: AxSnapshotCandidate[]): void {
+  const visit = (tNode: TreeSnapshot, lNode: LayoutSnapshot): void => {
+    const sem = tNode.semantic
+    if (sem?.ariaLabel || sem?.a11yEnriched) {
+      /* skip */
+    } else {
+      const cx = lNode.x + lNode.width / 2
+      const cy = lNode.y + lNode.height / 2
+      for (const c of candidates) {
+        const b = c.bounds
+        if (cx >= b.left && cx <= b.left + b.width && cy >= b.top && cy <= b.top + b.height) {
+          tNode.semantic = {
+            ...(sem ?? {}),
+            ariaLabel: c.name,
+            a11yRoleHint: c.role,
+            a11yEnriched: true,
+          }
+          break
+        }
+      }
+    }
+    const tch = tNode.children ?? []
+    const lch = lNode.children
+    for (let i = 0; i < tch.length; i++) {
+      visit(tch[i]!, lch[i]!)
+    }
+  }
+
+  visit(snap.tree, snap.layout)
+
+  if (countMeaningfulSnapshotNodes(snap.tree) <= 1) {
+    const fallback = buildAxFallbackChildren(candidates)
+    if (fallback.treeChildren.length > 0) {
+      snap.layout.children = fallback.layoutChildren
+      snap.tree.children = fallback.treeChildren
+      snap.tree.semantic = {
+        ...(snap.tree.semantic ?? {}),
+        a11yFallbackUsed: true,
+      }
+    }
+  }
+}
+
 /**
  * Use Chrome DevTools `Accessibility.getFullAXTree` to back-fill `semantic.ariaLabel` on nodes
  * whose center falls inside an AX bounds box (helps closed shadow + custom controls).
  */
-export async function enrichSnapshotWithCdpAx(page: Page, snap: GeometrySnapshot): Promise<void> {
-  let session: CDPSession | undefined
-  try {
-    session = await page.context().newCDPSession(page)
-    await session.send('Accessibility.enable')
+export async function enrichSnapshotWithCdpAx(
+  page: Page,
+  snap: GeometrySnapshot,
+  sessionManager?: CdpAxSessionManager,
+): Promise<void> {
+  let temporarySession: CDPSession | undefined
+  for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      await session.send('DOM.enable')
-    } catch {
-      /* optional */
-    }
-    const res = (await session.send('Accessibility.getFullAXTree')) as {
-      nodes?: Array<{
-        ignored?: boolean
-        role?: { value?: string }
-        name?: { value?: string }
-        properties?: unknown[]
-        backendDOMNodeId?: number
-      }>
-    }
-    const nodes = res.nodes ?? []
-    const root = snap.layout
-    const candidates: AxSnapshotCandidate[] = []
-    for (const n of nodes) {
-      if (n.ignored) continue
-      const role = normalizeAxRole(n.role?.value)
-      if (!role || !INTERESTING_AX_ROLES.has(role)) continue
-      const name = n.name?.value?.trim() || undefined
-      const b = parseAxBounds(n.properties as unknown[] | undefined) ??
-        await boundsForBackendNode(session, n.backendDOMNodeId)
-      if (!b || b.width <= 0 || b.height <= 0) continue
-      if (!boundsIntersectsViewport(b, root)) continue
-      if (!name && !INTERACTIVE_AX_ROLES.has(role) && role !== 'img') continue
-      candidates.push({
-        ...(name ? { name } : {}),
-        role,
-        bounds: b,
-        selected: parseAxBooleanProperty(n.properties as unknown[] | undefined, 'selected'),
-        expanded: parseAxBooleanProperty(n.properties as unknown[] | undefined, 'expanded'),
-        checked: parseAxCheckedProperty(n.properties as unknown[] | undefined),
-        disabled: parseAxBooleanProperty(n.properties as unknown[] | undefined, 'disabled'),
-        focused: parseAxBooleanProperty(n.properties as unknown[] | undefined, 'focused'),
-      })
-    }
-
-    const visit = (tNode: TreeSnapshot, lNode: LayoutSnapshot): void => {
-      const sem = tNode.semantic
-      if (sem?.ariaLabel || sem?.a11yEnriched) {
-        /* skip */
-      } else {
-        const cx = lNode.x + lNode.width / 2
-        const cy = lNode.y + lNode.height / 2
-        for (const c of candidates) {
-          const b = c.bounds
-          if (cx >= b.left && cx <= b.left + b.width && cy >= b.top && cy <= b.top + b.height) {
-            tNode.semantic = {
-              ...(sem ?? {}),
-              ariaLabel: c.name,
-              a11yRoleHint: c.role,
-              a11yEnriched: true,
-            }
-            break
-          }
-        }
+      const session = sessionManager
+        ? await sessionManager.get(page)
+        : (temporarySession = await createEnabledCdpSession(page))
+      const candidates = await collectAxSnapshotCandidates(session, snap.layout)
+      applyAxSnapshotCandidates(snap, candidates)
+      return
+    } catch (err) {
+      if (sessionManager && attempt === 0 && !page.isClosed() && isRecoverableCdpSessionError(err)) {
+        await sessionManager.reset()
+        continue
       }
-      const tch = tNode.children ?? []
-      const lch = lNode.children
-      for (let i = 0; i < tch.length; i++) {
-        visit(tch[i]!, lch[i]!)
+      return
+    } finally {
+      if (!sessionManager && temporarySession) {
+        await detachCdpSession(temporarySession)
+        temporarySession = undefined
       }
-    }
-    visit(snap.tree, snap.layout)
-
-    if (countMeaningfulSnapshotNodes(snap.tree) <= 1) {
-      const fallback = buildAxFallbackChildren(candidates)
-      if (fallback.treeChildren.length > 0) {
-        snap.layout.children = fallback.layoutChildren
-        snap.tree.children = fallback.treeChildren
-        snap.tree.semantic = {
-          ...(snap.tree.semantic ?? {}),
-          a11yFallbackUsed: true,
-        }
-      }
-    }
-  } catch {
-    /* optional */
-  } finally {
-    try {
-      await session?.detach()
-    } catch {
-      /* ignore */
     }
   }
 }

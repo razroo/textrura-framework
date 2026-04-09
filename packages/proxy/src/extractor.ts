@@ -1,5 +1,10 @@
+import { performance } from 'node:perf_hooks'
 import type { Frame, Page } from 'playwright'
-import { enrichSnapshotWithCdpAx } from './a11y-enrich.js'
+import {
+  enrichSnapshotWithCdpAx,
+  shouldEnrichSnapshotWithCdpAx,
+  type CdpAxSessionManager,
+} from './a11y-enrich.js'
 import { frameOriginInRootPage } from './frame-offset.js'
 import { offsetLayoutSubtree } from './layout-offset.js'
 import type { GeometrySnapshot, LayoutSnapshot, TreeSnapshot } from './types.js'
@@ -22,12 +27,23 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
   }
 
   function getAccessibleName(el: Element): string | undefined {
+    const role = el.getAttribute('role')
     const aria = el.getAttribute('aria-label')
     if (aria) return aria.trim() || undefined
-    const alt = el.getAttribute('alt')
-    if (alt) return alt.trim() || undefined
-    const title = el.getAttribute('title')
-    if (title) return title.trim() || undefined
+    const labelledBy = el.getAttribute('aria-labelledby')
+    if (labelledBy) {
+      const text = labelledBy
+        .split(/\s+/)
+        .map(id => {
+          const target = document.getElementById(id)
+          if (!target) return ''
+          return textWithoutNestedControls(target).replace(/\s+/g, ' ').trim()
+        })
+        .filter(Boolean)
+        .join(' ')
+        .trim()
+      if (text) return text.length > 100 ? text.slice(0, 100) : text
+    }
     if (
       (el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) &&
       el.labels &&
@@ -36,9 +52,38 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
       const t = textWithoutNestedControls(el.labels[0]!).replace(/\s+/g, ' ').trim()
       if (t) return t
     }
-    const ph = el.getAttribute('placeholder')
-    if (ph) return ph.trim() || undefined
-    const tc = el.textContent?.trim()
+    if (el instanceof HTMLElement && el.id) {
+      const label = document.querySelector(`label[for="${CSS.escape(el.id)}"]`)
+      const t = label ? textWithoutNestedControls(label).replace(/\s+/g, ' ').trim() : ''
+      if (t) return t
+    }
+    if (el.parentElement?.tagName.toLowerCase() === 'label') {
+      const t = textWithoutNestedControls(el.parentElement).replace(/\s+/g, ' ').trim()
+      if (t) return t
+    }
+    if (el instanceof HTMLInputElement && ['button', 'submit', 'reset'].includes(el.type)) {
+      const value = el.value?.trim()
+      if (value) return value.length > 100 ? value.slice(0, 100) : value
+    }
+    const alt = el.getAttribute('alt')
+    if (alt) return alt.trim() || undefined
+    if (el.tagName.toLowerCase() === 'a' || el.tagName.toLowerCase() === 'button' || role === 'link' || role === 'button') {
+      const descendantAlt = Array.from(el.querySelectorAll('img[alt]'))
+        .map(img => img.getAttribute('alt')?.trim() ?? '')
+        .find(Boolean)
+      if (descendantAlt) return descendantAlt.length > 100 ? descendantAlt.slice(0, 100) : descendantAlt
+    }
+    const title = el.getAttribute('title')
+    if (title) return title.trim() || undefined
+    const textLikeControl =
+      el instanceof HTMLTextAreaElement ||
+      el instanceof HTMLSelectElement ||
+      (el instanceof HTMLInputElement && !['checkbox', 'radio', 'file', 'button', 'submit', 'reset', 'hidden', 'range', 'color'].includes(el.type)) ||
+      role === 'textbox' ||
+      role === 'combobox'
+    const placeholder = el.getAttribute('aria-placeholder') || (textLikeControl ? el.getAttribute('placeholder') : null)
+    if (placeholder) return placeholder.trim() || undefined
+    const tc = textWithoutNestedControls(el).replace(/\s+/g, ' ').trim()
     if (tc && tc.length > 0) {
       return tc.length > 100 ? tc.slice(0, 100) : tc
     }
@@ -509,10 +554,27 @@ function cloneTree(tree: TreeSnapshot): TreeSnapshot {
   return structuredClone(tree)
 }
 
-export async function extractFrameGeometry(frame: Frame): Promise<GeometrySnapshot> {
+export interface ExtractGeometryTrace {
+  mainFrameMs?: number
+  iframeCount?: number
+  iframeMergeMs?: number
+  axDecisionMs?: number
+  axEnrichMs?: number
+  axRan?: boolean
+  treeJsonMs?: number
+  totalMs?: number
+}
+
+async function captureFrameGeometry(frame: Frame): Promise<{ layout: LayoutSnapshot; tree: TreeSnapshot }> {
   const raw = await frame.evaluate(browserExtractGeometry)
-  const tree = raw.tree as TreeSnapshot
-  const layout = raw.layout as LayoutSnapshot
+  return {
+    layout: raw.layout as LayoutSnapshot,
+    tree: raw.tree as TreeSnapshot,
+  }
+}
+
+export async function extractFrameGeometry(frame: Frame): Promise<GeometrySnapshot> {
+  const { tree, layout } = await captureFrameGeometry(frame)
   return {
     layout,
     tree,
@@ -525,8 +587,11 @@ export async function mergeAllIframes(
   layout: LayoutSnapshot,
   ownerFrame: Frame,
 ): Promise<void> {
+  if (ownerFrame.childFrames().length === 0) return
+
   async function dfs(t: TreeSnapshot, l: LayoutSnapshot, f: Frame): Promise<void> {
     const subFrames = f.childFrames()
+    if (subFrames.length === 0) return
     let slot = 0
     const tch = t.children ?? []
     const lch = l.children
@@ -536,7 +601,7 @@ export async function mergeAllIframes(
       if (st.semantic?.tag === 'iframe') {
         const cf = subFrames[slot++]
         if (cf && !cf.isDetached()) {
-          const snap = await extractFrameGeometry(cf)
+          const snap = await captureFrameGeometry(cf)
           await mergeAllIframes(snap.tree, snap.layout, cf)
           const { x: ox, y: oy } = await frameOriginInRootPage(cf)
           sl.children = snap.layout.children.map(c => {
@@ -556,16 +621,56 @@ export async function mergeAllIframes(
   await dfs(tree, layout, ownerFrame)
 }
 
+export interface ExtractGeometryOptions {
+  axSessionManager?: CdpAxSessionManager
+  trace?: ExtractGeometryTrace
+}
+
 /**
  * Full page: main frame + every nested iframe (any origin) + optional CDP AX name enrichment.
  */
-export async function extractGeometry(page: Page): Promise<GeometrySnapshot> {
-  const main = await extractFrameGeometry(page.mainFrame())
-  await mergeAllIframes(main.tree, main.layout, page.mainFrame())
-  await enrichSnapshotWithCdpAx(page, main)
-  return {
-    layout: main.layout,
-    tree: main.tree,
-    treeJson: JSON.stringify(main.tree),
+export async function extractGeometry(page: Page, options?: ExtractGeometryOptions): Promise<GeometrySnapshot> {
+  const trace = options?.trace
+  const totalStartedAt = performance.now()
+
+  const mainFrameStartedAt = performance.now()
+  const mainFrame = await captureFrameGeometry(page.mainFrame())
+  if (trace) {
+    trace.mainFrameMs = performance.now() - mainFrameStartedAt
+    trace.iframeCount = Math.max(0, page.frames().length - 1)
   }
+  const main: GeometrySnapshot = {
+    layout: mainFrame.layout,
+    tree: mainFrame.tree,
+    treeJson: '',
+  }
+
+  const iframeMergeStartedAt = performance.now()
+  await mergeAllIframes(main.tree, main.layout, page.mainFrame())
+  if (trace) {
+    trace.iframeMergeMs = performance.now() - iframeMergeStartedAt
+  }
+
+  const axDecisionStartedAt = performance.now()
+  const shouldRunAxEnrichment = shouldEnrichSnapshotWithCdpAx(main)
+  if (trace) {
+    trace.axDecisionMs = performance.now() - axDecisionStartedAt
+    trace.axRan = shouldRunAxEnrichment
+  }
+
+  if (shouldRunAxEnrichment) {
+    const axEnrichStartedAt = performance.now()
+    await enrichSnapshotWithCdpAx(page, main, options?.axSessionManager)
+    if (trace) {
+      trace.axEnrichMs = performance.now() - axEnrichStartedAt
+    }
+  }
+
+  const treeJsonStartedAt = performance.now()
+  main.treeJson = JSON.stringify(main.tree)
+  if (trace) {
+    trace.treeJsonMs = performance.now() - treeJsonStartedAt
+    trace.totalMs = performance.now() - totalStartedAt
+  }
+  return main
 }

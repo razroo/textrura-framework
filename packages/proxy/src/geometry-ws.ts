@@ -1,3 +1,4 @@
+import { performance } from 'node:perf_hooks'
 import type { Page } from 'playwright'
 import { WebSocketServer, type WebSocket } from 'ws'
 import {
@@ -13,8 +14,9 @@ import {
   setCheckedControl,
   wheelAt,
 } from './dom-actions.js'
+import { createCdpAxSessionManager } from './a11y-enrich.js'
 import { coalescePatches, diffLayout } from './diff-layout.js'
-import { extractGeometry } from './extractor.js'
+import { extractGeometry, type ExtractGeometryTrace } from './extractor.js'
 import type { ClientKeyMessage, GeometrySnapshot, LayoutSnapshot, ParsedClientMessage } from './types.js'
 import {
   isClickEventMessage,
@@ -34,6 +36,46 @@ import {
 } from './types.js'
 
 const DOM_OBSERVER_BINDINGS = new WeakSet<Page>()
+
+async function bindDomObserverBridge(page: Page, scheduleExtract: () => void): Promise<void> {
+  if (DOM_OBSERVER_BINDINGS.has(page)) return
+  await page.exposeFunction('__geometraProxyNotify', () => {
+    scheduleExtract()
+  })
+  await page.addInitScript(() => {
+    const w = window as unknown as {
+      __geometraProxyNotify?: () => Promise<void>
+      __geometraProxyObserverBootstrapped?: boolean
+      __geometraProxyObserverInstalled?: boolean
+    }
+    if (w.__geometraProxyObserverBootstrapped) return
+
+    const install = () => {
+      if (w.__geometraProxyObserverInstalled) return
+      const root = document.documentElement
+      if (!root) return
+      const observer = new MutationObserver(() => {
+        void w.__geometraProxyNotify?.()
+      })
+      observer.observe(root, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        characterData: true,
+      })
+      w.__geometraProxyObserverInstalled = true
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', install, { once: true })
+    } else {
+      install()
+    }
+
+    w.__geometraProxyObserverBootstrapped = true
+  })
+  DOM_OBSERVER_BINDINGS.add(page)
+}
 
 interface PendingInputAck {
   ws: WebSocket
@@ -93,7 +135,7 @@ async function applyKeyPhase(page: Page, msg: ClientKeyMessage): Promise<void> {
 }
 
 async function handleClientMessage(
-  page: Page,
+  waitForPage: () => Promise<Page>,
   ws: WebSocket,
   raw: unknown,
   fieldLookupCache: ReturnType<typeof createFillLookupCache>,
@@ -134,6 +176,7 @@ async function handleClientMessage(
   }
 
   try {
+    const page = await waitForPage()
     if (isResizeMessage(msg)) {
       const w = Math.max(1, Math.floor(msg.width))
       const h = Math.max(1, Math.floor(msg.height))
@@ -299,12 +342,34 @@ export interface GeometryWsHub {
   scheduleExtract: () => void
   /** Wait until any in-flight extract + broadcast finishes. */
   flushExtract: () => Promise<void>
+  getTrace: () => GeometryWsTrace
   close: () => Promise<void>
+}
+
+export interface GeometryExtractRecoveryTrace {
+  attemptCount: number
+  domContentLoadedWaitMs: number
+  loadWaitMs: number
+}
+
+export interface GeometryFirstExtractTrace {
+  beforeInputMs: number
+  extractMs: number
+  broadcastMs: number
+  totalMs: number
+  changed: boolean
+  extractor: ExtractGeometryTrace
+  recovery: GeometryExtractRecoveryTrace
+}
+
+export interface GeometryWsTrace {
+  extractCount: number
+  firstExtract?: GeometryFirstExtractTrace
 }
 
 export function startGeometryWebSocket(options: {
   port: number
-  page: Page
+  page: Page | Promise<Page>
   /** DOM mutation debounce (ms). */
   debounceMs?: number
   /** Optional promise that must resolve before extracts or input actions run. */
@@ -315,6 +380,7 @@ export function startGeometryWebSocket(options: {
   const debounceMs = options.debounceMs ?? 50
   const clients = new Set<WebSocket>()
   const wss = new WebSocketServer({ port: options.port })
+  const axSessionManager = createCdpAxSessionManager()
 
   let prevLayout: LayoutSnapshot | null = null
   let prevTreeJson: string | null = null
@@ -326,17 +392,25 @@ export function startGeometryWebSocket(options: {
   let pendingInputAcks: PendingInputAck[] = []
   const fieldLookupCache = createFillLookupCache()
   const beforeInput = options.beforeInput?.then(() => undefined)
+  const trace: GeometryWsTrace = { extractCount: 0 }
+  const pagePromise = Promise.resolve(options.page)
 
   async function waitForBeforeInput(): Promise<void> {
     if (!beforeInput) return
     await beforeInput
   }
 
-  options.page.on('framenavigated', frame => {
-    if (frame === options.page.mainFrame()) {
-      clearFillLookupCache(fieldLookupCache)
-    }
-  })
+  async function waitForPage(): Promise<Page> {
+    return await pagePromise
+  }
+
+  void pagePromise.then(page => {
+    page.on('framenavigated', frame => {
+      if (frame === page.mainFrame()) {
+        clearFillLookupCache(fieldLookupCache)
+      }
+    })
+  }).catch(err => options.onError?.(err))
 
   function sendPendingInputAcks() {
     if (pendingInputAcks.length === 0) return
@@ -423,10 +497,37 @@ export function startGeometryWebSocket(options: {
   }
 
   async function runExtract(): Promise<boolean> {
+    const runStartedAt = performance.now()
+    const beforeInputStartedAt = performance.now()
     try {
       await waitForBeforeInput()
-      const snap = await extractGeometryWithRecovery(options.page)
-      return broadcastSnapshot(snap)
+      const beforeInputMs = performance.now() - beforeInputStartedAt
+      const extractorTrace: ExtractGeometryTrace = {}
+      const recoveryTrace: GeometryExtractRecoveryTrace = {
+        attemptCount: 0,
+        domContentLoadedWaitMs: 0,
+        loadWaitMs: 0,
+      }
+      const page = await waitForPage()
+      const extractStartedAt = performance.now()
+      const snap = await extractGeometryWithRecovery(page, axSessionManager, extractorTrace, recoveryTrace)
+      const extractMs = performance.now() - extractStartedAt
+      const broadcastStartedAt = performance.now()
+      const changed = broadcastSnapshot(snap)
+      const broadcastMs = performance.now() - broadcastStartedAt
+      trace.extractCount += 1
+      if (!trace.firstExtract) {
+        trace.firstExtract = {
+          beforeInputMs,
+          extractMs,
+          broadcastMs,
+          totalMs: performance.now() - runStartedAt,
+          changed,
+          extractor: { ...extractorTrace },
+          recovery: { ...recoveryTrace },
+        }
+      }
+      return changed
     } catch (err) {
       options.onError?.(err)
       sendPendingInputErrors(err instanceof Error ? err.message : String(err))
@@ -495,7 +596,7 @@ export function startGeometryWebSocket(options: {
       actionQueue = actionQueue
         .then(() =>
           handleClientMessage(
-            options.page,
+            waitForPage,
             ws,
             raw,
             fieldLookupCache,
@@ -530,24 +631,26 @@ export function startGeometryWebSocket(options: {
       await runExtractQueued()
       sendPendingInputAcks()
     },
+    getTrace: () => structuredClone(trace),
     close: () =>
       new Promise((resolve, reject) => {
-        for (const ws of clients) {
-          ws.close()
-        }
-        clients.clear()
-        wss.close(err => (err ? reject(err) : resolve()))
+        void axSessionManager.close().finally(() => {
+          for (const ws of clients) {
+            ws.close()
+          }
+          clients.clear()
+          wss.close(err => (err ? reject(err) : resolve()))
+        })
       }),
   }
 }
 
+export async function primeDomObserver(page: Page, scheduleExtract: () => void): Promise<void> {
+  await bindDomObserverBridge(page, scheduleExtract)
+}
+
 export async function installDomObserver(page: Page, scheduleExtract: () => void): Promise<void> {
-  if (!DOM_OBSERVER_BINDINGS.has(page)) {
-    await page.exposeFunction('__geometraProxyNotify', () => {
-      scheduleExtract()
-    })
-    DOM_OBSERVER_BINDINGS.add(page)
-  }
+  await bindDomObserverBridge(page, scheduleExtract)
   await page.evaluate(() => {
     const w = window as unknown as {
       __geometraProxyNotify?: () => Promise<void>
@@ -572,17 +675,35 @@ function isNavigationTransitionError(err: unknown): boolean {
   return /Execution context was destroyed|Cannot find context with specified id|Frame was detached|navigation/i.test(message)
 }
 
-async function extractGeometryWithRecovery(page: Page): Promise<GeometrySnapshot> {
+async function extractGeometryWithRecovery(
+  page: Page,
+  axSessionManager: ReturnType<typeof createCdpAxSessionManager>,
+  extractTrace?: ExtractGeometryTrace,
+  recoveryTrace?: GeometryExtractRecoveryTrace,
+): Promise<GeometrySnapshot> {
   let lastNavigationError: Error | null = null
+  let domContentLoadedWaitMs = 0
+  let loadWaitMs = 0
 
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      return await extractGeometry(page)
+      if (recoveryTrace) {
+        recoveryTrace.attemptCount = attempt + 1
+      }
+      return await extractGeometry(page, { axSessionManager, trace: extractTrace })
     } catch (err) {
       if (page.isClosed() || !isNavigationTransitionError(err)) throw err
       lastNavigationError = err instanceof Error ? err : new Error(String(err))
+      const domContentLoadedStartedAt = performance.now()
       await page.waitForLoadState('domcontentloaded', { timeout: 2500 }).catch(() => {})
+      domContentLoadedWaitMs += performance.now() - domContentLoadedStartedAt
+      const loadStartedAt = performance.now()
       await page.waitForLoadState('load', { timeout: 1000 }).catch(() => {})
+      loadWaitMs += performance.now() - loadStartedAt
+      if (recoveryTrace) {
+        recoveryTrace.domContentLoadedWaitMs = domContentLoadedWaitMs
+        recoveryTrace.loadWaitMs = loadWaitMs
+      }
     }
   }
 

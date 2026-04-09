@@ -504,6 +504,20 @@ describe('setFieldText', () => {
     expect(await page.locator('#full-name').inputValue()).toBe('Taylor Applicant')
     await page.close()
   })
+
+  it('fills a placeholder-only text field semantically', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <div style="display:grid;gap:12px;width:320px;margin:24px;font-family:sans-serif;">
+        <input id="username" placeholder="Username" />
+      </div>
+    `)
+
+    await setFieldText(page, 'Username', 'standard_user')
+
+    expect(await page.locator('#username').inputValue()).toBe('standard_user')
+    await page.close()
+  })
 })
 
 describe('setFieldChoice', () => {
@@ -718,6 +732,41 @@ describe('fillFields auto', () => {
       shareProfile: true,
       sponsorshipNo: true,
       hybridNo: true,
+    })
+    await page.close()
+  })
+
+  it('fills placeholder-labeled text inputs in one batch', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; display: grid; gap: 16px; width: 320px; }
+      </style>
+      <input id="username" placeholder="Username" />
+      <input id="password" placeholder="Password" type="password" />
+      <input id="first-name" placeholder="First Name" />
+      <input id="postal-code" placeholder="Zip/Postal Code" />
+    `)
+
+    await fillFields(page, [
+      { kind: 'text', fieldLabel: 'Username', value: 'standard_user' },
+      { kind: 'text', fieldLabel: 'Password', value: 'secret_sauce' },
+      { kind: 'text', fieldLabel: 'First Name', value: 'Taylor' },
+      { kind: 'text', fieldLabel: 'Zip/Postal Code', value: '10001' },
+    ])
+
+    const result = await page.evaluate(() => ({
+      username: (document.getElementById('username') as HTMLInputElement).value,
+      password: (document.getElementById('password') as HTMLInputElement).value,
+      firstName: (document.getElementById('first-name') as HTMLInputElement).value,
+      postalCode: (document.getElementById('postal-code') as HTMLInputElement).value,
+    }))
+
+    expect(result).toEqual({
+      username: 'standard_user',
+      password: 'secret_sauce',
+      firstName: 'Taylor',
+      postalCode: '10001',
     })
     await page.close()
   })

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { chromium, type Browser } from 'playwright'
-import { extractGeometry } from '../extractor.js'
+import { extractGeometry } from '../extractor.ts'
 import type { LayoutSnapshot, TreeSnapshot } from '../types.js'
 
 interface SnapshotNode {
@@ -109,6 +109,52 @@ describe('extractGeometry', () => {
 
     expect(input).toBeDefined()
     expect(input?.tree.semantic?.ariaLabel).toBe('Location')
+
+    await page.close()
+  })
+
+  it('uses button-like input values as accessible button labels', async () => {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } })
+    await page.setContent(`
+      <form>
+        <input type="submit" value="Login" />
+      </form>
+    `)
+
+    const snapshot = await extractGeometry(page)
+    const nodes = flattenSnapshot(snapshot.tree, snapshot.layout)
+    const button = nodes.find(node =>
+      node.tree.semantic?.role === 'button' &&
+      node.tree.semantic?.ariaLabel === 'Login',
+    )
+
+    expect(button).toBeDefined()
+    expect(button?.tree.handlers?.onClick).toBe(true)
+
+    await page.close()
+  })
+
+  it('uses descendant image alt text for image-only links', async () => {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } })
+    await page.setContent(`
+      <a href="#item">
+        <img
+          alt="Sauce Labs Backpack"
+          width="120"
+          height="120"
+          src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="
+        />
+      </a>
+    `)
+
+    const snapshot = await extractGeometry(page)
+    const nodes = flattenSnapshot(snapshot.tree, snapshot.layout)
+    const link = nodes.find(node =>
+      node.tree.semantic?.role === 'link' &&
+      node.tree.semantic?.ariaLabel === 'Sauce Labs Backpack',
+    )
+
+    expect(link).toBeDefined()
 
     await page.close()
   })

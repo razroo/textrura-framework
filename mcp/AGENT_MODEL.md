@@ -94,7 +94,7 @@ It includes things like:
 - counts of landmarks/forms/dialogs/lists
 - stable section ids
 - top-level sections
-- a few primary actions
+- a few primary actions, often with nearby `section` / `item` context
 
 This is meant for **orientation**, not detailed inspection.
 
@@ -194,15 +194,17 @@ If you already have schema ids, `geometra_fill_fields` can resolve `fieldId` dir
 
 For custom dropdowns and searchable comboboxes, prefer `geometra_pick_listbox_option` over raw clicks. Pass `fieldLabel` when possible, add `query` for searchable widgets, and use the returned `visibleOptions` failure hints when the requested label does not match what the site is showing.
 
-When the page is long and the text payload is large, keep `detail: "minimal"` so Geometra returns compact structured step results instead of verbose action narration.
+When the page is long and the text payload is large, keep `includeSteps: false`. Use `detail: "terse"` for the smallest machine-friendly JSON, or `detail: "minimal"` when you still want short human-readable summaries.
 
 ### 8. Batch obvious multi-step flows
 
 `geometra_run_actions` exists for longer predictable workflows where you need to mix navigation, waits, and field entry in one MCP round trip.
 
-It complements `form_schema` / `fill_form` and `page_model` / `expand_section`; it does not replace them.
+It complements `form_schema` / `fill_form` and `page_model` / `expand_section`; it does not replace them. It can also auto-connect from `pageUrl` / `url`, which is the best path for straightforward one-call flows.
 
-For token-sensitive automation loops, add `includeSteps: false` so the response is mostly aggregate status plus the final validation/state payload.
+For token-sensitive automation loops, add `includeSteps: false` and `output: "final"` so the response is mostly completion state plus the final validation/state payload.
+
+If browser launch latency matters and you already know the target URL, `geometra_prepare_browser({ pageUrl, ... })` can pre-launch and pre-navigate the proxy before the user-visible task starts so the next `geometra_connect` or `geometra_run_actions` attaches warm.
 
 ### 9. Query only when you know the target
 
@@ -213,8 +215,11 @@ For token-sensitive automation loops, add `includeSteps: false` so the response 
 - by `name`
 - by `text`
 - by `contextText` when repeated controls share the same visible label
+- by `promptText`, `sectionText`, or `itemText` when repeated actions live in cards/rows/items
 
 Use it when you already know what you are looking for and want exact bounds.
+
+If the target is specifically a repeated action, prefer `geometra_find_action` or `geometra_click` with `itemText` / `sectionText` before falling back to larger section expansion payloads.
 
 ### 10. Reveal offscreen targets semantically
 
@@ -226,17 +231,20 @@ This is the preferred path for “bring Submit into view”, “jump to the next
 
 For most DOM-heavy pages, the best order is:
 
-1. `geometra_fill_form({ pageUrl, valuesByLabel })` when the page is clearly a known form and you already have the answers
-2. otherwise `geometra_connect`
-3. `geometra_form_schema` when the page is clearly a form you intend to fill
-4. `geometra_fill_form` for the lowest-token happy path after discovery
-5. `geometra_page_model` when you still need broader page orientation
-6. `geometra_expand_section` for one important section if needed
-7. `geometra_query` or `geometra_wait_for` (or `geometra_wait_for_resume_parse` after resume upload / “Parsing…” banners)
-8. `geometra_reveal` when the target is offscreen
-9. `geometra_fill_fields` when you need field-level control instead of schema-driven values or want to reuse `fieldId` from `geometra_form_schema`
-10. `geometra_run_actions` for predictable mixed flows, otherwise a single action tool (`geometra_click`, `geometra_type`, etc.)
-11. consume the returned semantic delta / terse state summary
+1. if you already know the target page and want to hide startup: `geometra_prepare_browser({ pageUrl, ... })`
+2. `geometra_fill_form({ pageUrl, valuesByLabel })` when the page is clearly a known form and you already have the answers
+3. otherwise `geometra_connect`
+4. `geometra_form_schema` when the page is clearly a form you intend to fill
+5. `geometra_fill_form` for the lowest-token happy path after discovery
+6. `geometra_page_model` when you still need broader page orientation
+7. `geometra_expand_section` for one important section if needed
+8. `geometra_query` or `geometra_wait_for` (or `geometra_wait_for_resume_parse` after resume upload / “Parsing…” banners)
+9. `geometra_reveal` when the target is offscreen
+10. `geometra_fill_fields` when you need field-level control instead of schema-driven values or want to reuse `fieldId` from `geometra_form_schema`
+11. `geometra_run_actions` for predictable mixed flows, especially with `pageUrl` / `url` for a one-call batch
+12. `geometra_find_action` or `geometra_click({ name, itemText / sectionText / promptText, ... })` when repeated actions need card/row disambiguation
+13. otherwise a single action tool (`geometra_click`, `geometra_type`, etc.)
+14. consume the returned semantic delta / terse state summary
 
 Use `geometra_snapshot` compact when:
 
@@ -252,30 +260,32 @@ Use `geometra_snapshot({ view: "form-required" })` when:
 - you want remaining required fields, even if offscreen
 - you want scroll hints before deciding whether to reveal, fill, or click
 
-Action tools default to terse summaries. Use `detail: "verbose"` when you need a fuller fallback view for debugging.
+Action tools default to `detail: "minimal"`. Use `detail: "terse"` for the smallest machine-friendly JSON, or `detail: "verbose"` when you need a fuller fallback view for debugging.
 
 For the lowest-token batch pattern:
 
-1. if labels are already known: `geometra_fill_form({ pageUrl, valuesByLabel, detail: "minimal", includeSteps: false })`
+1. if labels are already known: `geometra_fill_form({ pageUrl, valuesByLabel, detail: "terse", includeSteps: false })`
 2. otherwise `geometra_form_schema`
 3. then `geometra_fill_form`
-4. `detail: "minimal"`
+4. `detail: "terse"`
 5. `includeSteps: false`
-6. inspect the returned `final.invalidCount`, `final.alertCount`, and any sampled `invalidFields`
+6. optionally `geometra_prepare_browser({ pageUrl, ... })` before the flow when latency matters
+7. inspect the returned `final.invalidCount`, `final.alertCount`, and any sampled `invalidFields`
 
 If you need direct field-level control instead of schema-driven ids:
 
 1. `geometra_fill_fields` or `geometra_run_actions`
-2. `detail: "minimal"`
+2. `detail: "terse"`
 3. `includeSteps: false`
-4. inspect the returned `final.invalidCount`, `final.alertCount`, and any sampled `invalidFields`
+4. `output: "final"` on `geometra_run_actions` when available
+5. inspect the returned `final.invalidCount`, `final.alertCount`, and any sampled `invalidFields`
 
 For long forms with repeated controls:
 
 1. `geometra_snapshot({ view: "form-required" })` when you want all required fields including offscreen ones
 2. `geometra_expand_section` with `fieldOffset` / `actionOffset` to page through the section
 3. `onlyRequiredFields: true` or `onlyInvalidFields: true` when you want the actionable subset
-4. `geometra_query({ role, name, contextText })` to disambiguate repeated `Yes` / `No` answers
+4. `geometra_query({ role, name, contextText / itemText / sectionText })` to disambiguate repeated `Yes` / `No` answers or repeated card actions
 5. `geometra_reveal(...)` before clicking a far-below-fold target like submit
 
 ## Headed vs Headless

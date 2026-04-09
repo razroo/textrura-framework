@@ -4,7 +4,7 @@ import { formatProxyFatalError, launchProxyRuntime, parseHttpPageUrl } from './r
 const READY_SIGNAL_TYPE = 'geometra-proxy-ready'
 
 function printUsage(): void {
-  console.error(`Usage: geometra-proxy <url> [--port <n>] [--width <n>] [--height <n>] [--headless] [--headed] [--slow-mo <ms>]
+  console.error(`Usage: geometra-proxy <url> [--port <n>] [--width <n>] [--height <n>] [--headless] [--headed] [--slow-mo <ms>] [--lazy-initial-extract]
 
 Open <url> in Chromium and stream GEOM v1 frames on WebSocket (JSON text).
 
@@ -29,6 +29,11 @@ function envRequestsHeadless(): boolean {
 function envRequestsReadyJson(): boolean {
   const v = (process.env.GEOMETRA_PROXY_READY_JSON ?? '').toLowerCase()
   return v === '1' || v === 'true' || v === 'yes'
+}
+
+function envRequestsLazyInitialExtract(): boolean {
+  const v = (process.env.GEOMETRA_PROXY_EAGER_INITIAL_EXTRACT ?? '').toLowerCase()
+  return v === '0' || v === 'false' || v === 'no'
 }
 
 function parsePortArg(raw: string | undefined): number {
@@ -56,6 +61,7 @@ function parseArgs(argv: string[]): {
   height: number
   headed: boolean
   slowMo: number
+  eagerInitialExtract: boolean
 } {
   let url = ''
   let port = 3200
@@ -63,6 +69,7 @@ function parseArgs(argv: string[]): {
   let height = 720
   let headed = !envRequestsHeadless()
   let slowMo = 0
+  let eagerInitialExtract = !envRequestsLazyInitialExtract()
 
   const envSlow = process.env.GEOMETRA_SLOW_MO ?? process.env.GEOMETRA_SLOWMO
   if (envSlow !== undefined && envSlow !== '') {
@@ -85,6 +92,8 @@ function parseArgs(argv: string[]): {
     } else if (a === '--slow-mo' || a === '--slowMo') {
       const n = Number(argv[++i] ?? '')
       if (Number.isFinite(n) && n >= 0) slowMo = Math.floor(n)
+    } else if (a === '--lazy-initial-extract') {
+      eagerInitialExtract = false
     } else if (!a.startsWith('-')) {
       url = a
     } else {
@@ -93,11 +102,11 @@ function parseArgs(argv: string[]): {
       process.exit(1)
     }
   }
-  return { url, port, width, height, headed, slowMo }
+  return { url, port, width, height, headed, slowMo, eagerInitialExtract }
 }
 
 async function main(): Promise<void> {
-  const { url: rawUrl, port, width, height, headed, slowMo } = parseArgs(process.argv.slice(2))
+  const { url: rawUrl, port, width, height, headed, slowMo, eagerInitialExtract } = parseArgs(process.argv.slice(2))
   if (!rawUrl) {
     printUsage()
     process.exit(1)
@@ -115,6 +124,7 @@ async function main(): Promise<void> {
     height,
     headed,
     slowMo,
+    eagerInitialExtract,
     debounceMs: 50,
     onListening(wsUrl) {
       console.error(`[geometra-proxy] WebSocket listening on ${wsUrl}`)

@@ -32,6 +32,7 @@ const mockState = vi.hoisted(() => ({
   currentA11yRoot: node('group', undefined, {
     meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 0 },
   }),
+  nodeContexts: new Map<string, Record<string, unknown>>(),
   session: {
     tree: { kind: 'box' },
     layout: { x: 0, y: 0, width: 1280, height: 800, children: [] },
@@ -44,6 +45,7 @@ const mockState = vi.hoisted(() => ({
   formSchemas: [] as Array<Record<string, unknown>>,
   connect: vi.fn(),
   connectThroughProxy: vi.fn(),
+  prewarmProxy: vi.fn(),
   sendClick: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 2000 })),
   sendType: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 2000 })),
   sendKey: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 2000 })),
@@ -67,6 +69,7 @@ function resetMockSessionCaches() {
   mockState.session.cachedA11y = undefined
   mockState.session.cachedA11yRevision = undefined
   mockState.session.cachedFormSchemas = undefined
+  mockState.nodeContexts.clear()
 }
 
 function bumpMockUiRevision() {
@@ -79,6 +82,7 @@ function bumpMockUiRevision() {
 vi.mock('../session.js', () => ({
   connect: mockState.connect,
   connectThroughProxy: mockState.connectThroughProxy,
+  prewarmProxy: mockState.prewarmProxy,
   disconnect: vi.fn(),
   getSession: vi.fn(() => mockState.session),
   sendClick: mockState.sendClick,
@@ -113,6 +117,8 @@ vi.mock('../session.js', () => ({
   summarizeCompactIndex: vi.fn(() => ''),
   summarizePageModel: vi.fn(() => ''),
   summarizeUiDelta: vi.fn(() => ''),
+  nodeContextForNode: vi.fn((_: unknown, node: { path?: number[] }) =>
+    mockState.nodeContexts.get((node.path ?? []).join('.'))),
   waitForUiCondition: mockState.waitForUiCondition,
 }))
 
@@ -131,6 +137,16 @@ describe('batch MCP result shaping', () => {
     resetMockSessionCaches()
     mockState.connect.mockResolvedValue(mockState.session)
     mockState.connectThroughProxy.mockResolvedValue(mockState.session)
+    mockState.prewarmProxy.mockResolvedValue({
+      prepared: true,
+      reused: false,
+      transport: 'embedded',
+      pageUrl: 'https://jobs.example.com/application',
+      wsUrl: 'ws://127.0.0.1:3200',
+      headless: true,
+      width: 1280,
+      height: 720,
+    })
     mockState.formSchemas = []
     mockState.currentA11yRoot = node('group', undefined, {
       meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 420 },
@@ -323,6 +339,127 @@ describe('batch MCP result shaping', () => {
     expect((final.alerts as unknown[]).length).toBe(1)
   })
 
+  it('uses the proxy batch path for fill_fields when step output is omitted', async () => {
+    const handler = getToolHandler('geometra_fill_fields')
+
+    mockState.currentA11yRoot = node('group', undefined, {
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 420 },
+      children: [
+        node('textbox', 'Full name', { value: 'Taylor Applicant', path: [0] }),
+        node('textbox', 'Email', { value: 'taylor@example.com', path: [1] }),
+      ],
+    })
+
+    const result = await handler({
+      fields: [
+        { kind: 'text', fieldLabel: 'Full name', value: 'Taylor Applicant' },
+        { kind: 'text', fieldLabel: 'Email', value: 'taylor@example.com' },
+      ],
+      stopOnError: true,
+      failOnInvalid: false,
+      includeSteps: false,
+      detail: 'terse',
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    expect(mockState.sendFillFields).toHaveBeenCalledWith(
+      mockState.session,
+      [
+        { kind: 'text', fieldLabel: 'Full name', value: 'Taylor Applicant' },
+        { kind: 'text', fieldLabel: 'Email', value: 'taylor@example.com' },
+      ],
+    )
+    expect(mockState.sendFieldText).not.toHaveBeenCalled()
+    expect(payload).toMatchObject({
+      completed: true,
+      execution: 'batched',
+      finalSource: 'session',
+      fieldCount: 2,
+      successCount: 2,
+      errorCount: 0,
+      final: { invalidCount: 0 },
+    })
+  })
+
+  it('auto-connects run_actions and supports final-only output', async () => {
+    const handler = getToolHandler('geometra_run_actions')
+
+    mockState.currentA11yRoot = node('group', undefined, {
+      meta: { pageUrl: 'https://shop.example.com/login', scrollX: 0, scrollY: 0 },
+      children: [
+        node('textbox', 'Username', { value: 'standard_user', path: [0] }),
+        node('textbox', 'Password', { value: 'secret_sauce', path: [1] }),
+      ],
+    })
+
+    const result = await handler({
+      pageUrl: 'https://shop.example.com/login',
+      headless: true,
+      actions: [
+        {
+          type: 'fill_fields',
+          fields: [
+            { kind: 'text', fieldLabel: 'Username', value: 'standard_user' },
+            { kind: 'text', fieldLabel: 'Password', value: 'secret_sauce' },
+          ],
+        },
+      ],
+      stopOnError: true,
+      includeSteps: false,
+      output: 'final',
+      detail: 'terse',
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    expect(mockState.connectThroughProxy).toHaveBeenCalledWith(expect.objectContaining({
+      pageUrl: 'https://shop.example.com/login',
+      headless: true,
+      awaitInitialFrame: false,
+    }))
+    expect(payload).toMatchObject({
+      autoConnected: true,
+      transport: 'proxy',
+      pageUrl: 'https://shop.example.com/login',
+      completed: true,
+      final: { invalidCount: 0 },
+    })
+    expect(payload).not.toHaveProperty('steps')
+    expect(payload).not.toHaveProperty('stepCount')
+  })
+
+  it('finds repeated actions by itemText in terse mode', async () => {
+    const handler = getToolHandler('geometra_find_action')
+
+    mockState.currentA11yRoot = node('group', undefined, {
+      bounds: { x: 0, y: 0, width: 1280, height: 720 },
+      meta: { pageUrl: 'https://shop.example.com/inventory', scrollX: 0, scrollY: 0 },
+      children: [
+        node('button', 'Add to cart', { path: [0], bounds: { x: 40, y: 160, width: 120, height: 36 } }),
+        node('button', 'Add to cart', { path: [1], bounds: { x: 40, y: 260, width: 120, height: 36 } }),
+      ],
+    })
+    mockState.nodeContexts.set('0', { item: 'Sauce Labs Backpack', section: 'Inventory' })
+    mockState.nodeContexts.set('1', { item: 'Sauce Labs Bike Light', section: 'Inventory' })
+
+    const result = await handler({
+      name: 'Add to cart',
+      itemText: 'Backpack',
+      detail: 'terse',
+      maxResults: 4,
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    const matches = payload.matches as Array<Record<string, unknown>>
+    expect(payload.matchCount).toBe(1)
+    expect(matches[0]).toMatchObject({
+      id: 'n:0',
+      role: 'button',
+      name: 'Add to cart',
+      context: { item: 'Sauce Labs Backpack', section: 'Inventory' },
+      center: { x: 100, y: 178 },
+    })
+  })
+
   it('returns a compact structured connect payload by default', async () => {
     const handler = getToolHandler('geometra_connect')
 
@@ -339,6 +476,37 @@ describe('batch MCP result shaping', () => {
       pageUrl: 'https://jobs.example.com/application',
     })
     expect(payload).not.toHaveProperty('currentUi')
+  })
+
+  it('prepares a warm browser without creating an active session', async () => {
+    const handler = getToolHandler('geometra_prepare_browser')
+
+    const result = await handler({
+      pageUrl: 'https://jobs.example.com/application',
+      headless: true,
+      width: 1280,
+      height: 720,
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    expect(mockState.prewarmProxy).toHaveBeenCalledWith({
+      pageUrl: 'https://jobs.example.com/application',
+      port: undefined,
+      headless: true,
+      width: 1280,
+      height: 720,
+      slowMo: undefined,
+    })
+    expect(payload).toMatchObject({
+      prepared: true,
+      reused: false,
+      transport: 'embedded',
+      pageUrl: 'https://jobs.example.com/application',
+      headless: true,
+      width: 1280,
+      height: 720,
+    })
+    expect(mockState.connectThroughProxy).not.toHaveBeenCalled()
   })
 
   it('can inline a packed form schema into connect for the low-turn form path', async () => {
@@ -764,6 +932,14 @@ describe('query and reveal tools', () => {
         }),
       ],
     })
+    mockState.nodeContexts.set('0.0.1', {
+      prompt: 'Are you legally authorized to work here?',
+      section: 'Application',
+    })
+    mockState.nodeContexts.set('0.1.1', {
+      prompt: 'Will you require sponsorship?',
+      section: 'Application',
+    })
 
     const result = await handler({
       role: 'button',
@@ -1141,6 +1317,7 @@ describe('query and reveal tools', () => {
       index: 0,
       type: 'click',
       ok: true,
+      elapsedMs: expect.any(Number),
       at: { x: 150, y: 340 },
       revealSteps: 1,
       target: { id: 'n:0.0', role: 'button', name: 'Submit application' },
@@ -1206,6 +1383,7 @@ describe('query and reveal tools', () => {
       index: 0,
       type: 'click',
       ok: true,
+      elapsedMs: expect.any(Number),
       postWait: {
         present: true,
         matchCount: 1,

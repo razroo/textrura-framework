@@ -25,17 +25,19 @@ Proxy-backed sessions stay warm by default on disconnect, and MCP now keeps a sm
 | Tool | Description |
 |---|---|
 | `geometra_connect` | Connect with `url` (ws://…) **or** `pageUrl` (https://…) to auto-start geometra-proxy; can inline `formSchema` and/or `pageModel` for lower-turn starts |
-| `geometra_query` | Find elements by stable id, role, name, text content, ancestor/prompt context, current value, or semantic state such as `invalid`, `required`, or `busy` |
+| `geometra_prepare_browser` | Pre-launch and pre-navigate a reusable proxy/browser for `pageUrl` without creating an active session; best when the agent can prepare before the user-facing task starts |
+| `geometra_query` | Find elements by stable id, role, name, text content, prompt/section/item context, current value, or semantic state such as `invalid`, `required`, or `busy` |
 | `geometra_wait_for` | Wait for a semantic condition instead of guessing sleeps (`busy`, `disabled`, alerts, values, etc.). **Strict parameters** — use `text` plus `present: false` to wait until a substring disappears (e.g. “Parsing your resume”); there is no `textGone` field |
 | `geometra_wait_for_resume_parse` | Convenience wait until a parsing banner is gone (defaults: `text`: `"Parsing"`, `present` implied false). Same engine as `geometra_wait_for` |
 | `geometra_form_schema` | Compact, fill-oriented form schema with stable field ids and collapsed radio/button groups; can auto-connect from `pageUrl` / `url` |
 | `geometra_fill_form` | Fill a form from `valuesById` / `valuesByLabel` in one MCP call; can auto-connect from `pageUrl` / `url` for the lowest-token known-form path |
-| `geometra_fill_fields` | Fill text/choice/toggle/file fields in one MCP call; text/choice/toggle entries can use `fieldId` from `geometra_form_schema` without repeating the label |
-| `geometra_run_actions` | Execute a batch of high-level actions in one MCP round trip and get one consolidated result, with optional final-only output |
-| `geometra_page_model` | Summary-first webpage model: archetypes, stable section ids, counts, top-level sections, primary actions |
+| `geometra_fill_fields` | Fill text/choice/toggle/file fields in one MCP call; text-only batches now use the proxy fast path when step output is omitted, and text/choice/toggle entries can use `fieldId` from `geometra_form_schema` without repeating the label |
+| `geometra_run_actions` | Execute a batch of high-level actions in one MCP round trip; can auto-connect from `pageUrl` / `url` and return a final-only payload for the smallest multi-step responses |
+| `geometra_page_model` | Summary-first webpage model: archetypes, stable section ids, counts, top-level sections, and primary actions with nearby section/item context when available |
+| `geometra_find_action` | Resolve a repeated button/link by action label plus optional `sectionText`, `promptText`, or `itemText` before clicking |
 | `geometra_expand_section` | Expand one form/dialog/list/landmark from `geometra_page_model` on demand, with paging/filtering for long sections |
 | `geometra_reveal` | Scroll until a matching node is visible instead of guessing wheel deltas; auto-scales reveal steps for tall forms when omitted |
-| `geometra_click` | Click by coordinates or semantic target, optionally waiting for a post-click semantic condition |
+| `geometra_click` | Click by coordinates or semantic target, including repeated-action disambiguation with `promptText`, `sectionText`, or `itemText`, optionally waiting for a post-click semantic condition |
 | `geometra_type` | Type text into the focused element |
 | `geometra_key` | Send special keys (Enter, Tab, Escape, arrows) |
 | `geometra_upload_files` | Attach files: labeled field / auto / hidden input / native chooser / synthetic drop (`@geometra/proxy` only) |
@@ -323,10 +325,11 @@ Agent:  geometra_query({ role: "button", name: "Save" })
 5. **`geometra_form_schema`** is the compact form-specific path: stable field ids, required/invalid state, current values, and collapsed choice groups without layout-heavy section detail. It can auto-connect when you pass `pageUrl` / `url`.
 6. **`geometra_fill_form`** turns a compact values object into semantic field operations server-side, so the model does not need to emit one tool call per field. It can also auto-connect, which collapses “open page + fill known values” into a single tool call.
 7. **`geometra_fill_fields`** is the lower-level field-intent path when you need direct control; text / choice / toggle entries can now resolve `fieldId` from `geometra_form_schema` without repeating labels.
-8. **`geometra_page_model`** is still the right summary-first path for non-form exploration: page archetypes, stable section ids, counts, top-level landmarks/forms/dialogs/lists, and a few primary actions.
-9. **`geometra_expand_section`** fetches richer details only for the section you care about (fields, actions, headings, nested lists, list items, text preview).
-10. After interactions, action tools return a **semantic delta** when possible (dialogs opened/closed, forms appeared/removed, list counts changed, named/focusable nodes added/removed/updated). If nothing meaningful changed, they fall back to a short current-UI overview.
-11. After each interaction, the peer sends updated geometry (full `frame` or `patch`) — the MCP tools interpret that into compact summaries.
+8. **`geometra_page_model`** is still the right summary-first path for non-form exploration: page archetypes, stable section ids, counts, top-level landmarks/forms/dialogs/lists, and a few primary actions with nearby context.
+9. **`geometra_find_action`** is the narrow repeated-action resolver when the page has many identical buttons/links and you want one exact target by `itemText`, `sectionText`, or `promptText`.
+10. **`geometra_expand_section`** fetches richer details only for the section you care about (fields, actions, headings, nested lists, list items, text preview).
+11. After interactions, action tools return a **semantic delta** when possible (dialogs opened/closed, forms appeared/removed, list counts changed, named/focusable nodes added/removed/updated). If nothing meaningful changed, they fall back to a short current-UI overview.
+12. After each interaction, the peer sends updated geometry (full `frame` or `patch`) — the MCP tools interpret that into compact summaries.
 
 ## Long Forms
 
@@ -338,9 +341,11 @@ For long application flows, prefer one of these patterns:
 4. `geometra_snapshot({ view: "form-required" })` when you need the remaining required fields including offscreen ones
 5. `geometra_reveal` for far-below-fold targets such as submit buttons (auto-scales reveal steps when you omit `maxSteps`)
 6. `geometra_click({ ..., waitFor: ... })` when one action should also wait for the next semantic state
-7. `geometra_run_actions` when you need mixed navigation + waits + field entry
-8. `geometra_connect({ pageUrl, returnPageModel: true })` when you want connect + summary-first exploration in one turn
-9. `geometra_page_model` + `geometra_expand_section` when you are still exploring the page rather than filling it
+7. `geometra_prepare_browser({ pageUrl, headless, width, height })` when you can hide browser startup before the real task and want the next proxy-backed flow to attach warm
+8. `geometra_run_actions` when you need mixed navigation + waits + field entry, especially with `pageUrl` / `url` for a one-call flow
+9. `geometra_connect({ pageUrl, returnPageModel: true })` when you want connect + summary-first exploration in one turn
+10. `geometra_find_action` or `geometra_click({ name, itemText / sectionText / promptText, ... })` when the target action repeats across cards/rows
+11. `geometra_page_model` + `geometra_expand_section` when you are still exploring the page rather than filling it
 
 Typical batch:
 
@@ -355,12 +360,14 @@ Typical batch:
 }
 ```
 
-Single action tools now default to terse summaries. Pass `detail: "verbose"` when you need a fuller current-UI fallback for debugging.
+Single action tools default to short human-readable summaries (`detail: "minimal"`). Use `detail: "terse"` for the smallest machine-friendly JSON responses, or `detail: "verbose"` when you need a fuller current-UI fallback for debugging.
 
 For the smallest long-form responses, prefer:
 
-1. `detail: "minimal"` for structured step metadata instead of narrated deltas
+1. `detail: "terse"` for compact machine-friendly action responses
 2. `includeSteps: false` when you only need aggregate success/error counts plus the final validation/state payload
+3. `output: "final"` on `geometra_run_actions` when you only need completion state plus the final semantic signals
+4. `geometra_prepare_browser` before the flow when you can shift browser launch out of the user-visible task window
 
 Typical low-token form fill:
 

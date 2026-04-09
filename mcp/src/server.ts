@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { performance } from 'node:perf_hooks'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { formatConnectFailureMessage, isHttpUrl, normalizeConnectTarget } from './connect-utils.js'
@@ -7,6 +8,7 @@ import {
   connectThroughProxy,
   disconnect,
   getSession,
+  prewarmProxy,
   sendClick,
   sendFillFields,
   sendType,
@@ -27,6 +29,7 @@ import {
   buildUiDelta,
   hasUiDelta,
   nodeIdForPath,
+  nodeContextForNode,
   summarizeCompactIndex,
   summarizePageModel,
   summarizeUiDelta,
@@ -42,7 +45,7 @@ import type {
 } from './session.js'
 
 type NodeStateFilterValue = boolean | 'mixed'
-type ResponseDetail = 'minimal' | 'verbose'
+type ResponseDetail = 'terse' | 'minimal' | 'verbose'
 type FormSchemaFormat = 'compact' | 'packed'
 
 interface NodeFilter {
@@ -51,6 +54,9 @@ interface NodeFilter {
   name?: string
   text?: string
   contextText?: string
+  promptText?: string
+  sectionText?: string
+  itemText?: string
   value?: string
   checked?: NodeStateFilterValue
   disabled?: boolean
@@ -134,10 +140,10 @@ function checkedStateInput() {
 
 function detailInput() {
   return z
-    .enum(['minimal', 'verbose'])
+    .enum(['terse', 'minimal', 'verbose'])
     .optional()
     .default('minimal')
-    .describe('`minimal` (default) returns terse action summaries. Use `verbose` for a fuller current-UI fallback.')
+    .describe('`terse` returns compact machine-friendly JSON. `minimal` (default) returns short human-readable summaries. `verbose` adds fuller fallback context.')
 }
 
 function formSchemaFormatInput() {
@@ -163,6 +169,9 @@ function nodeFilterShape() {
     name: z.string().optional().describe('Accessible name to match (exact or substring)'),
     text: z.string().optional().describe('Text content to search for (substring match)'),
     contextText: z.string().optional().describe('Ancestor / prompt text to disambiguate repeated controls with the same visible name'),
+    promptText: z.string().optional().describe('Nearby question/prompt text to disambiguate repeated controls or actions'),
+    sectionText: z.string().optional().describe('Containing section/landmark/form/dialog text to disambiguate repeated controls or actions'),
+    itemText: z.string().optional().describe('Nearby card/row/item label to disambiguate repeated actions like “Add to cart” or “Open incident”'),
     value: z.string().optional().describe('Displayed / current field value to match (substring match)'),
     checked: checkedStateInput(),
     disabled: z.boolean().optional().describe('Match disabled state'),
@@ -197,19 +206,26 @@ function waitConditionShape() {
 }
 
 const GEOMETRA_QUERY_FILTER_REQUIRED_MESSAGE =
-  'Provide at least one filter (id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, or busy). ' +
+  'Provide at least one filter (id, role, name, text, contextText, promptText, sectionText, itemText, value, checked, disabled, focused, selected, expanded, invalid, required, or busy). ' +
   'This tool uses a strict schema: unknown keys are rejected. There is no textGone parameter — use text for substring matching. ' +
   'To wait until text disappears from the UI, use geometra_wait_for with text and present: false, or geometra_wait_for_resume_parse for typical resume “Parsing…” banners.'
 
 const GEOMETRA_WAIT_FILTER_REQUIRED_MESSAGE =
-  'Provide at least one semantic filter (id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, or busy). ' +
+  'Provide at least one semantic filter (id, role, name, text, contextText, promptText, sectionText, itemText, value, checked, disabled, focused, selected, expanded, invalid, required, or busy). ' +
   'This tool uses a strict schema: unknown keys are rejected. There is no textGone parameter — use text with a distinctive substring and present: false to wait until that text is gone ' +
   '(common for “Parsing…”, “Parsing your resume”, or similar). Passing only present/timeoutMs is not enough without a filter.'
 
 /** Strict input so unknown keys (e.g. textGone) fail parse; empty-filter checks happen in handlers / waitForSemanticCondition. */
-const geometraQueryInputSchema = z.object(nodeFilterShape()).strict()
+const geometraQueryInputSchema = z.object({
+  ...nodeFilterShape(),
+  maxResults: z.number().int().min(1).max(50).optional().describe('Optional cap on returned matches; terse mode defaults to 8'),
+  detail: detailInput(),
+}).strict()
 
-const geometraWaitForInputSchema = z.object(waitConditionShape()).strict()
+const geometraWaitForInputSchema = z.object({
+  ...waitConditionShape(),
+  detail: detailInput(),
+}).strict()
 
 /** Same upper bound as geometra_wait_for; resume uploads often need the full minute. */
 const geometraWaitForResumeParseInputSchema = z
@@ -571,6 +587,48 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
     }
   )
 
+  // ── prepare browser ──────────────────────────────────────────
+  server.tool(
+    'geometra_prepare_browser',
+    `Pre-launch and pre-navigate a reusable geometra-proxy browser for a normal web page without creating an active MCP session.
+
+Use this when you can prepare ahead of the user-facing task so the next \`geometra_connect\` or one-call \`geometra_run_actions\` on the same \`pageUrl\` / viewport / headless settings skips the cold browser launch.`,
+    {
+      pageUrl: z
+        .string()
+        .url()
+        .refine(isHttpUrl, 'pageUrl must use http:// or https://')
+        .describe('HTTP(S) page to open and keep warm for the next proxy-backed task.'),
+      port: z
+        .number()
+        .int()
+        .positive()
+        .max(65535)
+        .optional()
+        .describe('Preferred local port for spawned proxy (default: ephemeral OS-assigned port).'),
+      headless: z
+        .boolean()
+        .optional()
+        .describe('Run Chromium headless (default false = visible window).'),
+      width: z.number().int().positive().optional().describe('Viewport width for the warmed browser.'),
+      height: z.number().int().positive().optional().describe('Viewport height for the warmed browser.'),
+      slowMo: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe('Playwright slowMo (ms) for the warmed browser.'),
+    },
+    async ({ pageUrl, port, headless, width, height, slowMo }) => {
+      try {
+        const prepared = await prewarmProxy({ pageUrl, port, headless, width, height, slowMo })
+        return ok(JSON.stringify(prepared))
+      } catch (e) {
+        return err(`Failed to prepare browser: ${e instanceof Error ? e.message : String(e)}`)
+      }
+    },
+  )
+
   // ── query ────────────────────────────────────────────────────
   server.registerTool(
     'geometra_query',
@@ -582,7 +640,7 @@ This is the Geometra equivalent of Playwright's locator — but instant, structu
 Unknown parameter names are rejected (strict schema). To wait until visible text goes away (e.g. a parsing banner), use geometra_wait_for with that substring in text and present: false — there is no textGone field.`,
       inputSchema: geometraQueryInputSchema,
     },
-    async ({ id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, busy }) => {
+    async ({ id, role, name, text, contextText, promptText, sectionText, itemText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, maxResults, detail }) => {
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
 
@@ -594,6 +652,9 @@ Unknown parameter names are rejected (strict schema). To wait until visible text
         name,
         text,
         contextText,
+        promptText,
+        sectionText,
+        itemText,
         value,
         checked,
         disabled,
@@ -608,12 +669,70 @@ Unknown parameter names are rejected (strict schema). To wait until visible text
       const matches = findNodes(a11y, filter)
 
       if (matches.length === 0) {
+        if (detail === 'terse') {
+          return ok(JSON.stringify({ matchCount: 0, filter: compactFilterPayload(filter) }))
+        }
         return ok(`No elements found matching ${JSON.stringify(filter)}`)
       }
 
-      const result = sortA11yNodes(matches).map(node => formatNode(node, a11y, a11y.bounds))
+      const formatted = sortA11yNodes(matches).map(node => formatNode(node, a11y, a11y.bounds))
+      if (detail === 'terse') {
+        const limited = formatted.slice(0, maxResults ?? 8)
+        return ok(JSON.stringify({
+          matchCount: formatted.length,
+          matches: limited.map(compactFormattedNode),
+        }))
+      }
+      const result = typeof maxResults === 'number' ? formatted.slice(0, maxResults) : formatted
       return ok(JSON.stringify(result, null, 2))
     }
+  )
+
+  server.tool(
+    'geometra_find_action',
+    `Resolve a clickable action by action label plus optional section, prompt, or item/card text. This is a narrower, lower-token path for repeated actions like "Open incident" in a queue row or "Add to cart" inside a product card.
+
+Use this when geometra_page_model tells you the page shape, but you want one direct semantic action target instead of expanding a whole section.`,
+    {
+      name: z.string().describe('Action label / accessible name to match'),
+      role: z.enum(['button', 'link']).optional().describe('Optional action role hint (button or link)'),
+      sectionText: z.string().optional().describe('Containing section/landmark/form/dialog text to disambiguate repeated actions'),
+      promptText: z.string().optional().describe('Nearby question/prompt text to disambiguate repeated actions'),
+      itemText: z.string().optional().describe('Nearby card/row/item label to disambiguate repeated actions'),
+      maxResults: z.number().int().min(1).max(12).optional().default(6).describe('Maximum number of matches to return'),
+      detail: detailInput(),
+    },
+    async ({ name, role, sectionText, promptText, itemText, maxResults, detail }) => {
+      const session = getSession()
+      if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
+
+      const a11y = sessionA11y(session)
+      if (!a11y) return err('No UI tree available')
+
+      const filter: NodeFilter = {
+        ...(role ? { role } : {}),
+        name,
+        ...(sectionText ? { sectionText } : {}),
+        ...(promptText ? { promptText } : {}),
+        ...(itemText ? { itemText } : {}),
+      }
+      const matches = sortA11yNodes(findNodes(a11y, filter).filter(node => node.focusable && (node.role === 'button' || node.role === 'link')))
+      if (matches.length === 0) {
+        if (detail === 'terse') {
+          return ok(JSON.stringify({ matchCount: 0, filter: compactFilterPayload(filter) }))
+        }
+        return ok(`No actions found matching ${JSON.stringify(filter)}`)
+      }
+
+      const formatted = matches.slice(0, maxResults).map(node => formatNode(node, a11y, a11y.bounds))
+      if (detail === 'terse') {
+        return ok(JSON.stringify({
+          matchCount: matches.length,
+          matches: formatted.map(compactFormattedNode),
+        }))
+      }
+      return ok(JSON.stringify(formatted))
+    },
   )
 
   server.registerTool(
@@ -624,7 +743,7 @@ Unknown parameter names are rejected (strict schema). To wait until visible text
 The filter matches the same fields as geometra_query (strict schema — unknown keys error). Set \`present: false\` to wait until **no** node matches — for example Ashby/Lever-style “Parsing your resume” or any “Parsing…” banner: \`{ "text": "Parsing", "present": false }\` (tune the substring to the site). Do not use a textGone parameter; use \`text\` + \`present: false\`, or \`geometra_wait_for_resume_parse\` for the usual post-upload parsing banner.`,
       inputSchema: geometraWaitForInputSchema,
     },
-    async ({ id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, present, timeoutMs }) => {
+    async ({ id, role, name, text, contextText, promptText, sectionText, itemText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, present, timeoutMs, detail }) => {
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
 
@@ -634,6 +753,9 @@ The filter matches the same fields as geometra_query (strict schema — unknown 
         name,
         text,
         contextText,
+        promptText,
+        sectionText,
+        itemText,
         value,
         checked,
         disabled,
@@ -652,6 +774,17 @@ The filter matches the same fields as geometra_query (strict schema — unknown 
         timeoutMs: timeoutMs ?? 10_000,
       })
       if (!waited.ok) return err(waited.error)
+
+      if (detail === 'terse') {
+        const compact = waitConditionCompact(waited.value)
+        const matches = waited.value.matches
+          .slice(0, 3)
+          .map(match => compactFormattedNode(match))
+        return ok(JSON.stringify({
+          ...compact,
+          ...(matches.length > 0 ? { matches } : {}),
+        }))
+      }
 
       if (!waited.value.present) {
         return ok(waitConditionSuccessLine(waited.value))
@@ -709,6 +842,30 @@ Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / combo
       if (!session) return err('Not connected. Call geometra_connect first.')
       const resolvedFields = resolveFillFieldInputs(session, fields)
       if (!resolvedFields.ok) return err(resolvedFields.error)
+
+      if (!includeSteps) {
+        try {
+          const batched = await tryBatchedResolvedFields(session, resolvedFields.fields, detail)
+          if (batched.ok) {
+            const payload = {
+              completed: true,
+              execution: 'batched',
+              finalSource: batched.finalSource,
+              fieldCount: resolvedFields.fields.length,
+              successCount: resolvedFields.fields.length,
+              errorCount: 0,
+              final: batched.final,
+            }
+            if (failOnInvalid && batched.invalidRemaining > 0) {
+              return err(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
+            }
+            return ok(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
+          }
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e)
+          return err(message)
+        }
+      }
 
       const steps: Array<Record<string, unknown>> = []
       let stoppedAt: number | undefined
@@ -990,8 +1147,15 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
     'geometra_run_actions',
     `Execute several Geometra actions in one MCP round trip and return one consolidated result. This is the preferred path for long, multi-step form fills where one-tool-per-field would otherwise create too much chatter.
 
-Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_listbox_option\`, \`select_option\`, \`set_checked\`, \`wheel\`, \`wait_for\`, and \`fill_fields\`. \`click\` steps can also carry a nested \`waitFor\` condition.`,
+Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_listbox_option\`, \`select_option\`, \`set_checked\`, \`wheel\`, \`wait_for\`, and \`fill_fields\`. \`click\` steps can also carry a nested \`waitFor\` condition. Pass \`pageUrl\` / \`url\` to auto-connect so an entire flow can run in one MCP call.`,
     {
+      url: z.string().optional().describe('Optional target URL. Use a ws:// Geometra server URL or an http(s) page URL to auto-connect before running actions.'),
+      pageUrl: z.string().optional().describe('Optional http(s) page URL to auto-connect before running actions. Prefer this over url for browser pages.'),
+      port: z.number().int().min(0).max(65535).optional().describe('Preferred local port for an auto-spawned proxy (default: ephemeral OS-assigned port).'),
+      headless: z.boolean().optional().describe('Run Chromium headless when auto-spawning a proxy (default false = visible window).'),
+      width: z.number().int().positive().optional().describe('Viewport width for auto-connected sessions.'),
+      height: z.number().int().positive().optional().describe('Viewport height for auto-connected sessions.'),
+      slowMo: z.number().int().nonnegative().optional().describe('Playwright slowMo (ms) when auto-spawning a proxy.'),
       actions: z.array(batchActionSchema).min(1).max(80).describe('Ordered high-level action steps to run sequentially'),
       stopOnError: z.boolean().optional().default(true).describe('Stop at the first failing step (default true)'),
       includeSteps: z
@@ -999,25 +1163,70 @@ Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_lis
         .optional()
         .default(true)
         .describe('Include per-action step results in the JSON payload (default true). Set false for the smallest batch response.'),
+      output: z.enum(['full', 'final']).optional().default('full').describe('`full` (default) returns counts and optional step listings. `final` keeps only completion state plus final semantic signals.'),
       detail: detailInput(),
     },
-    async ({ actions, stopOnError, includeSteps, detail }) => {
-      const session = getSession()
-      if (!session) return err('Not connected. Call geometra_connect first.')
+    async ({ url, pageUrl, port, headless, width, height, slowMo, actions, stopOnError, includeSteps, output, detail }) => {
+      const resolved = await ensureToolSession(
+        {
+          url,
+          pageUrl,
+          port,
+          headless,
+          width,
+          height,
+          slowMo,
+          awaitInitialFrame: canDeferInitialFrameForRunActions(actions) ? false : undefined,
+        },
+        'Not connected. Call geometra_connect first, or pass pageUrl/url to geometra_run_actions.',
+      )
+      if (!resolved.ok) return err(resolved.error)
+      const session = resolved.session
+      const connection = autoConnectionPayload(resolved)
 
       const steps: Array<Record<string, unknown>> = []
       let stoppedAt: number | undefined
 
       for (let index = 0; index < actions.length; index++) {
         const action = actions[index]!
+        const startedAt = performance.now()
+        let uiTreeWaitMs = 0
         try {
+          if (actionNeedsUiTree(action) && (!session.tree || !session.layout)) {
+            const uiTreeWaitStartedAt = performance.now()
+            await waitForUiCondition(session, () => Boolean(session.tree && session.layout), 2_000)
+            uiTreeWaitMs = performance.now() - uiTreeWaitStartedAt
+          }
           const result = await executeBatchAction(session, action, detail, includeSteps)
+          const elapsedMs = Number((performance.now() - startedAt).toFixed(1))
           steps.push(detail === 'verbose'
-            ? { index, type: action.type, ok: true, summary: result.summary }
-            : { index, type: action.type, ok: true, ...result.compact })
+            ? {
+                index,
+                type: action.type,
+                ok: true,
+                elapsedMs,
+                ...(uiTreeWaitMs > 0 ? { uiTreeWaitMs: Number(uiTreeWaitMs.toFixed(1)) } : {}),
+                summary: result.summary,
+              }
+            : {
+                index,
+                type: action.type,
+                ok: true,
+                elapsedMs,
+                ...(uiTreeWaitMs > 0 ? { uiTreeWaitMs: Number(uiTreeWaitMs.toFixed(1)) } : {}),
+                ...result.compact,
+              })
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e)
-          steps.push({ index, type: action.type, ok: false, error: message })
+          const elapsedMs = Number((performance.now() - startedAt).toFixed(1))
+          steps.push({
+            index,
+            type: action.type,
+            ok: false,
+            elapsedMs,
+            ...(uiTreeWaitMs > 0 ? { uiTreeWaitMs: Number(uiTreeWaitMs.toFixed(1)) } : {}),
+            error: message,
+          })
           if (stopOnError) {
             stoppedAt = index
             break
@@ -1028,15 +1237,23 @@ Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_lis
       const after = sessionA11y(session)
       const successCount = steps.filter(step => step.ok === true).length
       const errorCount = steps.length - successCount
-      const payload = {
-        completed: stoppedAt === undefined && steps.length === actions.length,
-        stepCount: actions.length,
-        successCount,
-        errorCount,
-        ...(includeSteps ? { steps } : {}),
-        ...(stoppedAt !== undefined ? { stoppedAt } : {}),
-        ...(after ? { final: sessionSignalsPayload(collectSessionSignals(after), detail) } : {}),
-      }
+      const payload = output === 'final'
+        ? {
+            ...connection,
+            completed: stoppedAt === undefined && steps.length === actions.length,
+            ...(stoppedAt !== undefined ? { stoppedAt } : {}),
+            ...(after ? { final: sessionSignalsPayload(collectSessionSignals(after), detail) } : {}),
+          }
+        : {
+            ...connection,
+            completed: stoppedAt === undefined && steps.length === actions.length,
+            stepCount: actions.length,
+            successCount,
+            errorCount,
+            ...(includeSteps ? { steps } : {}),
+            ...(stoppedAt !== undefined ? { stoppedAt } : {}),
+            ...(after ? { final: sessionSignalsPayload(collectSessionSignals(after), detail) } : {}),
+          }
       return ok(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
     }
   )
@@ -1207,7 +1424,7 @@ Use the same filters as geometra_query, plus an optional match index when repeat
         .default(2_500)
         .describe('Per-scroll wait timeout (default 2500ms)'),
     },
-    async ({ id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, index, fullyVisible, maxSteps, timeoutMs }) => {
+    async ({ id, role, name, text, contextText, promptText, sectionText, itemText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, index, fullyVisible, maxSteps, timeoutMs }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
 
@@ -1217,6 +1434,9 @@ Use the same filters as geometra_query, plus an optional match index when repeat
         name,
         text,
         contextText,
+        promptText,
+        sectionText,
+        itemText,
         value,
         checked,
         disabled,
@@ -1227,7 +1447,7 @@ Use the same filters as geometra_query, plus an optional match index when repeat
         required,
         busy,
       }
-      if (!hasNodeFilter(filter)) return err('Provide at least one reveal filter (id, role, name, text, contextText, value, or state)')
+      if (!hasNodeFilter(filter)) return err('Provide at least one reveal filter (id, role, name, text, contextText, promptText, sectionText, itemText, value, or state)')
 
       const revealed = await revealSemanticTarget(session, {
         filter,
@@ -1277,7 +1497,7 @@ After clicking, returns a compact semantic delta when possible (dialogs/forms/li
         .describe('Optional action wait timeout (use a longer value for slow submits or route transitions)'),
       detail: detailInput(),
     },
-    async ({ x, y, id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, index, fullyVisible, maxRevealSteps, revealTimeoutMs, waitFor, timeoutMs, detail }) => {
+    async ({ x, y, id, role, name, text, contextText, promptText, sectionText, itemText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, index, fullyVisible, maxRevealSteps, revealTimeoutMs, waitFor, timeoutMs, detail }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
@@ -1290,6 +1510,9 @@ After clicking, returns a compact semantic delta when possible (dialogs/forms/li
           name,
           text,
           contextText,
+          promptText,
+          sectionText,
+          itemText,
           value,
           checked,
           disabled,
@@ -1322,6 +1545,9 @@ After clicking, returns a compact semantic delta when possible (dialogs/forms/li
             name: waitFor.name,
             text: waitFor.text,
             contextText: waitFor.contextText,
+            promptText: waitFor.promptText,
+            sectionText: waitFor.sectionText,
+            itemText: waitFor.itemText,
             value: waitFor.value,
             checked: waitFor.checked,
             disabled: waitFor.disabled,
@@ -1337,8 +1563,20 @@ After clicking, returns a compact semantic delta when possible (dialogs/forms/li
         })
         if (!postWait.ok) return err([...lines, postWait.error].join('\n'))
         lines.push(`Post-click ${waitConditionSuccessLine(postWait.value)}`)
+        const compact = {
+          at: { x: resolved.value.x, y: resolved.value.y },
+          ...(resolved.value.target ? { target: compactNodeReference(resolved.value.target), revealSteps: resolved.value.revealAttempts ?? 0 } : {}),
+          ...waitStatusPayload(wait),
+          postWait: waitConditionCompact(postWait.value),
+        }
+        return ok(detailText(lines.filter(Boolean).join('\n'), compact, detail))
       }
-      return ok(lines.filter(Boolean).join('\n'))
+      const compact = {
+        at: { x: resolved.value.x, y: resolved.value.y },
+        ...(resolved.value.target ? { target: compactNodeReference(resolved.value.target), revealSteps: resolved.value.revealAttempts ?? 0 } : {}),
+        ...waitStatusPayload(wait),
+      }
+      return ok(detailText(lines.filter(Boolean).join('\n'), compact, detail))
     }
   )
 
@@ -1367,7 +1605,10 @@ Each character is sent as a key event through the geometry protocol. Returns a c
       const wait = await sendType(session, text, timeoutMs)
 
       const summary = postActionSummary(session, before, wait, detail)
-      return ok(`Typed "${text}".\n${summary}`)
+      return ok(detailText(`Typed "${text}".\n${summary}`, {
+        ...compactTextValue(text),
+        ...waitStatusPayload(wait),
+      }, detail))
     }
   )
 
@@ -1398,7 +1639,10 @@ Each character is sent as a key event through the geometry protocol. Returns a c
       const wait = await sendKey(session, key, { shift, ctrl, meta, alt }, timeoutMs)
 
       const summary = postActionSummary(session, before, wait, detail)
-      return ok(`Pressed ${formatKeyCombo(key, { shift, ctrl, meta, alt })}.\n${summary}`)
+      return ok(detailText(`Pressed ${formatKeyCombo(key, { shift, ctrl, meta, alt })}.\n${summary}`, {
+        key: formatKeyCombo(key, { shift, ctrl, meta, alt }),
+        ...waitStatusPayload(wait),
+      }, detail))
     }
   )
 
@@ -1442,7 +1686,13 @@ Strategies: **auto** (default) tries chooser click if x,y given, else a labeled 
           drop: dropX !== undefined && dropY !== undefined ? { x: dropX, y: dropY } : undefined,
         }, timeoutMs ?? 8_000)
         const summary = postActionSummary(session, before, wait, detail)
-        return ok(`Uploaded ${paths.length} file(s).\n${summary}`)
+        return ok(detailText(`Uploaded ${paths.length} file(s).\n${summary}`, {
+          fileCount: paths.length,
+          ...(fieldLabel ? { fieldLabel } : {}),
+          ...(strategy ? { strategy } : {}),
+          ...waitStatusPayload(wait),
+          ...(fieldLabel ? { readback: fieldStatePayload(session, fieldLabel) } : {}),
+        }, detail))
       } catch (e) {
         return err((e as Error).message)
       }
@@ -1483,11 +1733,17 @@ Pass \`fieldLabel\` to open a labeled dropdown semantically instead of relying o
         }, timeoutMs)
         const summary = postActionSummary(session, before, wait, detail)
         const fieldSummary = fieldLabel ? summarizeFieldLabelState(session, fieldLabel) : undefined
-        return ok([
+        const summaryText = [
           `Picked listbox option "${label}".`,
           fieldSummary,
           summary,
-        ].filter(Boolean).join('\n'))
+        ].filter(Boolean).join('\n')
+        return ok(detailText(summaryText, {
+          label,
+          ...(fieldLabel ? { fieldLabel } : {}),
+          ...waitStatusPayload(wait),
+          ...(fieldLabel ? { readback: fieldStatePayload(session, fieldLabel) } : {}),
+        }, detail))
       } catch (e) {
         return err((e as Error).message)
       }
@@ -1525,7 +1781,13 @@ Custom React/Vue dropdowns are not supported here — use \`geometra_pick_listbo
       try {
         const wait = await sendSelectOption(session, x, y, { value, label, index }, timeoutMs)
         const summary = postActionSummary(session, before, wait, detail)
-        return ok(`Selected option.\n${summary}`)
+        return ok(detailText(`Selected option.\n${summary}`, {
+          at: { x, y },
+          ...(value !== undefined ? { value } : {}),
+          ...(label !== undefined ? { label } : {}),
+          ...(index !== undefined ? { index } : {}),
+          ...waitStatusPayload(wait),
+        }, detail))
       } catch (e) {
         return err((e as Error).message)
       }
@@ -1558,7 +1820,12 @@ Prefer this over raw coordinate clicks for custom forms that keep the real input
       try {
         const wait = await sendSetChecked(session, label, { checked, exact, controlType }, timeoutMs)
         const summary = postActionSummary(session, before, wait, detail)
-        return ok(`Set ${controlType ?? 'checkbox/radio'} "${label}" to ${String(checked ?? true)}.\n${summary}`)
+        return ok(detailText(`Set ${controlType ?? 'checkbox/radio'} "${label}" to ${String(checked ?? true)}.\n${summary}`, {
+          label,
+          checked: checked ?? true,
+          ...(controlType ? { controlType } : {}),
+          ...waitStatusPayload(wait),
+        }, detail))
       } catch (e) {
         return err((e as Error).message)
       }
@@ -1590,7 +1857,12 @@ Prefer this over raw coordinate clicks for custom forms that keep the real input
       try {
         const wait = await sendWheel(session, deltaY, { deltaX, x, y }, timeoutMs)
         const summary = postActionSummary(session, before, wait, detail)
-        return ok(`Wheel delta (${deltaX ?? 0}, ${deltaY}).\n${summary}`)
+        return ok(detailText(`Wheel delta (${deltaX ?? 0}, ${deltaY}).\n${summary}`, {
+          deltaY,
+          ...(deltaX !== undefined ? { deltaX } : {}),
+          ...(x !== undefined && y !== undefined ? { at: { x, y } } : {}),
+          ...waitStatusPayload(wait),
+        }, detail))
       } catch (e) {
         return err((e as Error).message)
       }
@@ -2186,8 +2458,17 @@ function sessionSignalsPayload(signals: SessionSignals, detail: ResponseDetail =
     busyCount: signals.busyCount,
     alertCount: signals.alerts.length,
     invalidCount: signals.invalidFields.length,
-    alerts: detail === 'verbose' ? signals.alerts : signals.alerts.slice(0, 2),
-    invalidFields: detail === 'verbose' ? signals.invalidFields : signals.invalidFields.slice(0, 4),
+    ...(detail === 'verbose'
+      ? {
+          alerts: signals.alerts,
+          invalidFields: signals.invalidFields,
+        }
+      : detail === 'minimal'
+        ? {
+            alerts: signals.alerts.slice(0, 2),
+            invalidFields: signals.invalidFields.slice(0, 4),
+          }
+        : {}),
   }
 }
 
@@ -2408,7 +2689,7 @@ async function resolveClickLocation(
   if (!hasNodeFilter(options.filter)) {
     return {
       ok: false,
-      error: 'Provide x and y, or at least one semantic target filter (id, role, name, text, contextText, value, or state)',
+      error: 'Provide x and y, or at least one semantic target filter (id, role, name, text, contextText, promptText, sectionText, itemText, value, or state)',
     }
   }
 
@@ -2442,6 +2723,20 @@ function compactNodeReference(node: FormattedNodePayload): Record<string, unknow
     role: node.role,
     ...(node.name ? { name: node.name } : {}),
   }
+}
+
+function compactFormattedNode(node: FormattedNodePayload): Record<string, unknown> {
+  return {
+    ...compactNodeReference(node),
+    ...(node.context ? { context: node.context } : {}),
+    ...(node.value ? { value: node.value } : {}),
+    center: node.center,
+    bounds: node.bounds,
+  }
+}
+
+function detailText(summary: string, compact: Record<string, unknown>, detail: ResponseDetail): string {
+  return detail === 'terse' ? JSON.stringify(compact) : summary
 }
 
 function normalizeLookupKey(value: string): string {
@@ -2741,6 +3036,51 @@ function directLabelBatchFields(
   return fields
 }
 
+async function tryBatchedResolvedFields(
+  session: Session,
+  fields: ResolvedFillFieldInput[],
+  detail: ResponseDetail,
+): Promise<
+  | { ok: true; finalSource: 'proxy' | 'session'; final: ProxyFillAckResult | Record<string, unknown>; invalidRemaining: number }
+  | { ok: false }
+> {
+  let batchAckResult: ProxyFillAckResult | undefined
+  try {
+    const startRevision = session.updateRevision
+    const wait = await sendFillFields(session, fields)
+    const ackResult = parseProxyFillAckResult(wait.result)
+    batchAckResult = ackResult
+    if (ackResult && ackResult.invalidCount === 0) {
+      return {
+        ok: true,
+        finalSource: 'proxy',
+        final: ackResult,
+        invalidRemaining: 0,
+      }
+    }
+    await waitForDeferredBatchUpdate(session, startRevision, wait)
+    await waitForBatchFieldReadback(session, fields)
+  } catch (e) {
+    if (canFallbackToSequentialFill(e)) return { ok: false }
+    throw e
+  }
+
+  const after = sessionA11y(session)
+  if (!after) return { ok: false }
+  const signals = collectSessionSignals(after)
+  const invalidRemaining = signals.invalidFields.length
+  if ((!batchAckResult || batchAckResult.invalidCount > 0) && invalidRemaining > 0) {
+    return { ok: false }
+  }
+
+  return {
+    ok: true,
+    finalSource: 'session',
+    final: sessionSignalsPayload(signals, detail),
+    invalidRemaining,
+  }
+}
+
 async function waitForDeferredBatchUpdate(
   session: Session,
   startRevision: number,
@@ -2785,6 +3125,23 @@ function batchFieldReadbackMatches(a11y: A11yNode, field: ResolvedFillFieldInput
   }
 }
 
+function actionNeedsUiTree(action: BatchAction): boolean {
+  switch (action.type) {
+    case 'wait_for':
+      return true
+    case 'click':
+      return action.x === undefined || action.y === undefined || Boolean(action.waitFor)
+    default:
+      return false
+  }
+}
+
+function canDeferInitialFrameForRunActions(actions: BatchAction[]): boolean {
+  const first = actions[0]
+  if (!first) return false
+  return first.type === 'fill_fields'
+}
+
 async function executeBatchAction(
   session: Session,
   action: BatchAction,
@@ -2803,6 +3160,9 @@ async function executeBatchAction(
           name: action.name,
           text: action.text,
           contextText: action.contextText,
+          promptText: action.promptText,
+          sectionText: action.sectionText,
+          itemText: action.itemText,
           value: action.value,
           checked: action.checked,
           disabled: action.disabled,
@@ -2834,6 +3194,9 @@ async function executeBatchAction(
             name: action.waitFor.name,
             text: action.waitFor.text,
             contextText: action.waitFor.contextText,
+            promptText: action.waitFor.promptText,
+            sectionText: action.waitFor.sectionText,
+            itemText: action.waitFor.itemText,
             value: action.waitFor.value,
             checked: action.waitFor.checked,
             disabled: action.waitFor.disabled,
@@ -2994,6 +3357,9 @@ async function executeBatchAction(
           name: action.name,
           text: action.text,
           contextText: action.contextText,
+          promptText: action.promptText,
+          sectionText: action.sectionText,
+          itemText: action.itemText,
           value: action.value,
           checked: action.checked,
           disabled: action.disabled,
@@ -3030,6 +3396,20 @@ async function executeBatchAction(
     case 'fill_fields': {
       const resolvedFields = resolveFillFieldInputs(session, action.fields)
       if (!resolvedFields.ok) throw new Error(resolvedFields.error)
+      if (!includeSteps) {
+        const batched = await tryBatchedResolvedFields(session, resolvedFields.fields, detail)
+        if (batched.ok) {
+          return {
+            summary: `Filled ${resolvedFields.fields.length} field(s) in one proxy batch.`,
+            compact: {
+              fieldCount: resolvedFields.fields.length,
+              execution: 'batched',
+              finalSource: batched.finalSource,
+              final: batched.final,
+            },
+          }
+        }
+      }
       const steps: Array<Record<string, unknown>> = []
       for (let index = 0; index < resolvedFields.fields.length; index++) {
         const field = resolvedFields.fields[index]!
@@ -3255,11 +3635,15 @@ function sectionContext(root: A11yNode, node: A11yNode): string | undefined {
   return undefined
 }
 
-function nodeContextText(root: A11yNode, node: A11yNode): string | undefined {
-  return [promptContext(root, node), sectionContext(root, node)].filter(Boolean).join(' | ') || undefined
+function nodeContextText(context: { prompt?: string; section?: string; item?: string } | undefined): string | undefined {
+  return [context?.prompt, context?.section, context?.item].filter(Boolean).join(' | ') || undefined
 }
 
-function nodeMatchesFilter(node: A11yNode, filter: NodeFilter, contextText?: string): boolean {
+function nodeMatchesFilter(
+  node: A11yNode,
+  filter: NodeFilter,
+  context?: { prompt?: string; section?: string; item?: string },
+): boolean {
   if (filter.id && nodeIdForPath(node.path) !== filter.id) return false
   if (filter.role && node.role !== filter.role) return false
   if (!textMatches(node.name, filter.name)) return false
@@ -3271,7 +3655,10 @@ function nodeMatchesFilter(node: A11yNode, filter: NodeFilter, contextText?: str
       filter.text,
     )
   ) return false
-  if (!textMatches(contextText, filter.contextText)) return false
+  if (!textMatches(nodeContextText(context), filter.contextText)) return false
+  if (!textMatches(context?.prompt, filter.promptText)) return false
+  if (!textMatches(context?.section, filter.sectionText)) return false
+  if (!textMatches(context?.item, filter.itemText)) return false
   if (filter.checked !== undefined && node.state?.checked !== filter.checked) return false
   if (filter.disabled !== undefined && (node.state?.disabled ?? false) !== filter.disabled) return false
   if (filter.focused !== undefined && (node.state?.focused ?? false) !== filter.focused) return false
@@ -3287,8 +3674,10 @@ export function findNodes(node: A11yNode, filter: NodeFilter): A11yNode[] {
   const matches: A11yNode[] = []
 
   function walk(n: A11yNode) {
-    const contextText = filter.contextText ? nodeContextText(node, n) : undefined
-    if (nodeMatchesFilter(n, filter, contextText) && hasNodeFilter(filter)) matches.push(n)
+    const context = filter.contextText || filter.promptText || filter.sectionText || filter.itemText
+      ? nodeContextForNode(node, n)
+      : undefined
+    if (nodeMatchesFilter(n, filter, context) && hasNodeFilter(filter)) matches.push(n)
     for (const child of n.children) walk(child)
   }
 
@@ -3331,14 +3720,13 @@ function formatNode(
     : Math.round(Math.min(Math.max(node.bounds.y + node.bounds.height / 2, 0), viewport.height))
   const revealDeltaX = Math.round(node.bounds.x + node.bounds.width / 2 - viewport.width / 2)
   const revealDeltaY = Math.round(node.bounds.y + node.bounds.height / 2 - viewport.height / 2)
-  const prompt = promptContext(root, node)
-  const section = sectionContext(root, node)
+  const context = nodeContextForNode(root, node)
   return {
     id: nodeIdForPath(node.path),
     role: node.role,
     name: node.name,
     ...(node.value ? { value: node.value } : {}),
-    ...(prompt || section ? { context: { ...(prompt ? { prompt } : {}), ...(section ? { section } : {}) } } : {}),
+    ...(context ? { context } : {}),
     bounds: node.bounds,
     visibleBounds: {
       x: visibleLeft,

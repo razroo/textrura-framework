@@ -11,6 +11,8 @@ const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url))
 
 export interface EmbeddedProxyRuntime {
   wsUrl: string
+  ready: Promise<void>
+  getTrace?: () => Record<string, unknown>
   closed: boolean
   close: () => Promise<void>
 }
@@ -159,6 +161,7 @@ export interface SpawnProxyParams {
   width?: number
   height?: number
   slowMo?: number
+  eagerInitialExtract?: boolean
 }
 
 export async function startEmbeddedGeometraProxy(
@@ -173,6 +176,7 @@ export async function startEmbeddedGeometraProxy(
       height?: number
       headed?: boolean
       slowMo?: number
+      eagerInitialExtract?: boolean
     }) => Promise<EmbeddedProxyRuntime>
   }
   if (typeof runtimeModule.launchProxyRuntime !== 'function') {
@@ -186,6 +190,7 @@ export async function startEmbeddedGeometraProxy(
     height: opts.height,
     headed: opts.headless !== true,
     slowMo: opts.slowMo,
+    eagerInitialExtract: opts.eagerInitialExtract,
   })
   return { runtime, wsUrl: runtime.wsUrl }
 }
@@ -241,6 +246,7 @@ export function spawnGeometraProxy(opts: SpawnProxyParams): Promise<{ child: Chi
   if (opts.slowMo != null && opts.slowMo > 0) args.push('--slow-mo', String(opts.slowMo))
   if (opts.headless === true) args.push('--headless')
   else if (opts.headless === false) args.push('--headed')
+  if (opts.eagerInitialExtract === false) args.push('--lazy-initial-extract')
 
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, args, {
