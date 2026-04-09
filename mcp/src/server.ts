@@ -43,6 +43,8 @@ import type {
   FormSchemaModel,
   Session,
   UpdateWaitResult,
+  WorkflowPageEntry,
+  WorkflowState,
 } from './session.js'
 
 type NodeStateFilterValue = boolean | 'mixed'
@@ -1002,6 +1004,7 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
           const wait = await sendFillFields(session, directFields)
           const ackResult = parseProxyFillAckResult(wait.result)
           if (ackResult && ackResult.invalidCount === 0) {
+            recordWorkflowFill(session, undefined, undefined, valuesById, valuesByLabel, 0, directFields.length)
             return ok(JSON.stringify({
               ...connection,
               completed: true,
@@ -1019,6 +1022,7 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
           const afterDirect = sessionA11y(session)
           const directSignals = afterDirect ? collectSessionSignals(afterDirect) : undefined
           if (directSignals && directSignals.invalidFields.length === 0) {
+            recordWorkflowFill(session, undefined, undefined, valuesById, valuesByLabel, 0, directFields.length)
             return ok(JSON.stringify({
               ...connection,
               completed: true,
@@ -1114,8 +1118,13 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
             fieldCount: planned.fields.length,
             successCount: planned.fields.length,
             errorCount: 0,
+            minConfidence: planned.planned.length > 0
+              ? Number(Math.min(...planned.planned.map(p => p.confidence)).toFixed(2))
+              : undefined,
             ...(signals ? { final: sessionSignalsPayload(signals, detail) } : {}),
           }
+
+          recordWorkflowFill(session, schema.formId, schema.name, valuesById, valuesByLabel, invalidRemaining, planned.fields.length)
 
           if (failOnInvalid && invalidRemaining > 0) {
             return err(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
@@ -1131,14 +1140,17 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
 
       for (let index = startIndex; index < planned.fields.length; index++) {
         const field = planned.fields[index]!
+        const plan = planned.planned[index]
+        const confidence = plan?.confidence
+        const matchMethod = plan?.matchMethod
         try {
           const result = await executeFillField(session, field, detail)
           steps.push(detail === 'verbose'
-            ? { index, kind: field.kind, ok: true, summary: result.summary }
-            : { index, kind: field.kind, ok: true, ...result.compact })
+            ? { index, kind: field.kind, ok: true, ...(confidence !== undefined ? { confidence, matchMethod } : {}), summary: result.summary }
+            : { index, kind: field.kind, ok: true, ...(confidence !== undefined ? { confidence, matchMethod } : {}), ...result.compact })
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e)
-          steps.push({ index, kind: field.kind, ok: false, error: message })
+          steps.push({ index, kind: field.kind, ok: false, ...(confidence !== undefined ? { confidence, matchMethod } : {}), error: message })
           if (stopOnError) {
             stoppedAt = index
             break
@@ -1160,11 +1172,16 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
         fieldCount: planned.fields.length,
         successCount,
         errorCount,
+        minConfidence: planned.planned.length > 0
+          ? Number(Math.min(...planned.planned.map(p => p.confidence)).toFixed(2))
+          : undefined,
         ...(startIndex > 0 ? { resumedFromIndex: startIndex } : {}),
         ...(includeSteps ? { steps } : {}),
         ...(stoppedAt !== undefined ? { stoppedAt, resumeFromIndex: stoppedAt + 1 } : {}),
         ...(signals ? { final: sessionSignalsPayload(signals, detail) } : {}),
       }
+
+      recordWorkflowFill(session, schema.formId, schema.name, valuesById, valuesByLabel, invalidRemaining, planned.fields.length)
 
       if (failOnInvalid && invalidRemaining > 0) {
         return err(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
@@ -2071,6 +2088,51 @@ For a token-efficient semantic view, use geometra_snapshot (default compact). Fo
     }
   )
 
+  // ── workflow state ───────────────────────────────────────────
+  server.tool(
+    'geometra_workflow_state',
+    `Get the accumulated workflow state across page navigations. Shows which pages/forms have been filled, what values were submitted, and the fill status per page.
+
+Use this after navigating to a new page in a multi-step flow (e.g. job applications) to understand what has been completed so far. Pass \`clear: true\` to reset the workflow state.`,
+    {
+      clear: z.boolean().optional().default(false).describe('Reset the workflow state'),
+    },
+    async ({ clear }) => {
+      const session = getSession()
+      if (!session) return err('Not connected. Call geometra_connect first.')
+
+      if (clear) {
+        session.workflowState = undefined
+        return ok(JSON.stringify({ cleared: true }))
+      }
+
+      if (!session.workflowState || session.workflowState.pages.length === 0) {
+        return ok(JSON.stringify({
+          pageCount: 0,
+          message: 'No workflow state recorded yet. Fill a form with geometra_fill_form to start tracking.',
+        }))
+      }
+
+      const state = session.workflowState
+      const totalFields = state.pages.reduce((sum, p) => sum + p.fieldCount, 0)
+      const totalInvalid = state.pages.reduce((sum, p) => sum + p.invalidCount, 0)
+      return ok(JSON.stringify({
+        pageCount: state.pages.length,
+        totalFieldsFilled: totalFields,
+        totalInvalidRemaining: totalInvalid,
+        elapsedMs: Date.now() - state.startedAt,
+        pages: state.pages.map(p => ({
+          pageUrl: p.pageUrl,
+          ...(p.formId ? { formId: p.formId } : {}),
+          ...(p.formName ? { formName: p.formName } : {}),
+          fieldCount: p.fieldCount,
+          invalidCount: p.invalidCount,
+          filledValues: p.filledValues,
+        })),
+      }))
+    }
+  )
+
   // ── disconnect ───────────────────────────────────────────────
   server.tool(
     'geometra_disconnect',
@@ -2495,6 +2557,8 @@ interface SessionSignals {
     name?: string
     value?: string
   }
+  captchaDetected?: boolean
+  captchaType?: string
   dialogCount: number
   busyCount: number
   alerts: string[]
@@ -2519,6 +2583,13 @@ function collectSessionSignals(root: A11yNode): SessionSignals {
 
   const seenAlerts = new Set<string>()
   const seenInvalidIds = new Set<string>()
+
+  const captchaPattern = /recaptcha|g-recaptcha|hcaptcha|h-captcha|turnstile|cf-turnstile|captcha/i
+  const captchaTypes: Record<string, string> = {
+    recaptcha: 'recaptcha', 'g-recaptcha': 'recaptcha',
+    hcaptcha: 'hcaptcha', 'h-captcha': 'hcaptcha',
+    turnstile: 'turnstile', 'cf-turnstile': 'turnstile',
+  }
 
   function walk(node: A11yNode) {
     if (!signals.focus && node.state?.focused) {
@@ -2548,6 +2619,14 @@ function collectSessionSignals(root: A11yNode): SessionSignals {
           ...(node.name ? { name: truncateInlineText(node.name, 80) } : {}),
           ...(node.validation?.error ? { error: truncateInlineText(node.validation.error, 120) } : {}),
         })
+      }
+    }
+    if (!signals.captchaDetected) {
+      const text = [node.name, node.value].filter(Boolean).join(' ')
+      if (captchaPattern.test(text)) {
+        signals.captchaDetected = true
+        const match = text.toLowerCase().match(/recaptcha|g-recaptcha|hcaptcha|h-captcha|turnstile|cf-turnstile/)
+        signals.captchaType = match ? (captchaTypes[match[0]] ?? 'unknown') : 'unknown'
       }
     }
     for (const child of node.children) walk(child)
@@ -2614,6 +2693,7 @@ function sessionSignalsPayload(signals: SessionSignals, detail: ResponseDetail =
       ? { scroll: { x: signals.scrollX ?? 0, y: signals.scrollY ?? 0 } }
       : {}),
     ...(signals.focus ? { focus: signals.focus } : {}),
+    ...(signals.captchaDetected ? { captchaDetected: true, captchaType: signals.captchaType ?? 'unknown' } : {}),
     dialogCount: signals.dialogCount,
     busyCount: signals.busyCount,
     alertCount: signals.alerts.length,
@@ -2990,13 +3070,19 @@ function plannedFillInputsForField(field: FormSchemaField, value: FormValueInput
   }))
 }
 
+interface PlannedFillField {
+  field: ResolvedFillFieldInput
+  confidence: number
+  matchMethod: 'id' | 'label-exact' | 'label-normalized'
+}
+
 function planFormFill(
   schema: FormSchemaModel,
   opts: {
     valuesById?: Record<string, FormValueInput>
     valuesByLabel?: Record<string, FormValueInput>
   },
-): { ok: true; fields: ResolvedFillFieldInput[] } | { ok: false; error: string } {
+): { ok: true; fields: ResolvedFillFieldInput[]; planned: PlannedFillField[] } | { ok: false; error: string } {
   const fieldById = new Map(schema.fields.map(field => [field.id, field]))
   const fieldsByLabel = new Map<string, FormSchemaField[]>()
   for (const field of schema.fields) {
@@ -3006,7 +3092,7 @@ function planFormFill(
     else fieldsByLabel.set(key, [field])
   }
 
-  const planned: ResolvedFillFieldInput[] = []
+  const allPlanned: PlannedFillField[] = []
   const seenFieldIds = new Set<string>()
 
   for (const [fieldId, value] of Object.entries(opts.valuesById ?? {})) {
@@ -3014,7 +3100,7 @@ function planFormFill(
     if (!field) return { ok: false, error: `Unknown form field id ${fieldId}. Refresh geometra_form_schema and try again.` }
     const next = plannedFillInputsForField(field, value)
     if ('error' in next) return { ok: false, error: next.error }
-    planned.push(...next)
+    for (const n of next) allPlanned.push({ field: n, confidence: 1.0, matchMethod: 'id' })
     seenFieldIds.add(field.id)
   }
 
@@ -3030,11 +3116,14 @@ function planFormFill(
     }
     const next = plannedFillInputsForField(field, value)
     if ('error' in next) return { ok: false, error: next.error }
-    planned.push(...next)
+    const isExact = field.label === label
+    const confidence = isExact ? 0.95 : 0.8
+    const matchMethod = isExact ? 'label-exact' as const : 'label-normalized' as const
+    for (const n of next) allPlanned.push({ field: n, confidence, matchMethod })
     seenFieldIds.add(field.id)
   }
 
-  return { ok: true, fields: planned }
+  return { ok: true, fields: allPlanned.map(p => p.field), planned: allPlanned }
 }
 
 function isResolvedFillFieldInput(field: FillFieldInput): field is ResolvedFillFieldInput {
@@ -3698,6 +3787,40 @@ function ok(text: string, screenshot?: string) {
     content.push({ type: 'image' as const, data: screenshot, mimeType: 'image/png' })
   }
   return { content }
+}
+
+function recordWorkflowFill(
+  session: Session,
+  formId: string | undefined,
+  formName: string | undefined,
+  valuesById: Record<string, unknown> | undefined,
+  valuesByLabel: Record<string, unknown> | undefined,
+  invalidCount: number,
+  fieldCount: number,
+): void {
+  if (!session.workflowState) {
+    session.workflowState = { pages: [], startedAt: Date.now() }
+  }
+  const filledValues: Record<string, string | boolean> = {}
+  for (const [k, v] of Object.entries(valuesById ?? {})) {
+    if (typeof v === 'string' || typeof v === 'boolean') filledValues[k] = v
+  }
+  for (const [k, v] of Object.entries(valuesByLabel ?? {})) {
+    if (typeof v === 'string' || typeof v === 'boolean') filledValues[k] = v
+  }
+
+  const a11y = sessionA11y(session)
+  const pageUrl = (a11y?.meta?.pageUrl as string | undefined) ?? session.url
+
+  session.workflowState.pages.push({
+    pageUrl,
+    formId,
+    formName,
+    filledValues,
+    filledAt: Date.now(),
+    fieldCount,
+    invalidCount,
+  })
 }
 
 async function captureScreenshotBase64(session: Session): Promise<string | undefined> {

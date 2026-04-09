@@ -114,6 +114,12 @@ export interface PageListModel extends PageSectionSummaryBase {
   itemCount: number
 }
 
+export interface CaptchaDetection {
+  detected: boolean
+  type?: 'recaptcha' | 'hcaptcha' | 'turnstile' | 'cloudflare-challenge' | 'unknown'
+  hint?: string
+}
+
 export interface PageModel {
   viewport: { width: number; height: number }
   archetypes: PageArchetype[]
@@ -124,6 +130,7 @@ export interface PageModel {
     listCount: number
     focusableCount: number
   }
+  captcha?: CaptchaDetection
   primaryActions: PagePrimaryAction[]
   landmarks: PageLandmark[]
   forms: PageFormModel[]
@@ -302,6 +309,21 @@ export interface UiDelta {
   focus?: UiFocusChange
 }
 
+export interface WorkflowPageEntry {
+  pageUrl: string
+  formId?: string
+  formName?: string
+  filledValues: Record<string, string | boolean>
+  filledAt: number
+  fieldCount: number
+  invalidCount: number
+}
+
+export interface WorkflowState {
+  pages: WorkflowPageEntry[]
+  startedAt: number
+}
+
 export interface Session {
   ws: WebSocket
   layout: Record<string, unknown> | null
@@ -316,6 +338,7 @@ export interface Session {
   cachedA11y?: A11yNode | null
   cachedA11yRevision?: number
   cachedFormSchemas?: Map<string, { revision: number; forms: FormSchemaModel[] }>
+  workflowState?: WorkflowState
 }
 
 export interface SessionConnectTrace {
@@ -2461,6 +2484,51 @@ function inferPageArchetypes(model: Omit<PageModel, 'archetypes'>): PageArchetyp
  * Build a summary-first, stable-ID webpage model from the accessibility tree.
  * Use {@link expandPageSection} to fetch details for a specific section on demand.
  */
+const CAPTCHA_PATTERNS: Array<{ pattern: RegExp; type: CaptchaDetection['type']; hint: string }> = [
+  { pattern: /recaptcha|g-recaptcha/i, type: 'recaptcha', hint: 'Google reCAPTCHA detected' },
+  { pattern: /hcaptcha|h-captcha/i, type: 'hcaptcha', hint: 'hCaptcha detected' },
+  { pattern: /turnstile|cf-turnstile/i, type: 'turnstile', hint: 'Cloudflare Turnstile detected' },
+  { pattern: /cloudflare.*challenge|challenge-platform|just a moment/i, type: 'cloudflare-challenge', hint: 'Cloudflare challenge page detected' },
+  { pattern: /captcha/i, type: 'unknown', hint: 'CAPTCHA element detected' },
+]
+
+function detectCaptcha(root: A11yNode): CaptchaDetection {
+  let found: CaptchaDetection | undefined
+
+  function walk(node: A11yNode) {
+    if (found) return
+    const text = [node.name, node.value, node.role].filter(Boolean).join(' ')
+    for (const { pattern, type, hint } of CAPTCHA_PATTERNS) {
+      if (pattern.test(text)) {
+        found = { detected: true, type, hint }
+        return
+      }
+    }
+    // Check iframe placeholders (common for reCAPTCHA/hCaptcha/Turnstile)
+    if (node.meta && typeof (node.meta as Record<string, unknown>).frameUrl === 'string') {
+      const frameUrl = (node.meta as Record<string, unknown>).frameUrl as string
+      for (const { pattern, type, hint } of CAPTCHA_PATTERNS) {
+        if (pattern.test(frameUrl)) {
+          found = { detected: true, type, hint }
+          return
+        }
+      }
+    }
+    for (const child of node.children) walk(child)
+  }
+
+  walk(root)
+
+  // Also check the page URL for Cloudflare challenge pages
+  if (!found && root.meta?.pageUrl) {
+    if (/challenge|cdn-cgi.*challenge/i.test(root.meta.pageUrl)) {
+      found = { detected: true, type: 'cloudflare-challenge', hint: 'Cloudflare challenge page URL detected' }
+    }
+  }
+
+  return found ?? { detected: false }
+}
+
 export function buildPageModel(
   root: A11yNode,
   options?: {
@@ -2565,8 +2633,10 @@ export function buildPageModel(
     lists: sortByBounds(lists).slice(0, maxSectionsPerKind),
   }
 
+  const captcha = detectCaptcha(root)
   return {
     ...baseModel,
+    ...(captcha.detected ? { captcha } : {}),
     archetypes: inferPageArchetypes(baseModel),
   }
 }
