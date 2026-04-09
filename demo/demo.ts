@@ -1943,9 +1943,9 @@ function seoOutputBlock(): UIElement {
 function archSection(): UIElement {
   const pkgs = [
     { name: '@geometra/core', badge: 'Core', bg: 'rgba(233,69,96,0.15)', bc: ACCENT, desc: 'Signals, box()/text()/image(), hit-testing, text selection, SEO, animations.' },
-    { name: '@geometra/renderer-canvas', badge: 'Render', bg: 'rgba(14,165,233,0.15)', bc: ACCENT2, desc: 'Canvas2D paint. Gradients, shadows, text wrapping, HiDPI, clipping.' },
-    { name: '@geometra/renderer-terminal', badge: 'Render', bg: 'rgba(14,165,233,0.15)', bc: ACCENT2, desc: 'ANSI terminal renderer. Box-drawing, 256-color, TUI.' },
-    { name: '@geometra/renderer-webgpu', badge: 'Render', bg: 'rgba(14,165,233,0.15)', bc: ACCENT2, desc: 'WebGPU renderer scaffold with capability detection and initialization surface.' },
+    { name: '@geometra/renderer-canvas', badge: 'Canvas', bg: 'rgba(14,165,233,0.15)', bc: ACCENT2, desc: 'Canvas2D paint. Gradients, shadows, text wrapping, HiDPI, clipping.' },
+    { name: '@geometra/renderer-terminal', badge: 'Terminal', bg: 'rgba(14,165,233,0.15)', bc: ACCENT2, desc: 'ANSI terminal renderer. Box-drawing, 256-color, TUI.' },
+    { name: '@geometra/renderer-webgpu', badge: 'WebGPU', bg: 'rgba(14,165,233,0.15)', bc: ACCENT2, desc: 'WebGPU renderer scaffold with capability detection and initialization surface.' },
     { name: '@geometra/server', badge: 'Network', bg: 'rgba(34,197,94,0.15)', bc: ACCENT3, desc: 'Server-side layout. Diffs frames, streams patches over WebSocket.' },
     { name: '@geometra/client', badge: 'Network', bg: 'rgba(34,197,94,0.15)', bc: ACCENT3, desc: 'Thin client (~2KB). Receives geometry, paints. Auto-reconnect.' },
     { name: '@geometra/ui', badge: 'App', bg: 'rgba(245,158,11,0.15)', bc: ACCENT4, desc: 'Starter UI primitives for forms, overlays, tables, trees, and command surfaces.' },
@@ -1953,23 +1953,29 @@ function archSection(): UIElement {
   ]
   return section([
     ...heading('Packages', '8 packages. One protocol. The official starter ships on ui + router + server/client.'),
-    box({ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }, pkgs.map(p =>
+    box({ flexDirection: 'row', flexWrap: 'wrap', gap: 16, alignContent: 'flex-start' }, pkgs.map(p =>
       box({
         backgroundColor: SURFACE,
         borderColor: BORDER,
         borderRadius: 14,
         padding: 24,
         flexDirection: 'column', gap: 10,
-        minWidth: 200, flexGrow: 1, flexBasis: 0,
+        minWidth: 200, flexGrow: 1, flexShrink: 1, flexBasis: 'auto',
         boxShadow: { offsetX: 0, offsetY: 6, blur: 20, color: 'rgba(0,0,0,0.28)' },
       }, [
-        box({ flexDirection: 'row', gap: 10, alignItems: 'center' }, [
-          text({ text: p.name, font: '600 14px Inter', lineHeight: 18, color: TEXT_COLOR }),
+        box({ flexDirection: 'column', alignItems: 'flex-start', gap: 8 }, [
+          text({
+            text: p.name,
+            font: '600 14px Inter',
+            lineHeight: 18,
+            color: TEXT_COLOR,
+            whiteSpace: 'normal',
+          }),
           box({ backgroundColor: p.bg, borderRadius: 6, paddingLeft: 8, paddingRight: 8, paddingTop: 3, paddingBottom: 3 }, [
             text({ text: p.badge, font: '700 10px Inter', lineHeight: 12, color: p.bc }),
           ]),
         ]),
-        text({ text: p.desc, font: '13px Inter', lineHeight: 20, color: MUTED }),
+        text({ text: p.desc, font: '13px Inter', lineHeight: 20, color: MUTED, whiteSpace: 'normal' }),
       ]),
     )),
     box({
