@@ -177,7 +177,13 @@ function nodeFilterShape() {
 function waitConditionShape() {
   return {
     ...nodeFilterShape(),
-    present: z.boolean().optional().default(true).describe('Wait for a matching node to exist (default true) or disappear'),
+    present: z
+      .boolean()
+      .optional()
+      .default(true)
+      .describe(
+        'Wait until at least one node matches the filter (default true), or until no node matches (set false to wait out loading/parsing banners like “Parsing…” or “Parsing your resume”)',
+      ),
     timeoutMs: z
       .number()
       .int()
@@ -188,6 +194,21 @@ function waitConditionShape() {
       .describe('Maximum time to wait before returning an error (default 10000ms)'),
   }
 }
+
+const GEOMETRA_QUERY_FILTER_REQUIRED_MESSAGE =
+  'Provide at least one filter (id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, or busy). ' +
+  'This tool uses a strict schema: unknown keys are rejected. There is no textGone parameter — use text for substring matching. ' +
+  'To wait until text disappears from the UI, use geometra_wait_for with text and present: false.'
+
+const GEOMETRA_WAIT_FILTER_REQUIRED_MESSAGE =
+  'Provide at least one semantic filter (id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, or busy). ' +
+  'This tool uses a strict schema: unknown keys are rejected. There is no textGone parameter — use text with a distinctive substring and present: false to wait until that text is gone ' +
+  '(common for “Parsing…”, “Parsing your resume”, or similar). Passing only present/timeoutMs is not enough without a filter.'
+
+/** Strict input so unknown keys (e.g. textGone) fail parse; empty-filter checks happen in handlers / waitForSemanticCondition. */
+const geometraQueryInputSchema = z.object(nodeFilterShape()).strict()
+
+const geometraWaitForInputSchema = z.object(waitConditionShape()).strict()
 
 const timeoutMsInput = z.number().int().min(50).max(60_000).optional()
 
@@ -333,7 +354,7 @@ type BatchAction = z.infer<typeof batchActionSchema>
 
 export function createServer(): McpServer {
   const server = new McpServer(
-    { name: 'geometra', version: '1.19.17' },
+    { name: 'geometra', version: '1.19.20' },
     { capabilities: { tools: {} } },
   )
 
@@ -474,8 +495,11 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
     'geometra_query',
     `Find elements in the current Geometra UI by stable id, role, name, text content, current value, or semantic state. Returns matching elements with their exact pixel bounds {x, y, width, height}, visible in-viewport bounds, an on-screen center point, visibility / scroll-reveal hints, role, name, value, state, and tree path.
 
-This is the Geometra equivalent of Playwright's locator — but instant, structured, and with no browser. Use the returned bounds to click elements or assert on layout.`,
-    nodeFilterShape(),
+This is the Geometra equivalent of Playwright's locator — but instant, structured, and with no browser. Use the returned bounds to click elements or assert on layout.
+
+Unknown parameter names are rejected (strict schema). To wait until visible text goes away (e.g. a parsing banner), use geometra_wait_for with that substring in text and present: false — there is no textGone field.`,
+    // SDK overload typings only list raw shapes; runtime accepts ZodObject via getZodSchemaObject().
+    geometraQueryInputSchema as unknown as Parameters<McpServer['tool']>[2],
     async ({ id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, busy }) => {
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
@@ -498,7 +522,7 @@ This is the Geometra equivalent of Playwright's locator — but instant, structu
         required,
         busy,
       }
-      if (!hasNodeFilter(filter)) return err('Provide at least one query filter (id, role, name, text, contextText, value, or state)')
+      if (!hasNodeFilter(filter)) return err(GEOMETRA_QUERY_FILTER_REQUIRED_MESSAGE)
       const matches = findNodes(a11y, filter)
 
       if (matches.length === 0) {
@@ -514,29 +538,32 @@ This is the Geometra equivalent of Playwright's locator — but instant, structu
     'geometra_wait_for',
     `Wait for a semantic UI condition without guessing sleep durations. Use this for slow SPA transitions, resume parsing, custom validation alerts, disabled submit buttons, and value/state confirmation before submit.
 
-The filter matches the same fields as geometra_query. Set \`present: false\` to wait for something to disappear (for example an alert or a "Parsing…" status).`,
-    waitConditionShape(),
+The filter matches the same fields as geometra_query (strict schema — unknown keys error). Set \`present: false\` to wait until **no** node matches — for example Ashby/Lever-style “Parsing your resume” or any “Parsing…” banner: \`{ "text": "Parsing", "present": false }\` (tune the substring to the site). Do not use a textGone parameter; use \`text\` + \`present: false\`.`,
+    geometraWaitForInputSchema as unknown as Parameters<McpServer['tool']>[2],
     async ({ id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, present, timeoutMs }) => {
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
 
+      const filterProbe: NodeFilter = {
+        id,
+        role,
+        name,
+        text,
+        contextText,
+        value,
+        checked,
+        disabled,
+        focused,
+        selected,
+        expanded,
+        invalid,
+        required,
+        busy,
+      }
+      if (!hasNodeFilter(filterProbe)) return err(GEOMETRA_WAIT_FILTER_REQUIRED_MESSAGE)
+
       const waited = await waitForSemanticCondition(session, {
-        filter: {
-          id,
-          role,
-          name,
-          text,
-          contextText,
-          value,
-          checked,
-          disabled,
-          focused,
-          selected,
-          expanded,
-          invalid,
-          required,
-          busy,
-        },
+        filter: filterProbe,
         present: present ?? true,
         timeoutMs: timeoutMs ?? 10_000,
       })
@@ -2089,7 +2116,7 @@ async function waitForSemanticCondition(
   },
 ): Promise<{ ok: true; value: WaitConditionResult } | { ok: false; error: string }> {
   if (!hasNodeFilter(options.filter)) {
-    return { ok: false, error: 'Provide at least one wait filter (id, role, name, text, contextText, value, or state)' }
+    return { ok: false, error: GEOMETRA_WAIT_FILTER_REQUIRED_MESSAGE }
   }
 
   const startedAt = Date.now()

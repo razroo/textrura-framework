@@ -26,7 +26,7 @@ Proxy-backed sessions stay warm by default on disconnect, and MCP now keeps a sm
 |---|---|
 | `geometra_connect` | Connect with `url` (ws://…) **or** `pageUrl` (https://…) to auto-start geometra-proxy; can inline `formSchema` and/or `pageModel` for lower-turn starts |
 | `geometra_query` | Find elements by stable id, role, name, text content, ancestor/prompt context, current value, or semantic state such as `invalid`, `required`, or `busy` |
-| `geometra_wait_for` | Wait for a semantic condition instead of guessing sleeps (`busy`, `disabled`, alerts, values, etc.) |
+| `geometra_wait_for` | Wait for a semantic condition instead of guessing sleeps (`busy`, `disabled`, alerts, values, etc.). **Strict parameters** — use `text` plus `present: false` to wait until a substring disappears (e.g. “Parsing your resume”); there is no `textGone` field |
 | `geometra_form_schema` | Compact, fill-oriented form schema with stable field ids and collapsed radio/button groups; can auto-connect from `pageUrl` / `url` |
 | `geometra_fill_form` | Fill a form from `valuesById` / `valuesByLabel` in one MCP call; can auto-connect from `pageUrl` / `url` for the lowest-token known-form path |
 | `geometra_fill_fields` | Fill labeled text/choice/toggle/file fields in one MCP call; can return final-only status for the smallest responses |
@@ -45,6 +45,10 @@ Proxy-backed sessions stay warm by default on disconnect, and MCP now keeps a sm
 | `geometra_snapshot` | Default **compact**: flat viewport-visible actionable nodes (minified JSON). `view=full` for nested tree |
 | `geometra_layout` | Raw computed geometry for every node |
 | `geometra_disconnect` | Close the connection |
+
+### `geometra_wait_for` and loading banners
+
+The tool input is **strict**: unknown keys are rejected (so mistaken names like `textGone` fail fast instead of being ignored). To wait until copy such as “Parsing…” or “Parsing your resume” is **gone**, pass a substring that matches the banner in **`text`** and set **`present`** to **`false`**. Example: `{ "text": "Parsing", "present": false }` (adjust the substring per site).
 
 ## Setup
 
