@@ -168,6 +168,12 @@ export type ClientWheelMessage = {
   protocolVersion?: number
 }
 
+export type ClientScreenshotMessage = {
+  type: 'screenshot'
+  requestId?: string
+  protocolVersion?: number
+}
+
 export type ParsedClientMessage =
   | ClientEventMessage
   | ClientKeyMessage
@@ -182,6 +188,7 @@ export type ParsedClientMessage =
   | ClientSelectOptionMessage
   | ClientSetCheckedMessage
   | ClientWheelMessage
+  | ClientScreenshotMessage
   | { type: string; protocolVersion?: number }
 
 export function isKeyMessage(msg: ParsedClientMessage): msg is ClientKeyMessage {
@@ -252,4 +259,8 @@ export function isListboxPickMessage(msg: ParsedClientMessage): msg is ClientLis
 
 export function isSetCheckedMessage(msg: ParsedClientMessage): msg is ClientSetCheckedMessage {
   return msg.type === 'setChecked' && 'label' in msg && typeof (msg as ClientSetCheckedMessage).label === 'string'
+}
+
+export function isScreenshotMessage(msg: ParsedClientMessage): msg is ClientScreenshotMessage {
+  return msg.type === 'screenshot'
 }

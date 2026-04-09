@@ -27,6 +27,7 @@ import {
   isListboxPickMessage,
   isNavigateMessage,
   isResizeMessage,
+  isScreenshotMessage,
   isSetFieldChoiceMessage,
   isSetFieldTextMessage,
   isSetCheckedMessage,
@@ -305,6 +306,13 @@ async function handleClientMessage(
       const y = typeof msg.y === 'number' && Number.isFinite(msg.y) ? msg.y : undefined
       await wheelAt(page, dx, dy, x, y)
       onViewportOrInput('input', requestId)
+      return
+    }
+
+    if (isScreenshotMessage(msg)) {
+      const buffer = await page.screenshot({ type: 'png', fullPage: false })
+      const base64 = buffer.toString('base64')
+      onViewportOrInput('input', requestId, { screenshot: base64 })
     }
   } catch (err) {
     onHandlerError(err)
@@ -321,13 +329,50 @@ async function fillFieldsAckResult(page: Page): Promise<Record<string, unknown>>
     countAcrossFrames(frames, '[aria-busy="true"]'),
   ])
 
+  let invalidFields: Array<{ name?: string; error?: string }> | undefined
+  if (invalidCount > 0) {
+    invalidFields = await collectInvalidFieldErrors(frames)
+  }
+
   return {
     pageUrl: page.url(),
     invalidCount,
     alertCount,
     dialogCount,
     busyCount,
+    ...(invalidFields && invalidFields.length > 0 ? { invalidFields } : {}),
   }
+}
+
+async function collectInvalidFieldErrors(
+  frames: ReturnType<Page['frames']>,
+): Promise<Array<{ name?: string; error?: string }>> {
+  const results = await Promise.all(
+    frames.map(frame =>
+      frame.evaluate(() => {
+        const fields: Array<{ name?: string; error?: string }> = []
+        const invalidEls = document.querySelectorAll(':invalid')
+        for (const el of invalidEls) {
+          if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement)) continue
+          const label =
+            el.getAttribute('aria-label')?.trim() ||
+            (el.labels && el.labels.length > 0 ? el.labels[0]?.textContent?.trim() : undefined) ||
+            el.getAttribute('placeholder')?.trim() ||
+            el.name ||
+            undefined
+          const errorId = el.getAttribute('aria-errormessage')
+          const errorEl = errorId ? document.getElementById(errorId) : null
+          const error =
+            errorEl?.textContent?.trim() ||
+            el.validationMessage ||
+            undefined
+          if (label || error) fields.push({ ...(label ? { name: label } : {}), ...(error ? { error } : {}) })
+        }
+        return fields.slice(0, 10)
+      }).catch(() => [] as Array<{ name?: string; error?: string }>),
+    ),
+  )
+  return results.flat().slice(0, 10)
 }
 
 async function countAcrossFrames(frames: ReturnType<Page['frames']>, selector: string): Promise<number> {

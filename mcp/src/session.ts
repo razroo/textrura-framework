@@ -215,7 +215,13 @@ export interface FormSchemaField {
   values?: string[]
   optionCount?: number
   options?: string[]
+  aliases?: Record<string, string[]>
   context?: NodeContextModel
+}
+
+export interface FormSchemaSection {
+  name: string
+  fieldIds: string[]
 }
 
 export interface FormSchemaModel {
@@ -225,6 +231,7 @@ export interface FormSchemaModel {
   requiredCount: number
   invalidCount: number
   fields: FormSchemaField[]
+  sections?: FormSchemaSection[]
 }
 
 export interface FormRequiredFieldSnapshot extends FormSchemaField {
@@ -1399,6 +1406,11 @@ export function sendWheel(
   }, timeoutMs)
 }
 
+/** Capture a viewport screenshot from the proxy (base64 PNG). */
+export function sendScreenshot(session: Session, timeoutMs = 10_000): Promise<UpdateWaitResult> {
+  return sendAndWaitForUpdate(session, { type: 'screenshot' }, timeoutMs)
+}
+
 /** Navigate the proxy page to a new URL while keeping the browser process alive. */
 export function sendNavigate(
   session: Session,
@@ -2139,6 +2151,35 @@ function groupedChoiceForNode(root: A11yNode, formNode: A11yNode, seed: A11yNode
   return controls.length >= 2 ? { container: formNode, prompt, controls } : null
 }
 
+const SEMANTIC_ALIAS_GROUPS: Array<{ triggers: string[]; aliases: string[] }> = [
+  { triggers: ['yes', 'true'], aliases: ['yes', 'true', 'agree', 'agreed', 'accept', 'accepted', 'consent', 'acknowledge', 'opt in'] },
+  { triggers: ['no', 'false'], aliases: ['no', 'false', 'decline', 'declined', 'disagree', 'deny', 'opt out', 'prefer not'] },
+  { triggers: ['decline'], aliases: ['decline', 'prefer not', 'opt out', 'do not'] },
+  { triggers: ['atx', 'austin'], aliases: ['atx', 'austin', 'austin tx', 'austin texas'] },
+  { triggers: ['nyc', 'new york'], aliases: ['nyc', 'new york', 'new york ny'] },
+  { triggers: ['sf', 'san francisco'], aliases: ['sf', 'san francisco', 'san francisco ca'] },
+  { triggers: ['la', 'los angeles'], aliases: ['la', 'los angeles', 'los angeles ca'] },
+  { triggers: ['dc', 'washington dc'], aliases: ['dc', 'washington dc', 'washington d c'] },
+  { triggers: ['us', 'usa', 'united states'], aliases: ['us', 'usa', 'united states'] },
+]
+
+function computeOptionAliases(options: string[]): Record<string, string[]> | undefined {
+  const result: Record<string, string[]> = {}
+  for (const option of options) {
+    const normalized = option.toLowerCase().trim()
+    for (const group of SEMANTIC_ALIAS_GROUPS) {
+      if (group.triggers.some(t => normalized === t || normalized.includes(t))) {
+        const relevant = group.aliases.filter(a => a !== normalized)
+        if (relevant.length > 0) {
+          result[option] = relevant
+          break
+        }
+      }
+    }
+  }
+  return Object.keys(result).length > 0 ? result : undefined
+}
+
 function simpleSchemaField(root: A11yNode, node: A11yNode): FormSchemaField | null {
   const context = nodeContextForNode(root, node)
   const label = fieldLabel(node) ?? sanitizeInlineName(node.name, 80) ?? context?.prompt
@@ -2200,6 +2241,7 @@ function groupedSchemaField(
         }),
     optionCount: options.length,
     options,
+    ...(computeOptionAliases(options) ? { aliases: computeOptionAliases(options) } : {}),
     ...(compactSchemaContext(context, grouped.prompt) ? { context: compactSchemaContext(context, grouped.prompt) } : {}),
   }
 }
@@ -2219,6 +2261,42 @@ function toggleSchemaField(root: A11yNode, node: A11yNode): FormSchemaField | nu
     ...(node.state?.checked !== undefined ? { checked: node.state.checked === true } : {}),
     ...(compactSchemaContext(context, label) ? { context: compactSchemaContext(context, label) } : {}),
   }
+}
+
+function detectFormSections(formNode: A11yNode, fields: FormSchemaField[]): FormSchemaSection[] {
+  const sectionRoles = new Set(['group', 'region'])
+  const sectionNodes: Array<{ name: string; path: number[] }> = []
+
+  function walk(node: A11yNode) {
+    if (sectionRoles.has(node.role) && node.name && node.path.length > formNode.path.length) {
+      sectionNodes.push({ name: node.name, path: node.path })
+    }
+    for (const child of node.children) walk(child)
+  }
+  walk(formNode)
+
+  if (sectionNodes.length === 0) return []
+
+  const fieldIdToPath = new Map<string, number[]>()
+  for (const field of fields) {
+    const parsed = parseFormFieldId(field.id)
+    if (parsed) fieldIdToPath.set(field.id, parsed)
+  }
+
+  const sections: FormSchemaSection[] = []
+  for (const sec of sectionNodes) {
+    const fieldIds = fields
+      .filter(field => {
+        const fieldPath = fieldIdToPath.get(field.id)
+        if (!fieldPath || fieldPath.length <= sec.path.length) return false
+        return sec.path.every((v, i) => fieldPath[i] === v)
+      })
+      .map(field => field.id)
+    if (fieldIds.length > 0) {
+      sections.push({ name: sec.name, fieldIds })
+    }
+  }
+  return sections
 }
 
 function buildFormSchemaForNode(
@@ -2285,6 +2363,10 @@ function buildFormSchemaForNode(
     requiredCount: compactFields.filter(field => field.required).length,
     invalidCount: compactFields.filter(field => field.invalid).length,
     fields: pageFields,
+    ...(() => {
+      const sections = detectFormSections(formNode, pageFields)
+      return sections.length > 0 ? { sections } : {}
+    })(),
   }
 }
 
@@ -2314,7 +2396,10 @@ function presentFormSchemaFields(
 
     const next: FormSchemaField = { ...field }
     if (booleanChoice) next.booleanChoice = true
-    if (!includeOptions) delete next.options
+    if (!includeOptions) {
+      delete next.options
+      delete next.aliases
+    }
 
     if (includeContext === 'none') {
       delete next.context

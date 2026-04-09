@@ -335,7 +335,7 @@ describe('batch MCP result shaping', () => {
       alertCount: 1,
       invalidCount: 5,
     })
-    expect((final.invalidFields as unknown[]).length).toBe(4)
+    expect((final.invalidFields as unknown[]).length).toBe(5)
     expect((final.alerts as unknown[]).length).toBe(1)
   })
 

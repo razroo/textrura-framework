@@ -32,16 +32,22 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
     if (aria) return aria.trim() || undefined
     const labelledBy = el.getAttribute('aria-labelledby')
     if (labelledBy) {
-      const text = labelledBy
-        .split(/\s+/)
-        .map(id => {
-          const target = document.getElementById(id)
-          if (!target) return ''
-          return textWithoutNestedControls(target).replace(/\s+/g, ' ').trim()
-        })
-        .filter(Boolean)
-        .join(' ')
-        .trim()
+      const resolveChain = (ids: string, visited: Set<string>): string =>
+        ids
+          .split(/\s+/)
+          .map(id => {
+            if (visited.has(id)) return ''
+            visited.add(id)
+            const target = document.getElementById(id)
+            if (!target) return ''
+            const chained = target.getAttribute('aria-labelledby')
+            if (chained) return resolveChain(chained, visited)
+            return textWithoutNestedControls(target).replace(/\s+/g, ' ').trim()
+          })
+          .filter(Boolean)
+          .join(' ')
+          .trim()
+      const text = resolveChain(labelledBy, new Set<string>())
       if (text) return text.length > 100 ? text.slice(0, 100) : text
     }
     if (
@@ -140,11 +146,20 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
     return trimmed.length > 240 ? trimmed.slice(0, 240) : trimmed
   }
 
-  function referencedText(ids: string | null): string | undefined {
+  function referencedText(ids: string | null, visited?: Set<string>): string | undefined {
     if (!ids) return undefined
+    const seen = visited ?? new Set<string>()
     const text = ids
       .split(/\s+/)
-      .map(id => document.getElementById(id)?.textContent?.trim() ?? '')
+      .map(id => {
+        if (seen.has(id)) return ''
+        seen.add(id)
+        const target = document.getElementById(id)
+        if (!target) return ''
+        const chained = target.getAttribute('aria-labelledby')
+        if (chained) return referencedText(chained, seen) ?? ''
+        return target.textContent?.trim() ?? ''
+      })
       .filter(Boolean)
       .join(' ')
     return normalizedControlValue(text)

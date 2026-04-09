@@ -440,11 +440,20 @@ async function findLabeledControl(
       return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0'
     }
 
-    function referencedText(ids: string | null): string | undefined {
+    function referencedText(ids: string | null, visited?: Set<string>): string | undefined {
       if (!ids) return undefined
+      const seen = visited ?? new Set<string>()
       const text = ids
         .split(/\s+/)
-        .map(id => document.getElementById(id)?.textContent?.trim() ?? '')
+        .map(id => {
+          if (seen.has(id)) return ''
+          seen.add(id)
+          const target = document.getElementById(id)
+          if (!target) return ''
+          const chained = target.getAttribute('aria-labelledby')
+          if (chained) return referencedText(chained, seen) ?? ''
+          return target.textContent?.trim() ?? ''
+        })
         .filter(Boolean)
         .join(' ')
         .trim()
@@ -1484,11 +1493,20 @@ async function findLabeledFileInput(frame: Frame, fieldLabel: string, exact: boo
       return payload.exact ? normalizedCandidate === normalizedExpected : normalizedCandidate.includes(normalizedExpected)
     }
 
-    function referencedText(ids: string | null): string | undefined {
+    function referencedText(ids: string | null, visited?: Set<string>): string | undefined {
       if (!ids) return undefined
+      const seen = visited ?? new Set<string>()
       const text = ids
         .split(/\s+/)
-        .map(id => document.getElementById(id)?.textContent?.trim() ?? '')
+        .map(id => {
+          if (seen.has(id)) return ''
+          seen.add(id)
+          const target = document.getElementById(id)
+          if (!target) return ''
+          const chained = target.getAttribute('aria-labelledby')
+          if (chained) return referencedText(chained, seen) ?? ''
+          return target.textContent?.trim() ?? ''
+        })
         .filter(Boolean)
         .join(' ')
         .trim()
@@ -1903,11 +1921,20 @@ async function attemptNativeBatchFill(page: Page, fields: FormFieldFill[]): Prom
         return style.display !== 'none' && style.visibility !== 'hidden'
       }
 
-      function referencedText(ids: string | null): string | undefined {
+      function referencedText(ids: string | null, visited?: Set<string>): string | undefined {
         if (!ids) return undefined
+        const seen = visited ?? new Set<string>()
         const text = ids
           .split(/\s+/)
-          .map(id => document.getElementById(id)?.textContent?.trim() ?? '')
+          .map(id => {
+            if (seen.has(id)) return ''
+            seen.add(id)
+            const target = document.getElementById(id)
+            if (!target) return ''
+            const chained = target.getAttribute('aria-labelledby')
+            if (chained) return referencedText(chained, seen) ?? ''
+            return target.textContent?.trim() ?? ''
+          })
           .filter(Boolean)
           .join(' ')
           .trim()
@@ -2242,11 +2269,20 @@ async function chooseValueFromLabeledGroup(
         return payload.exact ? normalizedCandidate === normalizedExpected : normalizedCandidate.includes(normalizedExpected)
       }
 
-      function referencedText(ids: string | null): string | undefined {
+      function referencedText(ids: string | null, visited?: Set<string>): string | undefined {
         if (!ids) return undefined
+        const seen = visited ?? new Set<string>()
         const text = ids
           .split(/\s+/)
-          .map(id => document.getElementById(id)?.textContent?.trim() ?? '')
+          .map(id => {
+            if (seen.has(id)) return ''
+            seen.add(id)
+            const target = document.getElementById(id)
+            if (!target) return ''
+            const chained = target.getAttribute('aria-labelledby')
+            if (chained) return referencedText(chained, seen) ?? ''
+            return target.textContent?.trim() ?? ''
+          })
           .filter(Boolean)
           .join(' ')
           .trim()
@@ -2725,11 +2761,20 @@ export async function setCheckedControl(page: Page, label: string, opts?: SetChe
           return style.display !== 'none' && style.visibility !== 'hidden'
         }
 
-        function referencedText(ids: string | null): string | undefined {
+        function referencedText(ids: string | null, visited?: Set<string>): string | undefined {
           if (!ids) return undefined
+          const seen = visited ?? new Set<string>()
           const text = ids
             .split(/\s+/)
-            .map(id => document.getElementById(id)?.textContent?.trim() ?? '')
+            .map(id => {
+              if (seen.has(id)) return ''
+              seen.add(id)
+              const target = document.getElementById(id)
+              if (!target) return ''
+              const chained = target.getAttribute('aria-labelledby')
+              if (chained) return referencedText(chained, seen) ?? ''
+              return target.textContent?.trim() ?? ''
+            })
             .filter(Boolean)
             .join(' ')
             .trim()

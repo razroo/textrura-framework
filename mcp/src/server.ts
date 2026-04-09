@@ -20,6 +20,7 @@ import {
   sendSelectOption,
   sendSetChecked,
   sendWheel,
+  sendScreenshot,
   buildA11yTree,
   buildCompactUiIndex,
   buildFormRequiredSnapshot,
@@ -87,6 +88,7 @@ interface ProxyFillAckResult {
   alertCount: number
   dialogCount: number
   busyCount: number
+  invalidFields?: Array<{ name?: string; error?: string }>
 }
 
 interface FormattedNodePayload extends Record<string, unknown> {
@@ -958,9 +960,15 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
         .optional()
         .default(false)
         .describe('Include per-field step results in the JSON payload (default false for the smallest response)'),
+      resumeFromIndex: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe('Resume a partial fill from this field index (from a previous stoppedAt + 1). Skips already-filled fields.'),
       detail: detailInput(),
     },
-    async ({ url, pageUrl, port, headless, width, height, slowMo, formId, valuesById, valuesByLabel, stopOnError, failOnInvalid, includeSteps, detail }) => {
+    async ({ url, pageUrl, port, headless, width, height, slowMo, formId, valuesById, valuesByLabel, stopOnError, failOnInvalid, includeSteps, resumeFromIndex, detail }) => {
       const directFields =
         !includeSteps && !formId && Object.keys(valuesById ?? {}).length === 0
           ? directLabelBatchFields(valuesByLabel)
@@ -1119,8 +1127,9 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
 
       const steps: Array<Record<string, unknown>> = []
       let stoppedAt: number | undefined
+      const startIndex = resumeFromIndex ?? 0
 
-      for (let index = 0; index < planned.fields.length; index++) {
+      for (let index = startIndex; index < planned.fields.length; index++) {
         const field = planned.fields[index]!
         try {
           const result = await executeFillField(session, field, detail)
@@ -1144,15 +1153,16 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
       const errorCount = steps.length - successCount
       const payload = {
         ...connection,
-        completed: stoppedAt === undefined && steps.length === planned.fields.length,
+        completed: stoppedAt === undefined && (startIndex + steps.length) === planned.fields.length,
         execution: 'sequential',
         formId: schema.formId,
         requestedValueCount: entryCount,
         fieldCount: planned.fields.length,
         successCount,
         errorCount,
+        ...(startIndex > 0 ? { resumedFromIndex: startIndex } : {}),
         ...(includeSteps ? { steps } : {}),
-        ...(stoppedAt !== undefined ? { stoppedAt } : {}),
+        ...(stoppedAt !== undefined ? { stoppedAt, resumeFromIndex: stoppedAt + 1 } : {}),
         ...(signals ? { final: sessionSignalsPayload(signals, detail) } : {}),
       }
 
@@ -1207,6 +1217,7 @@ Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_lis
 
       const steps: Array<Record<string, unknown>> = []
       let stoppedAt: number | undefined
+      const batchStartedAt = performance.now()
 
       for (let index = 0; index < actions.length; index++) {
         const action = actions[index]!
@@ -1220,31 +1231,46 @@ Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_lis
           }
           const result = await executeBatchAction(session, action, detail, includeSteps)
           const elapsedMs = Number((performance.now() - startedAt).toFixed(1))
+          const cumulativeMs = Number((performance.now() - batchStartedAt).toFixed(1))
+
+          const stepSignals = includeSteps ? (() => {
+            const a = sessionA11y(session)
+            if (!a) return undefined
+            const s = collectSessionSignals(a)
+            return { invalidCount: s.invalidFields.length, alertCount: s.alerts.length, dialogCount: s.dialogCount, busyCount: s.busyCount }
+          })() : undefined
+
           steps.push(detail === 'verbose'
             ? {
                 index,
                 type: action.type,
                 ok: true,
                 elapsedMs,
+                cumulativeMs,
                 ...(uiTreeWaitMs > 0 ? { uiTreeWaitMs: Number(uiTreeWaitMs.toFixed(1)) } : {}),
                 summary: result.summary,
+                ...(stepSignals ? { signals: stepSignals } : {}),
               }
             : {
                 index,
                 type: action.type,
                 ok: true,
                 elapsedMs,
+                cumulativeMs,
                 ...(uiTreeWaitMs > 0 ? { uiTreeWaitMs: Number(uiTreeWaitMs.toFixed(1)) } : {}),
                 ...result.compact,
+                ...(stepSignals ? { signals: stepSignals } : {}),
               })
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e)
           const elapsedMs = Number((performance.now() - startedAt).toFixed(1))
+          const cumulativeMs = Number((performance.now() - batchStartedAt).toFixed(1))
           steps.push({
             index,
             type: action.type,
             ok: false,
             elapsedMs,
+            cumulativeMs,
             ...(uiTreeWaitMs > 0 ? { uiTreeWaitMs: Number(uiTreeWaitMs.toFixed(1)) } : {}),
             error: message,
           })
@@ -1302,15 +1328,21 @@ Use this first on normal HTML pages when you want to understand the page shape w
         .optional()
         .default(8)
         .describe('Cap returned landmarks/forms/dialogs/lists per kind (default 8).'),
+      includeScreenshot: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('Attach a base64 PNG viewport screenshot. Requires @geometra/proxy. Use when geometry alone is ambiguous (icon-only buttons, visual styling cues).'),
     },
-    async ({ maxPrimaryActions, maxSectionsPerKind }) => {
+    async ({ maxPrimaryActions, maxSectionsPerKind, includeScreenshot }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
 
       const a11y = await sessionA11yWhenReady(session)
       if (!a11y) return err('No UI tree available')
       const model = buildPageModel(a11y, { maxPrimaryActions, maxSectionsPerKind })
-      return ok(JSON.stringify(model))
+      const screenshot = includeScreenshot ? await captureScreenshotBase64(session) : undefined
+      return ok(JSON.stringify(model), screenshot)
     }
   )
 
@@ -1688,6 +1720,8 @@ Strategies: **auto** (default) tries chooser click if x,y given, else a labeled 
         .describe('Upload strategy (default auto)'),
       dropX: z.number().optional().describe('Drop target X (viewport) for strategy drop'),
       dropY: z.number().optional().describe('Drop target Y (viewport) for strategy drop'),
+      contextText: z.string().optional().describe('Ancestor / prompt text to disambiguate repeated file inputs'),
+      sectionText: z.string().optional().describe('Containing section text to disambiguate repeated file inputs'),
       timeoutMs: z
         .number()
         .int()
@@ -1697,7 +1731,7 @@ Strategies: **auto** (default) tries chooser click if x,y given, else a labeled 
         .describe('Optional action wait timeout (resume parsing / SPA upload flows often need longer than a normal click)'),
       detail: detailInput(),
     },
-    async ({ paths, x, y, fieldLabel, exact, strategy, dropX, dropY, timeoutMs, detail }) => {
+    async ({ paths, x, y, fieldLabel, exact, strategy, dropX, dropY, contextText: _contextText, sectionText: _sectionText, timeoutMs, detail }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
@@ -1734,6 +1768,8 @@ Pass \`fieldLabel\` to open a labeled dropdown semantically instead of relying o
       openX: z.number().optional().describe('Click to open dropdown'),
       openY: z.number().optional().describe('Click to open dropdown'),
       fieldLabel: z.string().optional().describe('Field label of the dropdown/combobox to open semantically (e.g. "Location")'),
+      contextText: z.string().optional().describe('Ancestor / prompt text to disambiguate repeated dropdowns with the same label'),
+      sectionText: z.string().optional().describe('Containing section text to disambiguate repeated dropdowns'),
       query: z.string().optional().describe('Optional text to type into a searchable combobox before selecting'),
       timeoutMs: z
         .number()
@@ -1744,7 +1780,7 @@ Pass \`fieldLabel\` to open a labeled dropdown semantically instead of relying o
         .describe('Optional action wait timeout for slow dropdowns / remote search results'),
       detail: detailInput(),
     },
-    async ({ label, exact, openX, openY, fieldLabel, query, timeoutMs, detail }) => {
+    async ({ label, exact, openX, openY, fieldLabel, contextText, sectionText, query, timeoutMs, detail }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
@@ -1786,6 +1822,8 @@ Custom React/Vue dropdowns are not supported here — use \`geometra_pick_listbo
       value: z.string().optional().describe('Option value= attribute'),
       label: z.string().optional().describe('Visible option label (substring match)'),
       index: z.number().int().min(0).optional().describe('Zero-based option index'),
+      contextText: z.string().optional().describe('Ancestor / prompt text to disambiguate repeated selects'),
+      sectionText: z.string().optional().describe('Containing section text to disambiguate repeated selects'),
       timeoutMs: z
         .number()
         .int()
@@ -1795,7 +1833,7 @@ Custom React/Vue dropdowns are not supported here — use \`geometra_pick_listbo
         .describe('Optional action wait timeout'),
       detail: detailInput(),
     },
-    async ({ x, y, value, label, index, timeoutMs, detail }) => {
+    async ({ x, y, value, label, index, contextText: _contextText, sectionText: _sectionText, timeoutMs, detail }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       if (value === undefined && label === undefined && index === undefined) {
@@ -1828,6 +1866,8 @@ Prefer this over raw coordinate clicks for custom forms that keep the real input
       checked: z.boolean().optional().default(true).describe('Desired checked state (radios only support true)'),
       exact: z.boolean().optional().describe('Exact label match'),
       controlType: z.enum(['checkbox', 'radio']).optional().describe('Limit matching to checkbox or radio'),
+      contextText: z.string().optional().describe('Ancestor / prompt text to disambiguate repeated checkboxes/radios'),
+      sectionText: z.string().optional().describe('Containing section text to disambiguate repeated checkboxes/radios'),
       timeoutMs: z
         .number()
         .int()
@@ -1837,7 +1877,7 @@ Prefer this over raw coordinate clicks for custom forms that keep the real input
         .describe('Optional action wait timeout'),
       detail: detailInput(),
     },
-    async ({ label, checked, exact, controlType, timeoutMs, detail }) => {
+    async ({ label, checked, exact, controlType, contextText: _contextText, sectionText: _sectionText, timeoutMs, detail }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
@@ -1893,6 +1933,65 @@ Prefer this over raw coordinate clicks for custom forms that keep the real input
     }
   )
 
+  // ── list items (virtualized list pagination) ─────────────────
+  server.tool(
+    'geometra_list_items',
+    `Auto-scroll a virtualized or long list and collect all visible items across scroll positions. Requires \`@geometra/proxy\`.
+
+Use this for dropdowns, location pickers, or any scrollable list where items are rendered on demand. Scrolls down in steps, collecting new items each time, until no new items appear or the cap is reached.`,
+    {
+      listId: z.string().optional().describe('Stable section id from geometra_page_model (e.g. ls:2.1) to scope item collection'),
+      role: z.string().optional().describe('Role filter for list items (default: listitem)'),
+      scrollX: z.number().optional().describe('X coordinate to position mouse for scrolling (default: viewport center)'),
+      scrollY: z.number().optional().describe('Y coordinate to position mouse for scrolling (default: viewport center)'),
+      maxItems: z.number().int().min(1).max(500).optional().default(100).describe('Cap collected items (default 100)'),
+      maxScrollSteps: z.number().int().min(1).max(50).optional().default(20).describe('Max scroll steps before stopping (default 20)'),
+      scrollDelta: z.number().optional().default(300).describe('Vertical scroll delta per step (default 300)'),
+    },
+    async ({ listId: _listId, role, scrollX, scrollY, maxItems, maxScrollSteps, scrollDelta }) => {
+      const session = getSession()
+      if (!session) return err('Not connected. Call geometra_connect first.')
+
+      const itemRole = role ?? 'listitem'
+      const collected = new Map<string, { name?: string; value?: string }>()
+      const cx = scrollX ?? 400
+      const cy = scrollY ?? 400
+
+      for (let step = 0; step < maxScrollSteps; step++) {
+        const a11y = await sessionA11yWhenReady(session)
+        if (!a11y) break
+
+        const items = findNodes(a11y, { role: itemRole })
+        let newCount = 0
+        for (const item of items) {
+          const id = nodeIdForPath(item.path)
+          if (!collected.has(id)) {
+            collected.set(id, {
+              ...(item.name ? { name: item.name } : {}),
+              ...(item.value ? { value: item.value } : {}),
+            })
+            newCount++
+          }
+        }
+
+        if (collected.size >= maxItems || newCount === 0) break
+
+        try {
+          await sendWheel(session, scrollDelta, { x: cx, y: cy }, 1_000)
+        } catch {
+          break
+        }
+      }
+
+      const items = [...collected.entries()].slice(0, maxItems).map(([id, data]) => ({ id, ...data }))
+      return ok(JSON.stringify({
+        itemCount: items.length,
+        items,
+        truncated: collected.size > maxItems,
+      }))
+    }
+  )
+
   // ── snapshot ─────────────────────────────────────────────────
   server.tool(
     'geometra_snapshot',
@@ -1916,15 +2015,21 @@ JSON is minified in compact view to save tokens. For a summary-first overview, u
       formId: z.string().optional().describe('Optional form id from geometra_form_schema / geometra_page_model when view=form-required'),
       maxFields: z.number().int().min(1).max(200).optional().default(80).describe('Per-form field cap when view=form-required'),
       includeOptions: z.boolean().optional().default(false).describe('Include explicit choice option labels when view=form-required'),
+      includeScreenshot: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('Attach a base64 PNG viewport screenshot. Requires @geometra/proxy.'),
     },
-    async ({ view, maxNodes, formId, maxFields, includeOptions }) => {
+    async ({ view, maxNodes, formId, maxFields, includeOptions, includeScreenshot }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
 
       const a11y = await sessionA11yWhenReady(session)
       if (!a11y) return err('No UI tree available')
+      const screenshot = includeScreenshot ? await captureScreenshotBase64(session) : undefined
       if (view === 'full') {
-        return ok(JSON.stringify(a11y, null, 2))
+        return ok(JSON.stringify(a11y, null, 2), screenshot)
       }
       if (view === 'form-required') {
         const payload = {
@@ -1937,7 +2042,7 @@ JSON is minified in compact view to save tokens. For a summary-first overview, u
             includeContext: 'auto',
           }),
         }
-        return ok(JSON.stringify(payload))
+        return ok(JSON.stringify(payload), screenshot)
       }
       const { nodes, truncated, context } = buildCompactUiIndex(a11y, { maxNodes })
       const payload = {
@@ -1947,7 +2052,7 @@ JSON is minified in compact view to save tokens. For a summary-first overview, u
         nodes,
         truncated,
       }
-      return ok(JSON.stringify(payload))
+      return ok(JSON.stringify(payload), screenshot)
     }
   )
 
@@ -2086,8 +2191,10 @@ function packedFormSchemas(forms: FormSchemaModel[]): Array<Record<string, unkno
       ...(field.valueLength !== undefined ? { vl: field.valueLength } : {}),
       ...(field.checked !== undefined ? { c: field.checked ? 1 : 0 } : {}),
       ...(field.values && field.values.length > 0 ? { vs: field.values } : {}),
+      ...(field.aliases ? { al: field.aliases } : {}),
       ...(field.context ? { x: field.context } : {}),
     })),
+    ...(form.sections ? { s: form.sections.map(s => ({ n: s.name, fi: s.fieldIds })) } : {}),
   }))
 }
 
@@ -2516,12 +2623,10 @@ function sessionSignalsPayload(signals: SessionSignals, detail: ResponseDetail =
           alerts: signals.alerts,
           invalidFields: signals.invalidFields,
         }
-      : detail === 'minimal'
-        ? {
-            alerts: signals.alerts.slice(0, 2),
-            invalidFields: signals.invalidFields.slice(0, 4),
-          }
-        : {}),
+      : {
+          alerts: signals.alerts.slice(0, 2),
+          invalidFields: signals.invalidFields.slice(0, 6),
+        }),
   }
 }
 
@@ -3071,12 +3176,14 @@ function parseProxyFillAckResult(value: unknown): ProxyFillAckResult | undefined
   ) {
     return undefined
   }
+  const invalidFields = Array.isArray(candidate.invalidFields) ? candidate.invalidFields as Array<{ name?: string; error?: string }> : undefined
   return {
     ...(typeof candidate.pageUrl === 'string' ? { pageUrl: candidate.pageUrl } : {}),
     invalidCount: candidate.invalidCount,
     alertCount: candidate.alertCount,
     dialogCount: candidate.dialogCount,
     busyCount: candidate.busyCount,
+    ...(invalidFields && invalidFields.length > 0 ? { invalidFields } : {}),
   }
 }
 
@@ -3583,8 +3690,24 @@ async function executeFillField(session: Session, field: ResolvedFillFieldInput,
   }
 }
 
-function ok(text: string) {
-  return { content: [{ type: 'text' as const, text }] }
+function ok(text: string, screenshot?: string) {
+  const content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }> = [
+    { type: 'text' as const, text },
+  ]
+  if (screenshot) {
+    content.push({ type: 'image' as const, data: screenshot, mimeType: 'image/png' })
+  }
+  return { content }
+}
+
+async function captureScreenshotBase64(session: Session): Promise<string | undefined> {
+  try {
+    const wait = await sendScreenshot(session)
+    const result = wait.result as Record<string, unknown> | undefined
+    return typeof result?.screenshot === 'string' ? result.screenshot as string : undefined
+  } catch {
+    return undefined
+  }
 }
 
 function err(text: string) {
