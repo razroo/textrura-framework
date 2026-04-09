@@ -840,4 +840,129 @@ describe('query and reveal tools', () => {
       },
     })
   })
+
+  it('clicks an offscreen semantic target by revealing it first', async () => {
+    const handler = getToolHandler('geometra_click')
+
+    mockState.currentA11yRoot = node('group', undefined, {
+      bounds: { x: 0, y: 0, width: 1280, height: 800 },
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 0 },
+      children: [
+        node('form', 'Application', {
+          bounds: { x: 20, y: -200, width: 760, height: 1900 },
+          path: [0],
+          children: [
+            node('button', 'Submit application', {
+              bounds: { x: 60, y: 1540, width: 180, height: 40 },
+              path: [0, 0],
+            }),
+          ],
+        }),
+      ],
+    })
+
+    mockState.sendWheel.mockImplementationOnce(async () => {
+      mockState.currentA11yRoot = node('group', undefined, {
+        bounds: { x: 0, y: 0, width: 1280, height: 800 },
+        meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 1220 },
+        children: [
+          node('form', 'Application', {
+            bounds: { x: 20, y: -1420, width: 760, height: 1900 },
+            path: [0],
+            children: [
+              node('button', 'Submit application', {
+                bounds: { x: 60, y: 320, width: 180, height: 40 },
+                path: [0, 0],
+              }),
+            ],
+          }),
+        ],
+      })
+      bumpMockUiRevision()
+      return { status: 'updated' as const, timeoutMs: 2500 }
+    })
+
+    const result = await handler({
+      id: 'n:0.0',
+      maxRevealSteps: 3,
+      revealTimeoutMs: 2500,
+      detail: 'minimal',
+    })
+
+    expect(mockState.sendWheel).toHaveBeenCalledTimes(1)
+    expect(mockState.sendClick).toHaveBeenCalledWith(mockState.session, 150, 340, undefined)
+    expect(result.content[0]!.text).toContain('Clicked button "Submit application" (n:0.0) at (150, 340) after 1 reveal step.')
+  })
+
+  it('lets run_actions click a semantic target without manual coordinates', async () => {
+    const handler = getToolHandler('geometra_run_actions')
+
+    mockState.currentA11yRoot = node('group', undefined, {
+      bounds: { x: 0, y: 0, width: 1280, height: 800 },
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 0 },
+      children: [
+        node('form', 'Application', {
+          bounds: { x: 20, y: -200, width: 760, height: 1900 },
+          path: [0],
+          children: [
+            node('button', 'Submit application', {
+              bounds: { x: 60, y: 1540, width: 180, height: 40 },
+              path: [0, 0],
+            }),
+          ],
+        }),
+      ],
+    })
+
+    mockState.sendWheel.mockImplementationOnce(async () => {
+      mockState.currentA11yRoot = node('group', undefined, {
+        bounds: { x: 0, y: 0, width: 1280, height: 800 },
+        meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 1220 },
+        children: [
+          node('form', 'Application', {
+            bounds: { x: 20, y: -1420, width: 760, height: 1900 },
+            path: [0],
+            children: [
+              node('button', 'Submit application', {
+                bounds: { x: 60, y: 320, width: 180, height: 40 },
+                path: [0, 0],
+              }),
+            ],
+          }),
+        ],
+      })
+      bumpMockUiRevision()
+      return { status: 'updated' as const, timeoutMs: 2500 }
+    })
+
+    const result = await handler({
+      actions: [
+        {
+          type: 'click',
+          role: 'button',
+          name: 'Submit application',
+          maxRevealSteps: 3,
+          revealTimeoutMs: 2500,
+        },
+      ],
+      stopOnError: true,
+      includeSteps: true,
+      detail: 'minimal',
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    const steps = payload.steps as Array<Record<string, unknown>>
+
+    expect(mockState.sendWheel).toHaveBeenCalledTimes(1)
+    expect(mockState.sendClick).toHaveBeenCalledWith(mockState.session, 150, 340, undefined)
+    expect(steps[0]).toMatchObject({
+      index: 0,
+      type: 'click',
+      ok: true,
+      at: { x: 150, y: 340 },
+      revealSteps: 1,
+      target: { id: 'n:0.0', role: 'button', name: 'Submit application' },
+      wait: 'updated',
+    })
+  })
 })

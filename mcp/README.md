@@ -14,6 +14,10 @@ Native Geometra:      WebSocket → JSON geometry (no browser on the agent path)
 Geometra proxy:       Chromium → DOM geometry → same WebSocket as native → MCP tools unchanged (often started via `pageUrl`, no manual CLI)
 ```
 
+## When to choose this
+
+Use Geometra MCP when an LLM needs to explore, interpret, and operate a real UI with compact semantic state instead of repeatedly consuming large browser snapshots. Keep Playwright-style tooling for deterministic scripts, DOM-oriented test automation, and compatibility fallback paths while Geometra closes remaining live-site gaps.
+
 ## Tools
 
 | Tool | Description |
@@ -28,7 +32,7 @@ Geometra proxy:       Chromium → DOM geometry → same WebSocket as native →
 | `geometra_page_model` | Summary-first webpage model: archetypes, stable section ids, counts, top-level sections, primary actions |
 | `geometra_expand_section` | Expand one form/dialog/list/landmark from `geometra_page_model` on demand, with paging/filtering for long sections |
 | `geometra_reveal` | Scroll until a matching node is visible instead of guessing wheel deltas |
-| `geometra_click` | Click an element by coordinates |
+| `geometra_click` | Click by coordinates or by semantic target (`id`, `role`, `name`, `text`, `contextText`, state) |
 | `geometra_type` | Type text into the focused element |
 | `geometra_key` | Send special keys (Enter, Tab, Escape, arrows) |
 | `geometra_upload_files` | Attach files: labeled field / auto / hidden input / native chooser / synthetic drop (`@geometra/proxy` only) |
@@ -251,19 +255,13 @@ Then in Claude Code (either backend):
 Agent:  geometra_connect({ url: "ws://localhost:3100" })
         → Connected. UI: button "Sign Up", textbox "Email", textbox "Password"
 
-Agent:  geometra_query({ role: "textbox", name: "Email" })
-        → [{ role: "textbox", name: "Email", bounds: {x:100, y:200, w:300, h:40}, center: {x:250, y:220} }]
-
-Agent:  geometra_click({ x: 250, y: 220 })
-        → Clicked. Email input focused.
+Agent:  geometra_click({ role: "textbox", name: "Email" })
+        → Clicked textbox "Email" (n:0) at (250, 220). Email input focused.
 
 Agent:  geometra_type({ text: "test@example.com" })
         → Typed. Email field updated.
 
-Agent:  geometra_query({ role: "button", name: "Sign Up" })
-        → [{ role: "button", name: "Sign Up", bounds: {x:100, y:350, w:120, h:44}, center: {x:160, y:372} }]
-
-Agent:  geometra_click({ x: 160, y: 372 })
+Agent:  geometra_click({ role: "button", name: "Sign Up" })
         → Clicked. Success message visible.
 ```
 
@@ -320,7 +318,7 @@ Typical batch:
 ```json
 {
   "actions": [
-    { "type": "click", "x": 412, "y": 228 },
+    { "type": "click", "role": "textbox", "name": "Full name" },
     { "type": "type", "text": "Taylor Applicant" },
     { "type": "upload_files", "paths": ["/Users/you/resume.pdf"], "fieldLabel": "Resume" },
     { "type": "wait_for", "text": "Parsing your resume", "present": false, "timeoutMs": 10000 }

@@ -104,6 +104,18 @@ interface FormattedNodePayload extends Record<string, unknown> {
   path: number[]
 }
 
+interface RevealTargetResult {
+  attempts: number
+  target: FormattedNodePayload
+}
+
+interface ResolvedClickLocation {
+  x: number
+  y: number
+  target?: FormattedNodePayload
+  revealAttempts?: number
+}
+
 function checkedStateInput() {
   return z
     .union([z.boolean(), z.literal('mixed')])
@@ -211,8 +223,13 @@ const formValuesRecordSchema = z.record(z.string(), formValueSchema)
 const batchActionSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('click'),
-    x: z.number(),
-    y: z.number(),
+    x: z.number().optional().describe('X coordinate to click'),
+    y: z.number().optional().describe('Y coordinate to click'),
+    ...nodeFilterShape(),
+    index: z.number().int().min(0).optional().describe('Which matching semantic target to click after sorting top-to-bottom'),
+    fullyVisible: z.boolean().optional().describe('When clicking by semantic target, require full visibility before clicking (default true)'),
+    maxRevealSteps: z.number().int().min(1).max(12).optional().describe('Maximum reveal attempts before clicking a semantic target'),
+    revealTimeoutMs: timeoutMsInput.describe('Per-scroll wait timeout while revealing a semantic target'),
     timeoutMs: timeoutMsInput,
   }),
   z.object({
@@ -1046,10 +1063,6 @@ Use the same filters as geometra_query, plus an optional match index when repeat
     async ({ id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, index, fullyVisible, maxSteps, timeoutMs }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
-      const matchIndex = index ?? 0
-      const requireFullyVisible = fullyVisible ?? true
-      const revealSteps = maxSteps ?? 6
-      const waitTimeout = timeoutMs ?? 2_500
 
       const filter: NodeFilter = {
         id,
@@ -1069,64 +1082,44 @@ Use the same filters as geometra_query, plus an optional match index when repeat
       }
       if (!hasNodeFilter(filter)) return err('Provide at least one reveal filter (id, role, name, text, contextText, value, or state)')
 
-      let attempts = 0
-      while (attempts <= revealSteps) {
-        const a11y = sessionA11y(session)
-        if (!a11y) return err('No UI tree available to reveal from')
-        const matches = sortA11yNodes(findNodes(a11y, filter))
-        if (matches.length === 0) {
-          return err(`No elements found matching ${JSON.stringify(filter)}`)
-        }
-        if (matchIndex >= matches.length) {
-          return err(`Requested reveal index ${matchIndex} but only ${matches.length} matching element(s) were found`)
-        }
+      const revealed = await revealSemanticTarget(session, {
+        filter,
+        index: index ?? 0,
+        fullyVisible: fullyVisible ?? true,
+        maxSteps: maxSteps ?? 6,
+        timeoutMs: timeoutMs ?? 2_500,
+      })
+      if (!revealed.ok) return err(revealed.error)
 
-        const target = matches[matchIndex]!
-        const formatted = formatNode(target, a11y, a11y.bounds)
-        const visible = requireFullyVisible ? formatted.visibility.fullyVisible : formatted.visibility.intersectsViewport
-        if (visible) {
-          return ok(JSON.stringify({
-            revealed: true,
-            attempts,
-            target: formatted,
-          }, null, 2))
-        }
-
-        if (attempts === revealSteps) {
-          return err(JSON.stringify({
-            revealed: false,
-            attempts,
-            target: formatted,
-          }, null, 2))
-        }
-
-        const deltaX = clamp(formatted.scrollHint.revealDeltaX, -Math.round(a11y.bounds.width * 0.75), Math.round(a11y.bounds.width * 0.75))
-        let deltaY = clamp(formatted.scrollHint.revealDeltaY, -Math.round(a11y.bounds.height * 0.85), Math.round(a11y.bounds.height * 0.85))
-        if (deltaY === 0 && !formatted.visibility.fullyVisible) {
-          deltaY = formatted.visibility.offscreenAbove ? -Math.round(a11y.bounds.height * 0.4) : Math.round(a11y.bounds.height * 0.4)
-        }
-
-        await sendWheel(session, deltaY, {
-          deltaX,
-          x: formatted.center.x,
-          y: formatted.center.y,
-        }, waitTimeout)
-        attempts++
-      }
-
-      return err(`Failed to reveal ${JSON.stringify(filter)}`)
+      return ok(JSON.stringify({
+        revealed: true,
+        attempts: revealed.value.attempts,
+        target: revealed.value.target,
+      }, null, 2))
     }
   )
 
   // ── click ────────────────────────────────────────────────────
   server.tool(
     'geometra_click',
-    `Click an element in the Geometra UI. Provide either the element's bounds (from geometra_query) or raw x,y coordinates. The click is dispatched server-side via the geometry protocol — no browser, no simulated DOM events.
+    `Click an element in the Geometra UI. Provide either raw x,y coordinates or a semantic target (\`id\`, \`role\`, \`name\`, \`text\`, \`contextText\`, \`value\`, or state filters). The click is dispatched server-side via the geometry protocol — no browser, no simulated DOM events.
 
 After clicking, returns a compact semantic delta when possible (dialogs/forms/lists/nodes changed). If nothing meaningful changed, returns a short current-UI overview.`,
     {
-      x: z.number().describe('X coordinate to click (use center of element bounds from geometra_query)'),
-      y: z.number().describe('Y coordinate to click'),
+      x: z.number().optional().describe('X coordinate to click (use center of element bounds from geometra_query)'),
+      y: z.number().optional().describe('Y coordinate to click'),
+      ...nodeFilterShape(),
+      index: z.number().int().min(0).optional().default(0).describe('Which matching semantic target to click after sorting top-to-bottom'),
+      fullyVisible: z.boolean().optional().default(true).describe('When clicking by semantic target, require full visibility before clicking (default true)'),
+      maxRevealSteps: z.number().int().min(1).max(12).optional().default(6).describe('Maximum reveal attempts before clicking a semantic target'),
+      revealTimeoutMs: z
+        .number()
+        .int()
+        .min(50)
+        .max(60_000)
+        .optional()
+        .default(2_500)
+        .describe('Per-scroll wait timeout while revealing a semantic target (default 2500ms)'),
       timeoutMs: z
         .number()
         .int()
@@ -1136,15 +1129,47 @@ After clicking, returns a compact semantic delta when possible (dialogs/forms/li
         .describe('Optional action wait timeout (use a longer value for slow submits or route transitions)'),
       detail: detailInput(),
     },
-    async ({ x, y, timeoutMs, detail }) => {
+    async ({ x, y, id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, index, fullyVisible, maxRevealSteps, revealTimeoutMs, timeoutMs, detail }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
+      const resolved = await resolveClickLocation(session, {
+        x,
+        y,
+        filter: {
+          id,
+          role,
+          name,
+          text,
+          contextText,
+          value,
+          checked,
+          disabled,
+          focused,
+          selected,
+          expanded,
+          invalid,
+          required,
+          busy,
+        },
+        index,
+        fullyVisible,
+        maxRevealSteps,
+        revealTimeoutMs,
+      })
+      if (!resolved.ok) return err(resolved.error)
 
-      const wait = await sendClick(session, x, y, timeoutMs)
+      const wait = await sendClick(session, resolved.value.x, resolved.value.y, timeoutMs)
 
       const summary = postActionSummary(session, before, wait, detail)
-      return ok(`Clicked at (${x}, ${y}).\n${summary}`)
+      if (!resolved.value.target) {
+        return ok(`Clicked at (${resolved.value.x}, ${resolved.value.y}).\n${summary}`)
+      }
+
+      const revealSuffix = resolved.value.revealAttempts && resolved.value.revealAttempts > 0
+        ? ` after ${resolved.value.revealAttempts} reveal step${resolved.value.revealAttempts === 1 ? '' : 's'}`
+        : ''
+      return ok(`Clicked ${describeFormattedNode(resolved.value.target)} at (${resolved.value.x}, ${resolved.value.y})${revealSuffix}.\n${summary}`)
     }
   )
 
@@ -2005,6 +2030,145 @@ function compactFilterPayload(filter: NodeFilter): Record<string, unknown> {
   return Object.fromEntries(Object.entries(filter).filter(([, value]) => value !== undefined))
 }
 
+async function revealSemanticTarget(
+  session: Session,
+  options: {
+    filter: NodeFilter
+    index: number
+    fullyVisible: boolean
+    maxSteps: number
+    timeoutMs: number
+  },
+): Promise<{ ok: true; value: RevealTargetResult } | { ok: false; error: string }> {
+  let attempts = 0
+  while (attempts <= options.maxSteps) {
+    const a11y = sessionA11y(session)
+    if (!a11y) return { ok: false, error: 'No UI tree available to reveal from' }
+
+    const matches = sortA11yNodes(findNodes(a11y, options.filter))
+    if (matches.length === 0) {
+      return { ok: false, error: `No elements found matching ${JSON.stringify(options.filter)}` }
+    }
+    if (options.index >= matches.length) {
+      return {
+        ok: false,
+        error: `Requested reveal index ${options.index} but only ${matches.length} matching element(s) were found`,
+      }
+    }
+
+    const formatted = formatNode(matches[options.index]!, a11y, a11y.bounds)
+    const visible = options.fullyVisible ? formatted.visibility.fullyVisible : formatted.visibility.intersectsViewport
+    if (visible) {
+      return {
+        ok: true,
+        value: {
+          attempts,
+          target: formatted,
+        },
+      }
+    }
+
+    if (attempts === options.maxSteps) {
+      return {
+        ok: false,
+        error: JSON.stringify({
+          revealed: false,
+          attempts,
+          target: formatted,
+        }, null, 2),
+      }
+    }
+
+    const deltaX = clamp(
+      formatted.scrollHint.revealDeltaX,
+      -Math.round(a11y.bounds.width * 0.75),
+      Math.round(a11y.bounds.width * 0.75),
+    )
+    let deltaY = clamp(
+      formatted.scrollHint.revealDeltaY,
+      -Math.round(a11y.bounds.height * 0.85),
+      Math.round(a11y.bounds.height * 0.85),
+    )
+    if (deltaY === 0 && !formatted.visibility.fullyVisible) {
+      deltaY = formatted.visibility.offscreenAbove ? -Math.round(a11y.bounds.height * 0.4) : Math.round(a11y.bounds.height * 0.4)
+    }
+
+    await sendWheel(session, deltaY, {
+      deltaX,
+      x: formatted.center.x,
+      y: formatted.center.y,
+    }, options.timeoutMs)
+    attempts++
+  }
+
+  return { ok: false, error: `Failed to reveal ${JSON.stringify(options.filter)}` }
+}
+
+async function resolveClickLocation(
+  session: Session,
+  options: {
+    x?: number
+    y?: number
+    filter: NodeFilter
+    index?: number
+    fullyVisible?: boolean
+    maxRevealSteps?: number
+    revealTimeoutMs?: number
+  },
+): Promise<{ ok: true; value: ResolvedClickLocation } | { ok: false; error: string }> {
+  const hasExplicitCoordinates = options.x !== undefined || options.y !== undefined
+  if (hasExplicitCoordinates) {
+    if (options.x === undefined || options.y === undefined) {
+      return { ok: false, error: 'Provide both x and y when clicking by coordinates' }
+    }
+    return {
+      ok: true,
+      value: {
+        x: options.x,
+        y: options.y,
+      },
+    }
+  }
+
+  if (!hasNodeFilter(options.filter)) {
+    return {
+      ok: false,
+      error: 'Provide x and y, or at least one semantic target filter (id, role, name, text, contextText, value, or state)',
+    }
+  }
+
+  const revealed = await revealSemanticTarget(session, {
+    filter: options.filter,
+    index: options.index ?? 0,
+    fullyVisible: options.fullyVisible ?? true,
+    maxSteps: options.maxRevealSteps ?? 6,
+    timeoutMs: options.revealTimeoutMs ?? 2_500,
+  })
+  if (!revealed.ok) return revealed
+
+  return {
+    ok: true,
+    value: {
+      x: revealed.value.target.center.x,
+      y: revealed.value.target.center.y,
+      target: revealed.value.target,
+      revealAttempts: revealed.value.attempts,
+    },
+  }
+}
+
+function describeFormattedNode(node: FormattedNodePayload): string {
+  return `${node.role}${node.name ? ` ${JSON.stringify(node.name)}` : ''} (${node.id})`
+}
+
+function compactNodeReference(node: FormattedNodePayload): Record<string, unknown> {
+  return {
+    id: node.id,
+    role: node.role,
+    ...(node.name ? { name: node.name } : {}),
+  }
+}
+
 function normalizeLookupKey(value: string): string {
   return value.replace(/\s+/g, ' ').trim().toLowerCase()
 }
@@ -2242,11 +2406,41 @@ async function executeBatchAction(
   switch (action.type) {
     case 'click': {
       const before = sessionA11y(session)
-      const wait = await sendClick(session, action.x, action.y, action.timeoutMs)
+      const resolved = await resolveClickLocation(session, {
+        x: action.x,
+        y: action.y,
+        filter: {
+          id: action.id,
+          role: action.role,
+          name: action.name,
+          text: action.text,
+          contextText: action.contextText,
+          value: action.value,
+          checked: action.checked,
+          disabled: action.disabled,
+          focused: action.focused,
+          selected: action.selected,
+          expanded: action.expanded,
+          invalid: action.invalid,
+          required: action.required,
+          busy: action.busy,
+        },
+        index: action.index,
+        fullyVisible: action.fullyVisible,
+        maxRevealSteps: action.maxRevealSteps,
+        revealTimeoutMs: action.revealTimeoutMs,
+      })
+      if (!resolved.ok) throw new Error(resolved.error)
+
+      const wait = await sendClick(session, resolved.value.x, resolved.value.y, action.timeoutMs)
+      const targetSummary = resolved.value.target
+        ? `Clicked ${describeFormattedNode(resolved.value.target)} at (${resolved.value.x}, ${resolved.value.y}).`
+        : `Clicked at (${resolved.value.x}, ${resolved.value.y}).`
       return {
-        summary: `Clicked at (${action.x}, ${action.y}).\n${postActionSummary(session, before, wait, detail)}`,
+        summary: `${targetSummary}\n${postActionSummary(session, before, wait, detail)}`,
         compact: {
-          at: { x: action.x, y: action.y },
+          at: { x: resolved.value.x, y: resolved.value.y },
+          ...(resolved.value.target ? { target: compactNodeReference(resolved.value.target), revealSteps: resolved.value.revealAttempts ?? 0 } : {}),
           ...waitStatusPayload(wait),
         },
       }

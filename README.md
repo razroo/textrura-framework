@@ -17,6 +17,8 @@ Geometra ships with [`@geometra/mcp`](mcp/README.md), an MCP server for AI agent
 - fill long forms semantically with `geometra_fill_fields`
 - query, wait on, and verify UI state without screenshots or vision models
 
+Use Geometra MCP as the default interface when an LLM needs to explore, read, and act on a UI with lower token pressure than snapshot-heavy browser tooling. Keep Playwright-style tooling for deterministic scripted tests, exact low-level control, and site-specific fallback cases.
+
 ### Install
 
 <details>
