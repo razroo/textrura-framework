@@ -1435,6 +1435,28 @@ export function sendScreenshot(session: Session, timeoutMs = 10_000): Promise<Up
   return sendAndWaitForUpdate(session, { type: 'screenshot' }, timeoutMs)
 }
 
+/** Generate a PDF from the current page or from provided HTML. Returns base64 PDF data. */
+export function sendPdfGenerate(
+  session: Session,
+  options?: {
+    html?: string
+    format?: 'A4' | 'Letter'
+    landscape?: boolean
+    margin?: string
+    printBackground?: boolean
+  },
+  timeoutMs = 30_000,
+): Promise<UpdateWaitResult> {
+  return sendAndWaitForUpdate(session, {
+    type: 'pdfGenerate',
+    ...(options?.html ? { html: options.html } : {}),
+    ...(options?.format ? { format: options.format } : {}),
+    ...(options?.landscape !== undefined ? { landscape: options.landscape } : {}),
+    ...(options?.margin ? { margin: options.margin } : {}),
+    ...(options?.printBackground !== undefined ? { printBackground: options.printBackground } : {}),
+  }, timeoutMs)
+}
+
 /** Navigate the proxy page to a new URL while keeping the browser process alive. */
 export function sendNavigate(
   session: Session,

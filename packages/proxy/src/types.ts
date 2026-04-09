@@ -174,6 +174,22 @@ export type ClientScreenshotMessage = {
   protocolVersion?: number
 }
 
+export type ClientPdfGenerateMessage = {
+  type: 'pdfGenerate'
+  /** Optional HTML string to render instead of the current page. */
+  html?: string
+  /** Paper format: 'A4' or 'Letter'. Defaults to 'A4'. */
+  format?: 'A4' | 'Letter'
+  /** Print in landscape orientation. */
+  landscape?: boolean
+  /** CSS margin (e.g. '1cm', '0.5in'). Applied to all sides if individual sides are not set. */
+  margin?: string
+  /** Print background graphics. Defaults to true. */
+  printBackground?: boolean
+  requestId?: string
+  protocolVersion?: number
+}
+
 export type ParsedClientMessage =
   | ClientEventMessage
   | ClientKeyMessage
@@ -189,6 +205,7 @@ export type ParsedClientMessage =
   | ClientSetCheckedMessage
   | ClientWheelMessage
   | ClientScreenshotMessage
+  | ClientPdfGenerateMessage
   | { type: string; protocolVersion?: number }
 
 export function isKeyMessage(msg: ParsedClientMessage): msg is ClientKeyMessage {
@@ -263,4 +280,8 @@ export function isSetCheckedMessage(msg: ParsedClientMessage): msg is ClientSetC
 
 export function isScreenshotMessage(msg: ParsedClientMessage): msg is ClientScreenshotMessage {
   return msg.type === 'screenshot'
+}
+
+export function isPdfGenerateMessage(msg: ParsedClientMessage): msg is ClientPdfGenerateMessage {
+  return msg.type === 'pdfGenerate'
 }

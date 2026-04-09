@@ -21,6 +21,7 @@ import {
   sendSetChecked,
   sendWheel,
   sendScreenshot,
+  sendPdfGenerate,
   buildA11yTree,
   buildCompactUiIndex,
   buildFormRequiredSnapshot,
@@ -2252,6 +2253,74 @@ Use this after navigating to a new page in a multi-step flow (e.g. job applicati
   )
 
   // ── disconnect ───────────────────────────────────────────────
+  server.tool(
+    'geometra_generate_pdf',
+    `Generate a PDF from the current page or from provided HTML content. Returns the PDF as base64-encoded data.
+
+**Two modes:**
+- **Current page:** Omit \`html\` to PDF-print whatever the proxy browser is currently showing (useful after navigating to a page and filling forms).
+- **HTML content:** Pass an \`html\` string to render and convert to PDF (useful for generating CVs, reports, or any custom document from a template).
+
+Returns \`{ pdf, pageUrl }\` where \`pdf\` is the base64-encoded PDF bytes.`,
+    {
+      html: z
+        .string()
+        .optional()
+        .describe('Full HTML string to render as PDF. If omitted, the current page is used.'),
+      format: z
+        .enum(['A4', 'Letter'])
+        .optional()
+        .default('A4')
+        .describe('Paper format.'),
+      landscape: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('Print in landscape orientation.'),
+      margin: z
+        .string()
+        .optional()
+        .default('1cm')
+        .describe('CSS margin applied to all sides (e.g. "1cm", "0.5in", "10mm").'),
+      printBackground: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe('Include background graphics and colors.'),
+    },
+    async ({ html, format, landscape, margin, printBackground }) => {
+      const session = getSession()
+      if (!session) return err('Not connected. Call geometra_connect first.')
+
+      try {
+        const wait = await sendPdfGenerate(session, {
+          html: html ?? undefined,
+          format,
+          landscape,
+          margin,
+          printBackground,
+        })
+        const result = wait.result as Record<string, unknown> | undefined
+        const pdfBase64 = typeof result?.pdf === 'string' ? result.pdf as string : undefined
+        if (!pdfBase64) return err('PDF generation failed — no data returned from proxy.')
+
+        const pageUrl = typeof result?.pageUrl === 'string' ? result.pageUrl : undefined
+        const sizeKb = Math.round((pdfBase64.length * 3) / 4 / 1024)
+
+        return ok(JSON.stringify({
+          pdf: pdfBase64,
+          pageUrl,
+          format,
+          landscape,
+          sizeKb,
+          ...(html ? { source: 'html' } : { source: 'current-page' }),
+        }))
+      } catch (e) {
+        return err(`PDF generation failed: ${e instanceof Error ? e.message : String(e)}`)
+      }
+    }
+  )
+
   server.tool(
     'geometra_disconnect',
     `Disconnect from the Geometra server. Proxy-backed sessions keep compatible browsers alive by default so the next geometra_connect can reuse them quickly; pass closeBrowser=true to fully tear down the warm proxy/browser pool.`,

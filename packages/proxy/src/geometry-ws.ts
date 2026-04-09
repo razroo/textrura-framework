@@ -27,6 +27,7 @@ import {
   isListboxPickMessage,
   isNavigateMessage,
   isResizeMessage,
+  isPdfGenerateMessage,
   isScreenshotMessage,
   isSetFieldChoiceMessage,
   isSetFieldTextMessage,
@@ -313,6 +314,28 @@ async function handleClientMessage(
       const buffer = await page.screenshot({ type: 'png', fullPage: false })
       const base64 = buffer.toString('base64')
       onViewportOrInput('input', requestId, { screenshot: base64 })
+      return
+    }
+
+    if (isPdfGenerateMessage(msg)) {
+      const format = (msg.format ?? 'A4').toLowerCase() as 'a4' | 'letter'
+      const landscape = msg.landscape ?? false
+      const printBackground = msg.printBackground ?? true
+      const marginValue = msg.margin ?? '1cm'
+      const margin = { top: marginValue, right: marginValue, bottom: marginValue, left: marginValue }
+
+      if (msg.html) {
+        await page.setContent(msg.html, { waitUntil: 'networkidle', timeout: 30_000 })
+      }
+
+      const buffer = await page.pdf({
+        format,
+        landscape,
+        printBackground,
+        margin,
+      })
+      const base64 = buffer.toString('base64')
+      onViewportOrInput('input', requestId, { pdf: base64, pageUrl: page.url() })
     }
   } catch (err) {
     onHandlerError(err)
