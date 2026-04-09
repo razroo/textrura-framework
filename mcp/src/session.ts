@@ -224,6 +224,20 @@ export interface FormSchemaModel {
   fields: FormSchemaField[]
 }
 
+export interface FormRequiredFieldSnapshot extends FormSchemaField {
+  bounds: { x: number; y: number; width: number; height: number }
+  visibility: NodeVisibilityModel
+  scrollHint: NodeScrollHintModel
+}
+
+export interface FormRequiredSnapshotModel {
+  formId: string
+  name?: string
+  requiredCount: number
+  invalidCount: number
+  fields: FormRequiredFieldSnapshot[]
+}
+
 export interface FormSchemaBuildOptions {
   formId?: string
   maxFields?: number
@@ -1212,6 +1226,12 @@ function formFieldIdForPath(path: number[]): string {
   return `ff:${encodePath(path)}`
 }
 
+function parseFormFieldId(id: string): number[] | null {
+  const [prefix, encoded] = id.split(':', 2)
+  if (prefix !== 'ff' || !encoded) return null
+  return decodePath(encoded)
+}
+
 function sectionPrefix(kind: PageSectionKind): string {
   if (kind === 'landmark') return 'lm'
   if (kind === 'form') return 'fm'
@@ -2140,6 +2160,50 @@ export function buildFormSchemas(
   return forms
     .filter(form => !options?.formId || sectionIdForPath('form', form.path) === options.formId)
     .map(form => buildFormSchemaForNode(root, form, options))
+}
+
+/**
+ * Required-field snapshot for automation: every required field in a form, including
+ * offscreen entries, annotated with visibility and scroll hints so agents do not
+ * mistake long-form fields for missing controls.
+ */
+export function buildFormRequiredSnapshot(
+  root: A11yNode,
+  options?: Pick<FormSchemaBuildOptions, 'formId' | 'maxFields' | 'includeOptions' | 'includeContext'>,
+): FormRequiredSnapshotModel[] {
+  const schemas = buildFormSchemas(root, {
+    formId: options?.formId,
+    maxFields: options?.maxFields,
+    onlyRequiredFields: true,
+    includeOptions: options?.includeOptions,
+    includeContext: options?.includeContext,
+  })
+
+  return schemas.map(schema => {
+    const parsedForm = parseSectionId(schema.formId)
+    const formNode = parsedForm ? findNodeByPath(root, parsedForm.path) : null
+    const fields = schema.fields
+      .map(field => {
+        const fieldPath = parseFormFieldId(field.id)
+        const target = fieldPath ? findNodeByPath(root, fieldPath) ?? formNode : formNode
+        if (!target) return null
+        return {
+          ...field,
+          bounds: cloneBounds(target.bounds),
+          visibility: buildVisibility(target.bounds, root.bounds),
+          scrollHint: buildScrollHint(target.bounds, root.bounds),
+        }
+      })
+      .filter((field): field is FormRequiredFieldSnapshot => field !== null)
+
+    return {
+      formId: schema.formId,
+      ...(schema.name ? { name: schema.name } : {}),
+      requiredCount: schema.requiredCount,
+      invalidCount: schema.invalidCount,
+      fields,
+    }
+  })
 }
 
 function headingModels(node: A11yNode, maxHeadings: number, includeBounds: boolean): PageHeadingModel[] {

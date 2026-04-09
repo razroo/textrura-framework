@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildA11yTree,
   buildCompactUiIndex,
+  buildFormRequiredSnapshot,
   buildFormSchemas,
   buildPageModel,
   expandPageSection,
@@ -422,6 +423,81 @@ describe('buildFormSchemas', () => {
       context: {
         section: 'Application',
       },
+    })
+  })
+})
+
+describe('buildFormRequiredSnapshot', () => {
+  it('keeps offscreen required fields with bounds, visibility, and scroll hints', () => {
+    const tree = node('group', undefined, { x: 0, y: 0, width: 900, height: 700 }, {
+      children: [
+        node('form', 'Application', { x: 20, y: -160, width: 760, height: 2200 }, {
+          path: [0],
+          children: [
+            node('textbox', 'Full name', { x: 48, y: 120, width: 320, height: 36 }, {
+              path: [0, 0],
+              state: { required: true },
+            }),
+            node('combobox', 'Preferred location', { x: 48, y: 940, width: 320, height: 36 }, {
+              path: [0, 1],
+              state: { required: true },
+              meta: { controlTag: 'select' },
+            }),
+            node('group', undefined, { x: 40, y: 1260, width: 520, height: 96 }, {
+              path: [0, 2],
+              children: [
+                node('text', 'Will you require sponsorship?', { x: 48, y: 1260, width: 320, height: 24 }, {
+                  path: [0, 2, 0],
+                }),
+                node('button', 'Yes', { x: 48, y: 1300, width: 88, height: 40 }, {
+                  path: [0, 2, 1],
+                  focusable: true,
+                  state: { required: true },
+                }),
+                node('button', 'No', { x: 148, y: 1300, width: 88, height: 40 }, {
+                  path: [0, 2, 2],
+                  focusable: true,
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+    })
+
+    const snapshot = buildFormRequiredSnapshot(tree, { includeOptions: true })
+
+    expect(snapshot).toHaveLength(1)
+    expect(snapshot[0]).toMatchObject({
+      formId: 'fm:0',
+      name: 'Application',
+      requiredCount: 3,
+      fields: [
+        {
+          id: 'ff:0.0',
+          label: 'Full name',
+          visibility: { intersectsViewport: true, fullyVisible: true },
+          scrollHint: { status: 'visible' },
+          bounds: { x: 48, y: 120, width: 320, height: 36 },
+        },
+        {
+          id: 'ff:0.1',
+          label: 'Preferred location',
+          choiceType: 'select',
+          visibility: { intersectsViewport: false, offscreenBelow: true },
+          scrollHint: { status: 'offscreen' },
+          bounds: { x: 48, y: 940, width: 320, height: 36 },
+        },
+        {
+          id: 'ff:0.2',
+          label: 'Will you require sponsorship?',
+          choiceType: 'group',
+          visibility: { intersectsViewport: false, offscreenBelow: true },
+          scrollHint: { status: 'offscreen' },
+          bounds: { x: 40, y: 1260, width: 520, height: 96 },
+          options: ['Yes', 'No'],
+        },
+      ],
     })
   })
 })

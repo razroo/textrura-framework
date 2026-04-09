@@ -20,6 +20,7 @@ import {
   sendWheel,
   buildA11yTree,
   buildCompactUiIndex,
+  buildFormRequiredSnapshot,
   buildPageModel,
   buildFormSchemas,
   expandPageSection,
@@ -232,11 +233,19 @@ const geometraWaitForResumeParseInputSchema = z
 
 const timeoutMsInput = z.number().int().min(50).max(60_000).optional()
 
-const fillFieldSchema = z.discriminatedUnion('kind', [
+const fillFieldSchema = z.union([
   z.object({
     kind: z.literal('text'),
     fieldId: z.string().optional().describe('Optional stable field id from geometra_form_schema'),
-    fieldLabel: z.string().describe('Visible field label / accessible name'),
+    fieldLabel: z.string().describe('Visible field label / accessible name. Optional to duplicate when fieldId is present.'),
+    value: z.string().describe('Text value to set'),
+    exact: z.boolean().optional().describe('Exact label match'),
+    timeoutMs: timeoutMsInput.describe('Optional action wait timeout'),
+  }),
+  z.object({
+    kind: z.literal('text'),
+    fieldId: z.string().describe('Stable field id from geometra_form_schema'),
+    fieldLabel: z.string().optional().describe('Optional when fieldId is present; MCP resolves the current label from geometra_form_schema'),
     value: z.string().describe('Text value to set'),
     exact: z.boolean().optional().describe('Exact label match'),
     timeoutMs: timeoutMsInput.describe('Optional action wait timeout'),
@@ -244,7 +253,20 @@ const fillFieldSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('choice'),
     fieldId: z.string().optional().describe('Optional stable field id from geometra_form_schema'),
-    fieldLabel: z.string().describe('Visible field label / accessible name'),
+    fieldLabel: z.string().describe('Visible field label / accessible name. Optional to duplicate when fieldId is present.'),
+    value: z.string().describe('Desired option value / answer label'),
+    query: z.string().optional().describe('Optional search text for searchable comboboxes'),
+    choiceType: z
+      .enum(['select', 'group', 'listbox'])
+      .optional()
+      .describe('Optional choice subtype hint. Use `group` for repeated radio/button answers, `select` for native selects, and `listbox` for searchable dropdowns.'),
+    exact: z.boolean().optional().describe('Exact label match'),
+    timeoutMs: timeoutMsInput.describe('Optional action wait timeout'),
+  }),
+  z.object({
+    kind: z.literal('choice'),
+    fieldId: z.string().describe('Stable field id from geometra_form_schema'),
+    fieldLabel: z.string().optional().describe('Optional when fieldId is present; MCP resolves the current label from geometra_form_schema'),
     value: z.string().describe('Desired option value / answer label'),
     query: z.string().optional().describe('Optional search text for searchable comboboxes'),
     choiceType: z
@@ -257,7 +279,16 @@ const fillFieldSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('toggle'),
     fieldId: z.string().optional().describe('Optional stable field id from geometra_form_schema'),
-    label: z.string().describe('Visible checkbox/radio label to set'),
+    label: z.string().describe('Visible checkbox/radio label to set. Optional to duplicate when fieldId is present.'),
+    checked: z.boolean().optional().default(true).describe('Desired checked state (default true)'),
+    exact: z.boolean().optional().describe('Exact label match'),
+    controlType: z.enum(['checkbox', 'radio']).optional().describe('Limit matching to checkbox or radio'),
+    timeoutMs: timeoutMsInput.describe('Optional action wait timeout'),
+  }),
+  z.object({
+    kind: z.literal('toggle'),
+    fieldId: z.string().describe('Stable field id from geometra_form_schema'),
+    label: z.string().optional().describe('Optional when fieldId is present; MCP resolves the current label from geometra_form_schema'),
     checked: z.boolean().optional().default(true).describe('Desired checked state (default true)'),
     exact: z.boolean().optional().describe('Exact label match'),
     controlType: z.enum(['checkbox', 'radio']).optional().describe('Limit matching to checkbox or radio'),
@@ -271,9 +302,39 @@ const fillFieldSchema = z.discriminatedUnion('kind', [
     exact: z.boolean().optional().describe('Exact label match'),
     timeoutMs: timeoutMsInput.describe('Optional action wait timeout'),
   }),
+  z.object({
+    kind: z.literal('file'),
+    fieldId: z.string().describe('Stable field id from geometra_form_schema'),
+    fieldLabel: z.string().optional().describe('Optional when fieldId is present; MCP resolves the current label when file fields are exposed by geometra_form_schema'),
+    paths: z.array(z.string()).min(1).describe('Absolute paths on the proxy machine'),
+    exact: z.boolean().optional().describe('Exact label match'),
+    timeoutMs: timeoutMsInput.describe('Optional action wait timeout'),
+  }),
 ])
 
 type FillFieldInput = z.infer<typeof fillFieldSchema>
+type ResolvedFillFieldInput =
+  | { kind: 'text'; fieldId?: string; fieldLabel: string; value: string; exact?: boolean; timeoutMs?: number }
+  | {
+      kind: 'choice'
+      fieldId?: string
+      fieldLabel: string
+      value: string
+      query?: string
+      choiceType?: 'select' | 'group' | 'listbox'
+      exact?: boolean
+      timeoutMs?: number
+    }
+  | {
+      kind: 'toggle'
+      fieldId?: string
+      label: string
+      checked: boolean
+      controlType?: 'checkbox' | 'radio'
+      exact?: boolean
+      timeoutMs?: number
+    }
+  | { kind: 'file'; fieldId?: string; fieldLabel: string; paths: string[]; exact?: boolean; timeoutMs?: number }
 
 const formValueSchema = z.union([
   z.string(),
@@ -292,7 +353,7 @@ const batchActionSchema = z.discriminatedUnion('type', [
     ...nodeFilterShape(),
     index: z.number().int().min(0).optional().describe('Which matching semantic target to click after sorting top-to-bottom'),
     fullyVisible: z.boolean().optional().describe('When clicking by semantic target, require full visibility before clicking (default true)'),
-    maxRevealSteps: z.number().int().min(1).max(12).optional().describe('Maximum reveal attempts before clicking a semantic target'),
+    maxRevealSteps: z.number().int().min(1).max(48).optional().describe('Maximum reveal attempts before clicking a semantic target. When omitted, Geometra auto-scales from scroll distance for tall forms.'),
     revealTimeoutMs: timeoutMsInput.describe('Per-scroll wait timeout while revealing a semantic target'),
     waitFor: z.object(waitConditionShape()).optional().describe('Optional semantic condition to wait for after the click'),
     timeoutMs: timeoutMsInput,
@@ -511,15 +572,16 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
   )
 
   // ── query ────────────────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'geometra_query',
-    `Find elements in the current Geometra UI by stable id, role, name, text content, current value, or semantic state. Returns matching elements with their exact pixel bounds {x, y, width, height}, visible in-viewport bounds, an on-screen center point, visibility / scroll-reveal hints, role, name, value, state, and tree path.
+    {
+      description: `Find elements in the current Geometra UI by stable id, role, name, text content, current value, or semantic state. Returns matching elements with their exact pixel bounds {x, y, width, height}, visible in-viewport bounds, an on-screen center point, visibility / scroll-reveal hints, role, name, value, state, and tree path.
 
 This is the Geometra equivalent of Playwright's locator — but instant, structured, and with no browser. Use the returned bounds to click elements or assert on layout.
 
 Unknown parameter names are rejected (strict schema). To wait until visible text goes away (e.g. a parsing banner), use geometra_wait_for with that substring in text and present: false — there is no textGone field.`,
-    // SDK overload typings only list raw shapes; runtime accepts ZodObject via getZodSchemaObject().
-    geometraQueryInputSchema as unknown as Parameters<McpServer['tool']>[2],
+      inputSchema: geometraQueryInputSchema,
+    },
     async ({ id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, busy }) => {
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
@@ -554,12 +616,14 @@ Unknown parameter names are rejected (strict schema). To wait until visible text
     }
   )
 
-  server.tool(
+  server.registerTool(
     'geometra_wait_for',
-    `Wait for a semantic UI condition without guessing sleep durations. Use this for slow SPA transitions, resume parsing, custom validation alerts, disabled submit buttons, and value/state confirmation before submit.
+    {
+      description: `Wait for a semantic UI condition without guessing sleep durations. Use this for slow SPA transitions, resume parsing, custom validation alerts, disabled submit buttons, and value/state confirmation before submit.
 
 The filter matches the same fields as geometra_query (strict schema — unknown keys error). Set \`present: false\` to wait until **no** node matches — for example Ashby/Lever-style “Parsing your resume” or any “Parsing…” banner: \`{ "text": "Parsing", "present": false }\` (tune the substring to the site). Do not use a textGone parameter; use \`text\` + \`present: false\`, or \`geometra_wait_for_resume_parse\` for the usual post-upload parsing banner.`,
-    geometraWaitForInputSchema as unknown as Parameters<McpServer['tool']>[2],
+      inputSchema: geometraWaitForInputSchema,
+    },
     async ({ id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, present, timeoutMs }) => {
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
@@ -597,12 +661,14 @@ The filter matches the same fields as geometra_query (strict schema — unknown 
     }
   )
 
-  server.tool(
+  server.registerTool(
     'geometra_wait_for_resume_parse',
-    `Wait until **no** visible text contains the given substring — optimized for ATS “parsing your resume” / file-processing banners after upload.
+    {
+      description: `Wait until **no** visible text contains the given substring — optimized for ATS “parsing your resume” / file-processing banners after upload.
 
 Equivalent to \`geometra_wait_for\` with \`present: false\` and \`text\` set to a banner substring. Default \`text\` is \`Parsing\` (tune per site). Strict schema (unknown keys rejected).`,
-    geometraWaitForResumeParseInputSchema as unknown as Parameters<McpServer['tool']>[2],
+      inputSchema: geometraWaitForResumeParseInputSchema,
+    },
     async ({ text, timeoutMs }) => {
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
@@ -622,9 +688,9 @@ Equivalent to \`geometra_wait_for\` with \`present: false\` and \`text\` set to 
     'geometra_fill_fields',
     `Fill several labeled form fields in one MCP call. This is the preferred high-level primitive for long forms.
 
-Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / comboboxes / radio-style questions addressed by field label + answer, \`"toggle"\` for individually labeled checkboxes or radios, and \`"file"\` for labeled uploads.`,
+Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / comboboxes / radio-style questions addressed by field label + answer, \`"toggle"\` for individually labeled checkboxes or radios, and \`"file"\` for labeled uploads. When \`fieldId\` from \`geometra_form_schema\` is present, MCP can resolve the current label server-side so you do not need to duplicate \`fieldLabel\` / \`label\` for text, choice, and toggle fields.`,
     {
-      fields: z.array(fillFieldSchema).min(1).max(80).describe('Ordered labeled field operations to apply'),
+      fields: z.array(fillFieldSchema).min(1).max(80).describe('Ordered field operations to apply. Use fieldId from geometra_form_schema to omit duplicate fieldLabel/label on schema-backed fields.'),
       stopOnError: z.boolean().optional().default(true).describe('Stop at the first failing field (default true)'),
       failOnInvalid: z
         .boolean()
@@ -641,12 +707,14 @@ Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / combo
     async ({ fields, stopOnError, failOnInvalid, includeSteps, detail }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
+      const resolvedFields = resolveFillFieldInputs(session, fields)
+      if (!resolvedFields.ok) return err(resolvedFields.error)
 
       const steps: Array<Record<string, unknown>> = []
       let stoppedAt: number | undefined
 
-      for (let index = 0; index < fields.length; index++) {
-        const field = fields[index]!
+      for (let index = 0; index < resolvedFields.fields.length; index++) {
+        const field = resolvedFields.fields[index]!
         try {
           const result = await executeFillField(session, field, detail)
           steps.push(detail === 'verbose'
@@ -668,8 +736,8 @@ Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / combo
       const successCount = steps.filter(step => step.ok === true).length
       const errorCount = steps.length - successCount
       const payload = {
-        completed: stoppedAt === undefined && steps.length === fields.length,
-        fieldCount: fields.length,
+        completed: stoppedAt === undefined && steps.length === resolvedFields.fields.length,
+        fieldCount: resolvedFields.fields.length,
         successCount,
         errorCount,
         ...(includeSteps ? { steps } : {}),
@@ -1129,7 +1197,7 @@ Use the same filters as geometra_query, plus an optional match index when repeat
       ...nodeFilterShape(),
       index: z.number().int().min(0).optional().default(0).describe('Which matching node to reveal after sorting top-to-bottom'),
       fullyVisible: z.boolean().optional().default(true).describe('Require the target to become fully visible (default true)'),
-      maxSteps: z.number().int().min(1).max(12).optional().default(6).describe('Maximum reveal attempts before returning an error'),
+      maxSteps: z.number().int().min(1).max(48).optional().describe('Maximum reveal attempts before returning an error. When omitted, Geometra auto-scales from scroll distance for tall forms.'),
       timeoutMs: z
         .number()
         .int()
@@ -1165,7 +1233,7 @@ Use the same filters as geometra_query, plus an optional match index when repeat
         filter,
         index: index ?? 0,
         fullyVisible: fullyVisible ?? true,
-        maxSteps: maxSteps ?? 6,
+        maxSteps,
         timeoutMs: timeoutMs ?? 2_500,
       })
       if (!revealed.ok) return err(revealed.error)
@@ -1190,7 +1258,7 @@ After clicking, returns a compact semantic delta when possible (dialogs/forms/li
       ...nodeFilterShape(),
       index: z.number().int().min(0).optional().default(0).describe('Which matching semantic target to click after sorting top-to-bottom'),
       fullyVisible: z.boolean().optional().default(true).describe('When clicking by semantic target, require full visibility before clicking (default true)'),
-      maxRevealSteps: z.number().int().min(1).max(12).optional().default(6).describe('Maximum reveal attempts before clicking a semantic target'),
+      maxRevealSteps: z.number().int().min(1).max(48).optional().describe('Maximum reveal attempts before clicking a semantic target. When omitted, Geometra auto-scales from scroll distance for tall forms.'),
       revealTimeoutMs: z
         .number()
         .int()
@@ -1385,7 +1453,7 @@ Strategies: **auto** (default) tries chooser click if x,y given, else a labeled 
     'geometra_pick_listbox_option',
     `Pick an option from a custom dropdown / listbox / searchable combobox (Headless UI, React Select, Radix, Ashby-style custom selects, etc.). Requires \`@geometra/proxy\`.
 
-Pass \`fieldLabel\` to open a labeled dropdown semantically instead of relying on coordinates. If the opened control is editable, MCP types \`query\` (or the option label by default) before selecting. Uses substring name match unless exact=true, prefers the popup nearest the opened field, and handles a few short affirmative/negative aliases such as \`Yes\` /\`No\` for consent-style copy.`,
+Pass \`fieldLabel\` to open a labeled dropdown semantically instead of relying on coordinates. If the opened control is editable, MCP types \`query\` (or the option label by default) before selecting. Uses fuzzy-ish substring/alias matching unless exact=true, prefers the popup nearest the opened field, can fall back to keyboard navigation for searchable comboboxes, and returns capped \`visibleOptions\` in failure payloads so agents can retry with a real label.`,
     {
       label: z.string().describe('Accessible name of the option (visible text or aria-label)'),
       exact: z.boolean().optional().describe('Exact name match'),
@@ -1431,7 +1499,7 @@ Pass \`fieldLabel\` to open a labeled dropdown semantically instead of relying o
     'geometra_select_option',
     `Set a native HTML \`<select>\` after clicking its center (x,y from geometra_query). Requires \`@geometra/proxy\`.
 
-Custom React/Vue dropdowns are not supported — open them with geometra_click and pick options by snapshot instead.`,
+Custom React/Vue dropdowns are not supported here — use \`geometra_pick_listbox_option\` for custom dropdowns / searchable comboboxes.`,
     {
       x: z.number().describe('X coordinate (e.g. center of the select from geometra_query)'),
       y: z.number().describe('Y coordinate'),
@@ -1532,15 +1600,15 @@ Prefer this over raw coordinate clicks for custom forms that keep the real input
   // ── snapshot ─────────────────────────────────────────────────
   server.tool(
     'geometra_snapshot',
-    `Get the current UI as JSON. Default **compact** view: flat list of viewport-visible actionable nodes plus a few pinned context anchors (for example tab strips / form roots) and root context like URL, scroll, and focus — far fewer tokens than a full nested tree. Use **full** for complete nested a11y + every wrapper when debugging layout.
+    `Get the current UI as JSON. Default **compact** view: flat list of viewport-visible actionable nodes plus a few pinned context anchors (for example tab strips / form roots) and root context like URL, scroll, and focus — far fewer tokens than a full nested tree. Use **full** for complete nested a11y + every wrapper when debugging layout. Use **form-required** to list required fields across forms, including offscreen ones, with bounds + visibility + scroll hints for long application flows.
 
 JSON is minified in compact view to save tokens. For a summary-first overview, use geometra_page_model, then geometra_expand_section for just the part you want.`,
     {
       view: z
-        .enum(['compact', 'full'])
+        .enum(['compact', 'full', 'form-required'])
         .optional()
         .default('compact')
-        .describe('compact (default): token-efficient flat index. full: nested tree, every node.'),
+        .describe('compact (default): token-efficient flat index. full: nested tree, every node. form-required: required fields across forms, including offscreen controls.'),
       maxNodes: z
         .number()
         .int()
@@ -1549,8 +1617,11 @@ JSON is minified in compact view to save tokens. For a summary-first overview, u
         .optional()
         .default(400)
         .describe('Max rows in compact view (default 400).'),
+      formId: z.string().optional().describe('Optional form id from geometra_form_schema / geometra_page_model when view=form-required'),
+      maxFields: z.number().int().min(1).max(200).optional().default(80).describe('Per-form field cap when view=form-required'),
+      includeOptions: z.boolean().optional().default(false).describe('Include explicit choice option labels when view=form-required'),
     },
-    async ({ view, maxNodes }) => {
+    async ({ view, maxNodes, formId, maxFields, includeOptions }) => {
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
 
@@ -1558,6 +1629,19 @@ JSON is minified in compact view to save tokens. For a summary-first overview, u
       if (!a11y) return err('No UI tree available')
       if (view === 'full') {
         return ok(JSON.stringify(a11y, null, 2))
+      }
+      if (view === 'form-required') {
+        const payload = {
+          view: 'form-required' as const,
+          viewport: { width: a11y.bounds.width, height: a11y.bounds.height },
+          forms: buildFormRequiredSnapshot(a11y, {
+            formId,
+            maxFields,
+            includeOptions,
+            includeContext: 'auto',
+          }),
+        }
+        return ok(JSON.stringify(payload))
       }
       const { nodes, truncated, context } = buildCompactUiIndex(a11y, { maxNodes })
       const payload = {
@@ -2209,18 +2293,28 @@ function waitConditionCompact(result: WaitConditionResult): Record<string, unkno
   }
 }
 
+function inferRevealStepBudget(
+  target: FormattedNodePayload,
+  viewport: { width: number; height: number },
+): number {
+  const verticalSteps = Math.ceil(Math.abs(target.scrollHint.revealDeltaY) / Math.max(1, viewport.height * 0.75))
+  const horizontalSteps = Math.ceil(Math.abs(target.scrollHint.revealDeltaX) / Math.max(1, viewport.width * 0.7))
+  return clamp(Math.max(6, Math.max(verticalSteps, horizontalSteps) + 1), 6, 48)
+}
+
 async function revealSemanticTarget(
   session: Session,
   options: {
     filter: NodeFilter
     index: number
     fullyVisible: boolean
-    maxSteps: number
+    maxSteps?: number
     timeoutMs: number
   },
 ): Promise<{ ok: true; value: RevealTargetResult } | { ok: false; error: string }> {
   let attempts = 0
-  while (attempts <= options.maxSteps) {
+  let stepBudget = options.maxSteps
+  while (attempts <= (stepBudget ?? 48)) {
     const a11y = sessionA11y(session)
     if (!a11y) return { ok: false, error: 'No UI tree available to reveal from' }
 
@@ -2236,6 +2330,7 @@ async function revealSemanticTarget(
     }
 
     const formatted = formatNode(matches[options.index]!, a11y, a11y.bounds)
+    stepBudget ??= inferRevealStepBudget(formatted, a11y.bounds)
     const visible = options.fullyVisible ? formatted.visibility.fullyVisible : formatted.visibility.intersectsViewport
     if (visible) {
       return {
@@ -2247,12 +2342,13 @@ async function revealSemanticTarget(
       }
     }
 
-    if (attempts === options.maxSteps) {
+    if (attempts === stepBudget) {
       return {
         ok: false,
         error: JSON.stringify({
           revealed: false,
           attempts,
+          maxSteps: stepBudget,
           target: formatted,
         }, null, 2),
       }
@@ -2320,7 +2416,7 @@ async function resolveClickLocation(
     filter: options.filter,
     index: options.index ?? 0,
     fullyVisible: options.fullyVisible ?? true,
-    maxSteps: options.maxRevealSteps ?? 6,
+    maxSteps: options.maxRevealSteps,
     timeoutMs: options.revealTimeoutMs ?? 2_500,
   })
   if (!revealed.ok) return revealed
@@ -2399,7 +2495,7 @@ function coerceChoiceValue(field: FormSchemaField, value: FormValueInput): strin
   return option ?? (value ? 'Yes' : 'No')
 }
 
-function plannedFillInputsForField(field: FormSchemaField, value: FormValueInput): FillFieldInput[] | { error: string } {
+function plannedFillInputsForField(field: FormSchemaField, value: FormValueInput): ResolvedFillFieldInput[] | { error: string } {
   if (field.kind === 'text') {
     if (typeof value !== 'string') return { error: `Field "${field.label}" expects a string value` }
     return [{ kind: 'text', fieldId: field.id, fieldLabel: field.label, value }]
@@ -2443,7 +2539,7 @@ function planFormFill(
     valuesById?: Record<string, FormValueInput>
     valuesByLabel?: Record<string, FormValueInput>
   },
-): { ok: true; fields: FillFieldInput[] } | { ok: false; error: string } {
+): { ok: true; fields: ResolvedFillFieldInput[] } | { ok: false; error: string } {
   const fieldById = new Map(schema.fields.map(field => [field.id, field]))
   const fieldsByLabel = new Map<string, FormSchemaField[]>()
   for (const field of schema.fields) {
@@ -2453,7 +2549,7 @@ function planFormFill(
     else fieldsByLabel.set(key, [field])
   }
 
-  const planned: FillFieldInput[] = []
+  const planned: ResolvedFillFieldInput[] = []
   const seenFieldIds = new Set<string>()
 
   for (const [fieldId, value] of Object.entries(opts.valuesById ?? {})) {
@@ -2484,8 +2580,121 @@ function planFormFill(
   return { ok: true, fields: planned }
 }
 
+function isResolvedFillFieldInput(field: FillFieldInput): field is ResolvedFillFieldInput {
+  if (field.kind === 'toggle') return typeof field.label === 'string' && field.label.length > 0
+  return typeof field.fieldLabel === 'string' && field.fieldLabel.length > 0
+}
+
+function resolveFillFieldInputs(
+  session: Session,
+  fields: FillFieldInput[],
+): { ok: true; fields: ResolvedFillFieldInput[] } | { ok: false; error: string } {
+  const unresolved = fields.filter(field => !isResolvedFillFieldInput(field))
+  if (unresolved.length === 0) {
+    return { ok: true, fields: fields as ResolvedFillFieldInput[] }
+  }
+
+  const a11y = sessionA11y(session)
+  if (!a11y) return { ok: false, error: 'No UI tree available to resolve fieldId entries from geometra_form_schema' }
+
+  const fieldById = new Map<string, FormSchemaField>()
+  for (const schema of buildFormSchemas(a11y, { includeOptions: true, includeContext: 'always' })) {
+    for (const field of schema.fields) fieldById.set(field.id, field)
+  }
+
+  const resolved: ResolvedFillFieldInput[] = []
+  for (const field of fields) {
+    if (isResolvedFillFieldInput(field)) {
+      if (field.kind === 'choice' && field.fieldId && field.choiceType === undefined) {
+        const schemaField = fieldById.get(field.fieldId)
+        resolved.push({
+          ...field,
+          ...(schemaField?.kind === 'choice' && schemaField.choiceType ? { choiceType: schemaField.choiceType } : {}),
+        })
+      } else if (field.kind === 'toggle' && field.fieldId && field.controlType === undefined) {
+        const schemaField = fieldById.get(field.fieldId)
+        resolved.push({
+          ...field,
+          ...(schemaField?.kind === 'toggle' && schemaField.controlType ? { controlType: schemaField.controlType } : {}),
+        })
+      } else {
+        resolved.push(field)
+      }
+      continue
+    }
+
+    if (!field.fieldId) {
+      return {
+        ok: false,
+        error:
+          field.kind === 'toggle'
+            ? 'Toggle fields require label, or provide fieldId from geometra_form_schema so MCP can resolve the current label.'
+            : `${field.kind} fields require fieldLabel, or provide fieldId from geometra_form_schema so MCP can resolve the current label.`,
+      }
+    }
+
+    const schemaField = fieldById.get(field.fieldId)
+    if (!schemaField) {
+      return { ok: false, error: `Unknown form field id ${field.fieldId}. Refresh geometra_form_schema and try again.` }
+    }
+
+    if (field.kind === 'text') {
+      if (schemaField.kind !== 'text') {
+        return { ok: false, error: `Field id ${field.fieldId} resolves to kind "${schemaField.kind}", not text.` }
+      }
+      resolved.push({ ...field, fieldLabel: schemaField.label })
+      continue
+    }
+
+    if (field.kind === 'choice') {
+      if (schemaField.kind !== 'choice') {
+        return { ok: false, error: `Field id ${field.fieldId} resolves to kind "${schemaField.kind}", not choice.` }
+      }
+      resolved.push({
+        ...field,
+        fieldLabel: schemaField.label,
+        ...(field.choiceType === undefined && schemaField.choiceType ? { choiceType: schemaField.choiceType } : {}),
+      })
+      continue
+    }
+
+    if (field.kind === 'toggle') {
+      if (schemaField.kind !== 'toggle') {
+        return { ok: false, error: `Field id ${field.fieldId} resolves to kind "${schemaField.kind}", not toggle.` }
+      }
+      resolved.push({
+        ...field,
+        label: schemaField.label,
+        ...(field.controlType === undefined && schemaField.controlType ? { controlType: schemaField.controlType } : {}),
+      })
+      continue
+    }
+
+    return {
+      ok: false,
+      error: `File field id ${field.fieldId} still needs fieldLabel. geometra_form_schema does not reliably expose proxy file inputs yet.`,
+    }
+  }
+
+  return { ok: true, fields: resolved }
+}
+
 function canFallbackToSequentialFill(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error)
+  try {
+    const parsed = JSON.parse(message) as Record<string, unknown>
+    if (
+      parsed?.error === 'listboxPick' ||
+      parsed?.error === 'setFieldText' ||
+      parsed?.error === 'setFieldChoice' ||
+      parsed?.error === 'setChecked' ||
+      parsed?.error === 'attachFiles'
+    ) {
+      return true
+    }
+  } catch {
+    /* ignore non-JSON errors */
+  }
   return (
     message.includes('Unsupported client message type "fillFields"') ||
     message.includes('Client message type "fillFields" is not supported') ||
@@ -2541,7 +2750,7 @@ async function waitForDeferredBatchUpdate(
   await waitForUiCondition(session, () => session.updateRevision > startRevision, 750)
 }
 
-async function waitForBatchFieldReadback(session: Session, fields: FillFieldInput[]): Promise<void> {
+async function waitForBatchFieldReadback(session: Session, fields: ResolvedFillFieldInput[]): Promise<void> {
   await waitForUiCondition(session, () => {
     const a11y = sessionA11y(session)
     if (!a11y) return false
@@ -2549,7 +2758,7 @@ async function waitForBatchFieldReadback(session: Session, fields: FillFieldInpu
   }, 1500)
 }
 
-function batchFieldReadbackMatches(a11y: A11yNode, field: FillFieldInput): boolean {
+function batchFieldReadbackMatches(a11y: A11yNode, field: ResolvedFillFieldInput): boolean {
   switch (field.kind) {
     case 'text': {
       const matches = findNodes(a11y, { name: field.fieldLabel, role: 'textbox' })
@@ -2819,9 +3028,11 @@ async function executeBatchAction(
       }
     }
     case 'fill_fields': {
+      const resolvedFields = resolveFillFieldInputs(session, action.fields)
+      if (!resolvedFields.ok) throw new Error(resolvedFields.error)
       const steps: Array<Record<string, unknown>> = []
-      for (let index = 0; index < action.fields.length; index++) {
-        const field = action.fields[index]!
+      for (let index = 0; index < resolvedFields.fields.length; index++) {
+        const field = resolvedFields.fields[index]!
         const result = await executeFillField(session, field, detail)
         steps.push(detail === 'verbose'
           ? { index, kind: field.kind, ok: true, summary: result.summary }
@@ -2830,7 +3041,7 @@ async function executeBatchAction(
       return {
         summary: steps.map(step => String(step.summary ?? '')).filter(Boolean).join('\n'),
         compact: {
-          fieldCount: action.fields.length,
+          fieldCount: resolvedFields.fields.length,
           ...(includeSteps ? { steps } : {}),
         },
       }
@@ -2838,7 +3049,7 @@ async function executeBatchAction(
   }
 }
 
-async function executeFillField(session: Session, field: FillFieldInput, detail: ResponseDetail): Promise<StepExecutionResult> {
+async function executeFillField(session: Session, field: ResolvedFillFieldInput, detail: ResponseDetail): Promise<StepExecutionResult> {
   switch (field.kind) {
     case 'text': {
       const before = sessionA11y(session)

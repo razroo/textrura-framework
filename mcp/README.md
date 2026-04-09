@@ -30,20 +30,20 @@ Proxy-backed sessions stay warm by default on disconnect, and MCP now keeps a sm
 | `geometra_wait_for_resume_parse` | Convenience wait until a parsing banner is gone (defaults: `text`: `"Parsing"`, `present` implied false). Same engine as `geometra_wait_for` |
 | `geometra_form_schema` | Compact, fill-oriented form schema with stable field ids and collapsed radio/button groups; can auto-connect from `pageUrl` / `url` |
 | `geometra_fill_form` | Fill a form from `valuesById` / `valuesByLabel` in one MCP call; can auto-connect from `pageUrl` / `url` for the lowest-token known-form path |
-| `geometra_fill_fields` | Fill labeled text/choice/toggle/file fields in one MCP call; can return final-only status for the smallest responses |
+| `geometra_fill_fields` | Fill text/choice/toggle/file fields in one MCP call; text/choice/toggle entries can use `fieldId` from `geometra_form_schema` without repeating the label |
 | `geometra_run_actions` | Execute a batch of high-level actions in one MCP round trip and get one consolidated result, with optional final-only output |
 | `geometra_page_model` | Summary-first webpage model: archetypes, stable section ids, counts, top-level sections, primary actions |
 | `geometra_expand_section` | Expand one form/dialog/list/landmark from `geometra_page_model` on demand, with paging/filtering for long sections |
-| `geometra_reveal` | Scroll until a matching node is visible instead of guessing wheel deltas |
+| `geometra_reveal` | Scroll until a matching node is visible instead of guessing wheel deltas; auto-scales reveal steps for tall forms when omitted |
 | `geometra_click` | Click by coordinates or semantic target, optionally waiting for a post-click semantic condition |
 | `geometra_type` | Type text into the focused element |
 | `geometra_key` | Send special keys (Enter, Tab, Escape, arrows) |
 | `geometra_upload_files` | Attach files: labeled field / auto / hidden input / native chooser / synthetic drop (`@geometra/proxy` only) |
-| `geometra_pick_listbox_option` | Pick an option from a custom dropdown/searchable combobox; can open by field label (`@geometra/proxy` only) |
-| `geometra_select_option` | Choose an option on a native `<select>` (`@geometra/proxy` only) |
+| `geometra_pick_listbox_option` | Pick an option from a custom dropdown/searchable combobox; can open by field label, falls back to keyboard selection, and returns visible option hints on failure (`@geometra/proxy` only) |
+| `geometra_select_option` | Choose an option on a native `<select>` only; use `geometra_pick_listbox_option` for custom dropdowns (`@geometra/proxy` only) |
 | `geometra_set_checked` | Set a checkbox or radio by label instead of coordinate clicks (`@geometra/proxy` only) |
 | `geometra_wheel` | Mouse wheel / scroll (`@geometra/proxy` only) |
-| `geometra_snapshot` | Default **compact**: flat viewport-visible actionable nodes (minified JSON). `view=full` for nested tree |
+| `geometra_snapshot` | Default **compact**: flat viewport-visible actionable nodes (minified JSON). `view=full` for nested tree, `view=form-required` for required fields including offscreen ones |
 | `geometra_layout` | Raw computed geometry for every node |
 | `geometra_disconnect` | Close the connection |
 
@@ -52,6 +52,18 @@ Proxy-backed sessions stay warm by default on disconnect, and MCP now keeps a sm
 The tool input is **strict**: unknown keys are rejected (so mistaken names like `textGone` fail fast instead of being ignored). To wait until copy such as “Parsing…” or “Parsing your resume” is **gone**, pass a substring that matches the banner in **`text`** and set **`present`** to **`false`**. Example: `{ "text": "Parsing", "present": false }` (adjust the substring per site).
 
 For the common resume-upload case, prefer **`geometra_wait_for_resume_parse`** (optional `text`, default `"Parsing"`; optional `timeoutMs`, default `60000`) so agents do not have to remember `present: false`.
+
+### Custom dropdowns and searchable comboboxes
+
+Use **`geometra_pick_listbox_option`** for React Select / Radix / Headless UI / custom ATS dropdowns. Prefer **`fieldLabel`** so MCP opens the right combobox semantically, and pass **`query`** when the dropdown is searchable. If click-selection cannot be confirmed, the proxy now falls back to keyboard navigation for editable comboboxes.
+
+When selection fails, the error payload includes a capped **`visibleOptions`** list so an agent can retry with a real label instead of blindly guessing. Use **`geometra_select_option`** only for native HTML `<select>` controls.
+
+### Long forms and offscreen required fields
+
+For tall application forms, **`geometra_snapshot({ view: "form-required" })`** returns required fields even when they are offscreen, with **bounds**, **visibility**, and **scrollHint** data. This is useful for “what required fields are left?” without paging through a full tree.
+
+When a target is below the fold, **`geometra_reveal`** and semantic click actions auto-scale reveal steps when `maxSteps` / `maxRevealSteps` are omitted, so long forms do not fail after a hard-coded short scroll budget. If you already have schema ids, **`geometra_fill_fields`** can now use `fieldId` directly for text / choice / toggle entries without repeating `fieldLabel` / `label`.
 
 ## Setup
 
@@ -307,13 +319,14 @@ Agent:  geometra_query({ role: "button", name: "Save" })
 1. The MCP server connects to a WebSocket peer that speaks GEOM v1 (`frame` with `layout` + `tree`, optional `patch` updates).
 2. It receives the computed layout (`{ x, y, width, height }` for every node) and the UI tree (`kind`, `semantic`, `props`, `handlers`, `children`).
 3. It builds an accessibility tree from that data — roles, names, focusable state, bounds.
-4. **`geometra_snapshot`** defaults to a **compact** flat list of viewport-visible actionable nodes (minified JSON) to reduce LLM tokens; use `view: "full"` for the complete nested tree.
+4. **`geometra_snapshot`** defaults to a **compact** flat list of viewport-visible actionable nodes (minified JSON) to reduce LLM tokens; use `view: "full"` for the complete nested tree or `view: "form-required"` for offscreen required fields plus scroll hints.
 5. **`geometra_form_schema`** is the compact form-specific path: stable field ids, required/invalid state, current values, and collapsed choice groups without layout-heavy section detail. It can auto-connect when you pass `pageUrl` / `url`.
 6. **`geometra_fill_form`** turns a compact values object into semantic field operations server-side, so the model does not need to emit one tool call per field. It can also auto-connect, which collapses “open page + fill known values” into a single tool call.
-7. **`geometra_page_model`** is still the right summary-first path for non-form exploration: page archetypes, stable section ids, counts, top-level landmarks/forms/dialogs/lists, and a few primary actions.
-8. **`geometra_expand_section`** fetches richer details only for the section you care about (fields, actions, headings, nested lists, list items, text preview).
-9. After interactions, action tools return a **semantic delta** when possible (dialogs opened/closed, forms appeared/removed, list counts changed, named/focusable nodes added/removed/updated). If nothing meaningful changed, they fall back to a short current-UI overview.
-10. After each interaction, the peer sends updated geometry (full `frame` or `patch`) — the MCP tools interpret that into compact summaries.
+7. **`geometra_fill_fields`** is the lower-level field-intent path when you need direct control; text / choice / toggle entries can now resolve `fieldId` from `geometra_form_schema` without repeating labels.
+8. **`geometra_page_model`** is still the right summary-first path for non-form exploration: page archetypes, stable section ids, counts, top-level landmarks/forms/dialogs/lists, and a few primary actions.
+9. **`geometra_expand_section`** fetches richer details only for the section you care about (fields, actions, headings, nested lists, list items, text preview).
+10. After interactions, action tools return a **semantic delta** when possible (dialogs opened/closed, forms appeared/removed, list counts changed, named/focusable nodes added/removed/updated). If nothing meaningful changed, they fall back to a short current-UI overview.
+11. After each interaction, the peer sends updated geometry (full `frame` or `patch`) — the MCP tools interpret that into compact summaries.
 
 ## Long Forms
 
@@ -322,11 +335,12 @@ For long application flows, prefer one of these patterns:
 1. `geometra_fill_form({ pageUrl, valuesByLabel })` when you already know the fields you want to set
 2. otherwise `geometra_form_schema`
 3. then `geometra_fill_form`
-3. `geometra_reveal` for far-below-fold targets such as submit buttons
-4. `geometra_click({ ..., waitFor: ... })` when one action should also wait for the next semantic state
-5. `geometra_run_actions` when you need mixed navigation + waits + field entry
-6. `geometra_connect({ pageUrl, returnPageModel: true })` when you want connect + summary-first exploration in one turn
-7. `geometra_page_model` + `geometra_expand_section` when you are still exploring the page rather than filling it
+4. `geometra_snapshot({ view: "form-required" })` when you need the remaining required fields including offscreen ones
+5. `geometra_reveal` for far-below-fold targets such as submit buttons (auto-scales reveal steps when you omit `maxSteps`)
+6. `geometra_click({ ..., waitFor: ... })` when one action should also wait for the next semantic state
+7. `geometra_run_actions` when you need mixed navigation + waits + field entry
+8. `geometra_connect({ pageUrl, returnPageModel: true })` when you want connect + summary-first exploration in one turn
+9. `geometra_page_model` + `geometra_expand_section` when you are still exploring the page rather than filling it
 
 Typical batch:
 

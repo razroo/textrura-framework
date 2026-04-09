@@ -278,6 +278,158 @@ describe('pickListboxOption', () => {
     expect(await page.locator('#trigger-b').textContent()).toBe('Choose country')
     await page.close()
   })
+
+  it('falls back to keyboard navigation for searchable comboboxes when click selection does not update the field', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; }
+        .field { width: 420px; position: relative; display: grid; gap: 8px; }
+        #combo { width: 100%; min-height: 40px; }
+        #menu[hidden] { display: none; }
+        #menu { border: 1px solid #ccc; padding: 8px; display: grid; gap: 6px; }
+        [role="option"][data-highlighted="true"] { background: #def; }
+      </style>
+      <div class="field">
+        <label for="combo">Country</label>
+        <input
+          id="combo"
+          role="combobox"
+          aria-controls="menu"
+          aria-expanded="false"
+          aria-autocomplete="list"
+        />
+        <div id="selection">Choose country</div>
+        <div id="menu" role="listbox" hidden>
+          <div id="option-ca" role="option">Canada</div>
+          <div id="option-us" role="option">United States</div>
+        </div>
+      </div>
+      <script>
+        const input = document.getElementById('combo')
+        const menu = document.getElementById('menu')
+        const selection = document.getElementById('selection')
+        const options = Array.from(menu.querySelectorAll('[role="option"]'))
+        let filtered = options
+        let activeIndex = -1
+
+        function refresh() {
+          const query = input.value.toLowerCase()
+          filtered = options.filter(option => option.textContent.toLowerCase().includes(query))
+          menu.hidden = false
+          input.setAttribute('aria-expanded', 'true')
+          for (const option of options) {
+            option.hidden = !filtered.includes(option)
+            option.removeAttribute('data-highlighted')
+          }
+          if (filtered.length === 0) {
+            activeIndex = -1
+            input.removeAttribute('aria-activedescendant')
+            return
+          }
+          if (activeIndex < 0 || activeIndex >= filtered.length) activeIndex = 0
+          const active = filtered[activeIndex]
+          active.setAttribute('data-highlighted', 'true')
+          input.setAttribute('aria-activedescendant', active.id)
+        }
+
+        input.addEventListener('focus', refresh)
+        input.addEventListener('click', refresh)
+        input.addEventListener('input', () => {
+          activeIndex = -1
+          refresh()
+        })
+        input.addEventListener('keydown', (event) => {
+          if (event.key === 'ArrowDown') {
+            event.preventDefault()
+            if (filtered.length > 0) {
+              activeIndex = (activeIndex + 1) % filtered.length
+              refresh()
+            }
+          }
+          if (event.key === 'ArrowUp') {
+            event.preventDefault()
+            if (filtered.length > 0) {
+              activeIndex = (activeIndex - 1 + filtered.length) % filtered.length
+              refresh()
+            }
+          }
+          if (event.key === 'Enter') {
+            const active = filtered[activeIndex]
+            if (active) {
+              event.preventDefault()
+              selection.textContent = active.textContent
+              menu.hidden = true
+              input.setAttribute('aria-expanded', 'false')
+            }
+          }
+        })
+        for (const option of options) {
+          option.addEventListener('click', (event) => {
+            event.preventDefault()
+          })
+        }
+      </script>
+    `)
+
+    await pickListboxOption(page, 'United States', {
+      fieldLabel: 'Country',
+      exact: false,
+    })
+
+    expect(await page.locator('#selection').textContent()).toBe('United States')
+    await page.close()
+  })
+
+  it('returns visible options in the failure payload when no custom dropdown option matches', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; }
+        .field { width: 360px; position: relative; }
+        #trigger { width: 100%; min-height: 44px; text-align: left; }
+        #menu[hidden] { display: none; }
+        #menu { border: 1px solid #ccc; margin-top: 6px; padding: 8px; display: grid; gap: 6px; }
+      </style>
+      <div class="field">
+        <label>Location</label>
+        <button id="trigger" type="button" aria-haspopup="listbox">Select location</button>
+        <div id="menu" role="listbox" hidden>
+          <div role="option">Austin, TX</div>
+          <div role="option">Boston, MA</div>
+        </div>
+      </div>
+      <script>
+        const trigger = document.getElementById('trigger')
+        const menu = document.getElementById('menu')
+        trigger.addEventListener('click', () => {
+          menu.hidden = false
+        })
+      </script>
+    `)
+
+    let thrown: Error | null = null
+    try {
+      await pickListboxOption(page, 'Berlin, Germany', {
+        fieldLabel: 'Location',
+        exact: false,
+      })
+    } catch (error) {
+      thrown = error as Error
+    }
+
+    expect(thrown).toBeTruthy()
+    const payload = JSON.parse(thrown!.message) as Record<string, unknown>
+    expect(payload).toMatchObject({
+      error: 'listboxPick',
+      reason: 'no_visible_option_match',
+      fieldLabel: 'Location',
+      requestedLabel: 'Berlin, Germany',
+      visibleOptionCount: 2,
+      visibleOptions: ['Austin, TX', 'Boston, MA'],
+    })
+    await page.close()
+  })
 })
 
 describe('attachFiles', () => {

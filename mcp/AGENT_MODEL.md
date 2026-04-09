@@ -38,7 +38,7 @@ Normal webpage -> @geometra/proxy (CLI or MCP-spawned) -> Chromium (headed by de
           +-------------+----------------+
                         |
                         v
-    fill_form / fill_fields / click / type / set_checked / wheel / upload / select
+ fill_form / fill_fields / pick_listbox_option / click / type / set_checked / wheel / upload / select_option
                         |
                         v
                  semantic delta
@@ -151,6 +151,8 @@ This means later tool calls can refer to ids instead of repeatedly sending large
 
 This is useful when the whole visible UI matters more than page sections.
 
+When the page is a long form and you care about what is still missing, use `geometra_snapshot({ view: "form-required" })` to get required fields including offscreen ones, along with bounds, visibility, and scroll hints.
+
 ### 6. Semantic deltas after actions
 
 After clicks, typing, wheel events, uploads, etc., the MCP tries to return **what changed**:
@@ -188,6 +190,10 @@ Use it for labeled:
 
 This keeps the agent at the field-intent level and avoids repeated control-specific micro-decisions.
 
+If you already have schema ids, `geometra_fill_fields` can resolve `fieldId` directly for text / choice / toggle entries without repeating `fieldLabel` / `label`.
+
+For custom dropdowns and searchable comboboxes, prefer `geometra_pick_listbox_option` over raw clicks. Pass `fieldLabel` when possible, add `query` for searchable widgets, and use the returned `visibleOptions` failure hints when the requested label does not match what the site is showing.
+
 When the page is long and the text payload is large, keep `detail: "minimal"` so Geometra returns compact structured step results instead of verbose action narration.
 
 ### 8. Batch obvious multi-step flows
@@ -214,7 +220,7 @@ Use it when you already know what you are looking for and want exact bounds.
 
 Use `geometra_reveal` when the target is below the fold or inside a long form and you do not want to guess wheel deltas.
 
-This is the preferred path for “bring Submit into view”, “jump to the next required field”, and similar reveal operations.
+This is the preferred path for “bring Submit into view”, “jump to the next required field”, and similar reveal operations. When `maxSteps` is omitted, Geometra auto-scales the reveal budget from the target scroll distance so tall forms do not stop after a small fixed number of wheels.
 
 ## Recommended Agent Loop
 
@@ -228,7 +234,7 @@ For most DOM-heavy pages, the best order is:
 6. `geometra_expand_section` for one important section if needed
 7. `geometra_query` or `geometra_wait_for` (or `geometra_wait_for_resume_parse` after resume upload / “Parsing…” banners)
 8. `geometra_reveal` when the target is offscreen
-9. `geometra_fill_fields` when you need field-level control instead of schema-driven values
+9. `geometra_fill_fields` when you need field-level control instead of schema-driven values or want to reuse `fieldId` from `geometra_form_schema`
 10. `geometra_run_actions` for predictable mixed flows, otherwise a single action tool (`geometra_click`, `geometra_type`, etc.)
 11. consume the returned semantic delta / terse state summary
 
@@ -239,6 +245,12 @@ Use `geometra_snapshot` compact when:
 - you want a cheap global fallback
 
 Use `geometra_snapshot({ view: "full" })` only for deeper debugging.
+
+Use `geometra_snapshot({ view: "form-required" })` when:
+
+- the page is a tall application form
+- you want remaining required fields, even if offscreen
+- you want scroll hints before deciding whether to reveal, fill, or click
 
 Action tools default to terse summaries. Use `detail: "verbose"` when you need a fuller fallback view for debugging.
 
@@ -260,10 +272,11 @@ If you need direct field-level control instead of schema-driven ids:
 
 For long forms with repeated controls:
 
-1. `geometra_expand_section` with `fieldOffset` / `actionOffset` to page through the section
-2. `onlyRequiredFields: true` or `onlyInvalidFields: true` when you want the actionable subset
-3. `geometra_query({ role, name, contextText })` to disambiguate repeated `Yes` / `No` answers
-4. `geometra_reveal(...)` before clicking a far-below-fold target like submit
+1. `geometra_snapshot({ view: "form-required" })` when you want all required fields including offscreen ones
+2. `geometra_expand_section` with `fieldOffset` / `actionOffset` to page through the section
+3. `onlyRequiredFields: true` or `onlyInvalidFields: true` when you want the actionable subset
+4. `geometra_query({ role, name, contextText })` to disambiguate repeated `Yes` / `No` answers
+5. `geometra_reveal(...)` before clicking a far-below-fold target like submit
 
 ## Headed vs Headless
 

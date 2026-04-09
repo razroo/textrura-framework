@@ -105,6 +105,7 @@ vi.mock('../session.js', () => ({
     lists: [],
   })),
   buildFormSchemas: vi.fn(() => mockState.formSchemas),
+  buildFormRequiredSnapshot: vi.fn(() => []),
   expandPageSection: vi.fn(() => null),
   buildUiDelta: vi.fn(() => ({})),
   hasUiDelta: vi.fn(() => false),
@@ -197,6 +198,62 @@ describe('batch MCP result shaping', () => {
       value: 'taylor@example.com',
       wait: 'updated',
       readback: { role: 'textbox', value: 'taylor@example.com' },
+    })
+  })
+
+  it('resolves fieldId-only fill_fields entries from the current form schema', async () => {
+    const handler = getToolHandler('geometra_fill_fields')
+    mockState.formSchemas = [{
+      formId: 'fm:0',
+      name: 'Application',
+      fieldCount: 3,
+      requiredCount: 0,
+      invalidCount: 0,
+      fields: [
+        { id: 'ff:0.0', kind: 'text', label: 'Full name' },
+        { id: 'ff:0.1', kind: 'choice', label: 'Preferred location', choiceType: 'select' },
+        { id: 'ff:0.2', kind: 'toggle', label: 'Share my profile for future roles', controlType: 'checkbox' },
+      ],
+    }]
+
+    const result = await handler({
+      fields: [
+        { kind: 'text', fieldId: 'ff:0.0', value: 'Taylor Applicant' },
+        { kind: 'choice', fieldId: 'ff:0.1', value: 'Berlin, Germany' },
+        { kind: 'toggle', fieldId: 'ff:0.2', checked: true },
+      ],
+      stopOnError: true,
+      failOnInvalid: false,
+      includeSteps: true,
+      detail: 'minimal',
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    expect(mockState.sendFieldText).toHaveBeenCalledWith(
+      mockState.session,
+      'Full name',
+      'Taylor Applicant',
+      { exact: undefined, fieldId: 'ff:0.0' },
+      undefined,
+    )
+    expect(mockState.sendFieldChoice).toHaveBeenCalledWith(
+      mockState.session,
+      'Preferred location',
+      'Berlin, Germany',
+      { exact: undefined, query: undefined, choiceType: 'select', fieldId: 'ff:0.1' },
+      undefined,
+    )
+    expect(mockState.sendSetChecked).toHaveBeenCalledWith(
+      mockState.session,
+      'Share my profile for future roles',
+      { checked: true, exact: undefined, controlType: 'checkbox' },
+      undefined,
+    )
+    expect(payload).toMatchObject({
+      completed: true,
+      fieldCount: 3,
+      successCount: 3,
+      errorCount: 0,
     })
   })
 
@@ -858,6 +915,57 @@ describe('query and reveal tools', () => {
     expect(payload).toMatchObject({
       revealed: true,
       attempts: 1,
+      target: {
+        role: 'button',
+        name: 'Submit application',
+        visibility: { fullyVisible: true },
+      },
+    })
+  })
+
+  it('auto-scales reveal steps for tall forms when maxSteps is omitted', async () => {
+    const handler = getToolHandler('geometra_reveal')
+    let scrollY = 0
+
+    const setTree = () => {
+      mockState.currentA11yRoot = node('group', undefined, {
+        bounds: { x: 0, y: 0, width: 1280, height: 800 },
+        meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY },
+        children: [
+          node('form', 'Application', {
+            bounds: { x: 20, y: -200 - scrollY, width: 760, height: 6200 },
+            path: [0],
+            children: [
+              node('button', 'Submit application', {
+                bounds: { x: 60, y: 5200 - scrollY, width: 180, height: 40 },
+                path: [0, 0],
+              }),
+            ],
+          }),
+        ],
+      })
+    }
+
+    setTree()
+    mockState.sendWheel.mockImplementation(async () => {
+      scrollY += 650
+      setTree()
+      bumpMockUiRevision()
+      return { status: 'updated' as const, timeoutMs: 2500 }
+    })
+
+    const result = await handler({
+      role: 'button',
+      name: 'Submit application',
+      fullyVisible: true,
+      timeoutMs: 2500,
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    expect(mockState.sendWheel).toHaveBeenCalledTimes(7)
+    expect(payload).toMatchObject({
+      revealed: true,
+      attempts: 7,
       target: {
         role: 'button',
         name: 'Submit application',

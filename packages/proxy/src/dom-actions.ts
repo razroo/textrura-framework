@@ -12,8 +12,32 @@ export type FileAttachStrategy = 'auto' | 'chooser' | 'hidden' | 'drop'
 const LABELED_CONTROL_SELECTOR =
   'input, select, textarea, button, [role="combobox"], [role="textbox"], [aria-haspopup="listbox"], [contenteditable="true"]'
 
+const POPUP_CONTAINER_SELECTOR =
+  '[role="listbox"], [role="menu"], [role="dialog"], [aria-modal="true"], [data-radix-popper-content-wrapper], [class*="menu"], [class*="option"], [class*="select"], [class*="dropdown"]'
+
+const POPUP_ROOT_SELECTOR =
+  '[role="listbox"], [role="menu"], [role="dialog"], [aria-modal="true"], [data-radix-popper-content-wrapper], [class*="menu"], [class*="dropdown"], [class*="popover"], [class*="listbox"], [class*="options"]'
+
 const OPTION_PICKER_SELECTOR =
-  '[role="option"], [role="menuitem"], [role="treeitem"], button, li, [data-value], [aria-selected], [aria-checked]'
+  [
+    '[role="option"]',
+    '[role="menuitem"]',
+    '[role="treeitem"]',
+    'button',
+    'li',
+    '[data-value]',
+    '[aria-selected]',
+    '[aria-checked]',
+    '[role="listbox"] > *',
+    '[role="menu"] > *',
+    '[class*="option"]',
+    '[class*="menu-item"]',
+    '[class*="dropdown-item"]',
+    '[class*="listbox-option"]',
+  ].join(', ')
+
+const MAX_VISIBLE_OPTION_HINTS = 12
+const LISTBOX_KEYBOARD_FALLBACK_STEPS = 40
 
 interface AnchorPoint {
   x?: number
@@ -87,7 +111,18 @@ function writeCachedLocator(
 }
 
 function normalizedOptionLabel(value: string): string {
-  return value.replace(/\s+/g, ' ').trim().toLowerCase()
+  return value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[＋﹢∔]/g, '+')
+    .replace(/[‐‑‒–—―]/g, '-')
+    .replace(/&/g, ' and ')
+    .replace(/\bplus\b/g, '+')
+    .replace(/[,/()]+/g, ' ')
+    .replace(/\s*\+\s*/g, '+')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
 }
 
 function prefersGroupedChoiceValue(value: string): boolean {
@@ -118,6 +153,24 @@ function semanticSelectionAliases(value: string): string[] {
     for (const alias of ['prefer not', 'opt out', 'do not']) {
       aliases.add(alias)
     }
+  }
+  if (normalized === 'atx' || normalized.includes('austin')) {
+    for (const alias of ['atx', 'austin', 'austin tx', 'austin texas']) aliases.add(alias)
+  }
+  if (normalized === 'nyc' || normalized.includes('new york')) {
+    for (const alias of ['nyc', 'new york', 'new york ny']) aliases.add(alias)
+  }
+  if (normalized === 'sf' || normalized.includes('san francisco')) {
+    for (const alias of ['sf', 'san francisco', 'san francisco ca']) aliases.add(alias)
+  }
+  if (normalized === 'la' || normalized.includes('los angeles')) {
+    for (const alias of ['la', 'los angeles', 'los angeles ca']) aliases.add(alias)
+  }
+  if (normalized === 'dc' || normalized.includes('washington dc')) {
+    for (const alias of ['dc', 'washington dc', 'washington d c']) aliases.add(alias)
+  }
+  if (normalized === 'us' || normalized === 'usa' || normalized.includes('united states')) {
+    for (const alias of ['us', 'usa', 'united states']) aliases.add(alias)
   }
   return [...aliases]
 }
@@ -601,6 +654,404 @@ async function typeIntoActiveEditableElement(page: Page, text: string): Promise<
   return false
 }
 
+async function clearEditableLocator(locator: Locator): Promise<boolean> {
+  try {
+    await locator.fill('')
+    return true
+  } catch {
+    /* fall through */
+  }
+
+  try {
+    await locator.click()
+    await locator.press('ControlOrMeta+A')
+    await locator.press('Backspace')
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function clearActiveEditableElement(page: Page): Promise<boolean> {
+  for (const frame of page.frames()) {
+    const cleared = await frame.evaluate(() => {
+      const active = document.activeElement
+      if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) {
+        active.value = ''
+        active.dispatchEvent(new Event('input', { bubbles: true }))
+        return true
+      }
+      if (active instanceof HTMLElement && active.isContentEditable) {
+        active.textContent = ''
+        active.dispatchEvent(new Event('input', { bubbles: true }))
+        return true
+      }
+      return false
+    })
+    if (cleared) return true
+  }
+  return false
+}
+
+async function resetTypedListboxQuery(page: Page, locator?: Locator): Promise<boolean> {
+  if (locator && await clearEditableLocator(locator)) return true
+  return clearActiveEditableElement(page)
+}
+
+async function resolveMeaningfulOptionClickTarget(locator: Locator): Promise<ElementHandle<Element> | null> {
+  const baseHandle = await locator.elementHandle()
+  if (!baseHandle) return null
+
+  const targetHandle = (await baseHandle.evaluateHandle((el, payload) => {
+    function visible(node: Element): node is HTMLElement {
+      if (!(node instanceof HTMLElement)) return false
+      const rect = node.getBoundingClientRect()
+      if (rect.width <= 0 || rect.height <= 0) return false
+      const style = getComputedStyle(node)
+      return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0'
+    }
+
+    function textFor(node: Element): string {
+      return node.getAttribute('aria-label')?.trim() || node.textContent?.trim() || ''
+    }
+
+    if (!(el instanceof HTMLElement)) return el
+    const baseText = textFor(el)
+    const popup = el.closest(payload.popupSelector)
+
+    let best: HTMLElement = el
+    let bestScore = Number.POSITIVE_INFINITY
+    let current: HTMLElement | null = el
+    let depth = 0
+
+    while (current && depth < 6) {
+      if (visible(current)) {
+        const rect = current.getBoundingClientRect()
+        const className = typeof current.className === 'string' ? current.className.toLowerCase() : ''
+        const role = current.getAttribute('role')
+        const tag = current.tagName.toLowerCase()
+        const currentText = textFor(current)
+        const rowLike =
+          role === 'option' ||
+          role === 'menuitem' ||
+          role === 'treeitem' ||
+          tag === 'button' ||
+          tag === 'li' ||
+          tag === 'label' ||
+          current.hasAttribute('data-value') ||
+          current.hasAttribute('aria-selected') ||
+          current.hasAttribute('aria-checked') ||
+          className.includes('option') ||
+          className.includes('item') ||
+          className.includes('row') ||
+          className.includes('menu')
+        const textAligned = !!baseText && !!currentText && (currentText === baseText || currentText.includes(baseText))
+        const insidePopup = popup ? popup.contains(current) : !!current.closest(payload.popupSelector)
+        if ((rowLike || textAligned) && insidePopup) {
+          const score =
+            rect.width * rect.height +
+            depth * 600 -
+            (rowLike ? 20_000 : 0) -
+            (textAligned ? 8_000 : 0)
+          if (score < bestScore) {
+            best = current
+            bestScore = score
+          }
+        }
+      }
+      current = current.parentElement
+      depth++
+    }
+
+    return best
+  }, { popupSelector: POPUP_CONTAINER_SELECTOR })) as ElementHandle<Element>
+
+  return targetHandle
+}
+
+async function collectVisibleOptionHints(
+  page: Page,
+  anchor?: AnchorPoint,
+): Promise<{ hasPopup: boolean; options: Array<{ label: string; selected: boolean; highlighted: boolean }> }> {
+  const merged = new Map<string, { label: string; selected: boolean; highlighted: boolean; rank: number }>()
+  let hasPopup = false
+
+  for (const frame of page.frames()) {
+    const snapshot = await frame.evaluate((payload) => {
+      function normalize(value: string): string {
+        return value
+          .normalize('NFKD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[＋﹢∔]/g, '+')
+          .replace(/[‐‑‒–—―]/g, '-')
+          .replace(/&/g, ' and ')
+          .replace(/\bplus\b/g, '+')
+          .replace(/[,/()]+/g, ' ')
+          .replace(/\s*\+\s*/g, '+')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .toLowerCase()
+      }
+
+      function visible(el: Element): el is HTMLElement {
+        if (!(el instanceof HTMLElement)) return false
+        const rect = el.getBoundingClientRect()
+        if (rect.width <= 0 || rect.height <= 0) return false
+        const style = getComputedStyle(el)
+        return style.display !== 'none' && style.visibility !== 'hidden'
+      }
+
+      function labelFor(el: Element): string {
+        return el.getAttribute('aria-label')?.trim() || el.textContent?.trim() || ''
+      }
+
+      function selected(el: Element): boolean {
+        return (
+          el.getAttribute('aria-selected') === 'true' ||
+          el.getAttribute('aria-checked') === 'true' ||
+          el.getAttribute('data-selected') === 'true' ||
+          el.getAttribute('data-state') === 'checked' ||
+          el.getAttribute('data-state') === 'on'
+        )
+      }
+
+      function highlighted(el: Element): boolean {
+        return (
+          el === document.activeElement ||
+          el.getAttribute('data-highlighted') === 'true' ||
+          el.getAttribute('data-focus') === 'true' ||
+          el.getAttribute('data-focused') === 'true' ||
+          el.getAttribute('data-hovered') === 'true' ||
+          el.getAttribute('data-state') === 'active' ||
+          el.getAttribute('aria-current') === 'true'
+        )
+      }
+
+      const popupRoots = Array.from(document.querySelectorAll(payload.popupSelector)).filter((el): el is HTMLElement => visible(el))
+      const rows: Array<{ label: string; selected: boolean; highlighted: boolean; rank: number }> = []
+      const seen = new Set<string>()
+
+      for (const popup of popupRoots) {
+        const candidates = [popup, ...Array.from(popup.querySelectorAll(payload.optionSelector))]
+        for (const el of candidates) {
+          if (!(el instanceof Element) || !visible(el)) continue
+          const className = typeof (el as HTMLElement).className === 'string' ? (el as HTMLElement).className.toLowerCase() : ''
+          const role = el.getAttribute('role')
+          const tag = el.tagName.toLowerCase()
+          const optionLike =
+            role === 'option' ||
+            role === 'menuitem' ||
+            role === 'treeitem' ||
+            tag === 'button' ||
+            tag === 'li' ||
+            tag === 'label' ||
+            el.hasAttribute('data-value') ||
+            el.hasAttribute('aria-selected') ||
+            el.hasAttribute('aria-checked') ||
+            className.includes('option') ||
+            className.includes('item') ||
+            className.includes('row') ||
+            className.includes('menu')
+          const label = labelFor(el)
+          if (!label || label.length > 180) continue
+          if (!optionLike && !popup.contains(el.parentElement)) continue
+          const key = normalize(label)
+          if (!key || seen.has(key)) continue
+          const rect = (el as HTMLElement).getBoundingClientRect()
+          const centerX = rect.left + rect.width / 2
+          const centerY = rect.top + rect.height / 2
+          const distance =
+            payload.anchorX === null && payload.anchorY === null
+              ? rect.top
+              : Math.abs(centerX - (payload.anchorX ?? centerX)) + Math.abs(centerY - (payload.anchorY ?? centerY))
+          rows.push({
+            label,
+            selected: selected(el),
+            highlighted: highlighted(el),
+            rank: (selected(el) ? -4_000 : 0) + (highlighted(el) ? -2_000 : 0) + distance,
+          })
+          seen.add(key)
+          if (rows.length >= payload.maxOptions * 3) break
+        }
+      }
+
+      rows.sort((a, b) => a.rank - b.rank || a.label.localeCompare(b.label))
+      return {
+        hasPopup: popupRoots.length > 0,
+        options: rows.slice(0, payload.maxOptions),
+      }
+    }, {
+      popupSelector: POPUP_ROOT_SELECTOR,
+      optionSelector: OPTION_PICKER_SELECTOR,
+      anchorX: anchor?.x ?? null,
+      anchorY: anchor?.y ?? null,
+      maxOptions: MAX_VISIBLE_OPTION_HINTS,
+    })
+
+    hasPopup ||= snapshot.hasPopup
+    for (const option of snapshot.options) {
+      const key = normalizedOptionLabel(option.label)
+      const existing = merged.get(key)
+      const rank = (option.selected ? 0 : 10) + (option.highlighted ? 0 : 5) + merged.size
+      if (!existing || rank < existing.rank) {
+        merged.set(key, { ...option, rank })
+      }
+    }
+  }
+
+  const options = [...merged.values()]
+    .sort((a, b) => a.rank - b.rank || a.label.localeCompare(b.label))
+    .slice(0, MAX_VISIBLE_OPTION_HINTS)
+    .map(({ label, selected, highlighted }) => ({ label, selected, highlighted }))
+  return { hasPopup, options }
+}
+
+async function activeListboxOptionLabel(page: Page, anchor?: AnchorPoint): Promise<string | null> {
+  for (const frame of page.frames()) {
+    const label = await frame.evaluate((payload) => {
+      function visible(el: Element): el is HTMLElement {
+        if (!(el instanceof HTMLElement)) return false
+        const rect = el.getBoundingClientRect()
+        if (rect.width <= 0 || rect.height <= 0) return false
+        const style = getComputedStyle(el)
+        return style.display !== 'none' && style.visibility !== 'hidden'
+      }
+
+      function labelFor(el: Element | null): string | null {
+        const text = el?.getAttribute('aria-label')?.trim() || el?.textContent?.trim() || ''
+        return text || null
+      }
+
+      function highlighted(el: Element): boolean {
+        return (
+          el === document.activeElement ||
+          el.getAttribute('data-highlighted') === 'true' ||
+          el.getAttribute('data-focus') === 'true' ||
+          el.getAttribute('data-focused') === 'true' ||
+          el.getAttribute('data-hovered') === 'true' ||
+          el.getAttribute('data-state') === 'active' ||
+          el.getAttribute('aria-current') === 'true' ||
+          el.getAttribute('aria-selected') === 'true'
+        )
+      }
+
+      const active = document.activeElement
+      const activeDescendantId = active?.getAttribute('aria-activedescendant')
+      const referenced = activeDescendantId ? document.getElementById(activeDescendantId) : null
+      if (referenced && visible(referenced)) return labelFor(referenced)
+
+      const candidates = Array.from(document.querySelectorAll(payload.optionSelector)).filter(el =>
+        visible(el) && highlighted(el),
+      )
+      let best: { label: string; score: number } | null = null
+      for (const el of candidates) {
+        const label = labelFor(el)
+        if (!label) continue
+        const rect = (el as HTMLElement).getBoundingClientRect()
+        const centerX = rect.left + rect.width / 2
+        const centerY = rect.top + rect.height / 2
+        const distance =
+          payload.anchorX === null && payload.anchorY === null
+            ? rect.top
+            : Math.abs(centerX - (payload.anchorX ?? centerX)) + Math.abs(centerY - (payload.anchorY ?? centerY))
+        if (!best || distance < best.score) best = { label, score: distance }
+      }
+      return best?.label ?? null
+    }, {
+      optionSelector: OPTION_PICKER_SELECTOR,
+      anchorX: anchor?.x ?? null,
+      anchorY: anchor?.y ?? null,
+    })
+
+    if (label) return label
+  }
+  return null
+}
+
+async function tryKeyboardSelectVisibleOption(
+  page: Page,
+  label: string,
+  exact: boolean,
+  anchor?: AnchorPoint,
+  focusLocator?: Locator,
+): Promise<string | null> {
+  if (focusLocator) {
+    try {
+      await focusLocator.click()
+    } catch {
+      /* ignore */
+    }
+    try {
+      await focusLocator.focus()
+    } catch {
+      /* ignore */
+    }
+    await delay(40)
+  }
+
+  const visible = await collectVisibleOptionHints(page, anchor)
+  if (!visible.options.some(option => selectionMatchScore(option.label, label, exact) !== null)) {
+    return null
+  }
+
+  for (const key of ['ArrowDown', 'ArrowUp'] as const) {
+    const seen = new Set<string>()
+    for (let step = 0; step < LISTBOX_KEYBOARD_FALLBACK_STEPS; step++) {
+      await page.keyboard.press(key)
+      await delay(50)
+      const active = await activeListboxOptionLabel(page, anchor)
+      if (!active) continue
+      if (selectionMatchScore(active, label, exact) !== null) {
+        await page.keyboard.press('Enter')
+        return active
+      }
+      const normalized = normalizedOptionLabel(active)
+      if (seen.has(normalized)) break
+      seen.add(normalized)
+    }
+  }
+
+  return null
+}
+
+function listboxErrorMessage(opts: {
+  reason: 'field_not_found' | 'no_visible_option_match' | 'selection_not_confirmed'
+  requestedLabel: string
+  fieldLabel?: string
+  query?: string
+  exact: boolean
+  visibleOptions?: Array<{ label: string; selected: boolean; highlighted: boolean }>
+  listEmpty?: boolean
+  queryReset?: boolean
+}): string {
+  const visibleOptions = (opts.visibleOptions ?? []).map(option => option.label).slice(0, MAX_VISIBLE_OPTION_HINTS)
+  const payload = {
+    error: 'listboxPick',
+    reason: opts.reason,
+    message:
+      opts.reason === 'field_not_found'
+        ? `listboxPick: no visible combobox/dropdown matching field "${opts.fieldLabel ?? 'unknown'}"`
+        : opts.reason === 'selection_not_confirmed'
+          ? `listboxPick: selected "${opts.requestedLabel}" but could not confirm it on field "${opts.fieldLabel ?? 'unknown'}"`
+          : `listboxPick: no visible option matching "${opts.requestedLabel}"`,
+    requestedLabel: opts.requestedLabel,
+    ...(opts.fieldLabel ? { fieldLabel: opts.fieldLabel } : {}),
+    ...(opts.query ? { query: opts.query } : {}),
+    exact: opts.exact,
+    ...(opts.listEmpty !== undefined ? { listEmpty: opts.listEmpty } : {}),
+    ...(opts.queryReset ? { queryReset: true } : {}),
+    visibleOptionCount: visibleOptions.length,
+    visibleOptions,
+    suggestedAction:
+      visibleOptions.length > 0
+        ? 'Retry with one of visibleOptions, or pass a shorter query/alias for searchable comboboxes.'
+        : opts.listEmpty
+          ? 'The list appears empty. Retry after clearing the search query or reopening the dropdown.'
+          : 'Open the dropdown first, or retry with fieldLabel so Geometra can anchor to the correct combobox.',
+  }
+  return JSON.stringify(payload, null, 2)
+}
+
 async function clickVisibleOptionCandidate(
   page: Page,
   label: string,
@@ -614,7 +1065,18 @@ async function clickVisibleOptionCandidate(
 
     const bestIndex = await candidates.evaluateAll((elements, payload) => {
       function normalize(value: string): string {
-        return value.replace(/\s+/g, ' ').trim().toLowerCase()
+        return value
+          .normalize('NFKD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[＋﹢∔]/g, '+')
+          .replace(/[‐‑‒–—―]/g, '-')
+          .replace(/&/g, ' and ')
+          .replace(/\bplus\b/g, '+')
+          .replace(/[,/()]+/g, ' ')
+          .replace(/\s*\+\s*/g, '+')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .toLowerCase()
       }
 
       function aliases(value: string): string[] {
@@ -633,6 +1095,24 @@ async function clickVisibleOptionCandidate(
           for (const alias of ['prefer not', 'opt out', 'do not']) {
             out.add(alias)
           }
+        }
+        if (value === 'atx' || value.includes('austin')) {
+          for (const alias of ['atx', 'austin', 'austin tx', 'austin texas']) out.add(alias)
+        }
+        if (value === 'nyc' || value.includes('new york')) {
+          for (const alias of ['nyc', 'new york', 'new york ny']) out.add(alias)
+        }
+        if (value === 'sf' || value.includes('san francisco')) {
+          for (const alias of ['sf', 'san francisco', 'san francisco ca']) out.add(alias)
+        }
+        if (value === 'la' || value.includes('los angeles')) {
+          for (const alias of ['la', 'los angeles', 'los angeles ca']) out.add(alias)
+        }
+        if (value === 'dc' || value.includes('washington dc')) {
+          for (const alias of ['dc', 'washington dc', 'washington d c']) out.add(alias)
+        }
+        if (value === 'us' || value === 'usa' || value.includes('united states')) {
+          for (const alias of ['us', 'usa', 'united states']) out.add(alias)
         }
         return [...out]
       }
@@ -685,9 +1165,7 @@ async function clickVisibleOptionCandidate(
       }
 
       function popupWeight(el: HTMLElement): number {
-        return el.closest(
-          '[role="listbox"], [role="menu"], [role="dialog"], [aria-modal="true"], [data-radix-popper-content-wrapper], [class*="menu"], [class*="option"], [class*="select"], [class*="dropdown"]',
-        )
+        return el.closest(payload.popupSelector)
           ? 0
           : 220
       }
@@ -716,15 +1194,25 @@ async function clickVisibleOptionCandidate(
       }
 
       return best?.index ?? -1
-    }, { label, exact, anchorX: anchor?.x ?? null, anchorY: anchor?.y ?? null })
+    }, {
+      label,
+      exact,
+      anchorX: anchor?.x ?? null,
+      anchorY: anchor?.y ?? null,
+      popupSelector: POPUP_CONTAINER_SELECTOR,
+    })
 
     if (bestIndex >= 0) {
+      const candidate = candidates.nth(bestIndex)
       const selectedText =
-        (await candidates
-          .nth(bestIndex)
-          .evaluate(el => el.getAttribute('aria-label')?.trim() || el.textContent?.trim() || '')
-          .catch(() => '')) || null
-      await candidates.nth(bestIndex).click()
+        (await candidate.evaluate(el => el.getAttribute('aria-label')?.trim() || el.textContent?.trim() || '').catch(() => '')) || null
+      const clickTarget = await resolveMeaningfulOptionClickTarget(candidate)
+      if (clickTarget) {
+        await clickTarget.scrollIntoViewIfNeeded()
+        await clickTarget.click()
+      } else {
+        await candidate.click()
+      }
       return selectedText
     }
   }
@@ -761,7 +1249,18 @@ async function visibleOptionIsSelected(
 
     const selected = await candidates.evaluateAll((elements, payload) => {
       function normalize(value: string): string {
-        return value.replace(/\s+/g, ' ').trim().toLowerCase()
+        return value
+          .normalize('NFKD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[＋﹢∔]/g, '+')
+          .replace(/[‐‑‒–—―]/g, '-')
+          .replace(/&/g, ' and ')
+          .replace(/\bplus\b/g, '+')
+          .replace(/[,/()]+/g, ' ')
+          .replace(/\s*\+\s*/g, '+')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .toLowerCase()
       }
 
       function aliases(value: string): string[] {
@@ -780,6 +1279,24 @@ async function visibleOptionIsSelected(
           for (const alias of ['prefer not', 'opt out', 'do not']) {
             out.add(alias)
           }
+        }
+        if (value === 'atx' || value.includes('austin')) {
+          for (const alias of ['atx', 'austin', 'austin tx', 'austin texas']) out.add(alias)
+        }
+        if (value === 'nyc' || value.includes('new york')) {
+          for (const alias of ['nyc', 'new york', 'new york ny']) out.add(alias)
+        }
+        if (value === 'sf' || value.includes('san francisco')) {
+          for (const alias of ['sf', 'san francisco', 'san francisco ca']) out.add(alias)
+        }
+        if (value === 'la' || value.includes('los angeles')) {
+          for (const alias of ['la', 'los angeles', 'los angeles ca']) out.add(alias)
+        }
+        if (value === 'dc' || value.includes('washington dc')) {
+          for (const alias of ['dc', 'washington dc', 'washington d c']) out.add(alias)
+        }
+        if (value === 'us' || value === 'usa' || value.includes('united states')) {
+          for (const alias of ['us', 'usa', 'united states']) out.add(alias)
         }
         return [...out]
       }
@@ -866,10 +1383,21 @@ async function confirmListboxSelection(
   anchor?: AnchorPoint,
   currentHandle?: ElementHandle<Element> | null,
   selectedOptionText?: string,
+  opts?: { editable?: boolean },
 ): Promise<boolean> {
+  const canTrustEditableDisplayMatch = async (): Promise<boolean> => {
+    if (!opts?.editable) return true
+    if (await visibleOptionIsSelected(page, label, exact, anchor)) return true
+    const popupState = await collectVisibleOptionHints(page, anchor)
+    return !popupState.hasPopup
+  }
+
   if (currentHandle) {
     const immediateValues = await elementHandleDisplayedValues(currentHandle)
-    if (immediateValues.some(value => displayedValueMatchesSelection(value, label, exact, selectedOptionText))) {
+    if (
+      immediateValues.some(value => displayedValueMatchesSelection(value, label, exact, selectedOptionText)) &&
+      await canTrustEditableDisplayMatch()
+    ) {
       return true
     }
   }
@@ -880,7 +1408,12 @@ async function confirmListboxSelection(
       const locator = await findLabeledControl(frame, fieldLabel, exact, { preferredAnchor: anchor })
       if (!locator) continue
       const values = await locatorDisplayedValues(locator)
-      if (values.some(value => displayedValueMatchesSelection(value, label, exact, selectedOptionText))) return true
+      if (
+        values.some(value => displayedValueMatchesSelection(value, label, exact, selectedOptionText)) &&
+        await canTrustEditableDisplayMatch()
+      ) {
+        return true
+      }
     }
     if (await visibleOptionIsSelected(page, label, exact, anchor)) return true
     await delay(100)
@@ -2000,16 +2533,33 @@ export async function pickListboxOption(
   let attemptedSelection = false
   let selectedOptionText: string | undefined
   let openedHandle: ElementHandle<Element> | null | undefined
+  let openedLocator: Locator | undefined
+  let openedEditable = false
+  let queryUsed: string | undefined
+  let queryReset = false
 
   if (opts?.fieldLabel) {
-    const opened = await openDropdownControl(page, opts.fieldLabel, exact, opts.cache, opts.fieldId)
+    let opened
+    try {
+      opened = await openDropdownControl(page, opts.fieldLabel, exact, opts.cache, opts.fieldId)
+    } catch {
+      throw new Error(listboxErrorMessage({
+        reason: 'field_not_found',
+        requestedLabel: label,
+        fieldLabel: opts.fieldLabel,
+        query: opts?.query,
+        exact,
+      }))
+    }
     anchor = { x: opened.anchorX, y: opened.anchorY }
     openedHandle = opened.handle
-    const query = opts.query ?? label
-    if (query && opened.editable) {
-      await typeIntoEditableLocator(page, opened.locator, query)
+    openedLocator = opened.locator
+    openedEditable = opened.editable
+    queryUsed = opts.query ?? label
+    if (queryUsed && opened.editable) {
+      await typeIntoEditableLocator(page, opened.locator, queryUsed)
       await delay(80)
-    } else if (query && await typeIntoActiveEditableElement(page, query)) {
+    } else if (queryUsed && await typeIntoActiveEditableElement(page, queryUsed)) {
       await delay(80)
     }
   } else if (opts?.openX !== undefined && opts?.openY !== undefined) {
@@ -2018,25 +2568,71 @@ export async function pickListboxOption(
     await delay(120)
   }
 
-  const deadline = Date.now() + 3000
-  while (Date.now() < deadline) {
+  const attemptClickSelection = async (): Promise<boolean> => {
     selectedOptionText = (await clickVisibleOptionCandidate(page, label, exact, anchor)) ?? undefined
-    if (selectedOptionText) {
-      attemptedSelection = true
-      if (
-        !opts?.fieldLabel ||
-        await confirmListboxSelection(page, opts.fieldLabel, label, exact, anchor, openedHandle, selectedOptionText)
-      ) {
-        return
-      }
+    if (!selectedOptionText) return false
+    attemptedSelection = true
+    if (
+      !opts?.fieldLabel ||
+      await confirmListboxSelection(page, opts.fieldLabel, label, exact, anchor, openedHandle, selectedOptionText, {
+        editable: openedEditable,
+      })
+    ) {
+      return true
     }
-    await delay(120)
+    return false
   }
 
-  if (opts?.fieldLabel && attemptedSelection) {
-    throw new Error(`listboxPick: selected "${label}" but could not confirm it on field "${opts.fieldLabel}"`)
+  if (await attemptClickSelection()) return
+
+  let visibleHints = await collectVisibleOptionHints(page, anchor)
+  const visibleMatchExists = visibleHints.options.some(option => selectionMatchScore(option.label, label, exact) !== null)
+  if (queryUsed && !visibleMatchExists) {
+    queryReset = await resetTypedListboxQuery(page, openedLocator)
+    if (queryReset) {
+      await delay(80)
+      if (await attemptClickSelection()) return
+      visibleHints = await collectVisibleOptionHints(page, anchor)
+    }
   }
-  throw new Error(`listboxPick: no visible option matching "${label}"`)
+
+  const keyboardSelection = await tryKeyboardSelectVisibleOption(page, label, exact, anchor, openedLocator)
+  if (keyboardSelection) {
+    selectedOptionText = keyboardSelection
+    attemptedSelection = true
+    if (
+      !opts?.fieldLabel ||
+      await confirmListboxSelection(page, opts.fieldLabel, label, exact, anchor, openedHandle, selectedOptionText, {
+        editable: openedEditable,
+      })
+    ) {
+      return
+    }
+  }
+
+  visibleHints = await collectVisibleOptionHints(page, anchor)
+  if (opts?.fieldLabel && attemptedSelection) {
+    throw new Error(listboxErrorMessage({
+      reason: 'selection_not_confirmed',
+      requestedLabel: label,
+      fieldLabel: opts.fieldLabel,
+      query: queryUsed,
+      exact,
+      visibleOptions: visibleHints.options,
+      listEmpty: visibleHints.hasPopup && visibleHints.options.length === 0,
+      queryReset,
+    }))
+  }
+  throw new Error(listboxErrorMessage({
+    reason: 'no_visible_option_match',
+    requestedLabel: label,
+    fieldLabel: opts?.fieldLabel,
+    query: queryUsed,
+    exact,
+    visibleOptions: visibleHints.options,
+    listEmpty: visibleHints.hasPopup && visibleHints.options.length === 0,
+    queryReset,
+  }))
 }
 
 export interface SetCheckedPayload {
