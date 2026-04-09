@@ -1448,6 +1448,106 @@ function securityDemo(): UIElement {
   ])
 }
 
+// ─── MCP Benchmarks Demo ────────────────────────────────────────────────────
+
+const BENCHMARK_DATA = [
+  { label: 'Page Discovery',    geometra: 400,    playwright: 4000,  unit: 'tokens' },
+  { label: 'Form Schema',       geometra: 600,    playwright: 2000,  unit: 'tokens' },
+  { label: 'Fill 20 Fields',    geometra: 700,    playwright: 6000,  unit: 'tokens' },
+  { label: 'Verification',      geometra: 200,    playwright: 4000,  unit: 'tokens' },
+  { label: 'Custom Dropdown',   geometra: 200,    playwright: 800,   unit: 'tokens' },
+  { label: 'File Upload',       geometra: 200,    playwright: 600,   unit: 'tokens' },
+  { label: 'Navigation Wait',   geometra: 400,    playwright: 4000,  unit: 'tokens' },
+] as const
+
+const BENCHMARK_SUMMARY = [
+  { label: 'Total Tokens',    geometra: '2,900',   playwright: '22,550',  ratio: '7.8x fewer' },
+  { label: 'Tool Calls',      geometra: '8',       playwright: '57',      ratio: '7x fewer' },
+  { label: 'Wall-clock',      geometra: '~14s',    playwright: '~2m 13s', ratio: '~9x faster' },
+] as const
+
+function benchmarksDemo(): UIElement {
+  const w = rootWidth.value
+  const maxVal = 6000
+
+  return box({ flexDirection: 'column', padding: 20, gap: 14, width: w, minHeight: 380 }, [
+    // Header
+    box({ flexDirection: 'column', gap: 4 }, [
+      text({ text: 'MCP Token Benchmarks', font: 'bold 18px Inter', lineHeight: 24, color: TEXT_COLOR }),
+      text({
+        text: 'Geometra MCP vs Playwright MCP \u2014 20-field job application (estimated tokens per step)',
+        font: '12px Inter', lineHeight: 16, color: DIM, whiteSpace: 'normal',
+      }),
+    ]),
+
+    // Bar chart
+    box({ flexDirection: 'column', gap: 8 }, BENCHMARK_DATA.map(row => {
+      const geoWidth = Math.max(12, Math.round((row.geometra / maxVal) * 100))
+      const pwWidth = Math.max(12, Math.round((row.playwright / maxVal) * 100))
+      const ratio = (row.playwright / row.geometra).toFixed(0)
+      return box({ flexDirection: 'column', gap: 3 }, [
+        box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, [
+          text({ text: row.label, font: '11px Inter', lineHeight: 14, color: MUTED }),
+          text({ text: `${ratio}x`, font: 'bold 11px Inter', lineHeight: 14, color: ACCENT3 }),
+        ]),
+        // Geometra bar
+        box({ flexDirection: 'row', alignItems: 'center', gap: 6 }, [
+          box({
+            backgroundColor: ACCENT3,
+            borderRadius: 4,
+            height: 14,
+            width: geoWidth,
+            minWidth: 12,
+          }, []),
+          text({ text: `${row.geometra}`, font: '10px JetBrains Mono', lineHeight: 12, color: ACCENT3 }),
+        ]),
+        // Playwright bar
+        box({ flexDirection: 'row', alignItems: 'center', gap: 6 }, [
+          box({
+            backgroundColor: '#f97316',
+            borderRadius: 4,
+            height: 14,
+            width: pwWidth,
+            minWidth: 12,
+          }, []),
+          text({ text: `${row.playwright}`, font: '10px JetBrains Mono', lineHeight: 12, color: '#f97316' }),
+        ]),
+      ])
+    })),
+
+    // Legend
+    box({ flexDirection: 'row', gap: 16, justifyContent: 'center' }, [
+      box({ flexDirection: 'row', gap: 4, alignItems: 'center' }, [
+        box({ backgroundColor: ACCENT3, borderRadius: 3, width: 10, height: 10 }, []),
+        text({ text: 'Geometra MCP', font: '11px Inter', lineHeight: 14, color: ACCENT3 }),
+      ]),
+      box({ flexDirection: 'row', gap: 4, alignItems: 'center' }, [
+        box({ backgroundColor: '#f97316', borderRadius: 3, width: 10, height: 10 }, []),
+        text({ text: 'Playwright MCP', font: '11px Inter', lineHeight: 14, color: '#f97316' }),
+      ]),
+    ]),
+
+    // Summary stats
+    box({
+      flexDirection: 'row', gap: 10, flexWrap: 'wrap',
+    }, BENCHMARK_SUMMARY.map(s =>
+      box({
+        backgroundColor: SURFACE, borderColor: BORDER, borderWidth: 1,
+        borderRadius: 10, padding: 12, flexGrow: 1, minWidth: 100,
+        flexDirection: 'column', gap: 4, alignItems: 'center',
+      }, [
+        text({ text: s.ratio, font: 'bold 16px Inter', lineHeight: 20, color: ACCENT3 }),
+        text({ text: s.label, font: '11px Inter', lineHeight: 14, color: MUTED }),
+        box({ flexDirection: 'row', gap: 8, justifyContent: 'center' }, [
+          text({ text: s.geometra, font: 'bold 11px JetBrains Mono', lineHeight: 14, color: ACCENT3 }),
+          text({ text: 'vs', font: '10px Inter', lineHeight: 14, color: DIM }),
+          text({ text: s.playwright, font: '11px JetBrains Mono', lineHeight: 14, color: '#f97316' }),
+        ]),
+      ]),
+    )),
+  ])
+}
+
 const SCENARIOS: Record<string, () => UIElement> = {
   cards: cardGrid,
   chat: chatMessages,
@@ -1461,6 +1561,7 @@ const SCENARIOS: Record<string, () => UIElement> = {
   agent: agentDemo,
   auth: authDemo,
   security: securityDemo,
+  benchmarks: benchmarksDemo,
 }
 
 // ─── Hash History (GitHub Pages compatible) ──────────────────────────────────
