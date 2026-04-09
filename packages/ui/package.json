@@ -1,6 +1,6 @@
 {
   "name": "@geometra/ui",
-  "version": "1.19.22",
+  "version": "1.19.23",
   "description": "Starter UI primitives built on @geometra/core",
   "license": "MIT",
   "type": "module",
