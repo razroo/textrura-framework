@@ -22,7 +22,7 @@ Use Geometra MCP when an LLM needs to explore, interpret, and operate a real UI 
 
 | Tool | Description |
 |---|---|
-| `geometra_connect` | Connect with `url` (ws://…) **or** `pageUrl` (https://…) to auto-start geometra-proxy; `url: "https://…"` is auto-coerced onto the proxy path |
+| `geometra_connect` | Connect with `url` (ws://…) **or** `pageUrl` (https://…) to auto-start geometra-proxy; can inline `formSchema` and/or `pageModel` for lower-turn starts |
 | `geometra_query` | Find elements by stable id, role, name, text content, ancestor/prompt context, current value, or semantic state such as `invalid`, `required`, or `busy` |
 | `geometra_wait_for` | Wait for a semantic condition instead of guessing sleeps (`busy`, `disabled`, alerts, values, etc.) |
 | `geometra_form_schema` | Compact, fill-oriented form schema with stable field ids and collapsed radio/button groups; can auto-connect from `pageUrl` / `url` |
@@ -32,7 +32,7 @@ Use Geometra MCP when an LLM needs to explore, interpret, and operate a real UI 
 | `geometra_page_model` | Summary-first webpage model: archetypes, stable section ids, counts, top-level sections, primary actions |
 | `geometra_expand_section` | Expand one form/dialog/list/landmark from `geometra_page_model` on demand, with paging/filtering for long sections |
 | `geometra_reveal` | Scroll until a matching node is visible instead of guessing wheel deltas |
-| `geometra_click` | Click by coordinates or by semantic target (`id`, `role`, `name`, `text`, `contextText`, state) |
+| `geometra_click` | Click by coordinates or semantic target, optionally waiting for a post-click semantic condition |
 | `geometra_type` | Type text into the focused element |
 | `geometra_key` | Send special keys (Enter, Tab, Escape, arrows) |
 | `geometra_upload_files` | Attach files: labeled field / auto / hidden input / native chooser / synthetic drop (`@geometra/proxy` only) |
@@ -261,7 +261,11 @@ Agent:  geometra_click({ role: "textbox", name: "Email" })
 Agent:  geometra_type({ text: "test@example.com" })
         → Typed. Email field updated.
 
-Agent:  geometra_click({ role: "button", name: "Sign Up" })
+Agent:  geometra_click({
+          role: "button",
+          name: "Sign Up",
+          waitFor: { role: "dialog", name: "Success" }
+        })
         → Clicked. Success message visible.
 ```
 
@@ -310,8 +314,10 @@ For long application flows, prefer one of these patterns:
 2. otherwise `geometra_form_schema`
 3. then `geometra_fill_form`
 3. `geometra_reveal` for far-below-fold targets such as submit buttons
-4. `geometra_run_actions` when you need mixed navigation + waits + field entry
-5. `geometra_page_model` + `geometra_expand_section` when you are still exploring the page rather than filling it
+4. `geometra_click({ ..., waitFor: ... })` when one action should also wait for the next semantic state
+5. `geometra_run_actions` when you need mixed navigation + waits + field entry
+6. `geometra_connect({ pageUrl, returnPageModel: true })` when you want connect + summary-first exploration in one turn
+7. `geometra_page_model` + `geometra_expand_section` when you are still exploring the page rather than filling it
 
 Typical batch:
 
@@ -321,7 +327,7 @@ Typical batch:
     { "type": "click", "role": "textbox", "name": "Full name" },
     { "type": "type", "text": "Taylor Applicant" },
     { "type": "upload_files", "paths": ["/Users/you/resume.pdf"], "fieldLabel": "Resume" },
-    { "type": "wait_for", "text": "Parsing your resume", "present": false, "timeoutMs": 10000 }
+    { "type": "click", "role": "button", "name": "Submit", "waitFor": { "text": "Application submitted", "timeoutMs": 10000 } }
   ]
 }
 ```

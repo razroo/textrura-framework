@@ -334,6 +334,31 @@ describe('batch MCP result shaping', () => {
     })
   })
 
+  it('can inline the page model into connect for the low-turn exploration path', async () => {
+    const handler = getToolHandler('geometra_connect')
+
+    const result = await handler({
+      pageUrl: 'https://jobs.example.com/application',
+      headless: true,
+      returnPageModel: true,
+      maxPrimaryActions: 4,
+      maxSectionsPerKind: 3,
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    expect(payload).toMatchObject({
+      connected: true,
+      transport: 'proxy',
+      pageUrl: 'https://jobs.example.com/application',
+      pageModel: {
+        viewport: { width: 1280, height: 800 },
+        archetypes: ['form'],
+        summary: { formCount: 1 },
+      },
+    })
+    expect(payload).not.toHaveProperty('formSchema')
+  })
+
   it('returns compact form schemas without requiring section expansion', async () => {
     const handler = getToolHandler('geometra_form_schema')
     mockState.formSchemas = [
@@ -894,6 +919,55 @@ describe('query and reveal tools', () => {
     expect(result.content[0]!.text).toContain('Clicked button "Submit application" (n:0.0) at (150, 340) after 1 reveal step.')
   })
 
+  it('can wait for a semantic post-click condition in the same click call', async () => {
+    const handler = getToolHandler('geometra_click')
+
+    mockState.currentA11yRoot = node('group', undefined, {
+      bounds: { x: 0, y: 0, width: 1280, height: 800 },
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 0 },
+      children: [
+        node('button', 'Submit application', {
+          bounds: { x: 60, y: 320, width: 180, height: 40 },
+          path: [0],
+        }),
+      ],
+    })
+
+    mockState.sendClick.mockImplementationOnce(async () => {
+      mockState.currentA11yRoot = node('group', undefined, {
+        bounds: { x: 0, y: 0, width: 1280, height: 800 },
+        meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 0 },
+        children: [
+          node('button', 'Submit application', {
+            bounds: { x: 60, y: 320, width: 180, height: 40 },
+            path: [0],
+          }),
+          node('dialog', 'Application submitted', {
+            bounds: { x: 240, y: 140, width: 420, height: 260 },
+            path: [1],
+          }),
+        ],
+      })
+      bumpMockUiRevision()
+      return { status: 'updated' as const, timeoutMs: 2000 }
+    })
+
+    const result = await handler({
+      role: 'button',
+      name: 'Submit application',
+      waitFor: {
+        role: 'dialog',
+        name: 'Application submitted',
+        timeoutMs: 5000,
+      },
+      detail: 'minimal',
+    })
+
+    expect(mockState.waitForUiCondition).toHaveBeenCalledWith(mockState.session, expect.any(Function), 5000)
+    expect(result.content[0]!.text).toContain('Post-click condition satisfied after')
+    expect(result.content[0]!.text).toContain('1 matching node(s).')
+  })
+
   it('lets run_actions click a semantic target without manual coordinates', async () => {
     const handler = getToolHandler('geometra_run_actions')
 
@@ -963,6 +1037,72 @@ describe('query and reveal tools', () => {
       revealSteps: 1,
       target: { id: 'n:0.0', role: 'button', name: 'Submit application' },
       wait: 'updated',
+    })
+  })
+
+  it('lets run_actions click and wait for a semantic post-condition in one step', async () => {
+    const handler = getToolHandler('geometra_run_actions')
+
+    mockState.currentA11yRoot = node('group', undefined, {
+      bounds: { x: 0, y: 0, width: 1280, height: 800 },
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 0 },
+      children: [
+        node('button', 'Submit application', {
+          bounds: { x: 60, y: 320, width: 180, height: 40 },
+          path: [0],
+        }),
+      ],
+    })
+
+    mockState.sendClick.mockImplementationOnce(async () => {
+      mockState.currentA11yRoot = node('group', undefined, {
+        bounds: { x: 0, y: 0, width: 1280, height: 800 },
+        meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 0 },
+        children: [
+          node('button', 'Submit application', {
+            bounds: { x: 60, y: 320, width: 180, height: 40 },
+            path: [0],
+          }),
+          node('dialog', 'Application submitted', {
+            bounds: { x: 240, y: 140, width: 420, height: 260 },
+            path: [1],
+          }),
+        ],
+      })
+      bumpMockUiRevision()
+      return { status: 'updated' as const, timeoutMs: 2000 }
+    })
+
+    const result = await handler({
+      actions: [
+        {
+          type: 'click',
+          role: 'button',
+          name: 'Submit application',
+          waitFor: {
+            role: 'dialog',
+            name: 'Application submitted',
+            timeoutMs: 5000,
+          },
+        },
+      ],
+      stopOnError: true,
+      includeSteps: true,
+      detail: 'minimal',
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    const steps = payload.steps as Array<Record<string, unknown>>
+
+    expect(steps[0]).toMatchObject({
+      index: 0,
+      type: 'click',
+      ok: true,
+      postWait: {
+        present: true,
+        matchCount: 1,
+        filter: { role: 'dialog', name: 'Application submitted' },
+      },
     })
   })
 })

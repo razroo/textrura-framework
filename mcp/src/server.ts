@@ -116,6 +116,14 @@ interface ResolvedClickLocation {
   revealAttempts?: number
 }
 
+interface WaitConditionResult {
+  filter: NodeFilter
+  present: boolean
+  elapsedMs: number
+  matchCount: number
+  matches: FormattedNodePayload[]
+}
+
 function checkedStateInput() {
   return z
     .union([z.boolean(), z.literal('mixed')])
@@ -163,6 +171,21 @@ function nodeFilterShape() {
     invalid: z.boolean().optional().describe('Match invalid / failed-validation state'),
     required: z.boolean().optional().describe('Match required-field state'),
     busy: z.boolean().optional().describe('Match busy / in-progress state'),
+  }
+}
+
+function waitConditionShape() {
+  return {
+    ...nodeFilterShape(),
+    present: z.boolean().optional().default(true).describe('Wait for a matching node to exist (default true) or disappear'),
+    timeoutMs: z
+      .number()
+      .int()
+      .min(50)
+      .max(60_000)
+      .optional()
+      .default(10_000)
+      .describe('Maximum time to wait before returning an error (default 10000ms)'),
   }
 }
 
@@ -230,6 +253,7 @@ const batchActionSchema = z.discriminatedUnion('type', [
     fullyVisible: z.boolean().optional().describe('When clicking by semantic target, require full visibility before clicking (default true)'),
     maxRevealSteps: z.number().int().min(1).max(12).optional().describe('Maximum reveal attempts before clicking a semantic target'),
     revealTimeoutMs: timeoutMsInput.describe('Per-scroll wait timeout while revealing a semantic target'),
+    waitFor: z.object(waitConditionShape()).optional().describe('Optional semantic condition to wait for after the click'),
     timeoutMs: timeoutMsInput,
   }),
   z.object({
@@ -322,7 +346,7 @@ export function createServer(): McpServer {
 
 Use \`url\` (ws://…) only when a Geometra/native server or an already-running proxy is listening. If you accidentally pass \`https://…\` in \`url\`, MCP treats it like \`pageUrl\` and starts the proxy for you.
 
-Chromium opens **visible** by default unless \`headless: true\`. File upload / wheel / native \`<select>\` need the proxy path (\`pageUrl\` or ws to proxy).`,
+Chromium opens **visible** by default unless \`headless: true\`. File upload / wheel / native \`<select>\` need the proxy path (\`pageUrl\` or ws to proxy). Set \`returnForms: true\` and/or \`returnPageModel: true\` when you want a lower-turn startup response.`,
     {
       url: z
         .string()
@@ -362,6 +386,11 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
         .optional()
         .default(false)
         .describe('Include compact form schema discovery in the connect response so form flows can start in one turn.'),
+      returnPageModel: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('Include geometra_page_model output in the connect response so exploration can start in one turn.'),
       formId: z.string().optional().describe('Optional form id filter when returnForms=true'),
       maxFields: z.number().int().min(1).max(120).optional().default(80).describe('Cap returned fields per form when returnForms=true'),
       onlyRequiredFields: z.boolean().optional().default(false).describe('Only include required fields when returnForms=true'),
@@ -370,6 +399,8 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
       includeContext: formSchemaContextInput(),
       sinceSchemaId: z.string().optional().describe('If the current schema matches this id, return changed=false without resending forms'),
       schemaFormat: formSchemaFormatInput(),
+      maxPrimaryActions: z.number().int().min(1).max(12).optional().default(6).describe('Cap top-level primary actions when returnPageModel=true'),
+      maxSectionsPerKind: z.number().int().min(1).max(16).optional().default(8).describe('Cap returned landmarks/forms/dialogs/lists per kind when returnPageModel=true'),
       detail: detailInput(),
     },
     async input => {
@@ -385,6 +416,10 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
         includeContext: input.includeContext,
         sinceSchemaId: input.sinceSchemaId,
         format: input.schemaFormat,
+      }
+      const pageModelOptions = {
+        maxPrimaryActions: input.maxPrimaryActions,
+        maxSectionsPerKind: input.maxSectionsPerKind,
       }
 
       try {
@@ -406,7 +441,9 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
             autoCoercedFromUrl: target.autoCoercedFromUrl,
             detail: input.detail,
             returnForms: input.returnForms,
+            returnPageModel: input.returnPageModel,
             formSchema,
+            pageModelOptions,
           }), null, input.detail === 'verbose' ? 2 : undefined))
         }
         const session = await connect(target.wsUrl!, {
@@ -422,7 +459,9 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
           autoCoercedFromUrl: false,
           detail: input.detail,
           returnForms: input.returnForms,
+          returnPageModel: input.returnPageModel,
           formSchema,
+          pageModelOptions,
         }), null, input.detail === 'verbose' ? 2 : undefined))
       } catch (e) {
         return err(`Failed to connect: ${formatConnectFailureMessage(e, target)}`)
@@ -476,66 +515,38 @@ This is the Geometra equivalent of Playwright's locator — but instant, structu
     `Wait for a semantic UI condition without guessing sleep durations. Use this for slow SPA transitions, resume parsing, custom validation alerts, disabled submit buttons, and value/state confirmation before submit.
 
 The filter matches the same fields as geometra_query. Set \`present: false\` to wait for something to disappear (for example an alert or a "Parsing…" status).`,
-    {
-      ...nodeFilterShape(),
-      present: z.boolean().optional().default(true).describe('Wait for a matching node to exist (default true) or disappear'),
-      timeoutMs: z
-        .number()
-        .int()
-        .min(50)
-        .max(60_000)
-        .optional()
-        .default(10_000)
-        .describe('Maximum time to wait before returning an error (default 10000ms)'),
-    },
+    waitConditionShape(),
     async ({ id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, present, timeoutMs }) => {
       const session = getSession()
       if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
 
-      const filter: NodeFilter = {
-        id,
-        role,
-        name,
-        text,
-        contextText,
-        value,
-        checked,
-        disabled,
-        focused,
-        selected,
-        expanded,
-        invalid,
-        required,
-        busy,
-      }
-      if (!hasNodeFilter(filter)) return err('Provide at least one wait filter (id, role, name, text, contextText, value, or state)')
+      const waited = await waitForSemanticCondition(session, {
+        filter: {
+          id,
+          role,
+          name,
+          text,
+          contextText,
+          value,
+          checked,
+          disabled,
+          focused,
+          selected,
+          expanded,
+          invalid,
+          required,
+          busy,
+        },
+        present: present ?? true,
+        timeoutMs: timeoutMs ?? 10_000,
+      })
+      if (!waited.ok) return err(waited.error)
 
-      const matchesCondition = () => {
-        if (!session.tree || !session.layout) return false
-        const a11y = sessionA11y(session)
-        if (!a11y) return false
-        const matches = findNodes(a11y, filter)
-        return present ? matches.length > 0 : matches.length === 0
-      }
-
-      const startedAt = Date.now()
-      const matched = await waitForUiCondition(session, matchesCondition, timeoutMs)
-      const elapsedMs = Date.now() - startedAt
-      if (!matched) {
-        return err(
-          `Timed out after ${timeoutMs}ms waiting for ${present ? 'presence' : 'absence'} of ${JSON.stringify(filter)}.\nCurrent UI:\n${compactSessionSummary(session)}`,
-        )
+      if (!waited.value.present) {
+        return ok(waitConditionSuccessLine(waited.value))
       }
 
-      if (!present) {
-        return ok(`Condition satisfied after ${elapsedMs}ms: no nodes matched ${JSON.stringify(filter)}.`)
-      }
-
-      const after = sessionA11y(session)
-      if (!after) return ok(`Condition satisfied after ${elapsedMs}ms for ${JSON.stringify(filter)}.`)
-      const matches = findNodes(after, filter)
-      const result = sortA11yNodes(matches).slice(0, 8).map(node => formatNode(node, after, after.bounds))
-      return ok(JSON.stringify(result, null, 2))
+      return ok(JSON.stringify(waited.value.matches.slice(0, 8), null, 2))
     }
   )
 
@@ -843,7 +854,7 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
     'geometra_run_actions',
     `Execute several Geometra actions in one MCP round trip and return one consolidated result. This is the preferred path for long, multi-step form fills where one-tool-per-field would otherwise create too much chatter.
 
-Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_listbox_option\`, \`select_option\`, \`set_checked\`, \`wheel\`, \`wait_for\`, and \`fill_fields\`.`,
+Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_listbox_option\`, \`select_option\`, \`set_checked\`, \`wheel\`, \`wait_for\`, and \`fill_fields\`. \`click\` steps can also carry a nested \`waitFor\` condition.`,
     {
       actions: z.array(batchActionSchema).min(1).max(80).describe('Ordered high-level action steps to run sequentially'),
       stopOnError: z.boolean().optional().default(true).describe('Stop at the first failing step (default true)'),
@@ -1102,7 +1113,7 @@ Use the same filters as geometra_query, plus an optional match index when repeat
   // ── click ────────────────────────────────────────────────────
   server.tool(
     'geometra_click',
-    `Click an element in the Geometra UI. Provide either raw x,y coordinates or a semantic target (\`id\`, \`role\`, \`name\`, \`text\`, \`contextText\`, \`value\`, or state filters). The click is dispatched server-side via the geometry protocol — no browser, no simulated DOM events.
+    `Click an element in the Geometra UI. Provide either raw x,y coordinates or a semantic target (\`id\`, \`role\`, \`name\`, \`text\`, \`contextText\`, \`value\`, or state filters). You can also attach \`waitFor\` to block on the post-click semantic state in the same call. The click is dispatched server-side via the geometry protocol — no browser, no simulated DOM events.
 
 After clicking, returns a compact semantic delta when possible (dialogs/forms/lists/nodes changed). If nothing meaningful changed, returns a short current-UI overview.`,
     {
@@ -1120,6 +1131,7 @@ After clicking, returns a compact semantic delta when possible (dialogs/forms/li
         .optional()
         .default(2_500)
         .describe('Per-scroll wait timeout while revealing a semantic target (default 2500ms)'),
+      waitFor: z.object(waitConditionShape()).optional().describe('Optional semantic condition to wait for after the click'),
       timeoutMs: z
         .number()
         .int()
@@ -1129,7 +1141,7 @@ After clicking, returns a compact semantic delta when possible (dialogs/forms/li
         .describe('Optional action wait timeout (use a longer value for slow submits or route transitions)'),
       detail: detailInput(),
     },
-    async ({ x, y, id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, index, fullyVisible, maxRevealSteps, revealTimeoutMs, timeoutMs, detail }) => {
+    async ({ x, y, id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, index, fullyVisible, maxRevealSteps, revealTimeoutMs, waitFor, timeoutMs, detail }) => {
       const session = getSession()
       if (!session) return err('Not connected. Call geometra_connect first.')
       const before = sessionA11y(session)
@@ -1162,14 +1174,35 @@ After clicking, returns a compact semantic delta when possible (dialogs/forms/li
       const wait = await sendClick(session, resolved.value.x, resolved.value.y, timeoutMs)
 
       const summary = postActionSummary(session, before, wait, detail)
-      if (!resolved.value.target) {
-        return ok(`Clicked at (${resolved.value.x}, ${resolved.value.y}).\n${summary}`)
+      const clickLine = !resolved.value.target
+        ? `Clicked at (${resolved.value.x}, ${resolved.value.y}).`
+        : `Clicked ${describeFormattedNode(resolved.value.target)} at (${resolved.value.x}, ${resolved.value.y})${resolved.value.revealAttempts && resolved.value.revealAttempts > 0 ? ` after ${resolved.value.revealAttempts} reveal step${resolved.value.revealAttempts === 1 ? '' : 's'}` : ''}.`
+      const lines = [clickLine, summary]
+      if (waitFor) {
+        const postWait = await waitForSemanticCondition(session, {
+          filter: {
+            id: waitFor.id,
+            role: waitFor.role,
+            name: waitFor.name,
+            text: waitFor.text,
+            contextText: waitFor.contextText,
+            value: waitFor.value,
+            checked: waitFor.checked,
+            disabled: waitFor.disabled,
+            focused: waitFor.focused,
+            selected: waitFor.selected,
+            expanded: waitFor.expanded,
+            invalid: waitFor.invalid,
+            required: waitFor.required,
+            busy: waitFor.busy,
+          },
+          present: waitFor.present ?? true,
+          timeoutMs: waitFor.timeoutMs ?? 10_000,
+        })
+        if (!postWait.ok) return err([...lines, postWait.error].join('\n'))
+        lines.push(`Post-click ${waitConditionSuccessLine(postWait.value)}`)
       }
-
-      const revealSuffix = resolved.value.revealAttempts && resolved.value.revealAttempts > 0
-        ? ` after ${resolved.value.revealAttempts} reveal step${resolved.value.revealAttempts === 1 ? '' : 's'}`
-        : ''
-      return ok(`Clicked ${describeFormattedNode(resolved.value.target)} at (${resolved.value.x}, ${resolved.value.y})${revealSuffix}.\n${summary}`)
+      return ok(lines.filter(Boolean).join('\n'))
     }
   )
 
@@ -1684,15 +1717,32 @@ function connectResponsePayload(
     autoCoercedFromUrl?: boolean
     detail?: ResponseDetail
     returnForms?: boolean
+    returnPageModel?: boolean
     formSchema?: FormSchemaBuildOptions & { sinceSchemaId?: string; format?: FormSchemaFormat }
+    pageModelOptions?: { maxPrimaryActions?: number; maxSectionsPerKind?: number }
   },
 ): Record<string, unknown> {
   const payload = connectPayload(session, opts)
-  if (!opts.returnForms) return payload
-  return {
-    ...payload,
-    formSchema: formSchemaResponsePayload(session, opts.formSchema ?? {}),
+  if (!opts.returnForms && !opts.returnPageModel) return payload
+  const nextPayload: Record<string, unknown> = { ...payload }
+  if (opts.returnForms) {
+    nextPayload.formSchema = formSchemaResponsePayload(session, opts.formSchema ?? {})
   }
+  if (opts.returnPageModel) {
+    nextPayload.pageModel = pageModelResponsePayload(session, opts.pageModelOptions)
+  }
+  return nextPayload
+}
+
+function pageModelResponsePayload(
+  session: Session,
+  options?: { maxPrimaryActions?: number; maxSectionsPerKind?: number },
+): unknown {
+  const a11y = sessionA11y(session)
+  if (!a11y) {
+    return { available: false }
+  }
+  return buildPageModel(a11y, options)
 }
 
 async function ensureToolSession(
@@ -2028,6 +2078,67 @@ function waitStatusPayload(wait: UpdateWaitResult | undefined): Record<string, u
 
 function compactFilterPayload(filter: NodeFilter): Record<string, unknown> {
   return Object.fromEntries(Object.entries(filter).filter(([, value]) => value !== undefined))
+}
+
+async function waitForSemanticCondition(
+  session: Session,
+  options: {
+    filter: NodeFilter
+    present: boolean
+    timeoutMs: number
+  },
+): Promise<{ ok: true; value: WaitConditionResult } | { ok: false; error: string }> {
+  if (!hasNodeFilter(options.filter)) {
+    return { ok: false, error: 'Provide at least one wait filter (id, role, name, text, contextText, value, or state)' }
+  }
+
+  const startedAt = Date.now()
+  const matched = await waitForUiCondition(session, () => {
+    const a11y = sessionA11y(session)
+    if (!a11y) return false
+    const matches = findNodes(a11y, options.filter)
+    return options.present ? matches.length > 0 : matches.length === 0
+  }, options.timeoutMs)
+  const elapsedMs = Date.now() - startedAt
+
+  if (!matched) {
+    return {
+      ok: false,
+      error: `Timed out after ${options.timeoutMs}ms waiting for ${options.present ? 'presence' : 'absence'} of ${JSON.stringify(options.filter)}.\nCurrent UI:\n${compactSessionSummary(session)}`,
+    }
+  }
+
+  const after = sessionA11y(session)
+  const matches = options.present && after
+    ? sortA11yNodes(findNodes(after, options.filter)).slice(0, 8).map(node => formatNode(node, after, after.bounds))
+    : []
+
+  return {
+    ok: true,
+    value: {
+      filter: options.filter,
+      present: options.present,
+      elapsedMs,
+      matchCount: matches.length,
+      matches,
+    },
+  }
+}
+
+function waitConditionSuccessLine(result: WaitConditionResult): string {
+  if (!result.present) {
+    return `condition satisfied after ${result.elapsedMs}ms: no nodes matched ${JSON.stringify(result.filter)}.`
+  }
+  return `condition satisfied after ${result.elapsedMs}ms with ${result.matchCount} matching node(s).`
+}
+
+function waitConditionCompact(result: WaitConditionResult): Record<string, unknown> {
+  return {
+    present: result.present,
+    elapsedMs: result.elapsedMs,
+    filter: compactFilterPayload(result.filter),
+    ...(result.present ? { matchCount: result.matchCount } : {}),
+  }
 }
 
 async function revealSemanticTarget(
@@ -2436,12 +2547,42 @@ async function executeBatchAction(
       const targetSummary = resolved.value.target
         ? `Clicked ${describeFormattedNode(resolved.value.target)} at (${resolved.value.x}, ${resolved.value.y}).`
         : `Clicked at (${resolved.value.x}, ${resolved.value.y}).`
+      let postWaitSummary: string | undefined
+      let postWaitCompact: Record<string, unknown> | undefined
+      if (action.waitFor) {
+        const postWait = await waitForSemanticCondition(session, {
+          filter: {
+            id: action.waitFor.id,
+            role: action.waitFor.role,
+            name: action.waitFor.name,
+            text: action.waitFor.text,
+            contextText: action.waitFor.contextText,
+            value: action.waitFor.value,
+            checked: action.waitFor.checked,
+            disabled: action.waitFor.disabled,
+            focused: action.waitFor.focused,
+            selected: action.waitFor.selected,
+            expanded: action.waitFor.expanded,
+            invalid: action.waitFor.invalid,
+            required: action.waitFor.required,
+            busy: action.waitFor.busy,
+          },
+          present: action.waitFor.present ?? true,
+          timeoutMs: action.waitFor.timeoutMs ?? 10_000,
+        })
+        if (!postWait.ok) {
+          throw new Error(`Post-click wait failed after ${targetSummary.toLowerCase()}\n${postWait.error}`)
+        }
+        postWaitSummary = `Post-click ${waitConditionSuccessLine(postWait.value)}`
+        postWaitCompact = waitConditionCompact(postWait.value)
+      }
       return {
-        summary: `${targetSummary}\n${postActionSummary(session, before, wait, detail)}`,
+        summary: [targetSummary, postActionSummary(session, before, wait, detail), postWaitSummary].filter(Boolean).join('\n'),
         compact: {
           at: { x: resolved.value.x, y: resolved.value.y },
           ...(resolved.value.target ? { target: compactNodeReference(resolved.value.target), revealSteps: resolved.value.revealAttempts ?? 0 } : {}),
           ...waitStatusPayload(wait),
+          ...(postWaitCompact ? { postWait: postWaitCompact } : {}),
         },
       }
     }
@@ -2569,79 +2710,44 @@ async function executeBatchAction(
     }
     case 'wait_for': {
       if (!session.tree || !session.layout) throw new Error('Not connected. Call geometra_connect first.')
-      const filter: NodeFilter = {
-        id: action.id,
-        role: action.role,
-        name: action.name,
-        text: action.text,
-        contextText: action.contextText,
-        value: action.value,
-        checked: action.checked,
-        disabled: action.disabled,
-        focused: action.focused,
-        selected: action.selected,
-        expanded: action.expanded,
-        invalid: action.invalid,
-        required: action.required,
-        busy: action.busy,
+      const waited = await waitForSemanticCondition(session, {
+        filter: {
+          id: action.id,
+          role: action.role,
+          name: action.name,
+          text: action.text,
+          contextText: action.contextText,
+          value: action.value,
+          checked: action.checked,
+          disabled: action.disabled,
+          focused: action.focused,
+          selected: action.selected,
+          expanded: action.expanded,
+          invalid: action.invalid,
+          required: action.required,
+          busy: action.busy,
+        },
+        present: action.present ?? true,
+        timeoutMs: action.timeoutMs ?? 10_000,
+      })
+      if (!waited.ok) {
+        throw new Error(waited.error)
       }
-      if (!hasNodeFilter(filter)) {
-        throw new Error('wait_for step requires at least one filter')
-      }
-      const present = action.present ?? true
-      const timeoutMs = action.timeoutMs ?? 10_000
-      const startedAt = Date.now()
-      const matched = await waitForUiCondition(session, () => {
-        const a11y = sessionA11y(session)
-        if (!a11y) return false
-        const matches = findNodes(a11y, filter)
-        return present ? matches.length > 0 : matches.length === 0
-      }, timeoutMs)
-      const elapsedMs = Date.now() - startedAt
-      if (!matched) {
-        throw new Error(`Timed out after ${timeoutMs}ms waiting for ${present ? 'presence' : 'absence'} of ${JSON.stringify(filter)}`)
-      }
-      if (!present) {
+      if (!waited.value.present) {
         return {
-          summary: `Condition satisfied after ${elapsedMs}ms: no nodes matched ${JSON.stringify(filter)}.`,
-          compact: {
-            present,
-            elapsedMs,
-            filter: compactFilterPayload(filter),
-          },
+          summary: waitConditionSuccessLine(waited.value),
+          compact: waitConditionCompact(waited.value),
         }
       }
-      const after = sessionA11y(session)
-      if (!after) {
-        return {
-          summary: `Condition satisfied after ${elapsedMs}ms for ${JSON.stringify(filter)}.`,
-          compact: {
-            present,
-            elapsedMs,
-            filter: compactFilterPayload(filter),
-          },
-        }
-      }
-      const matches = findNodes(after, filter)
       if (detail === 'verbose') {
         return {
-          summary: JSON.stringify(sortA11yNodes(matches).slice(0, 8).map(node => formatNode(node, after, after.bounds)), null, 2),
-          compact: {
-            present,
-            elapsedMs,
-            matchCount: matches.length,
-            filter: compactFilterPayload(filter),
-          },
+          summary: JSON.stringify(waited.value.matches, null, 2),
+          compact: waitConditionCompact(waited.value),
         }
       }
       return {
-        summary: `Condition satisfied after ${elapsedMs}ms with ${matches.length} matching node(s).`,
-        compact: {
-          present,
-          elapsedMs,
-          matchCount: matches.length,
-          filter: compactFilterPayload(filter),
-        },
+        summary: waitConditionSuccessLine(waited.value),
+        compact: waitConditionCompact(waited.value),
       }
     }
     case 'fill_fields': {
