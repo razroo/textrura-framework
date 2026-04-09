@@ -362,6 +362,20 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
     if (validationDescription) semantic.validationDescription = validationDescription
     const validationError = controlErrorText(el)
     if (validationError) semantic.validationError = validationError
+    if (isTextLikeControl(el)) {
+      const placeholder = el.getAttribute('placeholder')?.trim()
+      if (placeholder) semantic.placeholder = placeholder
+      const pattern = el.getAttribute('pattern')
+      if (pattern) semantic.inputPattern = pattern
+      const inputType = (el instanceof HTMLInputElement) ? el.type : undefined
+      if (inputType && ['date', 'tel', 'email', 'url', 'number'].includes(inputType)) {
+        semantic.inputType = inputType
+      }
+      const autocomplete = el.getAttribute('autocomplete')?.trim()
+      if (autocomplete && autocomplete !== 'off' && autocomplete !== 'on') {
+        semantic.autocomplete = autocomplete
+      }
+    }
     const h = el as HTMLElement
     if (h instanceof HTMLInputElement && h.disabled) semantic.ariaDisabled = true
     if (h instanceof HTMLButtonElement && h.disabled) semantic.ariaDisabled = true

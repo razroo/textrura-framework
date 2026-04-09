@@ -843,6 +843,82 @@ Equivalent to \`geometra_wait_for\` with \`present: false\` and \`text\` set to 
   )
 
   server.tool(
+    'geometra_wait_for_navigation',
+    `Wait until the page URL changes and the new page's DOM stabilizes. Use this after clicking "Next", "Submit", or "Continue" on multi-page forms.
+
+Captures the current URL, then polls until the URL changes and a stable UI tree is available. Returns the new page URL and a page model summary.`,
+    {
+      timeoutMs: z
+        .number()
+        .int()
+        .min(500)
+        .max(60_000)
+        .optional()
+        .default(10_000)
+        .describe('Max time to wait for navigation + DOM stabilization (default 10s)'),
+      expectedUrl: z.string().optional().describe('Optional URL substring to match — keeps waiting if the URL changes to something else (e.g. intermediate redirects)'),
+    },
+    async ({ timeoutMs, expectedUrl }) => {
+      const session = getSession()
+      if (!session) return err('Not connected. Call geometra_connect first.')
+
+      const beforeA11y = sessionA11y(session)
+      const beforeUrl = beforeA11y?.meta?.pageUrl ?? session.url
+
+      const startedAt = performance.now()
+      let navigated = false
+
+      while (performance.now() - startedAt < timeoutMs) {
+        await waitForUiCondition(session, () => {
+          const a = sessionA11y(session)
+          if (!a?.meta?.pageUrl) return false
+          const currentUrl = a.meta.pageUrl
+          if (currentUrl === beforeUrl) return false
+          if (expectedUrl && !currentUrl.includes(expectedUrl)) return false
+          return true
+        }, Math.max(500, timeoutMs - (performance.now() - startedAt)))
+
+        const afterA11y = sessionA11y(session)
+        const afterUrl = afterA11y?.meta?.pageUrl
+        if (afterUrl && afterUrl !== beforeUrl) {
+          if (!expectedUrl || afterUrl.includes(expectedUrl)) {
+            navigated = true
+            break
+          }
+        }
+      }
+
+      const elapsedMs = Number((performance.now() - startedAt).toFixed(1))
+      const afterA11y = await sessionA11yWhenReady(session)
+      const afterUrl = afterA11y?.meta?.pageUrl
+
+      if (!navigated) {
+        return err(JSON.stringify({
+          navigated: false,
+          beforeUrl,
+          currentUrl: afterUrl,
+          elapsedMs,
+          message: `URL did not change within ${timeoutMs}ms`,
+        }))
+      }
+
+      const model = afterA11y ? buildPageModel(afterA11y) : undefined
+      return ok(JSON.stringify({
+        navigated: true,
+        beforeUrl,
+        afterUrl,
+        elapsedMs,
+        ...(model ? {
+          summary: model.summary,
+          archetypes: model.archetypes,
+          formCount: model.forms.length,
+          ...(model.captcha ? { captcha: model.captcha } : {}),
+        } : {}),
+      }))
+    }
+  )
+
+  server.tool(
     'geometra_fill_fields',
     `Fill several labeled form fields in one MCP call. This is the preferred high-level primitive for long forms.
 
@@ -904,7 +980,8 @@ Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / combo
             : { index, kind: field.kind, ok: true, ...result.compact })
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e)
-          steps.push({ index, kind: field.kind, ok: false, error: message })
+          const suggestion = isResolvedFillFieldInput(field) ? suggestRecovery(field, message) : undefined
+          steps.push({ index, kind: field.kind, ok: false, error: message, ...(suggestion ? { suggestion } : {}) })
           if (stopOnError) {
             stoppedAt = index
             break
@@ -968,9 +1045,19 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
         .min(0)
         .optional()
         .describe('Resume a partial fill from this field index (from a previous stoppedAt + 1). Skips already-filled fields.'),
+      verifyFills: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('After filling, read back each field value and flag mismatches (e.g. autocomplete rejected input, format transformed). Adds a verification array to the response.'),
+      skipPreFilled: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('Skip fields that already contain a matching value. Avoids overwriting good data from resume parsing or previous fills.'),
       detail: detailInput(),
     },
-    async ({ url, pageUrl, port, headless, width, height, slowMo, formId, valuesById, valuesByLabel, stopOnError, failOnInvalid, includeSteps, resumeFromIndex, detail }) => {
+    async ({ url, pageUrl, port, headless, width, height, slowMo, formId, valuesById, valuesByLabel, stopOnError, failOnInvalid, includeSteps, resumeFromIndex, verifyFills, skipPreFilled, detail }) => {
       const directFields =
         !includeSteps && !formId && Object.keys(valuesById ?? {}).length === 0
           ? directLabelBatchFields(valuesByLabel)
@@ -1061,6 +1148,31 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
       const planned = planFormFill(schema, { valuesById, valuesByLabel })
       if (!planned.ok) return err(planned.error)
 
+      let skippedCount = 0
+      if (skipPreFilled) {
+        const schemaFieldById = new Map(schema.fields.map(f => [f.id, f]))
+        const indicesToRemove = new Set<number>()
+        for (let i = 0; i < planned.planned.length; i++) {
+          const p = planned.planned[i]!
+          const fieldId = p.field.fieldId
+          if (!fieldId) continue
+          const schemaField = schemaFieldById.get(fieldId)
+          if (!schemaField?.value) continue
+          const currentVal = schemaField.value.toLowerCase().trim()
+          let intendedVal: string | undefined
+          if (p.field.kind === 'text') intendedVal = p.field.value
+          else if (p.field.kind === 'choice') intendedVal = p.field.value
+          if (intendedVal && currentVal === intendedVal.toLowerCase().trim()) {
+            indicesToRemove.add(i)
+          }
+        }
+        if (indicesToRemove.size > 0) {
+          skippedCount = indicesToRemove.size
+          planned.planned = planned.planned.filter((_, i) => !indicesToRemove.has(i))
+          planned.fields = planned.planned.map(p => p.field)
+        }
+      }
+
       if (!includeSteps) {
         let usedBatch = false
         let batchAckResult: ProxyFillAckResult | undefined
@@ -1150,7 +1262,8 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
             : { index, kind: field.kind, ok: true, ...(confidence !== undefined ? { confidence, matchMethod } : {}), ...result.compact })
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e)
-          steps.push({ index, kind: field.kind, ok: false, ...(confidence !== undefined ? { confidence, matchMethod } : {}), error: message })
+          const suggestion = suggestRecovery(field, message)
+          steps.push({ index, kind: field.kind, ok: false, ...(confidence !== undefined ? { confidence, matchMethod } : {}), error: message, ...(suggestion ? { suggestion } : {}) })
           if (stopOnError) {
             stoppedAt = index
             break
@@ -1163,6 +1276,9 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
       const invalidRemaining = signals?.invalidFields.length ?? 0
       const successCount = steps.filter(step => step.ok === true).length
       const errorCount = steps.length - successCount
+
+      const verification = verifyFills ? verifyFormFills(session, planned.planned) : undefined
+
       const payload = {
         ...connection,
         completed: stoppedAt === undefined && (startIndex + steps.length) === planned.fields.length,
@@ -1172,12 +1288,14 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
         fieldCount: planned.fields.length,
         successCount,
         errorCount,
+        ...(skippedCount > 0 ? { skippedPreFilled: skippedCount } : {}),
         minConfidence: planned.planned.length > 0
           ? Number(Math.min(...planned.planned.map(p => p.confidence)).toFixed(2))
           : undefined,
         ...(startIndex > 0 ? { resumedFromIndex: startIndex } : {}),
         ...(includeSteps ? { steps } : {}),
         ...(stoppedAt !== undefined ? { stoppedAt, resumeFromIndex: stoppedAt + 1 } : {}),
+        ...(verification ? { verification } : {}),
         ...(signals ? { final: sessionSignalsPayload(signals, detail) } : {}),
       }
 
@@ -2254,6 +2372,7 @@ function packedFormSchemas(forms: FormSchemaModel[]): Array<Record<string, unkno
       ...(field.checked !== undefined ? { c: field.checked ? 1 : 0 } : {}),
       ...(field.values && field.values.length > 0 ? { vs: field.values } : {}),
       ...(field.aliases ? { al: field.aliases } : {}),
+      ...(field.format ? { fmt: field.format } : {}),
       ...(field.context ? { x: field.context } : {}),
     })),
     ...(form.sections ? { s: form.sections.map(s => ({ n: s.name, fi: s.fieldIds })) } : {}),
@@ -3032,10 +3151,88 @@ function coerceChoiceValue(field: FormSchemaField, value: FormValueInput): strin
   return option ?? (value ? 'Yes' : 'No')
 }
 
+/**
+ * Normalize a text value based on field format hints (placeholder, inputType, pattern).
+ * Handles common date and phone format conversions.
+ */
+function normalizeFieldValue(value: string, format?: FormSchemaField['format']): string {
+  if (!format) return value
+
+  // Date normalization: detect ISO dates and convert to placeholder format
+  if (format.inputType === 'date') return value // native date inputs handle ISO fine
+
+  const isDateLike = /^\d{4}-\d{2}-\d{2}$/.test(value) || /^\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}$/.test(value)
+  if (isDateLike && format.placeholder) {
+    const parsed = parseDateLoose(value)
+    if (parsed) {
+      const ph = format.placeholder.toLowerCase()
+      if (ph.includes('mm/dd/yyyy') || ph.includes('mm/dd/yy')) {
+        return `${pad2(parsed.month)}/${pad2(parsed.day)}/${parsed.year}`
+      }
+      if (ph.includes('dd/mm/yyyy') || ph.includes('dd/mm/yy')) {
+        return `${pad2(parsed.day)}/${pad2(parsed.month)}/${parsed.year}`
+      }
+      if (ph.includes('yyyy-mm-dd')) {
+        return `${parsed.year}-${pad2(parsed.month)}-${pad2(parsed.day)}`
+      }
+      if (ph.includes('mm-dd-yyyy')) {
+        return `${pad2(parsed.month)}-${pad2(parsed.day)}-${parsed.year}`
+      }
+    }
+  }
+
+  // Phone normalization
+  if (format.inputType === 'tel' || format.autocomplete?.includes('tel')) {
+    const digits = value.replace(/\D/g, '')
+    if (digits.length === 10 && format.placeholder) {
+      const ph = format.placeholder
+      if (ph.includes('(') && ph.includes(')')) {
+        return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
+      }
+      if (ph.includes('-') && !ph.includes('(')) {
+        return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`
+      }
+      if (ph.includes('.')) {
+        return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`
+      }
+    }
+    if (digits.length === 11 && digits.startsWith('1') && format.placeholder) {
+      const core = digits.slice(1)
+      const ph = format.placeholder
+      if (ph.startsWith('+1') || ph.startsWith('1')) {
+        return `+1 (${core.slice(0, 3)}) ${core.slice(3, 6)}-${core.slice(6)}`
+      }
+    }
+  }
+
+  return value
+}
+
+function parseDateLoose(value: string): { year: number; month: number; day: number } | null {
+  // YYYY-MM-DD
+  const iso = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (iso) return { year: +iso[1]!, month: +iso[2]!, day: +iso[3]! }
+  // MM/DD/YYYY or MM-DD-YYYY or MM.DD.YYYY
+  const mdy = value.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/)
+  if (mdy) return { year: +mdy[3]!, month: +mdy[1]!, day: +mdy[2]! }
+  // MM/DD/YY
+  const mdy2 = value.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2})$/)
+  if (mdy2) {
+    const yr = +mdy2[3]!
+    return { year: yr < 50 ? 2000 + yr : 1900 + yr, month: +mdy2[1]!, day: +mdy2[2]! }
+  }
+  return null
+}
+
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : String(n)
+}
+
 function plannedFillInputsForField(field: FormSchemaField, value: FormValueInput): ResolvedFillFieldInput[] | { error: string } {
   if (field.kind === 'text') {
     if (typeof value !== 'string') return { error: `Field "${field.label}" expects a string value` }
-    return [{ kind: 'text', fieldId: field.id, fieldLabel: field.label, value }]
+    const normalized = normalizeFieldValue(value, field.format)
+    return [{ kind: 'text', fieldId: field.id, fieldLabel: field.label, value: normalized }]
   }
 
   if (field.kind === 'choice') {
@@ -3680,6 +3877,81 @@ async function executeBatchAction(
       }
     }
   }
+}
+
+function suggestRecovery(field: ResolvedFillFieldInput, error: string): string | undefined {
+  const lowerError = error.toLowerCase()
+
+  if (field.kind === 'choice') {
+    if (lowerError.includes('no option') || lowerError.includes('not found') || lowerError.includes('visible')) {
+      return `Try geometra_pick_listbox_option with fieldLabel="${field.fieldLabel}" and label="${field.value}" for custom dropdowns.`
+    }
+    if (lowerError.includes('timeout')) {
+      return `Dropdown may load options asynchronously. Retry with a higher timeoutMs, or use geometra_pick_listbox_option with a query parameter.`
+    }
+  }
+
+  if (field.kind === 'text') {
+    if (lowerError.includes('format') || lowerError.includes('pattern') || lowerError.includes('invalid')) {
+      return `Field may require a specific format (e.g. MM/DD/YYYY for dates, (555) 123-4567 for phone). Check the field's placeholder or aria-describedby for format hints.`
+    }
+    if (lowerError.includes('not found') || lowerError.includes('no match')) {
+      return `Field label "${field.fieldLabel}" may have changed after page update. Refresh with geometra_form_schema and retry.`
+    }
+    if (lowerError.includes('timeout')) {
+      return `Field may be disabled or obscured. Check geometra_snapshot for the field's current state.`
+    }
+  }
+
+  if (field.kind === 'toggle') {
+    if (lowerError.includes('not found') || lowerError.includes('no match')) {
+      return `Checkbox/radio "${field.label}" not found. The label may be dynamic — try geometra_set_checked with exact=false.`
+    }
+  }
+
+  if (field.kind === 'file') {
+    if (lowerError.includes('no file') || lowerError.includes('not found')) {
+      return `File input not found by label. Try geometra_upload_files with strategy="hidden" or provide click coordinates.`
+    }
+  }
+
+  if (lowerError.includes('timeout')) {
+    return `Action timed out. The page may still be loading. Try geometra_wait_for with a loading indicator, then retry.`
+  }
+
+  return undefined
+}
+
+function verifyFormFills(
+  session: Session,
+  planned: PlannedFillField[],
+): { verified: number; mismatches: Array<{ fieldLabel: string; expected: string; actual?: string; fieldId?: string }> } {
+  const a11y = sessionA11y(session)
+  if (!a11y) return { verified: 0, mismatches: [] }
+
+  const mismatches: Array<{ fieldLabel: string; expected: string; actual?: string; fieldId?: string }> = []
+  let verified = 0
+
+  for (const p of planned) {
+    if (p.field.kind === 'toggle' || p.field.kind === 'file') continue
+    const label = p.field.fieldLabel
+    const expected = p.field.kind === 'text' ? p.field.value : p.field.value
+    const matches = [
+      ...findNodes(a11y, { name: label, role: 'textbox' }),
+      ...findNodes(a11y, { name: label, role: 'combobox' }),
+    ]
+    const match = matches[0]
+    const actual = match?.value?.trim()
+    if (!actual || !expected) {
+      mismatches.push({ fieldLabel: label, expected, actual, ...(p.field.fieldId ? { fieldId: p.field.fieldId } : {}) })
+    } else if (actual.toLowerCase() !== expected.toLowerCase()) {
+      mismatches.push({ fieldLabel: label, expected, actual, ...(p.field.fieldId ? { fieldId: p.field.fieldId } : {}) })
+    } else {
+      verified++
+    }
+  }
+
+  return { verified, mismatches }
 }
 
 async function executeFillField(session: Session, field: ResolvedFillFieldInput, detail: ResponseDetail): Promise<StepExecutionResult> {

@@ -23,7 +23,7 @@ export interface A11yNode {
     busy?: boolean
   }
   validation?: { description?: string; error?: string }
-  meta?: { pageUrl?: string; scrollX?: number; scrollY?: number; controlTag?: string }
+  meta?: { pageUrl?: string; scrollX?: number; scrollY?: number; controlTag?: string; placeholder?: string; inputPattern?: string; inputType?: string; autocomplete?: string }
   bounds: { x: number; y: number; width: number; height: number }
   path: number[]
   children: A11yNode[]
@@ -223,6 +223,7 @@ export interface FormSchemaField {
   optionCount?: number
   options?: string[]
   aliases?: Record<string, string[]>
+  format?: { placeholder?: string; pattern?: string; inputType?: string; autocomplete?: string }
   context?: NodeContextModel
 }
 
@@ -2203,6 +2204,17 @@ function computeOptionAliases(options: string[]): Record<string, string[]> | und
   return Object.keys(result).length > 0 ? result : undefined
 }
 
+function buildFieldFormat(node: A11yNode): FormSchemaField['format'] {
+  const m = node.meta
+  if (!m) return undefined
+  const format: NonNullable<FormSchemaField['format']> = {}
+  if (m.placeholder) format.placeholder = m.placeholder
+  if (m.inputPattern) format.pattern = m.inputPattern
+  if (m.inputType) format.inputType = m.inputType
+  if (m.autocomplete) format.autocomplete = m.autocomplete
+  return Object.keys(format).length > 0 ? format : undefined
+}
+
 function simpleSchemaField(root: A11yNode, node: A11yNode): FormSchemaField | null {
   const context = nodeContextForNode(root, node)
   const label = fieldLabel(node) ?? sanitizeInlineName(node.name, 80) ?? context?.prompt
@@ -2214,6 +2226,7 @@ function simpleSchemaField(root: A11yNode, node: A11yNode): FormSchemaField | nu
         : 'listbox'
       : undefined
 
+  const format = buildFieldFormat(node)
   return {
     id: formFieldIdForPath(node.path),
     kind: node.role === 'combobox' ? 'choice' : 'text',
@@ -2222,6 +2235,7 @@ function simpleSchemaField(root: A11yNode, node: A11yNode): FormSchemaField | nu
     ...(node.state?.required ? { required: true } : {}),
     ...(node.state?.invalid ? { invalid: true } : {}),
     ...compactSchemaValue(node.value, 72),
+    ...(format ? { format } : {}),
     ...(compactSchemaContext(context, label) ? { context: compactSchemaContext(context, label) } : {}),
   }
 }
@@ -3225,6 +3239,10 @@ function walkNode(element: Record<string, unknown>, layout: Record<string, unkno
   if (typeof semantic?.scrollX === 'number' && Number.isFinite(semantic.scrollX)) meta.scrollX = semantic.scrollX
   if (typeof semantic?.scrollY === 'number' && Number.isFinite(semantic.scrollY)) meta.scrollY = semantic.scrollY
   if (typeof semantic?.tag === 'string' && semantic.tag.trim().length > 0) meta.controlTag = semantic.tag
+  if (typeof semantic?.placeholder === 'string') meta.placeholder = semantic.placeholder
+  if (typeof semantic?.inputPattern === 'string') meta.inputPattern = semantic.inputPattern
+  if (typeof semantic?.inputType === 'string') meta.inputType = semantic.inputType
+  if (typeof semantic?.autocomplete === 'string') meta.autocomplete = semantic.autocomplete
 
   const children: A11yNode[] = []
   const elementChildren = element.children as Record<string, unknown>[] | undefined
