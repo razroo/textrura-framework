@@ -299,29 +299,22 @@ export interface UpdateWaitResult {
   result?: unknown
 }
 
+interface ReusableProxyEntry {
+  child?: ChildProcess
+  runtime?: EmbeddedProxyRuntime
+  wsUrl: string
+  headless: boolean
+  slowMo: number
+  width: number
+  height: number
+  pageUrl?: string
+  lastUsedAt: number
+}
+
 let activeSession: Session | null = null
-let reusableProxy:
-  | {
-      child: ChildProcess
-      runtime?: undefined
-      wsUrl: string
-      headless: boolean
-      slowMo: number
-      width: number
-      height: number
-      pageUrl?: string
-    }
-  | {
-      child?: undefined
-      runtime: EmbeddedProxyRuntime
-      wsUrl: string
-      headless: boolean
-      slowMo: number
-      width: number
-      height: number
-      pageUrl?: string
-    }
-  | null = null
+let reusableProxies: ReusableProxyEntry[] = []
+const REUSABLE_PROXY_POOL_LIMIT = 2
+const trackedReusableProxyChildren = new WeakSet<ChildProcess>()
 const ACTION_UPDATE_TIMEOUT_MS = 2000
 const LISTBOX_UPDATE_TIMEOUT_MS = 4500
 const FILL_BATCH_BASE_TIMEOUT_MS = 2500
@@ -347,17 +340,82 @@ function invalidateSessionCaches(session: Session): void {
   session.cachedFormSchemas?.clear()
 }
 
-function clearReusableProxyIfExited(): void {
-  if (!reusableProxy) return
-  if (reusableProxy.child) {
-    if (!reusableProxy.child.killed && reusableProxy.child.exitCode === null && reusableProxy.child.signalCode === null) {
-      return
+function sameReusableProxyEntry(
+  entry: ReusableProxyEntry,
+  proxy: { child: ChildProcess } | { runtime: EmbeddedProxyRuntime },
+): boolean {
+  return ('child' in proxy && !!entry.child && entry.child === proxy.child)
+    || ('runtime' in proxy && !!entry.runtime && entry.runtime === proxy.runtime)
+}
+
+function reusableProxyEntryForSession(session: Session): ReusableProxyEntry | undefined {
+  return reusableProxies.find(entry =>
+    (entry.child && session.proxyChild === entry.child) || (entry.runtime && session.proxyRuntime === entry.runtime),
+  )
+}
+
+function reusableProxyEntryIsActive(entry: ReusableProxyEntry): boolean {
+  return !!activeSession && (
+    (!!entry.child && activeSession.proxyChild === entry.child)
+    || (!!entry.runtime && activeSession.proxyRuntime === entry.runtime)
+  )
+}
+
+function clearReusableProxiesIfExited(): void {
+  reusableProxies = reusableProxies.filter(entry => {
+    if (entry.child) {
+      return !entry.child.killed && entry.child.exitCode === null && entry.child.signalCode === null
     }
-    reusableProxy = null
+    return !entry.runtime?.closed
+  })
+}
+
+function touchReusableProxy(entry: ReusableProxyEntry): void {
+  entry.lastUsedAt = Date.now()
+}
+
+function closeReusableProxy(entry: ReusableProxyEntry): void {
+  reusableProxies = reusableProxies.filter(candidate => candidate !== entry)
+  if (entry.child) {
+    try {
+      entry.child.kill('SIGTERM')
+    } catch {
+      /* ignore */
+    }
     return
   }
-  if (!reusableProxy.runtime.closed) return
-  reusableProxy = null
+  void entry.runtime?.close().catch(() => {})
+}
+
+function closeReusableProxies(): void {
+  clearReusableProxiesIfExited()
+  const proxies = [...reusableProxies]
+  reusableProxies = []
+  for (const entry of proxies) {
+    if (entry.child) {
+      try {
+        entry.child.kill('SIGTERM')
+      } catch {
+        /* ignore */
+      }
+      continue
+    }
+    void entry.runtime?.close().catch(() => {})
+  }
+}
+
+function enforceReusableProxyPoolLimit(): void {
+  clearReusableProxiesIfExited()
+  if (reusableProxies.length <= REUSABLE_PROXY_POOL_LIMIT) return
+
+  const idleEntries = reusableProxies
+    .filter(entry => !reusableProxyEntryIsActive(entry))
+    .sort((a, b) => a.lastUsedAt - b.lastUsedAt)
+
+  for (const entry of idleEntries) {
+    if (reusableProxies.length <= REUSABLE_PROXY_POOL_LIMIT) break
+    closeReusableProxy(entry)
+  }
 }
 
 function setReusableProxy(
@@ -365,9 +423,24 @@ function setReusableProxy(
   wsUrl: string,
   opts: { headless?: boolean; slowMo?: number; width?: number; height?: number; pageUrl?: string },
 ): void {
+  clearReusableProxiesIfExited()
+  const now = Date.now()
+  const existing = reusableProxies.find(entry => sameReusableProxyEntry(entry, proxy))
+
+  if (existing) {
+    existing.wsUrl = wsUrl
+    existing.headless = opts.headless === true
+    existing.slowMo = opts.slowMo ?? 0
+    existing.width = opts.width ?? 1280
+    existing.height = opts.height ?? 720
+    existing.pageUrl = opts.pageUrl
+    existing.lastUsedAt = now
+    return
+  }
+
   if ('child' in proxy) {
     const child = proxy.child
-    reusableProxy = {
+    const entry: ReusableProxyEntry = {
       child,
       wsUrl,
       headless: opts.headless === true,
@@ -375,17 +448,23 @@ function setReusableProxy(
       width: opts.width ?? 1280,
       height: opts.height ?? 720,
       pageUrl: opts.pageUrl,
+      lastUsedAt: now,
     }
-    const clear = () => {
-      if (reusableProxy?.child === child) reusableProxy = null
+    reusableProxies.push(entry)
+    if (!trackedReusableProxyChildren.has(child)) {
+      trackedReusableProxyChildren.add(child)
+      const clear = () => {
+        reusableProxies = reusableProxies.filter(candidate => candidate.child !== child)
+      }
+      child.once('exit', clear)
+      child.once('close', clear)
+      child.once('error', clear)
     }
-    child.once('exit', clear)
-    child.once('close', clear)
-    child.once('error', clear)
+    enforceReusableProxyPoolLimit()
     return
   }
 
-  reusableProxy = {
+  reusableProxies.push({
     runtime: proxy.runtime,
     wsUrl,
     headless: opts.headless === true,
@@ -393,34 +472,18 @@ function setReusableProxy(
     width: opts.width ?? 1280,
     height: opts.height ?? 720,
     pageUrl: opts.pageUrl,
-  }
-}
-
-function closeReusableProxy(): void {
-  clearReusableProxyIfExited()
-  const proxy = reusableProxy
-  reusableProxy = null
-  if (!proxy) return
-  if (proxy.child) {
-    try {
-      proxy.child.kill('SIGTERM')
-    } catch {
-      /* ignore */
-    }
-    return
-  }
-  void proxy.runtime.close().catch(() => {})
+    lastUsedAt: now,
+  })
+  enforceReusableProxyPoolLimit()
 }
 
 function rememberReusableProxyPageUrl(session: Session): void {
   const pageUrl = session.cachedA11y?.meta?.pageUrl
   if (!pageUrl) return
-  if (session.proxyChild && reusableProxy?.child === session.proxyChild) {
-    reusableProxy.pageUrl = pageUrl
-    return
-  }
-  if (session.proxyRuntime && reusableProxy?.runtime === session.proxyRuntime) {
-    reusableProxy.pageUrl = pageUrl
+  const entry = reusableProxyEntryForSession(session)
+  if (entry) {
+    entry.pageUrl = pageUrl
+    touchReusableProxy(entry)
   }
 }
 
@@ -436,8 +499,16 @@ function shutdownPreviousSession(opts?: { closeProxy?: boolean }): void {
   if (prev.proxyChild) {
     const shouldKeepProxy = prev.proxyReusable && opts?.closeProxy === false
     rememberReusableProxyPageUrl(prev)
-    if (shouldKeepProxy) return
-    if (reusableProxy?.child === prev.proxyChild) reusableProxy = null
+    if (shouldKeepProxy) {
+      const entry = reusableProxyEntryForSession(prev)
+      if (entry) touchReusableProxy(entry)
+      return
+    }
+    const entry = reusableProxyEntryForSession(prev)
+    if (entry) {
+      closeReusableProxy(entry)
+      return
+    }
     try {
       prev.proxyChild.kill('SIGTERM')
     } catch {
@@ -448,8 +519,16 @@ function shutdownPreviousSession(opts?: { closeProxy?: boolean }): void {
   if (prev.proxyRuntime) {
     const shouldKeepProxy = prev.proxyReusable && opts?.closeProxy === false
     rememberReusableProxyPageUrl(prev)
-    if (shouldKeepProxy) return
-    if (reusableProxy?.runtime === prev.proxyRuntime) reusableProxy = null
+    if (shouldKeepProxy) {
+      const entry = reusableProxyEntryForSession(prev)
+      if (entry) touchReusableProxy(entry)
+      return
+    }
+    const entry = reusableProxyEntryForSession(prev)
+    if (entry) {
+      closeReusableProxy(entry)
+      return
+    }
     void prev.proxyRuntime.close().catch(() => {})
   }
 }
@@ -458,22 +537,45 @@ function formatUnknownError(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
-async function attachToReusableProxy(options: {
+function findReusableProxy(options: {
+  pageUrl: string
+  headless?: boolean
+  slowMo?: number
+  width?: number
+  height?: number
+}): ReusableProxyEntry | undefined {
+  clearReusableProxiesIfExited()
+  const desiredHeadless = options.headless === true
+  const desiredSlowMo = options.slowMo ?? 0
+  const desiredWidth = options.width ?? 1280
+  const desiredHeight = options.height ?? 720
+
+  return reusableProxies
+    .filter(entry => entry.headless === desiredHeadless && entry.slowMo === desiredSlowMo)
+    .sort((a, b) => {
+      const score = (entry: ReusableProxyEntry) => {
+        let value = 0
+        if (entry.pageUrl === options.pageUrl) value += 100
+        if (entry.width === desiredWidth && entry.height === desiredHeight) value += 10
+        if (reusableProxyEntryIsActive(entry)) value += 5
+        return value
+      }
+      return score(b) - score(a) || b.lastUsedAt - a.lastUsedAt
+    })[0]
+}
+
+async function attachToReusableProxy(proxy: ReusableProxyEntry, options: {
   pageUrl: string
   width?: number
   height?: number
   awaitInitialFrame?: boolean
 }): Promise<Session> {
-  if (!reusableProxy) {
-    throw new Error('Failed to attach to reusable proxy session')
-  }
-
   const session = (
-    (reusableProxy.child && activeSession?.proxyChild === reusableProxy.child) ||
-    (reusableProxy.runtime && activeSession?.proxyRuntime === reusableProxy.runtime)
+    (proxy.child && activeSession?.proxyChild === proxy.child) ||
+    (proxy.runtime && activeSession?.proxyRuntime === proxy.runtime)
   )
     ? activeSession
-    : await connect(reusableProxy.wsUrl, {
+    : await connect(proxy.wsUrl, {
         skipInitialResize: true,
         closePreviousProxy: false,
         awaitInitialFrame: options.awaitInitialFrame,
@@ -483,31 +585,27 @@ async function attachToReusableProxy(options: {
     throw new Error('Failed to attach to reusable proxy session')
   }
 
-  session.proxyChild = reusableProxy.child
-  session.proxyRuntime = reusableProxy.runtime
+  session.proxyChild = proxy.child
+  session.proxyRuntime = proxy.runtime
   session.proxyReusable = true
+  touchReusableProxy(proxy)
 
-  const desiredWidth = options.width ?? reusableProxy.width
-  const desiredHeight = options.height ?? reusableProxy.height
-  if (desiredWidth !== reusableProxy.width || desiredHeight !== reusableProxy.height) {
+  const desiredWidth = options.width ?? proxy.width
+  const desiredHeight = options.height ?? proxy.height
+  if (desiredWidth !== proxy.width || desiredHeight !== proxy.height) {
     await sendAndWaitForUpdate(session, {
       type: 'resize',
       width: desiredWidth,
       height: desiredHeight,
     }, 5_000)
-    reusableProxy.width = desiredWidth
-    reusableProxy.height = desiredHeight
+    proxy.width = desiredWidth
+    proxy.height = desiredHeight
   }
 
-  const currentUrl = session.cachedA11y?.meta?.pageUrl ?? reusableProxy.pageUrl
+  const currentUrl = session.cachedA11y?.meta?.pageUrl ?? proxy.pageUrl
   if (currentUrl !== options.pageUrl) {
     await sendNavigate(session, options.pageUrl, 15_000)
-    if (
-      (session.proxyChild && reusableProxy?.child === session.proxyChild) ||
-      (session.proxyRuntime && reusableProxy?.runtime === session.proxyRuntime)
-    ) {
-      reusableProxy.pageUrl = options.pageUrl
-    }
+    proxy.pageUrl = options.pageUrl
   }
 
   return session
@@ -522,7 +620,6 @@ async function startFreshProxySession(options: {
   slowMo?: number
   awaitInitialFrame?: boolean
 }): Promise<Session> {
-  closeReusableProxy()
   try {
     const { runtime, wsUrl } = await startEmbeddedGeometraProxy({
       pageUrl: options.pageUrl,
@@ -592,10 +689,7 @@ export function connect(
   opts?: { width?: number; height?: number; skipInitialResize?: boolean; closePreviousProxy?: boolean; awaitInitialFrame?: boolean },
 ): Promise<Session> {
   return new Promise((resolve, reject) => {
-    clearReusableProxyIfExited()
-    if (reusableProxy && reusableProxy.wsUrl !== url) {
-      closeReusableProxy()
-    }
+    clearReusableProxiesIfExited()
     shutdownPreviousSession({ closeProxy: opts?.closePreviousProxy ?? true })
 
     const ws = new WebSocket(url)
@@ -699,21 +793,16 @@ export async function connectThroughProxy(options: {
   slowMo?: number
   awaitInitialFrame?: boolean
 }): Promise<Session> {
-  clearReusableProxyIfExited()
-  const desiredHeadless = options.headless === true
-  const desiredSlowMo = options.slowMo ?? 0
+  clearReusableProxiesIfExited()
   let reuseFailure: unknown
 
-  if (
-    reusableProxy &&
-    reusableProxy.headless === desiredHeadless &&
-    reusableProxy.slowMo === desiredSlowMo
-  ) {
+  const reusableProxy = findReusableProxy(options)
+  if (reusableProxy) {
     try {
-      return await attachToReusableProxy(options)
+      return await attachToReusableProxy(reusableProxy, options)
     } catch (err) {
       reuseFailure = err
-      closeReusableProxy()
+      closeReusableProxy(reusableProxy)
     }
   }
 
@@ -735,7 +824,7 @@ export function getSession(): Session | null {
 
 export function disconnect(opts?: { closeProxy?: boolean }): void {
   shutdownPreviousSession({ closeProxy: opts?.closeProxy ?? false })
-  if (opts?.closeProxy) closeReusableProxy()
+  if (opts?.closeProxy) closeReusableProxies()
 }
 
 function estimateFillBatchTimeout(fields: ProxyFillField[]): number {

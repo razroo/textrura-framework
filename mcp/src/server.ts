@@ -1521,7 +1521,7 @@ For a token-efficient semantic view, use geometra_snapshot (default compact). Fo
   // ── disconnect ───────────────────────────────────────────────
   server.tool(
     'geometra_disconnect',
-    `Disconnect from the Geometra server. Proxy-backed sessions keep the browser alive by default so the next geometra_connect can reuse it quickly; pass closeBrowser=true to fully tear down the proxy/browser.`,
+    `Disconnect from the Geometra server. Proxy-backed sessions keep compatible browsers alive by default so the next geometra_connect can reuse them quickly; pass closeBrowser=true to fully tear down the warm proxy/browser pool.`,
     {
       closeBrowser: z.boolean().optional().default(false).describe('Fully close the spawned proxy/browser instead of keeping it warm for reuse'),
     },

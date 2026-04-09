@@ -131,4 +131,67 @@ describe('connectThroughProxy recovery', () => {
       await closePeer(freshPeer.wss)
     }
   })
+
+  it('keeps separate warm proxies for compatible headed and headless reuse', async () => {
+    const headedPeer = await createProxyPeer({
+      pageUrl: 'https://jobs.example.com/headed',
+    })
+    const headlessPeer = await createProxyPeer({
+      pageUrl: 'https://jobs.example.com/headless',
+    })
+
+    const headedRuntime = {
+      wsUrl: headedPeer.wsUrl,
+      closed: false,
+      close: vi.fn(async () => {
+        headedRuntime.closed = true
+      }),
+    }
+    const headlessRuntime = {
+      wsUrl: headlessPeer.wsUrl,
+      closed: false,
+      close: vi.fn(async () => {
+        headlessRuntime.closed = true
+      }),
+    }
+
+    mockState.startEmbeddedGeometraProxy
+      .mockResolvedValueOnce({ runtime: headedRuntime, wsUrl: headedPeer.wsUrl })
+      .mockResolvedValueOnce({ runtime: headlessRuntime, wsUrl: headlessPeer.wsUrl })
+    mockState.spawnGeometraProxy.mockRejectedValue(new Error('spawn fallback should not be used'))
+
+    try {
+      const headedSession = await connectThroughProxy({
+        pageUrl: 'https://jobs.example.com/headed',
+        headless: false,
+      })
+      expect(headedSession.proxyRuntime).toBe(headedRuntime)
+
+      disconnect()
+
+      const headlessSession = await connectThroughProxy({
+        pageUrl: 'https://jobs.example.com/headless',
+        headless: true,
+      })
+      expect(headlessSession.proxyRuntime).toBe(headlessRuntime)
+
+      disconnect()
+
+      const reusedHeadedSession = await connectThroughProxy({
+        pageUrl: 'https://jobs.example.com/headed',
+        headless: false,
+      })
+
+      expect(reusedHeadedSession.proxyRuntime).toBe(headedRuntime)
+      expect(mockState.startEmbeddedGeometraProxy).toHaveBeenCalledTimes(2)
+      expect(headedRuntime.close).not.toHaveBeenCalled()
+      expect(headlessRuntime.close).not.toHaveBeenCalled()
+    } finally {
+      disconnect({ closeProxy: true })
+      expect(headedRuntime.close).toHaveBeenCalledTimes(1)
+      expect(headlessRuntime.close).toHaveBeenCalledTimes(1)
+      await closePeer(headedPeer.wss)
+      await closePeer(headlessPeer.wss)
+    }
+  })
 })

@@ -40,6 +40,9 @@ Status:
 - Prewarm Chromium for benchmark and agent sessions that are likely to chain multiple tasks.
 - Measure warm and cold paths separately so startup cost does not hide interaction efficiency.
 
+Status:
+- MCP now keeps a small warm proxy pool instead of a single reusable slot, so compatible headed and headless sessions do not evict each other immediately.
+
 ## Phase 4: Transparent Fallback
 
 - Keep the Geometra MCP surface stable even when semantic actions need a lower-level browser escape hatch.

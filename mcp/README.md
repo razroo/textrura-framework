@@ -18,6 +18,8 @@ Geometra proxy:       Chromium → DOM geometry → same WebSocket as native →
 
 Use Geometra MCP when an LLM needs to explore, interpret, and operate a real UI with compact semantic state instead of repeatedly consuming large browser snapshots. Keep Playwright-style tooling for deterministic scripts, DOM-oriented test automation, and compatibility fallback paths while Geometra closes remaining live-site gaps.
 
+Proxy-backed sessions stay warm by default on disconnect, and MCP now keeps a small warm pool so compatible headed and headless workflows do not immediately evict each other.
+
 ## Tools
 
 | Tool | Description |
