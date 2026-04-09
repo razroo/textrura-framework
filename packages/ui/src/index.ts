@@ -1,4 +1,4 @@
-import { box, text } from '@geometra/core'
+import { box, bodyText, text } from '@geometra/core'
 import type { UIElement, EventHandlers } from '@geometra/core'
 
 let inputMeasureCtx: CanvasRenderingContext2D | null = null
@@ -84,7 +84,7 @@ export function link(label: string, href: string, options: LinkOptions = {}): UI
       },
       semantic: { tag: 'a', role: 'link', ariaLabel: label },
     },
-    [text({ text: label, font, lineHeight, color })],
+    [bodyText({ text: label, font, lineHeight, color })],
   )
 }
 
@@ -220,7 +220,7 @@ export function list(items: string[]): UIElement {
     { flexDirection: 'column', gap: 4, semantic: { tag: 'ul' } },
     items.map((item) =>
       box({ paddingLeft: 8, paddingTop: 4, paddingBottom: 4, semantic: { tag: 'li' } }, [
-        text({ text: item, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }),
+        bodyText({ text: item, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }),
       ]),
     ),
   )
@@ -239,8 +239,8 @@ export function dialog(title: string, body: string, actions: UIElement[] = []): 
       semantic: { role: 'dialog', ariaLabel: title },
     },
     [
-      text({ text: title, font: 'bold 16px Inter', lineHeight: 20, color: '#f8fafc' }),
-      text({ text: body, font: '13px Inter', lineHeight: 18, color: '#cbd5e1' }),
+      bodyText({ text: title, font: 'bold 16px Inter', lineHeight: 20, color: '#f8fafc' }),
+      bodyText({ text: body, font: '13px Inter', lineHeight: 18, color: '#cbd5e1' }),
       box({ flexDirection: 'row', gap: 8 }, actions),
     ],
   )
@@ -291,12 +291,14 @@ export function checkbox(label: string, options: CheckboxOptions = {}): UIElemen
           ? [text({ text: '✓', font: 'bold 11px Inter', lineHeight: 12, color: disabled ? '#94a3b8' : '#86efac' })]
           : [],
       ),
-      text({
-        text: label,
-        font: '13px Inter',
-        lineHeight: 18,
-        color: disabled ? '#64748b' : '#e2e8f0',
-      }),
+      box({ flexGrow: 1, minWidth: 0 }, [
+        bodyText({
+          text: label,
+          font: '13px Inter',
+          lineHeight: 18,
+          color: disabled ? '#64748b' : '#e2e8f0',
+        }),
+      ]),
     ],
   )
 }
@@ -345,12 +347,14 @@ export function radio(label: string, options: RadioOptions = {}): UIElement {
           ? [box({ width: 8, height: 8, borderRadius: 4, backgroundColor: disabled ? '#64748b' : '#38bdf8' }, [])]
           : [],
       ),
-      text({
-        text: label,
-        font: '13px Inter',
-        lineHeight: 18,
-        color: disabled ? '#64748b' : '#e2e8f0',
-      }),
+      box({ flexGrow: 1, minWidth: 0 }, [
+        bodyText({
+          text: label,
+          font: '13px Inter',
+          lineHeight: 18,
+          color: disabled ? '#64748b' : '#e2e8f0',
+        }),
+      ]),
     ],
   )
 }
@@ -396,7 +400,7 @@ export function tabs(items: TabItem[], options: TabsOptions = {}): UIElement {
               semantic: { role: 'tab', ariaLabel: item.label, ariaSelected: idx === activeIndex },
               onClick: () => options.onTabChange?.(idx),
             },
-            [text({ text: item.label, font: '13px Inter', lineHeight: 18, color: idx === activeIndex ? '#bae6fd' : '#cbd5e1' })],
+            [bodyText({ text: item.label, font: '13px Inter', lineHeight: 18, color: idx === activeIndex ? '#bae6fd' : '#cbd5e1' })],
           ),
         ),
       ),
@@ -442,7 +446,7 @@ export function toast(message: string, options: ToastOptions = {}): UIElement {
   const children: UIElement[] = []
   if (options.title) {
     children.push(
-      text({
+      bodyText({
         text: options.title,
         font: 'bold 13px Inter',
         lineHeight: 18,
@@ -451,7 +455,7 @@ export function toast(message: string, options: ToastOptions = {}): UIElement {
     )
   }
   children.push(
-    text({
+    bodyText({
       text: message,
       font: '13px Inter',
       lineHeight: 18,
@@ -529,6 +533,7 @@ export function commandPalette(commands: CommandItem[], options: CommandPaletteO
           justifyContent: 'space-between',
           alignItems: 'center',
           gap: 12,
+          minWidth: 0,
           paddingLeft: 10,
           paddingRight: 10,
           paddingTop: 8,
@@ -539,7 +544,9 @@ export function commandPalette(commands: CommandItem[], options: CommandPaletteO
           onClick: () => options.onSelect?.(cmd.id),
         },
         [
-          text({ text: cmd.label, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }),
+          box({ flexGrow: 1, minWidth: 0 }, [
+            bodyText({ text: cmd.label, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }),
+          ]),
           cmd.shortcut
             ? text({ text: cmd.shortcut, font: '12px Inter', lineHeight: 16, color: muted })
             : box({ width: 1, height: 1 }, []),
@@ -595,7 +602,7 @@ export function menu(items: MenuItem[], options: MenuOptions = {}): UIElement {
           },
           onClick: item.disabled ? undefined : () => options.onSelect?.(item.id),
         },
-        [text({ text: item.label, font: '13px Inter', lineHeight: 18, color })],
+        [bodyText({ text: item.label, font: '13px Inter', lineHeight: 18, color })],
       )
     }),
   )
@@ -630,6 +637,8 @@ export function selectControl(opts: SelectControlOptions): UIElement {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
+      gap: 8,
+      minWidth: 0,
       paddingLeft: 10,
       paddingRight: 10,
       paddingTop: 8,
@@ -643,7 +652,9 @@ export function selectControl(opts: SelectControlOptions): UIElement {
       onClick: () => opts.onToggle?.(),
     },
     [
-      text({ text: label, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }),
+      box({ flexGrow: 1, minWidth: 0 }, [
+        bodyText({ text: label, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }),
+      ]),
       text({
         text: opts.open ? '▲' : '▼',
         font: '10px Inter',
@@ -697,8 +708,8 @@ export function dataTable(
     },
     columns.map(col =>
       box(
-        { flexGrow: 1, semantic: { role: 'columnheader', ariaLabel: col.header } },
-        [text({ text: col.header, font: 'bold 12px Inter', lineHeight: 16, color: '#94a3b8' })],
+        { flexGrow: 1, minWidth: 0, semantic: { role: 'columnheader', ariaLabel: col.header } },
+        [bodyText({ text: col.header, font: 'bold 12px Inter', lineHeight: 16, color: '#94a3b8' })],
       ),
     ),
   )
@@ -715,8 +726,8 @@ export function dataTable(
         onClick: options.onRowClick ? () => options.onRowClick?.(ri) : undefined,
       },
       columns.map(col =>
-        box({ flexGrow: 1, semantic: { role: 'cell' } }, [
-          text({ text: row[col.key] ?? '', font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }),
+        box({ flexGrow: 1, minWidth: 0, semantic: { role: 'cell' } }, [
+          bodyText({ text: row[col.key] ?? '', font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }),
         ]),
       ),
     ),
@@ -755,6 +766,7 @@ function treeNodeElement(node: TreeNode, depth: number, options: TreeViewOptions
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
+      minWidth: 0,
       paddingLeft: 8 + depth * 14,
       paddingTop: 4,
       paddingBottom: 4,
@@ -780,7 +792,9 @@ function treeNodeElement(node: TreeNode, depth: number, options: TreeViewOptions
             color: '#94a3b8',
           })
         : box({ width: 14 }, []),
-      text({ text: node.label, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }),
+      box({ flexGrow: 1, minWidth: 0 }, [
+        bodyText({ text: node.label, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }),
+      ]),
     ],
   )
   if (!hasChildren || !expanded) return row
@@ -895,7 +909,7 @@ export function badge(label: string, options: BadgeOptions = {}): UIElement {
       paddingLeft: 8, paddingRight: 8, paddingTop: 2, paddingBottom: 2,
       borderRadius: 9999, backgroundColor: s.bg,
     },
-    [text({ text: label, font: 'bold 11px Inter', lineHeight: 14, color: s.color })],
+    [bodyText({ text: label, font: 'bold 11px Inter', lineHeight: 14, color: s.color })],
   )
 }
 
@@ -970,9 +984,9 @@ export function alert(message: string, options: AlertOptions = {}): UIElement {
   const s = alertVariantStyle[variant]
   const content: UIElement[] = []
   if (options.title) {
-    content.push(text({ text: options.title, font: 'bold 13px Inter', lineHeight: 18, color: s.color }))
+    content.push(bodyText({ text: options.title, font: 'bold 13px Inter', lineHeight: 18, color: s.color }))
   }
-  content.push(text({ text: message, font: '13px Inter', lineHeight: 18, color: s.color }))
+  content.push(bodyText({ text: message, font: '13px Inter', lineHeight: 18, color: s.color }))
 
   const body: UIElement[] = [
     text({ text: s.icon, font: '13px Inter', lineHeight: 18, color: s.color }),
@@ -1015,8 +1029,10 @@ export function progress(value: number, options: ProgressOptions = {}): UIElemen
   const children: UIElement[] = []
   if (options.label) {
     children.push(
-      box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, [
-        text({ text: options.label, font: '12px Inter', lineHeight: 16, color: '#94a3b8' }),
+      box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, minWidth: 0 }, [
+        box({ flexGrow: 1, minWidth: 0 }, [
+          bodyText({ text: options.label, font: '12px Inter', lineHeight: 16, color: '#94a3b8' }),
+        ]),
         text({ text: `${Math.round(clamped)}%`, font: '12px Inter', lineHeight: 16, color: '#94a3b8' }),
       ]),
     )
@@ -1084,12 +1100,12 @@ export function breadcrumb(items: BreadcrumbItem[], options: BreadcrumbOptions =
       children.push(
         box(
           { cursor: 'pointer', onClick: item.onClick },
-          [text({ text: item.label, font: '13px Inter', lineHeight: 18, color: '#38bdf8' })],
+          [bodyText({ text: item.label, font: '13px Inter', lineHeight: 18, color: '#38bdf8' })],
         ),
       )
     } else {
       children.push(
-        text({ text: item.label, font: '13px Inter', lineHeight: 18, color: isLast ? '#e2e8f0' : '#94a3b8' }),
+        bodyText({ text: item.label, font: '13px Inter', lineHeight: 18, color: isLast ? '#e2e8f0' : '#94a3b8' }),
       )
     }
     if (!isLast) {
@@ -1191,12 +1207,16 @@ export function switchControl(options: SwitchOptions): UIElement {
 
   const children: UIElement[] = [track]
   if (options.label) {
-    children.push(text({ text: options.label, font: '13px Inter', lineHeight: 18, color: isDisabled ? '#64748b' : '#e2e8f0' }))
+    children.push(
+      box({ flexGrow: 1, minWidth: 0 }, [
+        bodyText({ text: options.label, font: '13px Inter', lineHeight: 18, color: isDisabled ? '#64748b' : '#e2e8f0' }),
+      ]),
+    )
   }
 
   return box(
     {
-      flexDirection: 'row', gap: 10, alignItems: 'center',
+      flexDirection: 'row', gap: 10, alignItems: 'center', minWidth: 0,
       cursor: isDisabled ? 'not-allowed' : 'pointer',
       semantic: { role: 'switch', ariaLabel: options.label ?? 'Toggle', ariaSelected: checked, ariaDisabled: isDisabled },
       onClick: toggle,
@@ -1284,8 +1304,10 @@ export function slider(options: SliderOptions): UIElement {
   const topRow: UIElement[] = []
   if (options.label) {
     topRow.push(
-      box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, [
-        text({ text: options.label, font: '12px Inter', lineHeight: 16, color: '#94a3b8' }),
+      box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, minWidth: 0 }, [
+        box({ flexGrow: 1, minWidth: 0 }, [
+          bodyText({ text: options.label, font: '12px Inter', lineHeight: 16, color: '#94a3b8' }),
+        ]),
         text({ text: String(Math.round(value)), font: '12px Inter', lineHeight: 16, color: '#94a3b8' }),
       ]),
     )
@@ -1336,7 +1358,7 @@ export function accordion(items: AccordionItem[], options: AccordionOptions = {}
       const expanded = expandedIds.has(item.id)
       const header = box(
         {
-          flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+          flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, minWidth: 0,
           paddingLeft: 14, paddingRight: 14, paddingTop: 10, paddingBottom: 10,
           backgroundColor: '#0f172a', cursor: 'pointer',
           borderTop: i > 0 ? 1 : 0, borderColor: '#334155',
@@ -1344,7 +1366,9 @@ export function accordion(items: AccordionItem[], options: AccordionOptions = {}
           onClick: () => options.onToggle?.(item.id),
         },
         [
-          text({ text: item.title, font: 'bold 13px Inter', lineHeight: 18, color: '#e2e8f0' }),
+          box({ flexGrow: 1, minWidth: 0 }, [
+            bodyText({ text: item.title, font: 'bold 13px Inter', lineHeight: 18, color: '#e2e8f0' }),
+          ]),
           text({ text: expanded ? '▲' : '▼', font: '10px Inter', lineHeight: 14, color: '#94a3b8' }),
         ],
       )
@@ -1388,7 +1412,11 @@ export function sheet(options: SheetOptions): UIElement {
   if (options.title || options.onClose) {
     const headerChildren: UIElement[] = []
     if (options.title) {
-      headerChildren.push(text({ text: options.title, font: 'bold 16px Inter', lineHeight: 20, color: '#f8fafc' }))
+      headerChildren.push(
+        box({ flexGrow: 1, minWidth: 0 }, [
+          bodyText({ text: options.title, font: 'bold 16px Inter', lineHeight: 20, color: '#f8fafc' }),
+        ]),
+      )
     }
     if (options.onClose) {
       headerChildren.push(
@@ -1404,7 +1432,10 @@ export function sheet(options: SheetOptions): UIElement {
       )
     }
     header.push(
-      box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 12 }, headerChildren),
+      box(
+        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, minWidth: 0, paddingBottom: 12 },
+        headerChildren,
+      ),
     )
   }
 

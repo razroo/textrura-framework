@@ -11,6 +11,14 @@ The `font` value is passed through to:
 
 Prefer an explicit size and a **concrete family first**, then generics, e.g. `14px Inter, system-ui, sans-serif`.
 
+## Text wrapping (`whiteSpace`)
+
+Textura and renderers treat **omitted `whiteSpace` like `nowrap`**: one measured line, one paint line (unless you clip). That keeps short labels and controls predictable.
+
+For **paragraph-style copy** in a flex column or card (anything that should wrap when the container is narrow), set **`whiteSpace: 'normal'`** on the `text()` node, or use **`bodyText()`** from `@geometra/core`, which defaults `whiteSpace` to `'normal'`. Without that, layout height can stay too small while paint overflows, and the next sibling can appear to overlap.
+
+Use **`pre-wrap`** when preserving user line breaks (see `textarea` in `@geometra/ui`).
+
 ## Families ignored for “custom font” collection
 
 `extractFontFamiliesFromCSSFont` (in `packages/core/src/fonts.ts`) drops generic CSS keywords so `collectFontFamiliesFromTree` and `waitForFonts` only target real face names:

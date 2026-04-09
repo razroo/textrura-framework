@@ -100,6 +100,11 @@ export function box(props: BoxProps, children: UIElement[] = []): BoxElement {
 
 /**
  * Create a text leaf element.
+ *
+ * **Wrapping:** Textura measures text with **`whiteSpace` omitted or `'nowrap'`** as a single line (and canvas
+ * paint matches). For copy that should wrap inside a width-bounded flex box (paragraphs, card descriptions,
+ * long labels), pass **`whiteSpace: 'normal'`** or use {@link bodyText}.
+ *
  * `selectable` and `semantic` are runtime/rendering concerns; remaining props feed `toLayoutTree()` and Textura.
  * Optional `dir` participates in the same resolved-direction model as boxes (caret, selection, bidi) and is
  * forwarded to Textura when this node is not the layout root.
@@ -107,6 +112,20 @@ export function box(props: BoxProps, children: UIElement[] = []): BoxElement {
 export function text(props: TextProps): TextElement {
   const { key, semantic, ...rest } = props
   return { kind: 'text', props: rest, key, semantic }
+}
+
+/**
+ * Same as {@link text}, but defaults **`whiteSpace` to `'normal'`** so layout height and line breaks match
+ * wrapped painting in narrow containers. Explicit `whiteSpace` on `props` still wins.
+ */
+export function bodyText(props: TextProps): TextElement {
+  const { key, semantic, whiteSpace, ...rest } = props
+  return {
+    kind: 'text',
+    props: { ...rest, whiteSpace: whiteSpace ?? 'normal' },
+    key,
+    semantic,
+  }
 }
 
 /**

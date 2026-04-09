@@ -1,6 +1,7 @@
 /**
  * @packageDocumentation
- * Public entry for `@geometra/core`: reactive primitives, element constructors, app mount, layout-tree
+ * Public entry for `@geometra/core`: reactive primitives, element constructors (`box`, `text`, {@link bodyText},
+ * `image`, `scene3d`), app mount, layout-tree
  * conversion, hit-testing, focus and keyboard/composition dispatch, text selection and input, web font
  * helpers, animation and virtual-scroll utilities, SEO and accessibility snapshots,
  * {@link import('./focus-candidates.js').hasFocusCandidateHandlers} for parity with Tab / click-to-focus
@@ -16,7 +17,7 @@ export { signal, computed, effect, batch } from './signals.js'
 export type { Signal, Computed } from './signals.js'
 
 // Element constructors
-export { box, text, image, scene3d } from './elements.js'
+export { box, text, bodyText, image, scene3d } from './elements.js'
 
 // Scene3d object helpers
 export { sphere, points, line, ring, ambientLight, directionalLight, group } from './elements.js'

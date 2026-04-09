@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   ambientLight,
+  bodyText,
   box,
   directionalLight,
   group,
@@ -204,6 +205,42 @@ describe('text', () => {
     const p = el.props as Record<string, unknown>
     expect(p.onClick).toBe(noop)
     expect(p.onKeyDown).toBe(noop)
+  })
+})
+
+describe('bodyText', () => {
+  it('defaults whiteSpace to normal for measured wrapping', () => {
+    const el = bodyText({
+      text: 'Hi',
+      font: '14px sans-serif',
+      lineHeight: 18,
+    })
+    expect(el.kind).toBe('text')
+    expect((el.props as { whiteSpace?: string }).whiteSpace).toBe('normal')
+  })
+
+  it('allows explicit whiteSpace to override the default', () => {
+    const el = bodyText({
+      text: 'Hi',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      whiteSpace: 'nowrap',
+    })
+    expect((el.props as { whiteSpace?: string }).whiteSpace).toBe('nowrap')
+  })
+
+  it('lifts key and semantic like text()', () => {
+    const el = bodyText({
+      text: 'Hi',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      key: 'b1',
+      semantic: { role: 'paragraph' },
+    })
+    expect(el.key).toBe('b1')
+    expect(el.semantic).toEqual({ role: 'paragraph' })
+    expect((el.props as Record<string, unknown>).key).toBeUndefined()
+    expect((el.props as Record<string, unknown>).semantic).toBeUndefined()
   })
 })
 

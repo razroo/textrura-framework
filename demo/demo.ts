@@ -2,6 +2,7 @@ import {
   signal,
   box,
   text,
+  bodyText,
   image,
   createApp,
   toSemanticHTML,
@@ -1964,18 +1965,17 @@ function archSection(): UIElement {
         boxShadow: { offsetX: 0, offsetY: 6, blur: 20, color: 'rgba(0,0,0,0.28)' },
       }, [
         box({ flexDirection: 'column', alignItems: 'flex-start', gap: 8 }, [
-          text({
+          bodyText({
             text: p.name,
             font: '600 14px Inter',
             lineHeight: 18,
             color: TEXT_COLOR,
-            whiteSpace: 'normal',
           }),
           box({ backgroundColor: p.bg, borderRadius: 6, paddingLeft: 8, paddingRight: 8, paddingTop: 3, paddingBottom: 3 }, [
             text({ text: p.badge, font: '700 10px Inter', lineHeight: 12, color: p.bc }),
           ]),
         ]),
-        text({ text: p.desc, font: '13px Inter', lineHeight: 20, color: MUTED, whiteSpace: 'normal' }),
+        bodyText({ text: p.desc, font: '13px Inter', lineHeight: 20, color: MUTED }),
       ]),
     )),
     box({
