@@ -454,6 +454,135 @@ function shutdownPreviousSession(opts?: { closeProxy?: boolean }): void {
   }
 }
 
+function formatUnknownError(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
+
+async function attachToReusableProxy(options: {
+  pageUrl: string
+  width?: number
+  height?: number
+  awaitInitialFrame?: boolean
+}): Promise<Session> {
+  if (!reusableProxy) {
+    throw new Error('Failed to attach to reusable proxy session')
+  }
+
+  const session = (
+    (reusableProxy.child && activeSession?.proxyChild === reusableProxy.child) ||
+    (reusableProxy.runtime && activeSession?.proxyRuntime === reusableProxy.runtime)
+  )
+    ? activeSession
+    : await connect(reusableProxy.wsUrl, {
+        skipInitialResize: true,
+        closePreviousProxy: false,
+        awaitInitialFrame: options.awaitInitialFrame,
+      })
+
+  if (!session) {
+    throw new Error('Failed to attach to reusable proxy session')
+  }
+
+  session.proxyChild = reusableProxy.child
+  session.proxyRuntime = reusableProxy.runtime
+  session.proxyReusable = true
+
+  const desiredWidth = options.width ?? reusableProxy.width
+  const desiredHeight = options.height ?? reusableProxy.height
+  if (desiredWidth !== reusableProxy.width || desiredHeight !== reusableProxy.height) {
+    await sendAndWaitForUpdate(session, {
+      type: 'resize',
+      width: desiredWidth,
+      height: desiredHeight,
+    }, 5_000)
+    reusableProxy.width = desiredWidth
+    reusableProxy.height = desiredHeight
+  }
+
+  const currentUrl = session.cachedA11y?.meta?.pageUrl ?? reusableProxy.pageUrl
+  if (currentUrl !== options.pageUrl) {
+    await sendNavigate(session, options.pageUrl, 15_000)
+    if (
+      (session.proxyChild && reusableProxy?.child === session.proxyChild) ||
+      (session.proxyRuntime && reusableProxy?.runtime === session.proxyRuntime)
+    ) {
+      reusableProxy.pageUrl = options.pageUrl
+    }
+  }
+
+  return session
+}
+
+async function startFreshProxySession(options: {
+  pageUrl: string
+  port?: number
+  headless?: boolean
+  width?: number
+  height?: number
+  slowMo?: number
+  awaitInitialFrame?: boolean
+}): Promise<Session> {
+  closeReusableProxy()
+  try {
+    const { runtime, wsUrl } = await startEmbeddedGeometraProxy({
+      pageUrl: options.pageUrl,
+      port: options.port ?? 0,
+      headless: options.headless,
+      width: options.width,
+      height: options.height,
+      slowMo: options.slowMo,
+    })
+    const session = await connect(wsUrl, {
+      skipInitialResize: true,
+      closePreviousProxy: false,
+      awaitInitialFrame: options.awaitInitialFrame,
+    })
+    session.proxyRuntime = runtime
+    session.proxyReusable = true
+    setReusableProxy({ runtime }, wsUrl, {
+      headless: options.headless,
+      slowMo: options.slowMo,
+      width: options.width,
+      height: options.height,
+      pageUrl: options.pageUrl,
+    })
+    return session
+  } catch (e) {
+    const { child, wsUrl } = await spawnGeometraProxy({
+      pageUrl: options.pageUrl,
+      port: options.port ?? 0,
+      headless: options.headless,
+      width: options.width,
+      height: options.height,
+      slowMo: options.slowMo,
+    })
+    try {
+      const session = await connect(wsUrl, {
+        skipInitialResize: true,
+        closePreviousProxy: false,
+        awaitInitialFrame: options.awaitInitialFrame,
+      })
+      session.proxyChild = child
+      session.proxyReusable = true
+      setReusableProxy({ child }, wsUrl, {
+        headless: options.headless,
+        slowMo: options.slowMo,
+        width: options.width,
+        height: options.height,
+        pageUrl: options.pageUrl,
+      })
+      return session
+    } catch (fallbackError) {
+      try {
+        child.kill('SIGTERM')
+      } catch {
+        /* ignore */
+      }
+      throw fallbackError instanceof Error ? fallbackError : e
+    }
+  }
+}
+
 /**
  * Connect to a running Geometra server. Waits for the first frame so that
  * layout/tree state is available immediately after connection.
@@ -573,113 +702,30 @@ export async function connectThroughProxy(options: {
   clearReusableProxyIfExited()
   const desiredHeadless = options.headless === true
   const desiredSlowMo = options.slowMo ?? 0
+  let reuseFailure: unknown
 
   if (
     reusableProxy &&
     reusableProxy.headless === desiredHeadless &&
     reusableProxy.slowMo === desiredSlowMo
   ) {
-    const session = (
-      (reusableProxy.child && activeSession?.proxyChild === reusableProxy.child) ||
-      (reusableProxy.runtime && activeSession?.proxyRuntime === reusableProxy.runtime)
-    )
-      ? activeSession
-      : await connect(reusableProxy.wsUrl, {
-          skipInitialResize: true,
-          closePreviousProxy: false,
-          awaitInitialFrame: options.awaitInitialFrame,
-        })
-
-    if (!session) {
-      throw new Error('Failed to attach to reusable proxy session')
+    try {
+      return await attachToReusableProxy(options)
+    } catch (err) {
+      reuseFailure = err
+      closeReusableProxy()
     }
-    session.proxyChild = reusableProxy.child
-    session.proxyRuntime = reusableProxy.runtime
-    session.proxyReusable = true
-    const desiredWidth = options.width ?? reusableProxy.width
-    const desiredHeight = options.height ?? reusableProxy.height
-    if (desiredWidth !== reusableProxy.width || desiredHeight !== reusableProxy.height) {
-      await sendAndWaitForUpdate(session, {
-        type: 'resize',
-        width: desiredWidth,
-        height: desiredHeight,
-      }, 5_000)
-      reusableProxy.width = desiredWidth
-      reusableProxy.height = desiredHeight
-    }
-    if (options.pageUrl) {
-      const currentUrl = session.cachedA11y?.meta?.pageUrl ?? reusableProxy.pageUrl
-      if (currentUrl !== options.pageUrl) {
-        await sendNavigate(session, options.pageUrl, 15_000)
-        if (
-          (session.proxyChild && reusableProxy?.child === session.proxyChild) ||
-          (session.proxyRuntime && reusableProxy?.runtime === session.proxyRuntime)
-        ) {
-          reusableProxy.pageUrl = options.pageUrl
-        }
-      }
-    }
-    return session
   }
 
-  closeReusableProxy()
   try {
-    const { runtime, wsUrl } = await startEmbeddedGeometraProxy({
-      pageUrl: options.pageUrl,
-      port: options.port ?? 0,
-      headless: options.headless,
-      width: options.width,
-      height: options.height,
-      slowMo: options.slowMo,
-    })
-    const session = await connect(wsUrl, {
-      skipInitialResize: true,
-      closePreviousProxy: false,
-      awaitInitialFrame: options.awaitInitialFrame,
-    })
-    session.proxyRuntime = runtime
-    session.proxyReusable = true
-    setReusableProxy({ runtime }, wsUrl, {
-      headless: options.headless,
-      slowMo: options.slowMo,
-      width: options.width,
-      height: options.height,
-      pageUrl: options.pageUrl,
-    })
-    return session
+    return await startFreshProxySession(options)
   } catch (e) {
-    const { child, wsUrl } = await spawnGeometraProxy({
-      pageUrl: options.pageUrl,
-      port: options.port ?? 0,
-      headless: options.headless,
-      width: options.width,
-      height: options.height,
-      slowMo: options.slowMo,
-    })
-    try {
-      const session = await connect(wsUrl, {
-        skipInitialResize: true,
-        closePreviousProxy: false,
-        awaitInitialFrame: options.awaitInitialFrame,
-      })
-      session.proxyChild = child
-      session.proxyReusable = true
-      setReusableProxy({ child }, wsUrl, {
-        headless: options.headless,
-        slowMo: options.slowMo,
-        width: options.width,
-        height: options.height,
-        pageUrl: options.pageUrl,
-      })
-      return session
-    } catch (fallbackError) {
-      try {
-        child.kill('SIGTERM')
-      } catch {
-        /* ignore */
-      }
-      throw fallbackError instanceof Error ? fallbackError : e
+    if (reuseFailure) {
+      throw new Error(
+        `Failed to recover reusable browser session after it became stale: ${formatUnknownError(reuseFailure)}\nFresh proxy start also failed: ${formatUnknownError(e)}`,
+      )
     }
+    throw e
   }
 }
 

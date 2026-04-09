@@ -75,6 +75,7 @@ export async function launchProxyRuntime(options: LaunchProxyRuntimeOptions): Pr
 
   let wsUrl = options.port === 0 ? '' : `ws://127.0.0.1:${options.port}`
   let closed = false
+  let closing = false
 
   const reportError = (err: unknown) => {
     options.onError?.(err)
@@ -94,6 +95,27 @@ export async function launchProxyRuntime(options: LaunchProxyRuntimeOptions): Pr
       options.onListening?.(wsUrl)
     },
     onError: reportError,
+  })
+
+  const handleUnexpectedClosure = (source: 'page' | 'browser') => {
+    if (closed || closing) return
+    closed = true
+    const message =
+      source === 'browser'
+        ? 'Playwright browser was closed while geometra-proxy was still expected to serve MCP actions.'
+        : 'Playwright page or context was closed while geometra-proxy was still expected to serve MCP actions.'
+    const error = new Error(message)
+    rejectBeforeInput(error)
+    rejectListening(error)
+    options.onError?.(error)
+    void hub.close().catch(() => {})
+  }
+
+  page.on('close', () => {
+    handleUnexpectedClosure('page')
+  })
+  browser.on('disconnected', () => {
+    handleUnexpectedClosure('browser')
   })
 
   const refreshObservers = () => {
@@ -120,14 +142,22 @@ export async function launchProxyRuntime(options: LaunchProxyRuntimeOptions): Pr
   const listeningWsUrl = await listeningPromise
 
   const close = async () => {
-    if (closed) return
-    closed = true
+    if (closed || closing) return
+    closing = true
     try {
       await hub.close()
     } catch {
       /* ignore */
     }
-    await browser.close()
+    try {
+      if (browser.isConnected()) {
+        await browser.close()
+      }
+    } catch {
+      /* ignore */
+    }
+    closed = true
+    closing = false
   }
 
   return {

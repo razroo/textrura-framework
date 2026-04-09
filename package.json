@@ -24,6 +24,7 @@
     "benchmark:mcp-flow": "node scripts/benchmark-mcp-form-flow.mjs",
     "benchmark:mcp-flow:heavy": "node scripts/benchmark-mcp-form-flow.mjs --scenario heavy",
     "benchmark:mcp-flow:all": "node scripts/benchmark-mcp-form-flow.mjs --all",
+    "benchmark:mcp-triage": "node scripts/benchmark-mcp-triage-flow.mjs",
     "examples:check": "tsc -p tsconfig.examples.json --noEmit",
     "examples:build": "node scripts/examples/build-workspace-demos.mjs",
     "examples:smoke": "bun run examples:check && bun run examples:build && bun run create:app:smoke",

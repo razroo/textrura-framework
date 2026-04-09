@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Geometra MCP Triage Benchmark</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #edf2f7;
+        --panel: #ffffff;
+        --ink: #132033;
+        --muted: #5f6f84;
+        --border: #d6dfeb;
+        --critical: #9f1239;
+        --high: #c2410c;
+        --medium: #1d4ed8;
+        --low: #0f766e;
+        --shadow: 0 18px 48px rgba(27, 39, 56, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        font-family: "Instrument Sans", "Avenir Next", "Segoe UI", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 28rem),
+          linear-gradient(180deg, #f7fafc 0%, var(--bg) 48%, #e7eef7 100%);
+      }
+
+      body {
+        padding: 1.25rem;
+      }
+
+      main {
+        display: grid;
+        gap: 1rem;
+        max-width: 96rem;
+        margin: 0 auto;
+      }
+
+      header,
+      section,
+      #incident-dialog {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 1.2rem;
+        box-shadow: var(--shadow);
+      }
+
+      header {
+        padding: 1.25rem;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(2rem, 5vw, 3.1rem);
+        letter-spacing: -0.03em;
+      }
+
+      .header-grid {
+        display: grid;
+        gap: 1rem;
+      }
+
+      .header-copy {
+        display: grid;
+        gap: 0.7rem;
+      }
+
+      .header-copy p,
+      #board-status,
+      .column-note,
+      .incident-card__summary,
+      .incident-card__meta,
+      .incident-card__chips,
+      #incident-dialog p {
+        color: var(--muted);
+      }
+
+      .header-metrics {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.7rem;
+      }
+
+      .metric {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        min-height: 2.5rem;
+        padding: 0.7rem 0.95rem;
+        border-radius: 999px;
+        background: #eef4ff;
+        color: #19396a;
+        font-size: 0.95rem;
+      }
+
+      .metric strong {
+        color: var(--ink);
+      }
+
+      #board-status {
+        padding: 0.85rem 1rem;
+        border-radius: 0.95rem;
+        background: #f7fafc;
+        border: 1px solid #e1e8f0;
+      }
+
+      .board {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .column {
+        display: grid;
+        gap: 0.95rem;
+        padding: 1rem;
+        align-content: start;
+      }
+
+      .column-header {
+        display: grid;
+        gap: 0.45rem;
+      }
+
+      .column-heading-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+      }
+
+      .column-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 2rem;
+        min-height: 2rem;
+        padding: 0 0.65rem;
+        border-radius: 999px;
+        background: #ecf2fb;
+        color: #315179;
+        font-size: 0.92rem;
+      }
+
+      .incident-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 0.85rem;
+      }
+
+      .incident-card {
+        display: grid;
+        gap: 0.85rem;
+        padding: 0.95rem;
+        border-radius: 1rem;
+        border: 1px solid var(--border);
+        background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+      }
+
+      .incident-card__top {
+        display: grid;
+        gap: 0.55rem;
+      }
+
+      .incident-card__heading {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+      }
+
+      .incident-card__heading h3 {
+        font-size: 1rem;
+        line-height: 1.35;
+      }
+
+      .severity {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 5.8rem;
+        min-height: 2rem;
+        padding: 0 0.8rem;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+      }
+
+      .severity.critical {
+        background: #ffe3eb;
+        color: var(--critical);
+      }
+
+      .severity.high {
+        background: #ffe9db;
+        color: var(--high);
+      }
+
+      .severity.medium {
+        background: #e2ecff;
+        color: var(--medium);
+      }
+
+      .severity.low {
+        background: #dff7f4;
+        color: var(--low);
+      }
+
+      .incident-card__meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem 0.95rem;
+        font-size: 0.92rem;
+      }
+
+      .incident-card__chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .incident-card__chips li {
+        padding: 0.4rem 0.6rem;
+        border-radius: 999px;
+        background: #f3f6fb;
+        border: 1px solid #e5ebf4;
+        font-size: 0.84rem;
+      }
+
+      .incident-card__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 0.7rem 0.95rem;
+        cursor: pointer;
+        font: inherit;
+      }
+
+      .primary-action {
+        background: #1d4ed8;
+        color: #f8fbff;
+      }
+
+      .secondary-action {
+        background: #edf3ff;
+        color: #27426f;
+      }
+
+      .ghost-action {
+        background: #f6f8fb;
+        color: #49627f;
+      }
+
+      #incident-dialog[hidden] {
+        display: none;
+      }
+
+      #incident-dialog {
+        position: fixed;
+        inset: auto 1.25rem 1.25rem auto;
+        width: min(30rem, calc(100vw - 2.5rem));
+        padding: 1.05rem;
+        display: grid;
+        gap: 0.9rem;
+        z-index: 10;
+      }
+
+      #incident-dialog header {
+        border: 0;
+        box-shadow: none;
+        padding: 0;
+      }
+
+      #incident-dialog-title {
+        font-size: 1.3rem;
+        line-height: 1.25;
+      }
+
+      .dialog-actions {
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      @media (max-width: 980px) {
+        .board {
+          grid-template-columns: 1fr;
+        }
+
+        body {
+          padding: 0.85rem;
+        }
+
+        #incident-dialog {
+          inset: auto 0.85rem 0.85rem 0.85rem;
+          width: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="header-grid">
+          <div class="header-copy">
+            <div class="metric">Benchmark surface</div>
+            <h1>Incident triage board</h1>
+            <p>
+              This page is intentionally dense: three named queues, repeated card actions, long summaries, and a
+              detail dialog that opens when the correct incident is selected.
+            </p>
+            <p>
+              It is designed to test whether Geometra MCP’s summary-first page model and targeted section expansion
+              stay smaller than a Playwright-style accessibility snapshot when an agent needs to understand a board
+              before acting.
+            </p>
+          </div>
+          <div class="header-metrics">
+            <div class="metric"><strong>3</strong> named queues</div>
+            <div class="metric"><strong>18</strong> visible incidents</div>
+            <div class="metric"><strong>54</strong> repeated card actions</div>
+          </div>
+          <p id="board-status" role="status" aria-live="polite">
+            No incident opened yet. Select a card to inspect the details drawer.
+          </p>
+        </div>
+      </header>
+
+      <div class="board" aria-label="Incident queues">
+        <section class="column" aria-labelledby="queue-escalations-heading">
+          <div class="column-header">
+            <div class="column-heading-row">
+              <h2 id="queue-escalations-heading">Escalations</h2>
+              <span class="column-badge" id="queue-escalations-count">0</span>
+            </div>
+            <p class="column-note">Production issues with revenue, identity, and contract impact.</p>
+          </div>
+          <ul class="incident-list" id="queue-escalations" aria-labelledby="queue-escalations-heading"></ul>
+        </section>
+
+        <section class="column" aria-labelledby="queue-review-heading">
+          <div class="column-header">
+            <div class="column-heading-row">
+              <h2 id="queue-review-heading">Ready for review</h2>
+              <span class="column-badge" id="queue-review-count">0</span>
+            </div>
+            <p class="column-note">Changes that need a human pass before rollout or customer messaging.</p>
+          </div>
+          <ul class="incident-list" id="queue-review" aria-labelledby="queue-review-heading"></ul>
+        </section>
+
+        <section class="column" aria-labelledby="queue-scheduled-heading">
+          <div class="column-header">
+            <div class="column-heading-row">
+              <h2 id="queue-scheduled-heading">Scheduled today</h2>
+              <span class="column-badge" id="queue-scheduled-count">0</span>
+            </div>
+            <p class="column-note">Lower-risk work already scoped and waiting on a narrow execution window.</p>
+          </div>
+          <ul class="incident-list" id="queue-scheduled" aria-labelledby="queue-scheduled-heading"></ul>
+        </section>
+      </div>
+    </main>
+
+    <div id="incident-dialog" role="dialog" aria-modal="true" aria-labelledby="incident-dialog-title" hidden>
+      <header>
+        <h2 id="incident-dialog-title">Incident details</h2>
+      </header>
+      <p id="incident-dialog-meta"></p>
+      <p id="incident-dialog-summary"></p>
+      <div class="dialog-actions">
+        <button type="button" class="secondary-action" id="incident-dialog-close">Close details</button>
+      </div>
+    </div>
+
+    <script>
+      const QUEUES = [
+        {
+          key: 'escalations',
+          label: 'Escalations',
+          incidents: [
+            {
+              id: 'northwind-renewal',
+              title: 'Northwind renewal blocked',
+              severity: 'critical',
+              owner: 'Revenue Ops',
+              age: '14m old',
+              customer: 'Northwind Health',
+              summary:
+                'The renewal workflow is stuck after contract signature. Billing status is green, but the access grant step never commits, so the customer cannot roll into the new seat tier.',
+              chips: ['Renewals', 'Access grant', 'Customer visible'],
+            },
+            {
+              id: 'login-throttling',
+              title: 'Login throttling misclassified',
+              severity: 'high',
+              owner: 'Identity Platform',
+              age: '22m old',
+              customer: 'Shared tenant',
+              summary:
+                'A false-positive risk signal is forcing normal traffic into the suspicious-login queue, which creates support volume and extends first-session completion time.',
+              chips: ['Auth', 'Rate limits', 'Support load'],
+            },
+            {
+              id: 'finance-export',
+              title: 'Finance export missed two partners',
+              severity: 'high',
+              owner: 'Ledger Sync',
+              age: '31m old',
+              customer: 'Channel partners',
+              summary:
+                'The daily export acknowledged success, but two partner batches were dropped after a retry collision and are now missing from the reconciliation report.',
+              chips: ['Exports', 'Retry race', 'Finance'],
+            },
+            {
+              id: 'search-latency',
+              title: 'Search latency spike in Frankfurt',
+              severity: 'medium',
+              owner: 'Search Infra',
+              age: '46m old',
+              customer: 'EU shared cluster',
+              summary:
+                'Median search latency is stable, but the 95th percentile widened sharply after a shard rebalance. Users report inconsistent first-result load times.',
+              chips: ['Search', 'EU', 'Tail latency'],
+            },
+            {
+              id: 'policy-sync',
+              title: 'Policy sync queued for 43 minutes',
+              severity: 'medium',
+              owner: 'Compliance Services',
+              age: '52m old',
+              customer: 'Regulated accounts',
+              summary:
+                'New retention rules are accepted by the control plane, but the downstream fanout workers are backlogged and have not applied the policy set.',
+              chips: ['Compliance', 'Fanout', 'Backlog'],
+            },
+            {
+              id: 'support-inbox',
+              title: 'Support inbox desynced',
+              severity: 'low',
+              owner: 'Operations Tooling',
+              age: '1h old',
+              customer: 'Support org',
+              summary:
+                'Reply state in the support view is lagging behind the CRM mirror by one polling interval, causing duplicate follow-up drafts in busy queues.',
+              chips: ['Tooling', 'CRM', 'Workflow'],
+            },
+          ],
+        },
+        {
+          key: 'review',
+          label: 'Ready for review',
+          incidents: [
+            {
+              id: 'onboarding-refresh',
+              title: 'Onboarding checklist refresh',
+              severity: 'low',
+              owner: 'Growth Systems',
+              age: '8m old',
+              customer: 'Self-serve cohorts',
+              summary:
+                'Copy and sequencing updates are ready, but the analytics annotations need one final pass before the launch window opens tomorrow morning.',
+              chips: ['Growth', 'Copy review', 'Analytics'],
+            },
+            {
+              id: 'webhook-rollback',
+              title: 'Pipeline webhook rollback notes',
+              severity: 'medium',
+              owner: 'Integrations',
+              age: '17m old',
+              customer: 'Platform teams',
+              summary:
+                'Rollback logic is complete, but the recovery note still needs approval because it changes how duplicate events are explained to customers.',
+              chips: ['Integrations', 'Rollback', 'Docs'],
+            },
+            {
+              id: 'usage-digest',
+              title: 'Usage digest anomaly review',
+              severity: 'medium',
+              owner: 'Reporting',
+              age: '26m old',
+              customer: 'Enterprise admins',
+              summary:
+                'The aggregation patch removes a double-count edge case. Review is blocked on a quick pass over the before-and-after examples for large accounts.',
+              chips: ['Reporting', 'Aggregation', 'Admin'],
+            },
+            {
+              id: 'sandbox-cleanup',
+              title: 'Sandbox cleanup policy',
+              severity: 'low',
+              owner: 'Developer Experience',
+              age: '34m old',
+              customer: 'Internal teams',
+              summary:
+                'A narrower cleanup window is proposed for stale sandboxes. The implementation is ready, but product wants a final check on messaging language.',
+              chips: ['DX', 'Policy', 'Internal'],
+            },
+            {
+              id: 'billing-copy',
+              title: 'Billing notice copy revision',
+              severity: 'low',
+              owner: 'Monetization',
+              age: '41m old',
+              customer: 'Trial accounts',
+              summary:
+                'The overdue notice now clarifies grace periods and paused seats, but legal wants one more pass on the cancellation phrasing.',
+              chips: ['Billing', 'Copy', 'Legal'],
+            },
+            {
+              id: 'audit-log-redaction',
+              title: 'Audit log redaction check',
+              severity: 'medium',
+              owner: 'Security Platform',
+              age: '49m old',
+              customer: 'Security admins',
+              summary:
+                'Redaction is live in staging. The only remaining step is to confirm the reviewer-facing event detail still preserves the right troubleshooting context.',
+              chips: ['Security', 'Redaction', 'Staging'],
+            },
+          ],
+        },
+        {
+          key: 'scheduled',
+          label: 'Scheduled today',
+          incidents: [
+            {
+              id: 'api-pagination',
+              title: 'API pagination cleanup',
+              severity: 'low',
+              owner: 'Public API',
+              age: '6m old',
+              customer: 'Developers',
+              summary:
+                'Cursor normalization is ready for rollout after the maintenance window. This change is scoped, documented, and waiting on the safe deploy slot.',
+              chips: ['API', 'Pagination', 'Maintenance'],
+            },
+            {
+              id: 'edge-cache-rules',
+              title: 'Edge cache rule rebalance',
+              severity: 'medium',
+              owner: 'Edge Services',
+              age: '14m old',
+              customer: 'Public web',
+              summary:
+                'Traffic has already been sampled in shadow mode. The new rule set only needs the noon release window to flip from analysis to enforcement.',
+              chips: ['Edge', 'Caching', 'Release window'],
+            },
+            {
+              id: 'seat-backfill',
+              title: 'Seat ledger backfill',
+              severity: 'medium',
+              owner: 'Billing Systems',
+              age: '23m old',
+              customer: 'Annual contracts',
+              summary:
+                'Historical seat deltas were reconciled yesterday. The production backfill is queued for the low-traffic window with explicit rollback notes.',
+              chips: ['Ledger', 'Backfill', 'Low traffic'],
+            },
+            {
+              id: 'status-feed',
+              title: 'Status feed schema cutover',
+              severity: 'low',
+              owner: 'Status Platform',
+              age: '35m old',
+              customer: 'Status subscribers',
+              summary:
+                'The new status feed schema is backward compatible, but the team still wants the deploy grouped with subscriber-monitoring dashboards.',
+              chips: ['Status', 'Schema', 'Monitoring'],
+            },
+            {
+              id: 'quota-refresh',
+              title: 'Quota refresh cron bump',
+              severity: 'low',
+              owner: 'Control Plane',
+              age: '43m old',
+              customer: 'Enterprise orgs',
+              summary:
+                'The quota refresh interval was validated in staging and only needs the coordinated slot where metrics and alert thresholds can update together.',
+              chips: ['Quota', 'Cron', 'Metrics'],
+            },
+            {
+              id: 'cdn-image-rollout',
+              title: 'CDN image preset rollout',
+              severity: 'low',
+              owner: 'Media Platform',
+              age: '57m old',
+              customer: 'Marketing surfaces',
+              summary:
+                'Preset generation is stable after synthetic traffic replay. Rollout is delayed only to align with the afternoon content refresh job.',
+              chips: ['CDN', 'Images', 'Rollout'],
+            },
+          ],
+        },
+      ]
+
+      const statusNode = document.getElementById('board-status')
+      const dialogNode = document.getElementById('incident-dialog')
+      const dialogTitleNode = document.getElementById('incident-dialog-title')
+      const dialogMetaNode = document.getElementById('incident-dialog-meta')
+      const dialogSummaryNode = document.getElementById('incident-dialog-summary')
+      const closeDialogButton = document.getElementById('incident-dialog-close')
+      const queueRoots = Object.fromEntries(QUEUES.map(queue => [queue.key, document.getElementById(`queue-${queue.key}`)]))
+
+      function sentenceCase(value) {
+        return value.charAt(0).toUpperCase() + value.slice(1)
+      }
+
+      function renderQueue(queue) {
+        const root = queueRoots[queue.key]
+        root.innerHTML = queue.incidents
+          .map(
+            (incident) => `
+              <li>
+                <article class="incident-card" aria-labelledby="incident-${incident.id}-title">
+                  <div class="incident-card__top">
+                    <div class="incident-card__heading">
+                      <h3 id="incident-${incident.id}-title">${incident.title}</h3>
+                      <span class="severity ${incident.severity}">${sentenceCase(incident.severity)}</span>
+                    </div>
+                    <p class="incident-card__summary">${incident.summary}</p>
+                  </div>
+                  <p class="incident-card__meta">
+                    <span>Owner: ${incident.owner}</span>
+                    <span>Customer: ${incident.customer}</span>
+                    <span>Age: ${incident.age}</span>
+                  </p>
+                  <ul class="incident-card__chips" aria-label="Tags">
+                    ${incident.chips.map((chip) => `<li>${chip}</li>`).join('')}
+                  </ul>
+                  <div class="incident-card__actions">
+                    <button
+                      type="button"
+                      class="primary-action"
+                      data-open-incident="${incident.id}"
+                      data-queue-key="${queue.key}"
+                    >
+                      Open incident
+                    </button>
+                    <button type="button" class="secondary-action">Assign owner</button>
+                    <button type="button" class="ghost-action">Snooze until handoff</button>
+                  </div>
+                </article>
+              </li>
+            `,
+          )
+          .join('')
+
+        document.getElementById(`queue-${queue.key}-count`).textContent = String(queue.incidents.length)
+      }
+
+      function allIncidents() {
+        return QUEUES.flatMap(queue =>
+          queue.incidents.map(incident => ({
+            ...incident,
+            queueKey: queue.key,
+            queueLabel: queue.label,
+          })),
+        )
+      }
+
+      function openIncident(incidentId, queueKey) {
+        const incident = allIncidents().find(
+          (candidate) => candidate.id === incidentId && candidate.queueKey === queueKey,
+        )
+        if (!incident) return
+
+        dialogTitleNode.textContent = incident.title
+        dialogMetaNode.textContent = `${incident.queueLabel} • ${incident.owner} • ${sentenceCase(incident.severity)} • ${incident.age}`
+        dialogSummaryNode.textContent = incident.summary
+        dialogNode.hidden = false
+        statusNode.textContent = `Opened incident: ${incident.title} in ${incident.queueLabel}.`
+      }
+
+      function closeIncidentDialog() {
+        dialogNode.hidden = true
+      }
+
+      for (const queue of QUEUES) renderQueue(queue)
+
+      document.addEventListener('click', (event) => {
+        const target = event.target
+        if (!(target instanceof HTMLElement)) return
+
+        const openId = target.getAttribute('data-open-incident')
+        if (openId) {
+          openIncident(openId, target.getAttribute('data-queue-key'))
+          return
+        }
+
+        if (target === closeDialogButton) {
+          closeIncidentDialog()
+        }
+      })
+    </script>
+  </body>
+</html>
