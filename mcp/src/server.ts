@@ -154,6 +154,16 @@ function formSchemaFormatInput() {
     .describe('`compact` (default) returns readable JSON fields. Use `packed` for the smallest schema payload with short keys.')
 }
 
+function pageModelModeInput() {
+  return z
+    .enum(['inline', 'deferred'])
+    .optional()
+    .default('inline')
+    .describe(
+      'When returnPageModel=true, `inline` includes the full page model in the connect response. `deferred` returns connect as soon as the transport is ready and lets the caller fetch geometra_page_model separately.',
+    )
+}
+
 function formSchemaContextInput() {
   return z
     .enum(['auto', 'always', 'none'])
@@ -464,7 +474,7 @@ export function createServer(): McpServer {
 
 Use \`url\` (ws://…) only when a Geometra/native server or an already-running proxy is listening. If you accidentally pass \`https://…\` in \`url\`, MCP treats it like \`pageUrl\` and starts the proxy for you.
 
-Chromium opens **visible** by default unless \`headless: true\`. File upload / wheel / native \`<select>\` need the proxy path (\`pageUrl\` or ws to proxy). Set \`returnForms: true\` and/or \`returnPageModel: true\` when you want a lower-turn startup response.`,
+Chromium opens **visible** by default unless \`headless: true\`. File upload / wheel / native \`<select>\` need the proxy path (\`pageUrl\` or ws to proxy). Set \`returnForms: true\` and/or \`returnPageModel: true\` when you want a lower-turn startup response. When connect first-response latency matters more than inlining the page model, pair \`returnPageModel: true\` with \`pageModelMode: "deferred"\` and call \`geometra_page_model\` next.`,
     {
       url: z
         .string()
@@ -509,6 +519,7 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
         .optional()
         .default(false)
         .describe('Include geometra_page_model output in the connect response so exploration can start in one turn.'),
+      pageModelMode: pageModelModeInput(),
       formId: z.string().optional().describe('Optional form id filter when returnForms=true'),
       maxFields: z.number().int().min(1).max(120).optional().default(80).describe('Cap returned fields per form when returnForms=true'),
       onlyRequiredFields: z.boolean().optional().default(false).describe('Only include required fields when returnForms=true'),
@@ -539,6 +550,11 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
         maxPrimaryActions: input.maxPrimaryActions,
         maxSectionsPerKind: input.maxSectionsPerKind,
       }
+      const deferInlinePageModel =
+        input.returnPageModel
+        && input.pageModelMode === 'deferred'
+        && !input.returnForms
+        && input.detail !== 'verbose'
 
       try {
         if (target.kind === 'proxy') {
@@ -549,6 +565,8 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
             width: input.width,
             height: input.height,
             slowMo: input.slowMo,
+            awaitInitialFrame: deferInlinePageModel ? false : undefined,
+            eagerInitialExtract: deferInlinePageModel ? true : undefined,
           })
           if (input.returnForms) {
             await stabilizeInlineFormSchemas(session, formSchema)
@@ -560,6 +578,7 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
             detail: input.detail,
             returnForms: input.returnForms,
             returnPageModel: input.returnPageModel,
+            pageModelMode: input.pageModelMode,
             formSchema,
             pageModelOptions,
           }), null, input.detail === 'verbose' ? 2 : undefined))
@@ -567,6 +586,7 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
         const session = await connect(target.wsUrl!, {
           width: input.width,
           height: input.height,
+          awaitInitialFrame: deferInlinePageModel ? false : undefined,
         })
         if (input.returnForms) {
           await stabilizeInlineFormSchemas(session, formSchema)
@@ -578,6 +598,7 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
           detail: input.detail,
           returnForms: input.returnForms,
           returnPageModel: input.returnPageModel,
+          pageModelMode: input.pageModelMode,
           formSchema,
           pageModelOptions,
         }), null, input.detail === 'verbose' ? 2 : undefined))
@@ -642,9 +663,9 @@ Unknown parameter names are rejected (strict schema). To wait until visible text
     },
     async ({ id, role, name, text, contextText, promptText, sectionText, itemText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, maxResults, detail }) => {
       const session = getSession()
-      if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
+      if (!session) return err('Not connected. Call geometra_connect first.')
 
-      const a11y = sessionA11y(session)
+      const a11y = await sessionA11yWhenReady(session)
       if (!a11y) return err('No UI tree available')
       const filter: NodeFilter = {
         id,
@@ -704,9 +725,9 @@ Use this when geometra_page_model tells you the page shape, but you want one dir
     },
     async ({ name, role, sectionText, promptText, itemText, maxResults, detail }) => {
       const session = getSession()
-      if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
+      if (!session) return err('Not connected. Call geometra_connect first.')
 
-      const a11y = sessionA11y(session)
+      const a11y = await sessionA11yWhenReady(session)
       if (!a11y) return err('No UI tree available')
 
       const filter: NodeFilter = {
@@ -745,7 +766,7 @@ The filter matches the same fields as geometra_query (strict schema — unknown 
     },
     async ({ id, role, name, text, contextText, promptText, sectionText, itemText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, present, timeoutMs, detail }) => {
       const session = getSession()
-      if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
+      if (!session) return err('Not connected. Call geometra_connect first.')
 
       const filterProbe: NodeFilter = {
         id,
@@ -804,7 +825,7 @@ Equivalent to \`geometra_wait_for\` with \`present: false\` and \`text\` set to 
     },
     async ({ text, timeoutMs }) => {
       const session = getSession()
-      if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
+      if (!session) return err('Not connected. Call geometra_connect first.')
 
       const filter: NodeFilter = { text }
       const waited = await waitForSemanticCondition(session, {
@@ -1284,9 +1305,9 @@ Use this first on normal HTML pages when you want to understand the page shape w
     },
     async ({ maxPrimaryActions, maxSectionsPerKind }) => {
       const session = getSession()
-      if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
+      if (!session) return err('Not connected. Call geometra_connect first.')
 
-      const a11y = sessionA11y(session)
+      const a11y = await sessionA11yWhenReady(session)
       if (!a11y) return err('No UI tree available')
       const model = buildPageModel(a11y, { maxPrimaryActions, maxSectionsPerKind })
       return ok(JSON.stringify(model))
@@ -1322,6 +1343,9 @@ Unlike geometra_expand_section, this collapses repeated radio/button groups into
       )
       if (!resolved.ok) return err(resolved.error)
       const session = resolved.session
+      if (!(await ensureSessionUiTree(session, 4_000))) {
+        return err('Timed out waiting for the initial UI tree after connect.')
+      }
 
       const payload = formSchemaResponsePayload(session, {
         formId,
@@ -1381,9 +1405,9 @@ Use this after geometra_page_model when you know which form/dialog/list/landmark
       includeBounds,
     }) => {
       const session = getSession()
-      if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
+      if (!session) return err('Not connected. Call geometra_connect first.')
 
-      const a11y = sessionA11y(session)
+      const a11y = await sessionA11yWhenReady(session)
       if (!a11y) return err('No UI tree available')
       const detail = expandPageSection(a11y, id, {
         maxHeadings,
@@ -1895,9 +1919,9 @@ JSON is minified in compact view to save tokens. For a summary-first overview, u
     },
     async ({ view, maxNodes, formId, maxFields, includeOptions }) => {
       const session = getSession()
-      if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
+      if (!session) return err('Not connected. Call geometra_connect first.')
 
-      const a11y = sessionA11y(session)
+      const a11y = await sessionA11yWhenReady(session)
       if (!a11y) return err('No UI tree available')
       if (view === 'full') {
         return ok(JSON.stringify(a11y, null, 2))
@@ -1976,7 +2000,7 @@ function connectPayload(
     detail?: ResponseDetail
   },
 ): Record<string, unknown> {
-  const a11y = sessionA11y(session)
+  const a11y = opts.detail === 'verbose' ? sessionA11y(session) : null
   return {
     connected: true,
     transport: opts.transport,
@@ -1997,6 +2021,17 @@ function sessionA11y(session: Session): A11yNode | null {
   session.cachedA11y = a11y
   session.cachedA11yRevision = session.updateRevision
   return a11y
+}
+
+async function ensureSessionUiTree(session: Session, timeoutMs = 4_000): Promise<boolean> {
+  if (session.tree && session.layout) return true
+  return await waitForUiCondition(session, () => Boolean(session.tree && session.layout), timeoutMs)
+}
+
+async function sessionA11yWhenReady(session: Session, timeoutMs = 4_000): Promise<A11yNode | null> {
+  const ready = await ensureSessionUiTree(session, timeoutMs)
+  if (!ready) return null
+  return sessionA11y(session)
 }
 
 function shortHash(value: string): string {
@@ -2142,6 +2177,7 @@ function connectResponsePayload(
     detail?: ResponseDetail
     returnForms?: boolean
     returnPageModel?: boolean
+    pageModelMode?: 'inline' | 'deferred'
     formSchema?: FormSchemaBuildOptions & { sinceSchemaId?: string; format?: FormSchemaFormat }
     pageModelOptions?: { maxPrimaryActions?: number; maxSectionsPerKind?: number }
   },
@@ -2153,9 +2189,26 @@ function connectResponsePayload(
     nextPayload.formSchema = formSchemaResponsePayload(session, opts.formSchema ?? {})
   }
   if (opts.returnPageModel) {
-    nextPayload.pageModel = pageModelResponsePayload(session, opts.pageModelOptions)
+    nextPayload.pageModel = opts.pageModelMode === 'deferred'
+      ? deferredPageModelConnectPayload(session, opts.pageModelOptions)
+      : pageModelResponsePayload(session, opts.pageModelOptions)
   }
   return nextPayload
+}
+
+function deferredPageModelConnectPayload(
+  session: Session,
+  options?: { maxPrimaryActions?: number; maxSectionsPerKind?: number },
+): Record<string, unknown> {
+  return {
+    deferred: true,
+    ready: Boolean(session.tree && session.layout),
+    tool: 'geometra_page_model',
+    options: {
+      maxPrimaryActions: options?.maxPrimaryActions ?? 6,
+      maxSectionsPerKind: options?.maxSectionsPerKind ?? 8,
+    },
+  }
 }
 
 function pageModelResponsePayload(
@@ -2593,6 +2646,10 @@ async function revealSemanticTarget(
     timeoutMs: number
   },
 ): Promise<{ ok: true; value: RevealTargetResult } | { ok: false; error: string }> {
+  const initialTreeReady = await ensureSessionUiTree(session, Math.max(4_000, options.timeoutMs))
+  if (!initialTreeReady) {
+    return { ok: false, error: 'Timed out waiting for the initial UI tree after connect.' }
+  }
   let attempts = 0
   let stepBudget = options.maxSteps
   while (attempts <= (stepBudget ?? 48)) {

@@ -49,6 +49,8 @@ Normal webpage -> @geometra/proxy (CLI or MCP-spawned) -> Chromium (headed by de
 
 For real web pages, prefer **`geometra_connect({ pageUrl: "https://…" })`**. The MCP server spawns **`@geometra/proxy`** (bundled), waits until the WebSocket is listening, then connects. You do **not** need a separate terminal command or a `ws://` URL.
 
+If you want `geometra_connect` to return quickly and fetch the page model on the next turn, use **`geometra_connect({ pageUrl: "https://…", returnPageModel: true, pageModelMode: "deferred" })`** and then call **`geometra_page_model`**. This is a first-response / handoff optimization, not automatically the fastest full connect-then-act path.
+
 Use **`geometra_connect({ url: "ws://…" })`** only when you already have a Geometra server or a manually started proxy.
 
 **IDE prompts:** Some clients ask the user to approve each MCP tool invocation or “sensitive” parameters. That policy lives in **Cursor / Claude Desktop / etc.** — the Geometra server cannot disable it. Using `pageUrl` avoids an *extra* approval for running a shell command to start the proxy and avoids typing a local `ws://` URL.

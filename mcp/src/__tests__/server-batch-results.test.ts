@@ -61,7 +61,7 @@ const mockState = vi.hoisted(() => ({
   sendSelectOption: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 2000 })),
   sendSetChecked: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 2000 })),
   sendWheel: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 2000 })),
-  waitForUiCondition: vi.fn(async () => true),
+  waitForUiCondition: vi.fn(async (_session: unknown, _check: () => boolean, _timeoutMs?: number) => true),
 }))
 
 function resetMockSessionCaches() {
@@ -582,6 +582,78 @@ describe('batch MCP result shaping', () => {
       },
     })
     expect(payload).not.toHaveProperty('formSchema')
+  })
+
+  it('can defer the page model so connect returns before the first frame', async () => {
+    const handler = getToolHandler('geometra_connect')
+    mockState.session.tree = null as unknown as typeof mockState.session.tree
+    mockState.session.layout = null as unknown as typeof mockState.session.layout
+
+    const result = await handler({
+      pageUrl: 'https://jobs.example.com/application',
+      headless: true,
+      returnPageModel: true,
+      pageModelMode: 'deferred',
+      maxPrimaryActions: 4,
+      maxSectionsPerKind: 3,
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    expect(mockState.connectThroughProxy).toHaveBeenCalledWith({
+      pageUrl: 'https://jobs.example.com/application',
+      port: undefined,
+      headless: true,
+      width: undefined,
+      height: undefined,
+      slowMo: undefined,
+      awaitInitialFrame: false,
+      eagerInitialExtract: true,
+    })
+    expect(payload).toMatchObject({
+      connected: true,
+      transport: 'proxy',
+      pageUrl: 'https://jobs.example.com/application',
+      pageModel: {
+        deferred: true,
+        ready: false,
+        tool: 'geometra_page_model',
+        options: {
+          maxPrimaryActions: 4,
+          maxSectionsPerKind: 3,
+        },
+      },
+    })
+  })
+
+  it('waits for the initial tree when page_model is requested after a deferred connect', async () => {
+    const handler = getToolHandler('geometra_page_model')
+    mockState.session.tree = null as unknown as typeof mockState.session.tree
+    mockState.session.layout = null as unknown as typeof mockState.session.layout
+    mockState.waitForUiCondition.mockImplementationOnce(async (_session, check) => {
+      mockState.session.tree = { kind: 'box' } as unknown as typeof mockState.session.tree
+      mockState.session.layout = {
+        x: 0,
+        y: 0,
+        width: 1280,
+        height: 800,
+        children: [],
+      } as unknown as typeof mockState.session.layout
+      bumpMockUiRevision()
+      return check()
+    })
+
+    const result = await handler({
+      maxPrimaryActions: 4,
+      maxSectionsPerKind: 3,
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    expect(mockState.waitForUiCondition).toHaveBeenCalledWith(mockState.session, expect.any(Function), 4000)
+    expect(payload).toMatchObject({
+      viewport: { width: 1280, height: 800 },
+      archetypes: ['form'],
+      summary: { formCount: 1 },
+    })
   })
 
   it('returns compact form schemas without requiring section expansion', async () => {
@@ -1250,6 +1322,44 @@ describe('query and reveal tools', () => {
     expect(mockState.waitForUiCondition).toHaveBeenCalledWith(mockState.session, expect.any(Function), 5000)
     expect(result.content[0]!.text).toContain('Post-click condition satisfied after')
     expect(result.content[0]!.text).toContain('1 matching node(s).')
+  })
+
+  it('waits for the initial tree before a semantic click after deferred connect', async () => {
+    const handler = getToolHandler('geometra_click')
+    mockState.session.tree = null as unknown as typeof mockState.session.tree
+    mockState.session.layout = null as unknown as typeof mockState.session.layout
+    mockState.currentA11yRoot = node('group', undefined, {
+      bounds: { x: 0, y: 0, width: 1280, height: 800 },
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 0 },
+      children: [
+        node('button', 'Open incident', {
+          bounds: { x: 40, y: 120, width: 140, height: 40 },
+          path: [0],
+        }),
+      ],
+    })
+    mockState.waitForUiCondition.mockImplementationOnce(async (_session, check) => {
+      mockState.session.tree = { kind: 'box' } as unknown as typeof mockState.session.tree
+      mockState.session.layout = {
+        x: 0,
+        y: 0,
+        width: 1280,
+        height: 800,
+        children: [],
+      } as unknown as typeof mockState.session.layout
+      bumpMockUiRevision()
+      return check()
+    })
+
+    const result = await handler({
+      role: 'button',
+      name: 'Open incident',
+      detail: 'minimal',
+    })
+
+    expect(mockState.waitForUiCondition).toHaveBeenCalledWith(mockState.session, expect.any(Function), 4000)
+    expect(mockState.sendClick).toHaveBeenCalledWith(mockState.session, 110, 140, undefined)
+    expect(result.content[0]!.text).toContain('Clicked button "Open incident" (n:0) at (110, 140).')
   })
 
   it('lets run_actions click a semantic target without manual coordinates', async () => {

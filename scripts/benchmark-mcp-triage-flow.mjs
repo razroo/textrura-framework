@@ -40,6 +40,7 @@ const SCENARIO = {
 function parseArgs(argv) {
   let headless = true
   let slowMo = 0
+  let deferredPageModel = false
 
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index]
@@ -80,11 +81,16 @@ function parseArgs(argv) {
         throw new Error(`Invalid --slow-mo value "${arg.slice('--slow-mo='.length)}". Expected a non-negative number.`)
       }
       slowMo = value
+      continue
+    }
+    if (arg === '--deferred-page-model') {
+      deferredPageModel = true
     }
   }
 
   return {
     assert: argv.includes('--assert'),
+    deferredPageModel,
     headless,
     slowMo,
   }
@@ -226,6 +232,7 @@ async function runGeometraFlow(url, createServer, scenario, options) {
       height: VIEWPORT.height,
       slowMo: options.slowMo > 0 ? options.slowMo : undefined,
       returnPageModel: true,
+      ...(options.deferredPageModel ? { pageModelMode: 'deferred' } : {}),
       maxPrimaryActions: 8,
       maxSectionsPerKind: 8,
       detail: 'terse',
@@ -429,6 +436,7 @@ async function runScenario(createServer, options) {
     console.log(
       `Browser mode: ${options.headless ? 'headless' : 'headed'}${options.slowMo > 0 ? `, slowMo=${options.slowMo} ms` : ''}`,
     )
+    console.log(`Page model mode: ${options.deferredPageModel ? 'deferred connect + later fetch' : 'inline on connect'}`)
     console.log(`Benchmark page: ${url}`)
     console.log(
       `Target task: open "${SCENARIO.target.title}" from the "${SCENARIO.target.listName}" queue.`,
@@ -467,12 +475,21 @@ async function runScenario(createServer, options) {
     printDelta('Exploration-only', geometraExplorationTotals, playwrightExplorationTotals)
 
     console.log('\nKey payloads')
-    console.log(
-      `Geometra connect+page_model output: ${geometra.steps[0].outputBytes} B (~${approxTokens(geometra.steps[0].outputBytes)} tokens), connected=${geometra.connectPayload.connected === true}, landmarks=${geometra.pageModelPayload.landmarks.length}`,
-    )
-    console.log(
-      `Geometra inline page_model primary actions: ${geometra.pageModelPayload.primaryActions.length}, lists=${geometra.pageModelPayload.lists.length}`,
-    )
+    if (geometra.pageModelPayload?.deferred) {
+      console.log(
+        `Geometra deferred connect output: ${geometra.steps[0].outputBytes} B (~${approxTokens(geometra.steps[0].outputBytes)} tokens), connected=${geometra.connectPayload.connected === true}, ready=${geometra.pageModelPayload.ready === true}`,
+      )
+      console.log(
+        `Geometra deferred page_model handoff: tool=${geometra.pageModelPayload.tool}, maxPrimaryActions=${geometra.pageModelPayload.options?.maxPrimaryActions ?? 'n/a'}, maxSectionsPerKind=${geometra.pageModelPayload.options?.maxSectionsPerKind ?? 'n/a'}`,
+      )
+    } else {
+      console.log(
+        `Geometra connect+page_model output: ${geometra.steps[0].outputBytes} B (~${approxTokens(geometra.steps[0].outputBytes)} tokens), connected=${geometra.connectPayload.connected === true}, landmarks=${geometra.pageModelPayload.landmarks.length}`,
+      )
+      console.log(
+        `Geometra inline page_model primary actions: ${geometra.pageModelPayload.primaryActions.length}, lists=${geometra.pageModelPayload.lists.length}`,
+      )
+    }
     console.log(
       `Geometra contextual click output: ${geometra.steps[1].outputBytes} B (~${approxTokens(geometra.steps[1].outputBytes)} tokens), postWaitMatches=${geometra.clickPayload.postWait?.matchCount ?? 0}`,
     )

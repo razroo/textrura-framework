@@ -24,7 +24,7 @@ Proxy-backed sessions stay warm by default on disconnect, and MCP now keeps a sm
 
 | Tool | Description |
 |---|---|
-| `geometra_connect` | Connect with `url` (ws://…) **or** `pageUrl` (https://…) to auto-start geometra-proxy; can inline `formSchema` and/or `pageModel` for lower-turn starts |
+| `geometra_connect` | Connect with `url` (ws://…) **or** `pageUrl` (https://…) to auto-start geometra-proxy; can inline `formSchema` and/or `pageModel`, or defer the page model for a faster first connect response |
 | `geometra_prepare_browser` | Pre-launch and pre-navigate a reusable proxy/browser for `pageUrl` without creating an active session; best when the agent can prepare before the user-facing task starts |
 | `geometra_query` | Find elements by stable id, role, name, text content, prompt/section/item context, current value, or semantic state such as `invalid`, `required`, or `busy` |
 | `geometra_wait_for` | Wait for a semantic condition instead of guessing sleeps (`busy`, `disabled`, alerts, values, etc.). **Strict parameters** — use `text` plus `present: false` to wait until a substring disappears (e.g. “Parsing your resume”); there is no `textGone` field |
@@ -344,8 +344,9 @@ For long application flows, prefer one of these patterns:
 7. `geometra_prepare_browser({ pageUrl, headless, width, height })` when you can hide browser startup before the real task and want the next proxy-backed flow to attach warm
 8. `geometra_run_actions` when you need mixed navigation + waits + field entry, especially with `pageUrl` / `url` for a one-call flow
 9. `geometra_connect({ pageUrl, returnPageModel: true })` when you want connect + summary-first exploration in one turn
-10. `geometra_find_action` or `geometra_click({ name, itemText / sectionText / promptText, ... })` when the target action repeats across cards/rows
-11. `geometra_page_model` + `geometra_expand_section` when you are still exploring the page rather than filling it
+10. `geometra_connect({ pageUrl, returnPageModel: true, pageModelMode: "deferred" })` when first-response latency matters more than inlining the page model; follow with `geometra_page_model`
+11. `geometra_find_action` or `geometra_click({ name, itemText / sectionText / promptText, ... })` when the target action repeats across cards/rows
+12. `geometra_page_model` + `geometra_expand_section` when you are still exploring the page rather than filling it
 
 Typical batch:
 

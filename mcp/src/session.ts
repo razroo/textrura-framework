@@ -829,9 +829,15 @@ async function startFreshProxySession(options: {
   height?: number
   slowMo?: number
   awaitInitialFrame?: boolean
+  eagerInitialExtract?: boolean
 }): Promise<Session> {
   const startedAt = performance.now()
-  const eagerInitialExtract = options.awaitInitialFrame !== false ? undefined : false
+  const eagerInitialExtract =
+    options.eagerInitialExtract !== undefined
+      ? options.eagerInitialExtract
+      : options.awaitInitialFrame !== false
+        ? undefined
+        : false
   try {
     const proxyStartStartedAt = performance.now()
     const { runtime, wsUrl } = await startEmbeddedGeometraProxy({
@@ -1059,6 +1065,7 @@ export async function connectThroughProxy(options: {
   height?: number
   slowMo?: number
   awaitInitialFrame?: boolean
+  eagerInitialExtract?: boolean
 }): Promise<Session> {
   clearReusableProxiesIfExited()
   let reuseFailure: unknown
