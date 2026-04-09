@@ -226,7 +226,7 @@ For most DOM-heavy pages, the best order is:
 4. `geometra_fill_form` for the lowest-token happy path after discovery
 5. `geometra_page_model` when you still need broader page orientation
 6. `geometra_expand_section` for one important section if needed
-7. `geometra_query` or `geometra_wait_for`
+7. `geometra_query` or `geometra_wait_for` (or `geometra_wait_for_resume_parse` after resume upload / “Parsing…” banners)
 8. `geometra_reveal` when the target is offscreen
 9. `geometra_fill_fields` when you need field-level control instead of schema-driven values
 10. `geometra_run_actions` for predictable mixed flows, otherwise a single action tool (`geometra_click`, `geometra_type`, etc.)

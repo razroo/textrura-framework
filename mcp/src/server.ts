@@ -198,7 +198,7 @@ function waitConditionShape() {
 const GEOMETRA_QUERY_FILTER_REQUIRED_MESSAGE =
   'Provide at least one filter (id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, or busy). ' +
   'This tool uses a strict schema: unknown keys are rejected. There is no textGone parameter — use text for substring matching. ' +
-  'To wait until text disappears from the UI, use geometra_wait_for with text and present: false.'
+  'To wait until text disappears from the UI, use geometra_wait_for with text and present: false, or geometra_wait_for_resume_parse for typical resume “Parsing…” banners.'
 
 const GEOMETRA_WAIT_FILTER_REQUIRED_MESSAGE =
   'Provide at least one semantic filter (id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, or busy). ' +
@@ -209,6 +209,26 @@ const GEOMETRA_WAIT_FILTER_REQUIRED_MESSAGE =
 const geometraQueryInputSchema = z.object(nodeFilterShape()).strict()
 
 const geometraWaitForInputSchema = z.object(waitConditionShape()).strict()
+
+/** Same upper bound as geometra_wait_for; resume uploads often need the full minute. */
+const geometraWaitForResumeParseInputSchema = z
+  .object({
+    text: z
+      .string()
+      .min(1)
+      .default('Parsing')
+      .describe(
+        'Substring that appears in the loading/parsing banner while work is in progress (default matches copy like “Parsing your resume”, “Parsing…”, “Parsing resume”, etc.)',
+      ),
+    timeoutMs: z
+      .number()
+      .int()
+      .min(50)
+      .max(60_000)
+      .default(60_000)
+      .describe('Maximum time to wait before returning an error (default 60000ms)'),
+  })
+  .strict()
 
 const timeoutMsInput = z.number().int().min(50).max(60_000).optional()
 
@@ -354,7 +374,7 @@ type BatchAction = z.infer<typeof batchActionSchema>
 
 export function createServer(): McpServer {
   const server = new McpServer(
-    { name: 'geometra', version: '1.19.20' },
+    { name: 'geometra', version: '1.19.21' },
     { capabilities: { tools: {} } },
   )
 
@@ -538,7 +558,7 @@ Unknown parameter names are rejected (strict schema). To wait until visible text
     'geometra_wait_for',
     `Wait for a semantic UI condition without guessing sleep durations. Use this for slow SPA transitions, resume parsing, custom validation alerts, disabled submit buttons, and value/state confirmation before submit.
 
-The filter matches the same fields as geometra_query (strict schema — unknown keys error). Set \`present: false\` to wait until **no** node matches — for example Ashby/Lever-style “Parsing your resume” or any “Parsing…” banner: \`{ "text": "Parsing", "present": false }\` (tune the substring to the site). Do not use a textGone parameter; use \`text\` + \`present: false\`.`,
+The filter matches the same fields as geometra_query (strict schema — unknown keys error). Set \`present: false\` to wait until **no** node matches — for example Ashby/Lever-style “Parsing your resume” or any “Parsing…” banner: \`{ "text": "Parsing", "present": false }\` (tune the substring to the site). Do not use a textGone parameter; use \`text\` + \`present: false\`, or \`geometra_wait_for_resume_parse\` for the usual post-upload parsing banner.`,
     geometraWaitForInputSchema as unknown as Parameters<McpServer['tool']>[2],
     async ({ id, role, name, text, contextText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, present, timeoutMs }) => {
       const session = getSession()
@@ -574,6 +594,27 @@ The filter matches the same fields as geometra_query (strict schema — unknown 
       }
 
       return ok(JSON.stringify(waited.value.matches.slice(0, 8), null, 2))
+    }
+  )
+
+  server.tool(
+    'geometra_wait_for_resume_parse',
+    `Wait until **no** visible text contains the given substring — optimized for ATS “parsing your resume” / file-processing banners after upload.
+
+Equivalent to \`geometra_wait_for\` with \`present: false\` and \`text\` set to a banner substring. Default \`text\` is \`Parsing\` (tune per site). Strict schema (unknown keys rejected).`,
+    geometraWaitForResumeParseInputSchema as unknown as Parameters<McpServer['tool']>[2],
+    async ({ text, timeoutMs }) => {
+      const session = getSession()
+      if (!session?.tree || !session?.layout) return err('Not connected. Call geometra_connect first.')
+
+      const filter: NodeFilter = { text }
+      const waited = await waitForSemanticCondition(session, {
+        filter,
+        present: false,
+        timeoutMs,
+      })
+      if (!waited.ok) return err(waited.error)
+      return ok(waitConditionSuccessLine(waited.value))
     }
   )
 
