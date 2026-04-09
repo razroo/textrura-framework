@@ -20,6 +20,27 @@ Geometra ships with [`@geometra/mcp`](mcp/README.md), an MCP server for AI agent
 
 Use Geometra MCP as the default interface when an LLM needs to explore, read, and act on a UI with lower token pressure than snapshot-heavy browser tooling. Keep Playwright-style tooling for deterministic scripted tests, exact low-level control, and site-specific fallback cases.
 
+### Geometra MCP vs Playwright MCP
+
+Playwright MCP gives an agent raw browser automation primitives — click coordinates, fill selectors, evaluate JavaScript. The agent must orchestrate every low-level step. Geometra MCP wraps the same Chromium engine (via `@geometra/proxy`) but adds a **semantic layer purpose-built for LLM agents**, making it faster, cheaper, and more resilient for real-world workflows like filling job applications.
+
+| Concern | Playwright MCP | Geometra MCP |
+|---|---|---|
+| **Form discovery** | Agent must query DOM or a11y tree, then map fields manually | `geometra_form_schema` returns all fields with stable IDs and labels in one call |
+| **Form filling** | One click + type per field — 20 fields = 20+ tool calls | `geometra_fill_form` fills an entire form by label or ID in a single call |
+| **Custom dropdowns** | Agent writes bespoke click sequences per site (Workday, Greenhouse, Lever all differ) | `geometra_pick_listbox_option` handles custom comboboxes with keyboard fallback |
+| **File uploads** | Agent must locate the input, trigger the chooser, handle dialogs | `geometra_upload_files` auto-detects strategy: label match, hidden input, native chooser, or synthetic drop |
+| **Page understanding** | Agent receives raw DOM or screenshots — expensive to parse | `geometra_page_model` returns a structured summary (forms, landmarks, dialogs, actions) |
+| **Token cost** | Full DOM snapshots or base64 screenshots burn thousands of tokens | Compact geometry JSON — viewport-visible nodes only, minified by default |
+| **Waiting** | `page.waitForSelector` with CSS selectors the agent must guess | `geometra_wait_for` uses semantic conditions (role, state, text content) |
+| **Batch actions** | Each action is a separate tool roundtrip | `geometra_run_actions` executes multi-step workflows in one call |
+| **Value aliasing** | Exact string match only — "US" won't match "United States" | Built-in aliases: "US" ↔ "USA", "Yes" ↔ "Agree" ↔ "Accept", city abbreviations (NYC → New York) |
+| **Resume parsing** | Agent must poll or guess when parsing completes | `geometra_wait_for_resume_parse` handles the "Parsing..." spinner pattern directly |
+
+**When to use Geometra MCP:** Any time an LLM agent needs to interact with a UI — filling forms, navigating workflows, reading page state. The semantic tools reduce round-trips, cut token costs, and handle the messy inconsistencies of real-world sites.
+
+**When to stick with Playwright MCP:** Deterministic scripted test suites, pixel-level assertions, or cases requiring direct JavaScript evaluation in the page context.
+
 ### Install
 
 <details>
