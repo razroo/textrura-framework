@@ -11,6 +11,7 @@
  * Run from repo root:
  *   node scripts/benchmark-mcp-triage-flow.mjs
  *   node scripts/benchmark-mcp-triage-flow.mjs --assert
+ *   node scripts/benchmark-mcp-triage-flow.mjs --headed --slow-mo 250
  */
 import http from 'node:http'
 import { spawnSync } from 'node:child_process'
@@ -37,8 +38,55 @@ const SCENARIO = {
 }
 
 function parseArgs(argv) {
+  let headless = true
+  let slowMo = 0
+
+  for (let index = 0; index < argv.length; index++) {
+    const arg = argv[index]
+    if (arg === '--headed') {
+      headless = false
+      continue
+    }
+    if (arg === '--headless') {
+      const value = argv[index + 1]
+      if (value === 'true' || value === 'false') {
+        headless = value === 'true'
+        index++
+      } else {
+        headless = true
+      }
+      continue
+    }
+    if (arg.startsWith('--headless=')) {
+      const value = arg.slice('--headless='.length)
+      if (value !== 'true' && value !== 'false') {
+        throw new Error(`Invalid --headless value "${value}". Expected true or false.`)
+      }
+      headless = value === 'true'
+      continue
+    }
+    if (arg === '--slow-mo') {
+      const value = Number(argv[index + 1] ?? '')
+      if (!Number.isFinite(value) || value < 0) {
+        throw new Error(`Invalid --slow-mo value "${argv[index + 1] ?? ''}". Expected a non-negative number.`)
+      }
+      slowMo = value
+      index++
+      continue
+    }
+    if (arg.startsWith('--slow-mo=')) {
+      const value = Number(arg.slice('--slow-mo='.length))
+      if (!Number.isFinite(value) || value < 0) {
+        throw new Error(`Invalid --slow-mo value "${arg.slice('--slow-mo='.length)}". Expected a non-negative number.`)
+      }
+      slowMo = value
+    }
+  }
+
   return {
     assert: argv.includes('--assert'),
+    headless,
+    slowMo,
   }
 }
 
@@ -184,7 +232,7 @@ function centerOf(bounds) {
   }
 }
 
-async function runGeometraFlow(url, createServer, scenario) {
+async function runGeometraFlow(url, createServer, scenario, options) {
   const server = createServer()
   const connect = getToolHandler(server, 'geometra_connect')
   const pageModel = getToolHandler(server, 'geometra_page_model')
@@ -198,9 +246,10 @@ async function runGeometraFlow(url, createServer, scenario) {
     const connectStep = await invokeTool(connect, 'geometra_connect', {
       pageUrl: url,
       port: 0,
-      headless: true,
+      headless: options.headless,
       width: VIEWPORT.width,
       height: VIEWPORT.height,
+      slowMo: options.slowMo > 0 ? options.slowMo : undefined,
       detail: 'minimal',
     })
     const connectPayload = parseJsonOutput(connectStep)
@@ -294,9 +343,12 @@ return {
 `.trim()
 }
 
-async function runPlaywrightFlow(url, scenario) {
+async function runPlaywrightFlow(url, scenario, options) {
   const launchStarted = performance.now()
-  const browser = await chromium.launch({ headless: true })
+  const browser = await chromium.launch({
+    headless: options.headless,
+    slowMo: options.slowMo,
+  })
   const page = await browser.newPage({ viewport: VIEWPORT })
   const launchMs = performance.now() - launchStarted
 
@@ -421,7 +473,7 @@ function assertBenchmark(geometra, playwright, scenario) {
   }
 }
 
-async function runScenario(createServer, assert) {
+async function runScenario(createServer, options) {
   const { server, url } = await startStaticServer(SCENARIO.htmlPath)
 
   try {
@@ -434,13 +486,16 @@ async function runScenario(createServer, assert) {
     console.log(SCENARIO.title)
     console.log('Geometra MCP vs Playwright MCP-style summary-first board benchmark')
     console.log('Playwright side is approximated as navigate + aria snapshot + browser_run_code.')
+    console.log(
+      `Browser mode: ${options.headless ? 'headless' : 'headed'}${options.slowMo > 0 ? `, slowMo=${options.slowMo} ms` : ''}`,
+    )
     console.log(`Benchmark page: ${url}`)
     console.log(
       `Target task: open "${SCENARIO.target.title}" from the "${SCENARIO.target.listName}" queue.`,
     )
 
-    const geometra = await runGeometraFlow(url, createServer, SCENARIO)
-    const playwright = await runPlaywrightFlow(url, SCENARIO)
+    const geometra = await runGeometraFlow(url, createServer, SCENARIO, options)
+    const playwright = await runPlaywrightFlow(url, SCENARIO, options)
 
     printStepTable('Geometra steps', geometra.steps)
     printStepTable('Playwright-style steps', playwright.steps)
@@ -497,7 +552,7 @@ async function runScenario(createServer, assert) {
       `Playwright run_code input: ${playwright.steps[2].inputBytes} B (~${approxTokens(playwright.steps[2].inputBytes)} tokens), dialogTitle=${JSON.stringify(playwright.runCodeResult.dialogTitle)}`,
     )
 
-    if (assert) {
+    if (options.assert) {
       assertBenchmark(geometra, playwright, SCENARIO)
       console.log('\nAssertions passed.')
     }
@@ -527,7 +582,7 @@ async function main() {
   )
 
   const { createServer } = await import(pathToFileURL(path.join(ROOT, 'mcp/dist/server.js')).href)
-  await runScenario(createServer, args.assert)
+  await runScenario(createServer, args)
 }
 
 main().catch(error => {

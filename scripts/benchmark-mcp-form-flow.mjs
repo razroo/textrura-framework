@@ -12,6 +12,7 @@
  *   node scripts/benchmark-mcp-form-flow.mjs
  *   node scripts/benchmark-mcp-form-flow.mjs --scenario heavy
  *   node scripts/benchmark-mcp-form-flow.mjs --all
+ *   node scripts/benchmark-mcp-form-flow.mjs --headed --slow-mo 250
  */
 import http from 'node:http'
 import { spawnSync } from 'node:child_process'
@@ -141,6 +142,8 @@ const SCENARIOS = {
 function parseArgs(argv) {
   let scenario = 'baseline'
   let runAll = false
+  let headless = true
+  let slowMo = 0
   const assert = argv.includes('--assert')
 
   for (let index = 0; index < argv.length; index++) {
@@ -152,10 +155,49 @@ function parseArgs(argv) {
     }
     if (arg === '--all') {
       runAll = true
+      continue
+    }
+    if (arg === '--headed') {
+      headless = false
+      continue
+    }
+    if (arg === '--headless') {
+      const value = argv[index + 1]
+      if (value === 'true' || value === 'false') {
+        headless = value === 'true'
+        index++
+      } else {
+        headless = true
+      }
+      continue
+    }
+    if (arg.startsWith('--headless=')) {
+      const value = arg.slice('--headless='.length)
+      if (value !== 'true' && value !== 'false') {
+        throw new Error(`Invalid --headless value "${value}". Expected true or false.`)
+      }
+      headless = value === 'true'
+      continue
+    }
+    if (arg === '--slow-mo') {
+      const value = Number(argv[index + 1] ?? '')
+      if (!Number.isFinite(value) || value < 0) {
+        throw new Error(`Invalid --slow-mo value "${argv[index + 1] ?? ''}". Expected a non-negative number.`)
+      }
+      slowMo = value
+      index++
+      continue
+    }
+    if (arg.startsWith('--slow-mo=')) {
+      const value = Number(arg.slice('--slow-mo='.length))
+      if (!Number.isFinite(value) || value < 0) {
+        throw new Error(`Invalid --slow-mo value "${arg.slice('--slow-mo='.length)}". Expected a non-negative number.`)
+      }
+      slowMo = value
     }
   }
 
-  return { scenario, runAll, assert }
+  return { scenario, runAll, assert, headless, slowMo }
 }
 
 function selectedScenarios({ scenario, runAll }) {
@@ -303,7 +345,7 @@ function variantUrl(rawUrl, variant) {
   return next.toString()
 }
 
-async function runGeometraFlow(url, createServer, scenario) {
+async function runGeometraFlow(url, createServer, scenario, options) {
   const server = createServer()
   const disconnect = getToolHandler(server, 'geometra_disconnect')
   const fillForm = getToolHandler(server, 'geometra_fill_form')
@@ -313,9 +355,10 @@ async function runGeometraFlow(url, createServer, scenario) {
     const fillStep = await invokeTool(fillForm, 'geometra_fill_form', {
       pageUrl: url,
       port: 0,
-      headless: true,
+      headless: options.headless,
       width: VIEWPORT.width,
       height: VIEWPORT.height,
+      slowMo: options.slowMo > 0 ? options.slowMo : undefined,
       valuesByLabel: scenarioValuesByLabel(scenario),
       includeSteps: false,
       detail: 'minimal',
@@ -332,9 +375,10 @@ async function runGeometraFlow(url, createServer, scenario) {
     const warmStep = await invokeTool(fillForm, 'geometra_fill_form', {
       pageUrl: warmUrl,
       port: 0,
-      headless: true,
+      headless: options.headless,
       width: VIEWPORT.width,
       height: VIEWPORT.height,
+      slowMo: options.slowMo > 0 ? options.slowMo : undefined,
       valuesByLabel: scenarioValuesByLabel(scenario),
       includeSteps: false,
       detail: 'minimal',
@@ -392,9 +436,12 @@ return {
   return lines.join('\n')
 }
 
-async function runPlaywrightFlow(url, scenario) {
+async function runPlaywrightFlow(url, scenario, options) {
   const launchStarted = performance.now()
-  const browser = await chromium.launch({ headless: true })
+  const browser = await chromium.launch({
+    headless: options.headless,
+    slowMo: options.slowMo,
+  })
   const page = await browser.newPage({ viewport: VIEWPORT })
   const launchMs = performance.now() - launchStarted
 
@@ -433,10 +480,13 @@ async function runPlaywrightFlow(url, scenario) {
   }
 }
 
-async function runGeometraProxyGroupDiagnostics(url, scenario, proxyFillFields) {
+async function runGeometraProxyGroupDiagnostics(url, scenario, proxyFillFields, options) {
   if (!Array.isArray(scenario.groups) || scenario.groups.length === 0) return []
 
-  const browser = await chromium.launch({ headless: true })
+  const browser = await chromium.launch({
+    headless: options.headless,
+    slowMo: options.slowMo,
+  })
   const page = await browser.newPage({ viewport: VIEWPORT })
 
   try {
@@ -543,7 +593,7 @@ function assertBenchmark(geometra, playwright, scenario) {
   }
 }
 
-async function runScenario(scenario, createServer, proxyFillFields, assert) {
+async function runScenario(scenario, createServer, proxyFillFields, options) {
   const { server, url } = await startStaticServer(scenario.htmlPath)
 
   try {
@@ -556,11 +606,14 @@ async function runScenario(scenario, createServer, proxyFillFields, assert) {
     console.log(`${scenario.title}`)
     console.log('Geometra MCP vs Playwright MCP-style form-flow benchmark')
     console.log('Playwright side is approximated as navigate + aria snapshot + browser_run_code.')
+    console.log(
+      `Browser mode: ${options.headless ? 'headless' : 'headed'}${options.slowMo > 0 ? `, slowMo=${options.slowMo} ms` : ''}`,
+    )
     console.log(`Benchmark page: ${url}`)
 
-    const geometra = await runGeometraFlow(url, createServer, scenario)
-    const playwright = await runPlaywrightFlow(url, scenario)
-    const groupDiagnostics = await runGeometraProxyGroupDiagnostics(url, scenario, proxyFillFields)
+    const geometra = await runGeometraFlow(url, createServer, scenario, options)
+    const playwright = await runPlaywrightFlow(url, scenario, options)
+    const groupDiagnostics = await runGeometraProxyGroupDiagnostics(url, scenario, proxyFillFields, options)
 
     printStepTable('Geometra steps', geometra.steps)
     printStepTable('Playwright-style steps', playwright.steps)
@@ -608,7 +661,7 @@ async function runScenario(scenario, createServer, proxyFillFields, assert) {
     )
     printGroupDiagnostics(groupDiagnostics.diagnostics, groupDiagnostics.invalidCount)
 
-    if (assert) {
+    if (options.assert) {
       assertBenchmark(geometra, playwright, scenario)
       console.log('\nAssertions passed.')
     }
@@ -645,7 +698,7 @@ async function main() {
     if (index > 0) {
       console.log('\n' + '='.repeat(80))
     }
-    await runScenario(scenario, createServer, proxyFillFields, args.assert)
+    await runScenario(scenario, createServer, proxyFillFields, args)
   }
 }
 
