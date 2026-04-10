@@ -505,6 +505,21 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(0, max, 0, max, 1, 1e307)).toBe(false)
   })
 
+  it('returns false when a large finite absX plus Number.MAX_VALUE width overflows the right edge (naive x <= right would accept any finite x)', () => {
+    const absX = 1e300
+    const width = Number.MAX_VALUE
+    expect(absX + width).toBe(Infinity)
+    // Strictly right of absX, inside the naive span, but right/bottom checks must reject non-finite edges.
+    expect(pointInInclusiveLayoutRect(1e301, 0, absX, 0, width, 10)).toBe(false)
+  })
+
+  it('returns false when a large finite absY plus Number.MAX_VALUE height overflows the bottom edge', () => {
+    const absY = 1e300
+    const height = Number.MAX_VALUE
+    expect(absY + height).toBe(Infinity)
+    expect(pointInInclusiveLayoutRect(0, 1e301, 0, absY, 10, height)).toBe(false)
+  })
+
   it('accepts the far inclusive corner at Number.MAX_VALUE when the rect starts at the origin (finite right/bottom; no abs+size overflow)', () => {
     const max = Number.MAX_VALUE
     expect(max + max).toBe(Infinity)
