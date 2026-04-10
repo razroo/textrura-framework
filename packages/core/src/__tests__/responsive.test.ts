@@ -294,6 +294,16 @@ describe('createViewport edge cases', () => {
     expect(breakpoint(signal(Number.NEGATIVE_INFINITY), bps).value).toBe('sm')
   })
 
+  it('coerces operands that overflow IEEE doubles to Infinity into zero (finiteNumberOrZero parity)', () => {
+    expect(Number.MAX_VALUE * 2).toBe(Infinity)
+    const vp = createViewport(Number.MAX_VALUE * 2, 100)
+    expect(vp.width.value).toBe(0)
+    expect(vp.height.value).toBe(100)
+    vp.resize(50, Number.MAX_VALUE * 2)
+    expect(vp.width.value).toBe(50)
+    expect(vp.height.value).toBe(0)
+  })
+
   it('coerces non-finite resize arguments to zero without throwing', () => {
     const vp = createViewport(800, 600)
     vp.resize(Number.NaN, Number.POSITIVE_INFINITY)
