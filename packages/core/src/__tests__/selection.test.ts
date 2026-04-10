@@ -1366,4 +1366,21 @@ describe('findInTextNodes', () => {
     // Same-length window on the original cannot equal the expanded lowercased query; avoid [0,2) ranges in a 1-unit string.
     expect(findInTextNodes(nodes, ch.toLowerCase())).toEqual([])
   })
+
+  it('does not apply Unicode normalization: NFC query cannot match NFD text when code-unit lengths differ', () => {
+    // NFD: e + combining acute (5 UTF-16 units); NFC "café" is 4 units — no same-length window in the original.
+    const nfd = 'cafe\u0301'
+    const nfc = 'café'
+    expect(nfd.length).toBe(5)
+    expect(nfc.length).toBe(4)
+    const nodes = [stubTextNode(0, nfd)]
+    expect(findInTextNodes(nodes, nfc)).toEqual([])
+  })
+
+  it('matches when the stored text and query share the same UTF-16 sequence (including precomposed é)', () => {
+    const nodes = [stubTextNode(0, 'café')]
+    expect(findInTextNodes(nodes, 'café')).toEqual([
+      { anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 4 },
+    ])
+  })
 })
