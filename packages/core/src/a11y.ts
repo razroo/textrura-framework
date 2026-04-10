@@ -36,6 +36,7 @@ function inferBoxRole(element: BoxElement): string {
   const tag = element.semantic?.tag
   if (tag === 'nav') return 'navigation'
   if (tag === 'main') return 'main'
+  if (tag === 'search') return 'search'
   if (tag === 'article') return 'article'
   if (tag === 'section') return 'region'
   if (tag === 'ul' || tag === 'ol') return 'list'

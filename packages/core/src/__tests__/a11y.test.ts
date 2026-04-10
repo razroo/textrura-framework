@@ -336,6 +336,12 @@ describe('toAccessibilityTree', () => {
     expect(submit.focusable).toBe(true)
   })
 
+  it('maps semantic tag search to the search landmark role', () => {
+    const tree = box({ semantic: { tag: 'search' }, width: 200, height: 40 }, [])
+    const layout = { x: 0, y: 0, width: 200, height: 40, children: [] }
+    expect(toAccessibilityTree(tree, layout).role).toBe('search')
+  })
+
   it('maps aria state attributes to accessibility node state', () => {
     const tree = box({}, [
       box({ semantic: { tag: 'button', ariaDisabled: true, ariaExpanded: false } }, []),

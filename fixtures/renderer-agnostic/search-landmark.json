@@ -1,0 +1,37 @@
+{
+  "tree": {
+    "kind": "box",
+    "props": { "width": 200, "height": 80 },
+    "semantic": { "tag": "search" },
+    "children": [
+      {
+        "kind": "box",
+        "props": { "width": 120, "height": 32 },
+        "semantic": { "tag": "button", "ariaLabel": "Submit search" },
+        "children": [
+          {
+            "kind": "text",
+            "props": { "text": "Go", "font": "14px sans-serif", "lineHeight": 18 }
+          }
+        ]
+      }
+    ]
+  },
+  "layout": {
+    "x": 0,
+    "y": 0,
+    "width": 200,
+    "height": 80,
+    "children": [
+      {
+        "x": 0,
+        "y": 0,
+        "width": 120,
+        "height": 32,
+        "children": [{ "x": 0, "y": 0, "width": 24, "height": 18, "children": [] }]
+      }
+    ]
+  },
+  "expectedSemanticIncludes": ["<search", "Submit search", "<button", "Go"],
+  "expectedA11yRoles": ["search", "button", "text"]
+}
