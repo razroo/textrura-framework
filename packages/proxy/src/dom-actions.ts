@@ -1037,7 +1037,23 @@ async function tryKeyboardSelectVisibleOption(
     return null
   }
 
-  for (const key of ['ArrowDown', 'ArrowUp'] as const) {
+  // Check if the currently active option already matches (e.g. pre-selected country code)
+  const alreadyActive = await activeListboxOptionLabel(page, anchor)
+  if (alreadyActive && selectionMatchScore(alreadyActive, label, exact) !== null) {
+    await page.keyboard.press('Enter')
+    return alreadyActive
+  }
+
+  // Try the direction most likely to reach the target first.
+  // Compare list position: if the target appears after the highlighted option, go down first.
+  const highlightedIdx = visible.options.findIndex(o => o.highlighted)
+  const targetIdx = visible.options.findIndex(o => selectionMatchScore(o.label, label, exact) !== null)
+  const targetBelow = highlightedIdx < 0 || targetIdx < 0 || targetIdx >= highlightedIdx
+  const directions: Array<'ArrowDown' | 'ArrowUp'> = targetBelow
+    ? ['ArrowDown', 'ArrowUp']
+    : ['ArrowUp', 'ArrowDown']
+
+  for (const key of directions) {
     const seen = new Set<string>()
     for (let step = 0; step < LISTBOX_KEYBOARD_FALLBACK_STEPS; step++) {
       await page.keyboard.press(key)
