@@ -159,6 +159,105 @@ describe('extractGeometry', () => {
     await page.close()
   })
 
+  it('reads picked value from a sibling for react-select-style custom comboboxes', async () => {
+    // Reproduces the exact DOM react-select v5 emits for a single-select
+    // with a committed value: an <input role="combobox"> trigger whose own
+    // .value is empty (no search query), with the picked option living in
+    // a *sibling* <div class="select__single-value">. Without the
+    // findCustomComboboxValueText fallback, geometra_query returns this
+    // node with no value field — which is exactly the gap the
+    // benchmark-mcp-greenhouse run surfaced. This test locks the fallback
+    // in so it can't silently regress.
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } })
+    await page.setContent(`
+      <style>
+        .select__control { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid #ccc; min-width: 280px; }
+        .select__value-container { display: flex; flex: 1; align-items: center; gap: 4px; }
+        .select__single-value { color: #1a1f2e; font-size: 14px; }
+        .select__input-container { display: flex; flex: 1; }
+        .select__input-container input { border: 0; outline: 0; flex: 1; min-width: 60px; font-size: 14px; }
+        .select__indicators { display: flex; }
+      </style>
+      <label for="work-auth">Are you legally authorized to work here?</label>
+      <div class="select__control">
+        <div class="select__value-container">
+          <div class="select__single-value">Yes</div>
+          <div class="select__input-container">
+            <input
+              id="work-auth"
+              role="combobox"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              aria-autocomplete="list"
+              aria-controls="work-auth-listbox"
+              value=""
+            />
+          </div>
+        </div>
+        <div class="select__indicators" aria-hidden="true">
+          <span>▾</span>
+        </div>
+      </div>
+    `)
+
+    const snapshot = await extractGeometry(page)
+    const nodes = flattenSnapshot(snapshot.tree, snapshot.layout)
+    const combobox = nodes.find(node => node.tree.semantic?.role === 'combobox')
+
+    expect(combobox).toBeDefined()
+    expect(combobox?.tree.semantic?.valueText).toBe('Yes')
+
+    await page.close()
+  })
+
+  it('falls back to a Radix-style SelectValue sibling for picked combobox values', async () => {
+    // Same gap, different combobox library. Radix Select renders
+    // <SelectValue> as a span with a class containing "SelectValue".
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } })
+    await page.setContent(`
+      <label for="country">Country</label>
+      <button id="country" role="combobox" aria-expanded="false" aria-haspopup="listbox">
+        <span class="SelectValue">Germany</span>
+        <span aria-hidden="true">▾</span>
+      </button>
+    `)
+
+    const snapshot = await extractGeometry(page)
+    const nodes = flattenSnapshot(snapshot.tree, snapshot.layout)
+    const combobox = nodes.find(node => node.tree.semantic?.role === 'combobox')
+
+    expect(combobox).toBeDefined()
+    expect(combobox?.tree.semantic?.valueText).toBe('Germany')
+
+    await page.close()
+  })
+
+  it('does not surface placeholder text as a combobox value', async () => {
+    // The fallback must not return text from a placeholder element — that
+    // would be silently misleading. This locks in the className filter.
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } })
+    await page.setContent(`
+      <label for="empty">Country</label>
+      <div class="select__control">
+        <div class="select__value-container">
+          <div class="select__placeholder">Select...</div>
+          <div class="select__input-container">
+            <input id="empty" role="combobox" aria-expanded="false" value="" />
+          </div>
+        </div>
+      </div>
+    `)
+
+    const snapshot = await extractGeometry(page)
+    const nodes = flattenSnapshot(snapshot.tree, snapshot.layout)
+    const combobox = nodes.find(node => node.tree.semantic?.role === 'combobox')
+
+    expect(combobox).toBeDefined()
+    expect(combobox?.tree.semantic?.valueText).toBeUndefined()
+
+    await page.close()
+  })
+
   it('strips nested option text from wrapped select labels', async () => {
     const page = await browser.newPage({ viewport: { width: 800, height: 600 } })
     await page.setContent(`

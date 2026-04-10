@@ -213,6 +213,55 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
     return described === error ? undefined : described
   }
 
+  /**
+   * Custom-combobox value readback fallback.
+   *
+   * react-select, Radix Select, and similar custom-combobox patterns render
+   * the trigger as a small `<input role="combobox">` whose `.value` is the
+   * typed search query (empty when nothing's being searched). The displayed
+   * picked option lives in a *sibling* presentational element — for
+   * react-select that's `<div class="<prefix>__single-value">Yes</div>`,
+   * for Radix it's `<span class="*SelectValue*">Yes</span>`. Without this
+   * fallback, `geometra_query` returns these comboboxes with no value field
+   * and agents have no way to verify what option was actually picked
+   * (the v1.34.x benchmark surfaced this as a real gap).
+   *
+   * Heuristic: ascend up to 4 parent levels and look for a non-input
+   * descendant whose class hints at "single-value", "singleValue",
+   * "SelectValue", or `[data-state="checked"]`. Skip placeholders, indicator
+   * icons, and elements that wrap other form controls.
+   */
+  function findCustomComboboxValueText(el: Element): string | undefined {
+    let cur: Element | null = el.parentElement
+    let depth = 0
+    while (cur && depth < 4) {
+      const candidates = cur.querySelectorAll<HTMLElement>(
+        '[class*="single-value"], [class*="singleValue"], [class*="SelectValue"], [data-radix-select-value], [data-headlessui-state]',
+      )
+      for (const candidate of candidates) {
+        if (candidate === el) continue
+        if (candidate.contains(el)) continue
+        // Note: descendants of the trigger ARE allowed — Radix renders the
+        // <SelectValue> as a child of the <button role="combobox"> trigger.
+        // For react-select v5 the single-value div is a sibling of the
+        // input wrapper, not a descendant of the input, so allowing
+        // descendants doesn't widen scope incorrectly there.
+        if (candidate.getAttribute('aria-hidden') === 'true') continue
+        const className = (candidate.getAttribute('class') ?? '').toLowerCase()
+        if (className.includes('placeholder')) continue
+        if (className.includes('indicator')) continue
+        // Skip wrappers that contain other form controls — we want the
+        // presentational text node, not a container.
+        if (candidate.querySelector('input, select, textarea, button')) continue
+        const text = candidate.textContent?.trim()
+        if (text) return text
+      }
+      cur = cur.parentElement
+      depth++
+    }
+    return undefined
+  }
+
   function controlValueText(el: Element): string | undefined {
     if (el instanceof HTMLInputElement) {
       if (el.type === 'password') return el.value ? '••••••••' : undefined
@@ -223,7 +272,14 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
         return undefined
       }
       if (!isTextLikeControl(el)) return undefined
-      return normalizedControlValue(el.value || el.getAttribute('aria-valuetext') || undefined)
+      const direct = normalizedControlValue(el.value || el.getAttribute('aria-valuetext') || undefined)
+      if (direct) return direct
+      // For custom-combobox triggers (react-select etc.) the picked value
+      // lives in a sibling, not on the input itself.
+      if (el.getAttribute('role') === 'combobox') {
+        return normalizedControlValue(findCustomComboboxValueText(el))
+      }
+      return undefined
     }
     if (el instanceof HTMLTextAreaElement) {
       return normalizedControlValue(el.value || el.getAttribute('aria-valuetext') || undefined)
@@ -239,11 +295,21 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
 
     const role = el.getAttribute('role')
     if (role === 'combobox' || role === 'textbox') {
+      // Prefer aria-valuetext when set — that's the explicit author signal.
+      const valueText = normalizedControlValue(el.getAttribute('aria-valuetext') ?? undefined)
+      if (valueText) return valueText
+      // For div-/button-based combobox triggers (Radix etc.), the trigger's
+      // own innerText typically includes both the picked option AND the
+      // dropdown indicator glyph. Try the custom-combobox sibling fallback
+      // first — it pulls the picked option out of a class-hinted sibling
+      // and ignores the indicator. Falling through to innerText is the
+      // last-resort branch for plain comboboxes with no library hints.
+      if (role === 'combobox') {
+        const sibling = normalizedControlValue(findCustomComboboxValueText(el))
+        if (sibling) return sibling
+      }
       return normalizedControlValue(
-        el.getAttribute('aria-valuetext') ||
-          (el as HTMLElement).innerText ||
-          el.textContent ||
-          undefined,
+        (el as HTMLElement).innerText || el.textContent || undefined,
       )
     }
 

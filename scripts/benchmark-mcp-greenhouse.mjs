@@ -262,6 +262,7 @@ async function runScenario(createServer, options) {
     const formSchema = getToolHandler(mcpServer, 'geometra_form_schema')
     const fillForm = getToolHandler(mcpServer, 'geometra_fill_form')
     const query = getToolHandler(mcpServer, 'geometra_query')
+    const snapshot = getToolHandler(mcpServer, 'geometra_snapshot')
     const disconnect = getToolHandler(mcpServer, 'geometra_disconnect')
     let browserOpen = false
 
@@ -308,6 +309,21 @@ async function runScenario(createServer, options) {
         detail: 'terse',
       })
       fillPayload = parseJsonOutput(fillStep)
+
+      // ── 2.5. Force a fresh full snapshot AFTER fill_form completes, so
+      // any queries below see the post-fill state of every combobox. The
+      // proxy debounces snapshot emission and the MCP caches the a11y tree
+      // by updateRevision; without an explicit refresh nudge, queries can
+      // race the proxy's next snapshot tick.
+      if (process.env.GREENHOUSE_DEBUG_PAYLOAD) {
+        const fullSnapshot = await invokeTool(snapshot, 'geometra_snapshot', {
+          view: 'full',
+          detail: 'verbose',
+        })
+        const { writeFile } = await import('node:fs/promises')
+        await writeFile('/tmp/greenhouse-snapshot-after-fill.json', fullSnapshot.outputText)
+        console.log(`[debug] full a11y snapshot written to /tmp/greenhouse-snapshot-after-fill.json`)
+      }
 
       // ── 3. Ground truth: query each eligibility combobox by name and
       // read its actual displayed value. fill_form's verifyFills doesn't
@@ -461,14 +477,43 @@ async function runScenario(createServer, options) {
           failures.push(`fill_form step for "${label}" matchMethod=${step.matchMethod} (expected label-exact)`)
         }
       }
-      // 4e. Ground truth: geometra_query must find each eligibility combobox.
-      // This catches a popup-confusion bug in a way the MCP's own self-report
-      // cannot. We assert that EVERY eligibility field's name resolved to at
-      // least one combobox node — anything zero means the post-fill a11y tree
-      // doesn't have a match, which would be alarming.
+      // 4e. Ground truth: every eligibility combobox must have its picked
+      // value present in the live a11y tree post-fill. matchCount alone is
+      // weak (the combobox always exists; the question is what it shows).
+      // We require either:
+      //   - the node has a `value` field equal to the expected option, OR
+      //   - we can read the picked option from the node's child text.
+      // The proxy extractor.ts now populates the value via the
+      // findCustomComboboxValueText fallback for react-select, so a real
+      // fill should always surface the value here.
+      //
+      // This is the actual v1.33.0 case test: a popup-confusion bug would
+      // leave the trigger showing its placeholder, which means no value
+      // here, which means a hard failure.
       for (const gt of groundTruth) {
         if ((gt.matchCount ?? 0) === 0) {
           failures.push(`geometra_query found no combobox named "${gt.label}" after fill`)
+          continue
+        }
+        const node = gt.observed
+        const observedValue =
+          node?.value ??
+          node?.text ??
+          node?.children?.[0]?.text ??
+          node?.children?.[0]?.value
+        if (typeof observedValue !== 'string') {
+          failures.push(
+            `combobox "${gt.label}" has no readable value after fill (expected "${gt.expected}"). ` +
+            `The MCP reported the fill as ok=true but the live a11y tree shows no picked option — ` +
+            `this is the silent-fill bug the v1.33.0 popup-scoping fix is supposed to prevent. ` +
+            `Run with GREENHOUSE_DEBUG_PAYLOAD=1 to dump the post-fill snapshot.`,
+          )
+          continue
+        }
+        if (normalizeLabel(observedValue) !== normalizeLabel(gt.expected)) {
+          failures.push(
+            `combobox "${gt.label}" landed wrong value: expected="${gt.expected}" actual="${observedValue}"`,
+          )
         }
       }
 
