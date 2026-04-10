@@ -40,6 +40,16 @@ describe('layoutBoundsAreFinite', () => {
     ).toBe(false)
   })
 
+  it('accepts frozen or sealed empty children arrays (immutable snapshots; Array.isArray still true)', () => {
+    const frozen = Object.freeze([] as const)
+    expect(Object.isFrozen(frozen)).toBe(true)
+    expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 10, height: 10, children: frozen })).toBe(true)
+
+    const sealed = Object.seal([] as [])
+    expect(Object.isSealed(sealed)).toBe(true)
+    expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 10, height: 10, children: sealed })).toBe(true)
+  })
+
   it('rejects children that inherit Array.prototype but are not Arrays (Array.isArray guard)', () => {
     const children = Object.create(Array.prototype) as unknown as ComputedLayout['children']
     expect(Array.isArray(children)).toBe(false)
