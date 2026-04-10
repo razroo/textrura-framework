@@ -195,6 +195,38 @@ describe('box layout', () => {
     expect(sparseResult.children[2]).toEqual(denseResult.children[1])
   })
 
+  it('sparse children: middle hole in rtl row keeps surviving siblings aligned with dense rtl row (stable indices)', () => {
+    const dense: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'row',
+      dir: 'rtl',
+      children: [
+        { width: 50, height: 40 },
+        { width: 50, height: 40 },
+      ],
+    }
+    const sparse: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'row',
+      dir: 'rtl',
+      children: [{ width: 50, height: 40 }, null, { width: 50, height: 40 }],
+    } as unknown as BoxNode
+
+    const opts = { width: 200, height: 80, direction: 'ltr' as const }
+    const denseResult = computeLayout(dense, opts)
+    const sparseResult = computeLayout(sparse, opts)
+
+    expect(sparseResult.children).toHaveLength(3)
+    expect(sparseResult.children[0]!.x).toBe(denseResult.children[0]!.x)
+    expect(sparseResult.children[0]!.y).toBe(denseResult.children[0]!.y)
+    expect(sparseResult.children[2]!.x).toBe(denseResult.children[1]!.x)
+    expect(sparseResult.children[2]!.y).toBe(denseResult.children[1]!.y)
+    expect(sparseResult.children[1]!.width).toBe(0)
+    expect(sparseResult.children[1]!.height).toBe(0)
+  })
+
   it('applies aspectRatio as width/height when width is definite (Yoga setAspectRatio)', () => {
     const tree: BoxNode = {
       width: 200,
