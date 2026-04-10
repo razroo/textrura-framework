@@ -1,0 +1,9 @@
+# Pre-push lint guard.
+#
+# `bun run lint` is fast (~6s) and catches the kind of regression that
+# previously sat red on `main` for 14+ releases (an unused-assignment
+# warning that nobody noticed because the npm publish workflow isn't
+# gated on Quality checks). Pre-push (not pre-commit) is the right
+# granularity: it stays out of the way of normal commits but blocks
+# the git operation that would actually expose the failure to CI.
+bun run lint

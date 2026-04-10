@@ -12,6 +12,7 @@
         "@playwright/test": "^1.54.2",
         "eslint": "^10.1.0",
         "eslint-config-prettier": "^10.1.8",
+        "husky": "^9.1.7",
         "prettier": "^3.8.1",
         "typescript": "6.0.2",
         "typescript-eslint": "^8.58.0",
@@ -159,7 +160,7 @@
     },
     "packages/agent": {
       "name": "@geometra/agent",
-      "version": "1.19.10",
+      "version": "1.34.0",
       "dependencies": {
         "@geometra/core": "^1.6.0",
         "@geometra/server": "^1.6.0",
@@ -168,7 +169,7 @@
     },
     "packages/cli": {
       "name": "@geometra/cli",
-      "version": "1.19.10",
+      "version": "1.34.0",
       "bin": {
         "geometra": "./dist/bin.js",
       },
@@ -185,14 +186,14 @@
     },
     "packages/client": {
       "name": "@geometra/client",
-      "version": "1.19.10",
+      "version": "1.34.0",
       "dependencies": {
         "@geometra/core": "^1.6.0",
       },
     },
     "packages/core": {
       "name": "@geometra/core",
-      "version": "1.19.10",
+      "version": "1.34.0",
       "dependencies": {
         "textura": "^1.6.0",
       },
@@ -202,7 +203,7 @@
     },
     "packages/proxy": {
       "name": "@geometra/proxy",
-      "version": "1.19.10",
+      "version": "1.34.0",
       "bin": {
         "geometra-proxy": "./dist/index.js",
       },
@@ -218,7 +219,7 @@
     },
     "packages/renderer-canvas": {
       "name": "@geometra/renderer-canvas",
-      "version": "1.19.10",
+      "version": "1.34.0",
       "dependencies": {
         "@geometra/client": "^1.6.0",
         "@geometra/core": "^1.6.0",
@@ -226,7 +227,7 @@
     },
     "packages/renderer-terminal": {
       "name": "@geometra/renderer-terminal",
-      "version": "1.19.10",
+      "version": "1.34.0",
       "dependencies": {
         "@geometra/core": "^1.6.0",
       },
@@ -236,7 +237,7 @@
     },
     "packages/renderer-three": {
       "name": "@geometra/renderer-three",
-      "version": "1.19.10",
+      "version": "1.34.0",
       "dependencies": {
         "@geometra/client": "^1.6.0",
         "@geometra/core": "^1.6.0",
@@ -252,21 +253,21 @@
     },
     "packages/renderer-webgpu": {
       "name": "@geometra/renderer-webgpu",
-      "version": "1.19.10",
+      "version": "1.34.0",
       "dependencies": {
         "@geometra/core": "^1.2.1",
       },
     },
     "packages/router": {
       "name": "@geometra/router",
-      "version": "1.19.10",
+      "version": "1.34.0",
       "dependencies": {
         "@geometra/core": "^1.2.1",
       },
     },
     "packages/server": {
       "name": "@geometra/server",
-      "version": "1.19.10",
+      "version": "1.34.0",
       "dependencies": {
         "@geometra/core": "^1.6.0",
         "ws": "^8.18.0",
@@ -277,7 +278,7 @@
     },
     "packages/textura": {
       "name": "textura",
-      "version": "1.19.10",
+      "version": "1.34.0",
       "dependencies": {
         "@chenglou/pretext": "^0.0.3",
         "yoga-layout": "^3.2.1",
@@ -285,7 +286,7 @@
     },
     "packages/tw": {
       "name": "@geometra/tw",
-      "version": "1.19.10",
+      "version": "1.34.0",
       "dependencies": {
         "@geometra/core": "^1.6.0",
         "textura": "^1.6.0",
@@ -293,7 +294,7 @@
     },
     "packages/ui": {
       "name": "@geometra/ui",
-      "version": "1.19.10",
+      "version": "1.34.0",
       "dependencies": {
         "@geometra/core": "^1.6.0",
       },
@@ -669,6 +670,8 @@
     "hono": ["hono@4.12.12", "", {}, "sha512-p1JfQMKaceuCbpJKAPKVqyqviZdS0eUxH9v82oWo1kb9xjQ5wA6iP3FNVAPDFlz5/p7d45lO+BpSk1tuSZMF4Q=="],
 
     "http-errors": ["http-errors@2.0.1", "", { "dependencies": { "depd": "~2.0.0", "inherits": "~2.0.4", "setprototypeof": "~1.2.0", "statuses": "~2.0.2", "toidentifier": "~1.0.1" } }, "sha512-4FbRdAX+bSdmo4AUFuS0WNiPz8NgFt+r8ThgNWmlrjQjt1Q7ZR9+zTlce2859x4KSXrwIsaeTqDoKQmtP8pLmQ=="],
+
+    "husky": ["husky@9.1.7", "", { "bin": { "husky": "bin.js" } }, "sha512-5gs5ytaNjBrh5Ow3zrvdUUY+0VxIuWVL4i9irt6friV+BqdCfmV11CQTWMiBYWHbXhco+J1kHfTOUkePhCDvMA=="],
 
     "iconv-lite": ["iconv-lite@0.7.2", "", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3.0.0" } }, "sha512-im9DjEDQ55s9fL4EYzOAv0yMqmMBSZp6G0VvFyTMPKWxiSBHUj9NW/qqLmXUwXrrM7AvqSlTCfvqRb0cM8yYqw=="],
 
