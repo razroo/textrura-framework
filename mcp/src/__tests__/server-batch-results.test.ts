@@ -1105,7 +1105,7 @@ describe('query and reveal tools', () => {
   })
 
   it('reveals an offscreen target with semantic scrolling instead of requiring manual wheels', async () => {
-    const handler = getToolHandler('geometra_reveal')
+    const handler = getToolHandler('geometra_scroll_to')
 
     mockState.currentA11yRoot = node('group', undefined, {
       bounds: { x: 0, y: 0, width: 1280, height: 800 },
@@ -1172,7 +1172,7 @@ describe('query and reveal tools', () => {
   })
 
   it('auto-scales reveal steps for tall forms when maxSteps is omitted', async () => {
-    const handler = getToolHandler('geometra_reveal')
+    const handler = getToolHandler('geometra_scroll_to')
     let scrollY = 0
 
     const setTree = () => {

@@ -2578,19 +2578,35 @@ export type FormFieldFill = ClientFillField
 export async function fillFields(page: Page, fields: FormFieldFill[], cache = createFillLookupCache()): Promise<void> {
   const nativeResults = await attemptNativeBatchFill(page, fields)
 
+  // Separate text fields (parallelizable) from interactive fields (sequential)
+  const textFills: Array<{ field: FormFieldFill & { kind: 'text' } }> = []
+  const otherFills: Array<{ index: number; field: FormFieldFill }> = []
+
   for (let index = 0; index < fields.length; index++) {
-    const field = fields[index]!
     if (nativeResults[index]) continue
+    const field = fields[index]!
+    if (field.kind === 'text') {
+      textFills.push({ field: field as FormFieldFill & { kind: 'text' } })
+    } else {
+      otherFills.push({ index, field })
+    }
+  }
+
+  // Fill text fields in parallel (they don't trigger DOM changes that affect each other)
+  if (textFills.length > 0) {
+    await Promise.all(textFills.map(({ field }) =>
+      setFieldText(page, field.fieldLabel, field.value, { fieldId: field.fieldId, exact: field.exact, cache }),
+    ))
+  }
+
+  // Fill interactive fields sequentially (choice/toggle/file/auto may trigger DOM changes)
+  for (const { field } of otherFills) {
     if (field.kind === 'auto') {
       await setAutoFieldValue(page, field.fieldLabel, field.value, {
         fieldId: field.fieldId,
         exact: field.exact,
         cache,
       })
-      continue
-    }
-    if (field.kind === 'text') {
-      await setFieldText(page, field.fieldLabel, field.value, { fieldId: field.fieldId, exact: field.exact, cache })
       continue
     }
     if (field.kind === 'choice') {
@@ -2611,7 +2627,9 @@ export async function fillFields(page: Page, fields: FormFieldFill[], cache = cr
       })
       continue
     }
-    await attachFiles(page, field.paths, { fieldId: field.fieldId, fieldLabel: field.fieldLabel, exact: field.exact, cache })
+    if (field.kind === 'file') {
+      await attachFiles(page, field.paths, { fieldId: field.fieldId, fieldLabel: field.fieldLabel, exact: field.exact, cache })
+    }
   }
 }
 

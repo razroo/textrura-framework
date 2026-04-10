@@ -120,6 +120,12 @@ export interface CaptchaDetection {
   hint?: string
 }
 
+export interface VerificationDetection {
+  detected: boolean
+  type?: 'email_code' | 'sms_code' | 'security_question' | 'unknown'
+  hint?: string
+}
+
 export interface PageModel {
   viewport: { width: number; height: number }
   archetypes: PageArchetype[]
@@ -131,6 +137,7 @@ export interface PageModel {
     focusableCount: number
   }
   captcha?: CaptchaDetection
+  verification?: VerificationDetection
   primaryActions: PagePrimaryAction[]
   landmarks: PageLandmark[]
   forms: PageFormModel[]
@@ -1051,6 +1058,18 @@ export function connect(
       cachedFormSchemas: new Map(),
     }
     let resolved = false
+    let lastMessageAt = Date.now()
+    let heartbeatInterval: ReturnType<typeof setInterval> | null = null
+
+    function startHeartbeat(): void {
+      if (heartbeatInterval) return
+      heartbeatInterval = setInterval(() => {
+        if (Date.now() - lastMessageAt > 30_000) {
+          try { ws.close() } catch { /* ignore */ }
+        }
+      }, 30_000)
+      heartbeatInterval.unref()
+    }
 
     const timeout = setTimeout(() => {
       if (!resolved) {
@@ -1078,11 +1097,13 @@ export function connect(
         }
         activeSessions.set(session.id, session)
         defaultSessionId = session.id
+        startHeartbeat()
         resolve(session)
       }
     })
 
     ws.on('message', (data) => {
+      lastMessageAt = Date.now()
       try {
         const msg = JSON.parse(String(data))
         if (msg.type === 'frame') {
@@ -1102,6 +1123,7 @@ export function connect(
             }
             activeSessions.set(session.id, session)
             defaultSessionId = session.id
+            startHeartbeat()
             resolve(session)
           }
         } else if (msg.type === 'patch' && session.layout) {
@@ -1121,6 +1143,7 @@ export function connect(
     })
 
     ws.on('close', () => {
+      if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null }
       if (activeSessions.get(session.id) === session) {
         activeSessions.delete(session.id)
         if (defaultSessionId === session.id) promoteDefaultSession()
@@ -2639,6 +2662,38 @@ function detectCaptcha(root: A11yNode): CaptchaDetection {
   return found ?? { detected: false }
 }
 
+const VERIFICATION_FIELD_PATTERN = /verif|security.?code|confirm.*(code|email)|one.?time|otp|2fa|mfa|passcode/i
+const VERIFICATION_CONTEXT_PATTERN = /sent.*(code|email|sms|text)|enter.*code|check.your.(email|phone|inbox)|we.sent|verification/i
+
+function detectVerification(root: A11yNode): VerificationDetection {
+  let found: VerificationDetection | undefined
+
+  function walk(node: A11yNode) {
+    if (found) return
+    const name = node.name ?? ''
+    if (node.role === 'textbox' && VERIFICATION_FIELD_PATTERN.test(name)) {
+      const type = /email|inbox/i.test(name) ? 'email_code'
+        : /sms|phone|text/i.test(name) ? 'sms_code'
+        : /security.?question/i.test(name) ? 'security_question'
+        : 'unknown'
+      found = { detected: true, type, hint: `Verification field: "${name}"` }
+      return
+    }
+    const text = [name, node.value].filter(Boolean).join(' ')
+    if (VERIFICATION_CONTEXT_PATTERN.test(text)) {
+      const type = /email|inbox/i.test(text) ? 'email_code'
+        : /sms|phone|text.message/i.test(text) ? 'sms_code'
+        : 'unknown'
+      found = { detected: true, type, hint: text.slice(0, 120) }
+      return
+    }
+    for (const child of node.children) walk(child)
+  }
+
+  walk(root)
+  return found ?? { detected: false }
+}
+
 export function buildPageModel(
   root: A11yNode,
   options?: {
@@ -2744,9 +2799,11 @@ export function buildPageModel(
   }
 
   const captcha = detectCaptcha(root)
+  const verification = detectVerification(root)
   return {
     ...baseModel,
     ...(captcha.detected ? { captcha } : {}),
+    ...(verification.detected ? { verification } : {}),
     archetypes: inferPageArchetypes(baseModel),
   }
 }

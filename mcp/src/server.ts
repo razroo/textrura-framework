@@ -532,8 +532,8 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
       returnForms: z
         .boolean()
         .optional()
-        .default(false)
-        .describe('Include compact form schema discovery in the connect response so form flows can start in one turn.'),
+        .default(true)
+        .describe('Include compact form schema discovery in the connect response (default true). Set false to skip form discovery for non-form workflows.'),
       returnPageModel: z
         .boolean()
         .optional()
@@ -999,6 +999,16 @@ Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / combo
             : { index, kind: field.kind, ok: true, ...result.compact })
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e)
+          // Retry once for transient selection failures
+          if (message.includes('selection_not_confirmed')) {
+            try {
+              const retryResult = await executeFillField(session, field, detail)
+              steps.push(detail === 'verbose'
+                ? { index, kind: field.kind, ok: true, summary: retryResult.summary, retried: true }
+                : { index, kind: field.kind, ok: true, ...retryResult.compact, retried: true })
+              continue
+            } catch { /* fall through to error handling */ }
+          }
           const suggestion = isResolvedFillFieldInput(field) ? suggestRecovery(field, message) : undefined
           steps.push({ index, kind: field.kind, ok: false, error: message, ...(suggestion ? { suggestion } : {}) })
           if (stopOnError) {
@@ -1162,6 +1172,8 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
       })
       if (schemas.length === 0) return err('No forms found in the current UI')
 
+      const entryUrl = afterConnect?.meta?.pageUrl
+
       const resolution = resolveTargetFormSchema(schemas, { formId, valuesById, valuesByLabel })
       if (!resolution.ok) return err(resolution.error)
       const schema = resolution.schema
@@ -1318,6 +1330,19 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
         ...(stoppedAt !== undefined ? { stoppedAt, resumeFromIndex: stoppedAt + 1 } : {}),
         ...(verification ? { verification } : {}),
         ...(signals ? { final: sessionSignalsPayload(signals, detail) } : {}),
+      }
+
+      // Detect page navigation after fill (e.g. multi-page form submission)
+      const afterUrl = after?.meta?.pageUrl
+      if (afterUrl && entryUrl && afterUrl !== entryUrl) {
+        ;(payload as Record<string, unknown>).navigated = true
+        ;(payload as Record<string, unknown>).afterUrl = afterUrl
+        const model = after ? buildPageModel(after) : undefined
+        if (model) {
+          ;(payload as Record<string, unknown>).pageModel = summarizePageModel(model)
+          if (model.captcha) (payload as Record<string, unknown>).captcha = model.captcha
+          if (model.verification) (payload as Record<string, unknown>).verification = model.verification
+        }
       }
 
       recordWorkflowFill(session, schema.formId, schema.name, valuesById, valuesByLabel, invalidRemaining, planned.fields.length)
@@ -1624,10 +1649,10 @@ Use this after geometra_page_model when you know which form/dialog/list/landmark
   )
 
   server.tool(
-    'geometra_reveal',
-    `Scroll until a matching node is revealed. This is the generic alternative to trial-and-error wheel calls on long forms.
+    'geometra_scroll_to',
+    `Scroll the page until a matching element is visible. Use this to reach off-screen elements like Submit buttons at the bottom of long forms, or fields below the fold.
 
-Use the same filters as geometra_query, plus an optional match index when repeated controls share the same visible label.`,
+This is the preferred approach for scrolling — no need to guess pixel offsets or wheel deltas. Accepts the same filters as geometra_query, plus an optional match index when repeated controls share the same visible label. Auto-scales scroll steps based on distance.`,
     {
       ...nodeFilterShape(),
       index: z.number().int().min(0).optional().default(0).describe('Which matching node to reveal after sorting top-to-bottom'),
