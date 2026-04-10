@@ -25,10 +25,19 @@ async function hasMirroredLabelContaining(page: Page, snippet: string): Promise<
   )
 }
 
+// Generous CI-friendly poll budget. The full cycle behind each assertion is
+// click → server route → state mutation → WS broadcast → client render → a11y
+// mirror DOM patch, and on a cold/loaded CI runner the third or fourth
+// interaction in a sequence has been observed to push past Playwright's 5s
+// default. Locally the same assertions resolve in well under 100ms, so the
+// bump is purely flake tolerance — a real regression will still surface.
+const MIRROR_POLL_TIMEOUT_MS = 15_000
+
 async function expectMirroredLabel(page: Page, label: string): Promise<void> {
   await expect
     .poll(() => hasMirroredLabel(page, label), {
       message: `Expected accessibility mirror label "${label}"`,
+      timeout: MIRROR_POLL_TIMEOUT_MS,
     })
     .toBe(true)
 }
@@ -37,6 +46,7 @@ async function expectMirroredLabelContaining(page: Page, snippet: string): Promi
   await expect
     .poll(() => hasMirroredLabelContaining(page, snippet), {
       message: `Expected accessibility mirror text containing "${snippet}"`,
+      timeout: MIRROR_POLL_TIMEOUT_MS,
     })
     .toBe(true)
 }
