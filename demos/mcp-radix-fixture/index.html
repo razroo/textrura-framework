@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Radix Select — Eligibility Form</title>
+    <style>
+      /* Inlined here (not imported as src/styles.css) so vite never enters
+         its CSS pipeline for this fixture — see mcp-greenhouse-fixture for
+         the lightningcss / linux CI rationale. */
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+        background: #f7f8fa;
+        color: #1a1f2e;
+      }
+
+      main {
+        max-width: 720px;
+        margin: 40px auto;
+        padding: 24px 32px 64px;
+        background: #ffffff;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+      }
+
+      h1 { font-size: 24px; margin-bottom: 6px; }
+
+      .subtitle {
+        color: #5b6478;
+        margin-top: 0;
+        margin-bottom: 24px;
+        font-size: 14px;
+      }
+
+      fieldset {
+        border: 1px solid #e3e6ed;
+        border-radius: 8px;
+        padding: 16px 20px 20px;
+        margin-bottom: 20px;
+      }
+
+      legend {
+        font-weight: 600;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #6b7385;
+        padding: 0 8px;
+      }
+
+      .field { display: block; margin-bottom: 14px; }
+      .field:last-child { margin-bottom: 0; }
+
+      .field-label {
+        display: block;
+        font-size: 13px;
+        font-weight: 500;
+        color: #2d3445;
+        margin-bottom: 6px;
+      }
+
+      .SelectTrigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        width: 100%;
+        padding: 9px 12px;
+        border: 1px solid #cdd2dc;
+        border-radius: 6px;
+        font-size: 14px;
+        background: #ffffff;
+        font-family: inherit;
+        text-align: left;
+      }
+
+      .SelectContent {
+        background: #ffffff;
+        border: 1px solid #cdd2dc;
+        border-radius: 6px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        padding: 4px;
+        z-index: 9999;
+      }
+
+      .SelectItem {
+        font-size: 14px;
+        padding: 6px 28px 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        user-select: none;
+        outline: none;
+      }
+
+      .SelectItem[data-highlighted] { background: #eef1f8; }
+
+      .SelectIcon {
+        color: #6b7385;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

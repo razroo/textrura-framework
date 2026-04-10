@@ -210,6 +210,39 @@ describe('extractGeometry', () => {
     await page.close()
   })
 
+  it('strips aria-hidden indicator glyphs from Radix-style button-trigger combobox values', async () => {
+    // Regression: real @radix-ui/react-select renders the trigger as
+    //   <button role="combobox">
+    //     <span style="pointer-events:none">Yes</span>      ← picked value
+    //     <span aria-hidden="true">▾</span>                  ← decorative
+    //   </button>
+    // The value-bearing span has NO data-radix-select-value attribute and
+    // NO class containing "SelectValue", so findCustomComboboxValueText
+    // never matches it. Before the visibleTextSkippingAriaHidden fallback,
+    // controlValueText fell through to the trigger's innerText and
+    // returned "Yes ▾", which fails any post-fill ground-truth check.
+    // benchmark-mcp-radix:assert surfaced this against real Radix DOM —
+    // this test pins the fix against the same DOM shape so a future regression
+    // is caught by the fast suite without needing the benchmark.
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } })
+    await page.setContent(`
+      <label for="work-auth">Work auth</label>
+      <button id="work-auth" role="combobox" aria-expanded="false">
+        <span style="pointer-events:none">Yes</span>
+        <span aria-hidden="true">▾</span>
+      </button>
+    `)
+
+    const snapshot = await extractGeometry(page)
+    const nodes = flattenSnapshot(snapshot.tree, snapshot.layout)
+    const combobox = nodes.find(node => node.tree.semantic?.role === 'combobox')
+
+    expect(combobox).toBeDefined()
+    expect(combobox?.tree.semantic?.valueText).toBe('Yes')
+
+    await page.close()
+  })
+
   it('falls back to a Radix-style SelectValue sibling for picked combobox values', async () => {
     // Same gap, different combobox library. Radix Select renders
     // <SelectValue> as a span with a class containing "SelectValue".
@@ -327,6 +360,93 @@ describe('extractGeometry', () => {
 
     await page.close()
   })
+
+  // Visibility-vector contract — see shouldSkip / shouldKeepDespiteOpacity
+  // in extractor.ts. The opacity:0 + zero-rect exemptions for form-control
+  // inputs were added because react-select v5 silently dropped its trigger
+  // from the snapshot. Other libraries hide their trigger inputs the same
+  // way using vectors that shouldSkip currently has NO gate for at all
+  // (clip-path:inset(100%), transform:scale(0), aria-hidden ancestor).
+  // Today they survive by accident — they survive because shouldSkip
+  // never inspects them. The point of these tests is to lock that in:
+  // any future commit that adds a new shouldSkip gate must also add the
+  // role-and-form-control exemption, otherwise these tests fail and the
+  // engineer is forced to make the same exemption decision the
+  // opacity/zero-rect paths already made. Without these tests a new gate
+  // would silently regress combobox readback in any library that hides
+  // its trigger this way.
+  const HIDE_VECTORS: Array<{ name: string; trigger: string }> = [
+    {
+      name: 'clip-path: inset(100%)',
+      // NOTE: deliberately NO position:absolute. The wrapping
+      // .select__input-container is a plain div with no role and no
+      // form-control element type, so the zero-rect gate has no exemption
+      // for it. position:absolute would remove this input from flex layout
+      // and collapse the wrapper to 0x0, which would skip both the wrapper
+      // AND the input as a side effect — that's a separate "wrapping div
+      // collapse" issue, not the contract this test is supposed to pin.
+      // Real react-select / Radix never use position:absolute on the
+      // trigger input either; they rely on opacity / aria-hidden.
+      trigger: 'clip-path: inset(100%);',
+    },
+    {
+      name: 'transform: scale(0)',
+      trigger: 'transform: scale(0);',
+    },
+    {
+      name: 'aria-hidden ancestor wrapper',
+      trigger: '', // aria-hidden is set on a wrapper below, not via style
+    },
+  ]
+
+  for (const vector of HIDE_VECTORS) {
+    it(`keeps form-control combobox triggers under hide vector: ${vector.name}`, async () => {
+      const page = await browser.newPage({ viewport: { width: 800, height: 600 } })
+      const wrapperOpenTag = vector.name.startsWith('aria-hidden')
+        ? '<div aria-hidden="true">'
+        : '<div>'
+      await page.setContent(`
+        <style>
+          .select__control { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid #ccc; min-width: 280px; }
+          .select__value-container { display: flex; flex: 1; align-items: center; gap: 4px; }
+          .select__single-value { color: #1a1f2e; font-size: 14px; }
+          .select__input-container { display: flex; flex: 1; }
+          .select__input-container input { border: 0; outline: 0; flex: 1; min-width: 60px; ${vector.trigger} }
+        </style>
+        <label for="hidden-trigger">Country</label>
+        ${wrapperOpenTag}
+          <div class="select__control">
+            <div class="select__value-container">
+              <div class="select__single-value">Germany</div>
+              <div class="select__input-container">
+                <input
+                  id="hidden-trigger"
+                  role="combobox"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-autocomplete="list"
+                  value=""
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      `)
+
+      const snapshot = await extractGeometry(page)
+      const nodes = flattenSnapshot(snapshot.tree, snapshot.layout)
+      const combobox = nodes.find(node => node.tree.semantic?.role === 'combobox')
+
+      // Contract: the combobox trigger MUST survive into the snapshot, and
+      // its sibling-readback value MUST be available. If a future commit
+      // adds a hide gate without exempting form-controls, this assertion
+      // fails before the regression ever reaches a real ATS site.
+      expect(combobox, `combobox dropped under hide vector: ${vector.name}`).toBeDefined()
+      expect(combobox?.tree.semantic?.valueText).toBe('Germany')
+
+      await page.close()
+    })
+  }
 
   it('falls back to accessibility-tree nodes when DOM extraction is effectively empty', async () => {
     const page = await browser.newPage({ viewport: { width: 900, height: 700 } })

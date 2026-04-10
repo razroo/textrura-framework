@@ -174,4 +174,42 @@ describe('connectThroughProxy({ isolated: true })', () => {
 
     disconnect({ sessionId: sessionB.id, closeProxy: true })
   }, 30_000)
+
+  it('serializes concurrent default connects to a pooled proxy onto a single session', async () => {
+    // Regression for the per-proxy attach race. Before the attachLock fix,
+    // two concurrent connectThroughProxy calls that both picked the same
+    // pooled proxy entry could both pass attachToReusableProxy's
+    // "reusedExistingSession" check (because neither's session was in
+    // activeSessions yet — connect() runs first) and then both call
+    // connect(proxy.wsUrl), creating two distinct WebSocket sessions
+    // bound to the same Chromium. Two agents would silently mutate the
+    // same DOM. With the lock, the second connect waits for the first,
+    // re-picks via findReusableProxy, and takes the reusedExistingSession
+    // branch — both calls return the same Session object.
+    //
+    // Step 1: warm the pool with a single connect+disconnect so the next
+    // connects find an existing entry. Cold-start parallel connects
+    // legitimately create separate browsers (no shared state to leak), so
+    // the race only matters when the pool is already populated.
+    const warmup = await connectThroughProxy({
+      pageUrl: `${baseUrl}/page-a`,
+      headless: true,
+    })
+    disconnect({ sessionId: warmup.id, closeProxy: false })
+
+    // Step 2: fire two concurrent connects. Without the lock, both would
+    // call connect(proxy.wsUrl) and create distinct sessions bound to the
+    // same browser. With the lock, the second waits for the first to bind,
+    // then sees the bound session and reuses it.
+    const [sessionA, sessionB] = await Promise.all([
+      connectThroughProxy({ pageUrl: `${baseUrl}/page-a`, headless: true }),
+      connectThroughProxy({ pageUrl: `${baseUrl}/page-a`, headless: true }),
+    ])
+
+    // Both connects must converge on the same underlying session. If they
+    // don't, the race re-emerged: two agents would race in the same browser.
+    expect(sessionA.id).toBe(sessionB.id)
+
+    disconnect({ sessionId: sessionA.id, closeProxy: true })
+  }, 30_000)
 })

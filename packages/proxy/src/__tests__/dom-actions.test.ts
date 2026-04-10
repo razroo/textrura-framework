@@ -611,6 +611,44 @@ describe('attachFiles', () => {
       await page.close()
     }
   })
+
+  it('prefers an exact label match over a substring collision when caller passed exact=false', async () => {
+    // Regression: a file input labeled exactly "Resume" must not be hijacked
+    // by another file input whose label *contains* the substring "resume"
+    // (e.g. "Please attach your resume below as well"). The original
+    // findLabeledControl bug had the same shape — getByLabel(..., {exact:false})
+    // returned the wrong control. attachFiles' helper now tries exact first.
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    const tempFile = join(tmpdir(), `geometra-upload-collision-${Date.now()}.txt`)
+    await writeFile(tempFile, 'resume')
+
+    await page.setContent(`
+      <div style="display:grid;gap:16px;width:520px;margin:24px;font-family:sans-serif;">
+        <div>
+          <label for="extra-input">Please attach your resume below as well</label>
+          <input id="extra-input" type="file" />
+        </div>
+        <div>
+          <label for="resume-input">Resume</label>
+          <input id="resume-input" type="file" />
+        </div>
+      </div>
+    `)
+
+    try {
+      await attachFiles(page, [tempFile], { fieldLabel: 'Resume' })
+
+      const result = await page.evaluate(() => ({
+        resume: (document.getElementById('resume-input') as HTMLInputElement).files?.length ?? 0,
+        extra: (document.getElementById('extra-input') as HTMLInputElement).files?.length ?? 0,
+      }))
+
+      expect(result).toEqual({ resume: 1, extra: 0 })
+    } finally {
+      await rm(tempFile, { force: true })
+      await page.close()
+    }
+  })
 })
 
 describe('setFieldText', () => {
@@ -636,6 +674,35 @@ describe('setFieldText', () => {
     await setFieldText(page, 'Full name', 'Taylor Applicant')
 
     expect(await page.locator('#full-name').inputValue()).toBe('Taylor Applicant')
+    await page.close()
+  })
+
+  it('prefers an exact label match over a substring collision when caller passed exact=false', async () => {
+    // Regression: a text input labeled exactly "Country" must not be
+    // hijacked by another input whose label *contains* the substring
+    // "country" (e.g. the original Greenhouse case where work-auth's
+    // "Are you legally authorized to work in the country in which you
+    // are applying?" stole fills targeted at the Country field).
+    // findLabeledEditableField now tries exact-match candidates first
+    // even when the caller passed exact=false.
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <div style="display:grid;gap:16px;width:520px;margin:24px;font-family:sans-serif;">
+        <label>
+          Are you legally authorized to work in the country in which you are applying?
+          <input id="work-auth" />
+        </label>
+        <label>
+          Country
+          <input id="country" />
+        </label>
+      </div>
+    `)
+
+    await setFieldText(page, 'Country', 'United States')
+
+    expect(await page.locator('#country').inputValue()).toBe('United States')
+    expect(await page.locator('#work-auth').inputValue()).toBe('')
     await page.close()
   })
 

@@ -393,6 +393,17 @@ interface ReusableProxyEntry {
   pageUrl?: string
   snapshotReady: boolean
   lastUsedAt: number
+  /**
+   * Per-proxy attach mutex. Serializes concurrent `connectThroughProxy`
+   * calls that pick this entry so that two parallel connects cannot both
+   * call `connect(proxy.wsUrl)` and end up with two distinct WebSocket
+   * sessions bound to the same Chromium. Without this lock, two agents
+   * launched in parallel against the pool would silently mutate the same
+   * DOM. The first connect to claim the lock wins; the second waits, then
+   * re-picks via findReusableProxy, sees the now-bound session, and takes
+   * the reusedExistingSession branch in attachToReusableProxy.
+   */
+  attachLock?: Promise<void> | null
 }
 
 const activeSessions = new Map<string, Session>()
@@ -953,6 +964,7 @@ async function startFreshProxySession(options: {
       : options.awaitInitialFrame !== false
         ? undefined
         : false
+  let pendingEmbeddedRuntime: EmbeddedProxyRuntime | undefined
   try {
     const proxyStartStartedAt = performance.now()
     const { runtime, wsUrl } = await startEmbeddedGeometraProxy({
@@ -964,12 +976,16 @@ async function startFreshProxySession(options: {
       slowMo: options.slowMo,
       eagerInitialExtract,
     })
+    pendingEmbeddedRuntime = runtime
     const proxyStartMs = performance.now() - proxyStartStartedAt
     const session = await connect(wsUrl, {
       skipInitialResize: true,
       closePreviousProxy: false,
       awaitInitialFrame: options.awaitInitialFrame,
     })
+    // Connect succeeded — the session now owns the runtime, so the
+    // catch-block cleanup below must not also close it.
+    pendingEmbeddedRuntime = undefined
     session.proxyRuntime = runtime
     session.proxyReusable = !options.isolated
     if (options.isolated) {
@@ -999,6 +1015,16 @@ async function startFreshProxySession(options: {
     }
     return session
   } catch (e) {
+    // If startEmbeddedGeometraProxy() returned but the subsequent connect()
+    // threw (e.g. WebSocket failure, first-frame timeout), the runtime
+    // still owns a launched Chromium that nobody is going to clean up.
+    // Without this, that Chromium leaks for the lifetime of the MCP server
+    // every time we fall through to the child-process fallback path.
+    if (pendingEmbeddedRuntime) {
+      const leaked = pendingEmbeddedRuntime
+      pendingEmbeddedRuntime = undefined
+      void leaked.close().catch(() => {})
+    }
     const proxyStartStartedAt = performance.now()
     const { child, wsUrl } = await spawnGeometraProxy({
       pageUrl: options.pageUrl,
@@ -1231,13 +1257,30 @@ export async function connectThroughProxy(options: {
 
   let reuseFailure: unknown
 
-  const reusableProxy = findReusableProxy(options)
-  if (reusableProxy) {
+  // Loop because if a candidate is currently being attached by another
+  // concurrent connectThroughProxy call we wait for it, then re-pick. The
+  // second pick may now find the same entry already bound to an active
+  // session — attachToReusableProxy's reusedExistingSession branch then
+  // returns that session instead of opening a second WebSocket. Bounded
+  // by the pool size to defend against pathological churn.
+  for (let attempt = 0; attempt < REUSABLE_PROXY_POOL_LIMIT + 1; attempt++) {
+    const reusableProxy = findReusableProxy(options)
+    if (!reusableProxy) break
+    if (reusableProxy.attachLock) {
+      try { await reusableProxy.attachLock } catch { /* lock holder failed; we'll re-pick */ }
+      continue
+    }
+    let releaseLock: () => void = () => {}
+    reusableProxy.attachLock = new Promise<void>(resolve => { releaseLock = resolve })
     try {
       return await attachToReusableProxy(reusableProxy, options)
     } catch (err) {
       reuseFailure = err
       closeReusableProxy(reusableProxy)
+      break
+    } finally {
+      reusableProxy.attachLock = null
+      releaseLock()
     }
   }
 

@@ -2050,12 +2050,28 @@ export function resolveExistingFiles(rawPaths: unknown[]): string[] {
 }
 
 async function findLabeledFileInput(frame: Frame, fieldLabel: string, exact: boolean): Promise<Locator | null> {
-  const direct = frame.getByLabel(fieldLabel, { exact })
-  const directCount = await direct.count()
-  for (let i = 0; i < directCount; i++) {
-    const candidate = direct.nth(i)
+  // Try exact-match candidates first, even when the caller passed
+  // exact=false. Same Greenhouse-style failure mode as findLabeledControl:
+  // a substring match (e.g. file labeled "Resume" hijacked by another
+  // "Please attach your resume below" field) silently picks the wrong
+  // input. Trying exact first guarantees the literal label wins when
+  // present, and only falls through to substring matching otherwise.
+  const exactDirect = frame.getByLabel(fieldLabel, { exact: true })
+  const exactDirectCount = await exactDirect.count()
+  for (let i = 0; i < exactDirectCount; i++) {
+    const candidate = exactDirect.nth(i)
     const isFileInput = await candidate.evaluate(el => el instanceof HTMLInputElement && el.type === 'file').catch(() => false)
     if (isFileInput) return candidate
+  }
+
+  if (!exact) {
+    const direct = frame.getByLabel(fieldLabel, { exact: false })
+    const directCount = await direct.count()
+    for (let i = 0; i < directCount; i++) {
+      const candidate = direct.nth(i)
+      const isFileInput = await candidate.evaluate(el => el instanceof HTMLInputElement && el.type === 'file').catch(() => false)
+      if (isFileInput) return candidate
+    }
   }
 
   const loc = frame.locator('input[type="file"]')
@@ -2357,18 +2373,42 @@ async function findLabeledEditableField(
   if (cached !== undefined) return cached
 
   for (const frame of page.frames()) {
-    const candidates = [
-      frame.getByLabel(fieldLabel, { exact }),
-      frame.getByPlaceholder(fieldLabel, { exact }),
-      frame.getByRole('textbox', { name: fieldLabel, exact }),
-      frame.getByRole('combobox', { name: fieldLabel, exact }),
+    // Always try exact-match candidates first, even when the caller passed
+    // exact=false. Same Greenhouse-style failure as findLabeledControl: a
+    // text field labeled "Authorization code" gets silently hijacked by
+    // a sibling react-select labeled "Are you legally authorized to work
+    // in the country in which you are applying?" because the substring
+    // pass matches "auth" in both. Trying exact first guarantees the
+    // literal label wins when present.
+    const exactCandidates = [
+      frame.getByLabel(fieldLabel, { exact: true }),
+      frame.getByPlaceholder(fieldLabel, { exact: true }),
+      frame.getByRole('textbox', { name: fieldLabel, exact: true }),
+      frame.getByRole('combobox', { name: fieldLabel, exact: true }),
     ]
-    for (const candidate of candidates) {
+    for (const candidate of exactCandidates) {
       const visible = await firstVisible(candidate, { minWidth: 1, minHeight: 1 })
       if (!visible) continue
       if (await locatorIsEditable(visible)) {
         writeCachedLocator(cache, 'editable', fieldLabel, exact, fieldId, visible)
         return visible
+      }
+    }
+
+    if (!exact) {
+      const candidates = [
+        frame.getByLabel(fieldLabel, { exact: false }),
+        frame.getByPlaceholder(fieldLabel, { exact: false }),
+        frame.getByRole('textbox', { name: fieldLabel, exact: false }),
+        frame.getByRole('combobox', { name: fieldLabel, exact: false }),
+      ]
+      for (const candidate of candidates) {
+        const visible = await firstVisible(candidate, { minWidth: 1, minHeight: 1 })
+        if (!visible) continue
+        if (await locatorIsEditable(visible)) {
+          writeCachedLocator(cache, 'editable', fieldLabel, exact, fieldId, visible)
+          return visible
+        }
       }
     }
 

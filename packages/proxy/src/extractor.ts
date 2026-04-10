@@ -277,6 +277,49 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
     return undefined
   }
 
+  /**
+   * Compute an element's visible text but skip every aria-hidden subtree.
+   *
+   * Real Radix Select renders its trigger as:
+   *   <button role="combobox">
+   *     <span style="pointer-events:none">Yes</span>      ← the picked value
+   *     <span aria-hidden="true">▾</span>                  ← decorative icon
+   *   </button>
+   *
+   * Note that the value-bearing span has NO `data-radix-select-value`
+   * attribute and NO class containing "SelectValue" — those were the
+   * patterns the Radix sibling-readback was originally written against,
+   * but real `<Select.Value>` doesn't emit them. So
+   * findCustomComboboxValueText returns nothing for Radix and the trigger
+   * fallback runs. Plain `el.innerText` then returns "Yes\n▾", which
+   * fails any post-fill ground-truth check.
+   *
+   * The fix: when computing trigger text, walk children and skip every
+   * subtree marked aria-hidden. This strips Radix's <SelectIcon> reliably
+   * (it's always aria-hidden — that's how Radix marks it as decorative)
+   * and leaves the actual value text intact. The same trick handles every
+   * library that uses an aria-hidden glyph next to the picked value.
+   */
+  function visibleTextSkippingAriaHidden(el: Element): string | undefined {
+    if (!(el instanceof HTMLElement)) return undefined
+    function collect(node: Node, out: string[]): void {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent
+        if (text) out.push(text)
+        return
+      }
+      if (!(node instanceof Element)) return
+      if (node.getAttribute('aria-hidden') === 'true') return
+      const tag = node.tagName.toLowerCase()
+      if (LEAF_FORM_TAGS.has(tag) || tag === 'button') return
+      for (const child of node.childNodes) collect(child, out)
+    }
+    const parts: string[] = []
+    for (const child of el.childNodes) collect(child, parts)
+    const joined = parts.join(' ').replace(/\s+/g, ' ').trim()
+    return joined || undefined
+  }
+
   function controlValueText(el: Element): string | undefined {
     if (el instanceof HTMLInputElement) {
       if (el.type === 'password') return el.value ? '••••••••' : undefined
@@ -317,11 +360,16 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
       // own innerText typically includes both the picked option AND the
       // dropdown indicator glyph. Try the custom-combobox sibling fallback
       // first — it pulls the picked option out of a class-hinted sibling
-      // and ignores the indicator. Falling through to innerText is the
-      // last-resort branch for plain comboboxes with no library hints.
+      // and ignores the indicator. If no sibling is found (real Radix
+      // emits a plain <span> with no class/data hint), strip aria-hidden
+      // descendants from the trigger's text, which removes the decorative
+      // glyph and leaves just the picked value. innerText is the last
+      // resort, used only when there are no aria-hidden children to skip.
       if (role === 'combobox') {
         const sibling = normalizedControlValue(findCustomComboboxValueText(el))
         if (sibling) return sibling
+        const filtered = normalizedControlValue(visibleTextSkippingAriaHidden(el))
+        if (filtered) return filtered
       }
       return normalizedControlValue(
         (el as HTMLElement).innerText || el.textContent || undefined,
