@@ -1369,6 +1369,26 @@ describe('box layout', () => {
     expect(gapBetween).toBe(10)
   })
 
+  it('column layout with gap under rtl owner direction preserves vertical stack and gap (main axis not mirrored)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      flexDirection: 'column',
+      gap: 10,
+      children: [
+        { width: 100, height: 40 },
+        { width: 100, height: 40 },
+      ],
+    }
+    const ltr = computeLayout(tree, { width: 200, height: 200, direction: 'ltr' })
+    const rtl = computeLayout(tree, { width: 200, height: 200, direction: 'rtl' })
+    expect(ltr.children[0]!.y).toBe(rtl.children[0]!.y)
+    expect(ltr.children[1]!.y).toBe(rtl.children[1]!.y)
+    const gapLtr = ltr.children[1]!.y - (ltr.children[0]!.y + ltr.children[0]!.height)
+    expect(gapLtr).toBe(10)
+    const gapRtl = rtl.children[1]!.y - (rtl.children[0]!.y + rtl.children[0]!.height)
+    expect(gapRtl).toBe(10)
+  })
+
   it('padding affects child position', () => {
     const tree: BoxNode = {
       width: 300,
