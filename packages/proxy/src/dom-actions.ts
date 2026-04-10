@@ -243,6 +243,19 @@ function browserDisplayedValues(el: Element): string[] {
   push(el.getAttribute('aria-label') ?? undefined)
   push(el.textContent ?? undefined)
 
+  // If the element itself is combobox-like, broaden the search: any custom dropdown that
+  // displays its committed value in a *sibling* element (very common in React-Select,
+  // Headless UI, Radix, Greenhouse, etc.) needs us to read text from the surrounding
+  // wrapper. We can't assume the wrapper has a recognizable class, so we trust the
+  // ARIA role/attributes on the trigger itself as the signal.
+  const elIsComboboxLike =
+    el.getAttribute('role') === 'combobox' ||
+    el.getAttribute('aria-haspopup') === 'listbox' ||
+    el.getAttribute('aria-haspopup') === 'menu' ||
+    el.hasAttribute('aria-controls') ||
+    el.hasAttribute('aria-owns') ||
+    el.hasAttribute('aria-expanded')
+
   let current = el.parentElement
   for (let depth = 0; current && depth < 4; depth++) {
     const role = current.getAttribute('role')
@@ -258,8 +271,23 @@ function browserDisplayedValues(el: Element): string[] {
       className.includes('select') ||
       className.includes('combo') ||
       className.includes('chip')
-    if (looksLikeFieldContainer) push(current.textContent ?? undefined)
+    if (looksLikeFieldContainer || elIsComboboxLike) push(current.textContent ?? undefined)
     current = current.parentElement
+  }
+
+  // Even when the parent walk doesn't find a recognizable container, look for an immediate
+  // sibling with displayed text. Custom selects routinely render
+  // `<input role="combobox" /><span class="single-value">Selected</span>` inside a wrapper
+  // that has no helpful class or role.
+  if (elIsComboboxLike && el.parentElement) {
+    for (const sibling of Array.from(el.parentElement.children)) {
+      if (sibling === el) continue
+      if (sibling instanceof HTMLElement) {
+        const role = sibling.getAttribute('role')
+        if (role === 'listbox' || role === 'menu' || role === 'dialog') continue
+        push(sibling.textContent ?? undefined)
+      }
+    }
   }
 
   return [...values]
@@ -658,6 +686,149 @@ async function openDropdownControl(
   }
 
   throw new Error(`listboxPick: no visible combobox/dropdown matching field "${fieldLabel}"`)
+}
+
+/**
+ * Given a freshly-opened dropdown trigger, find the popup container that *belongs* to it.
+ *
+ * Resolution strategy (in order):
+ *   1. Walk `aria-controls`, `aria-owns`, `aria-activedescendant`, and parent versions of those
+ *      attributes to a real element id. The element (or its closest popup ancestor) is the answer.
+ *   2. Look for a sibling/descendant popup inside the trigger's nearest field container.
+ *   3. Fall back to the visible popup that is closest to (and below) the trigger.
+ *
+ * Returning a scoped popup handle lets the rest of the option-search pipeline restrict its
+ * lookups to descendants of one popup, instead of scanning every popup on the page. That is the
+ * single most important fix for forms with multiple comboboxes that share option labels (Yes/No,
+ * country lists, etc.) — common in Greenhouse / Workday / Ashby application flows.
+ */
+async function resolveOwnedPopupHandle(
+  triggerHandle: ElementHandle<Element> | null | undefined,
+): Promise<ElementHandle<Element> | null> {
+  if (!triggerHandle) return null
+  try {
+    const popup = await triggerHandle.evaluateHandle((el, payload) => {
+      function visible(node: Element | null): node is HTMLElement {
+        if (!(node instanceof HTMLElement)) return false
+        const rect = node.getBoundingClientRect()
+        if (rect.width <= 0 || rect.height <= 0) return false
+        const style = getComputedStyle(node)
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false
+        return true
+      }
+
+      function asPopupRoot(node: Element | null): HTMLElement | null {
+        if (!node) return null
+        if (!(node instanceof HTMLElement)) return null
+        if (node.matches(payload.popupRootSelector) && visible(node)) return node
+        const ancestor = node.closest(payload.popupRootSelector)
+        if (ancestor instanceof HTMLElement && visible(ancestor)) return ancestor
+        // Sometimes aria-activedescendant points at an option inside the popup —
+        // in which case we want the popup container itself.
+        const optionParent = node.closest('[role="listbox"], [role="menu"], [role="dialog"]')
+        if (optionParent instanceof HTMLElement && visible(optionParent)) return optionParent
+        return null
+      }
+
+      function readIdRefs(start: Element | null, attribute: string): string[] {
+        const ids: string[] = []
+        let cursor: Element | null = start
+        let depth = 0
+        while (cursor && depth < 4) {
+          const value = cursor.getAttribute(attribute)
+          if (value) {
+            for (const id of value.split(/\s+/)) if (id) ids.push(id)
+          }
+          cursor = cursor.parentElement
+          depth++
+        }
+        return ids
+      }
+
+      function lookupReferenced(): HTMLElement | null {
+        const attributes = ['aria-controls', 'aria-owns', 'aria-activedescendant']
+        for (const attribute of attributes) {
+          for (const id of readIdRefs(el, attribute)) {
+            const referenced = document.getElementById(id)
+            const popup = asPopupRoot(referenced)
+            if (popup) return popup
+          }
+        }
+        return null
+      }
+
+      function lookupSibling(): HTMLElement | null {
+        // React-Select / Headless UI often render the popup as a sibling of the trigger inside
+        // a small wrapper. Walk up a few levels and inspect each container's descendants.
+        let container: Element | null = el
+        let depth = 0
+        while (container && depth < 6) {
+          const candidates = container.querySelectorAll(payload.popupRootSelector)
+          for (const candidate of candidates) {
+            if (candidate === el) continue
+            if (el.contains(candidate)) {
+              // Popups nested inside the trigger itself are usually decorative
+              continue
+            }
+            if (candidate instanceof HTMLElement && visible(candidate)) {
+              return candidate
+            }
+          }
+          container = container.parentElement
+          depth++
+        }
+        return null
+      }
+
+      function lookupNearestBelow(): HTMLElement | null {
+        const triggerRect = el instanceof HTMLElement ? el.getBoundingClientRect() : null
+        if (!triggerRect) return null
+        const triggerCenterX = triggerRect.left + triggerRect.width / 2
+        const triggerBottom = triggerRect.bottom
+        let best: { popup: HTMLElement; score: number } | null = null
+        for (const node of Array.from(document.querySelectorAll(payload.popupRootSelector))) {
+          if (!(node instanceof HTMLElement)) continue
+          if (!visible(node)) continue
+          if (node === el || el.contains(node)) continue
+          // Skip the page-wide nav/footer that may match popup-ish class names
+          const rect = node.getBoundingClientRect()
+          if (rect.width <= 0 || rect.height <= 0) continue
+          if (rect.width >= window.innerWidth * 0.95 && rect.height >= window.innerHeight * 0.6) continue
+          const popupCenterX = rect.left + rect.width / 2
+          // Bias for popups directly under the trigger and within the trigger's vertical neighborhood.
+          const horizontalDistance = Math.abs(popupCenterX - triggerCenterX)
+          const verticalDistance = rect.top >= triggerBottom - 8
+            ? rect.top - triggerBottom
+            : rect.top < triggerRect.top
+              ? (triggerRect.top - rect.top) + 200 // popups above the trigger are unusual; penalize
+              : 50
+          const offscreenPenalty = rect.bottom < 0 || rect.top > window.innerHeight ? 600 : 0
+          const score = horizontalDistance + verticalDistance + offscreenPenalty
+          if (!best || score < best.score) best = { popup: node, score }
+        }
+        if (!best) return null
+        // Hard cap: if the closest popup is far away horizontally, it likely belongs to a
+        // different control. Don't claim ownership.
+        if (best.score > 1200) return null
+        return best.popup
+      }
+
+      const referenced = lookupReferenced()
+      if (referenced) return referenced
+      const sibling = lookupSibling()
+      if (sibling) return sibling
+      return lookupNearestBelow()
+    }, { popupRootSelector: '[role="listbox"], [role="menu"], [role="dialog"], [aria-modal="true"], [data-radix-popper-content-wrapper], [class*="menu"], [class*="dropdown"], [class*="popover"], [class*="listbox"], [class*="options"]' })
+
+    const asElement = popup.asElement()
+    if (!asElement) {
+      await popup.dispose()
+      return null
+    }
+    return asElement as ElementHandle<Element>
+  } catch {
+    return null
+  }
 }
 
 async function typeIntoEditableLocator(page: Page, locator: Locator, text: string): Promise<void> {
@@ -1111,12 +1282,178 @@ function listboxErrorMessage(opts: {
   return JSON.stringify(payload, null, 2)
 }
 
+/**
+ * Search for an option matching `label` within a single popup container handle and click it.
+ * Returns the clicked option's visible text, or null if no candidate matched.
+ *
+ * This is the popup-scoped variant used by `clickVisibleOptionCandidate` when the caller
+ * knows which popup belongs to the trigger. It eliminates cross-combobox confusion that
+ * makes generic application forms fail when multiple selects share option labels.
+ */
+async function clickScopedOptionCandidate(
+  popupScope: ElementHandle<Element>,
+  label: string,
+  exact: boolean,
+): Promise<string | null> {
+  type ScopedHit = { selector: string; text: string }
+  let hit: ScopedHit | null = null
+  try {
+    hit = await popupScope.evaluate((root, payload): ScopedHit | null => {
+      function normalize(value: string): string {
+        return value
+          .normalize('NFKD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[＋﹢∔]/g, '+')
+          .replace(/[‐‑‒–—―]/g, '-')
+          .replace(/&/g, ' and ')
+          .replace(/\bplus\b/g, '+')
+          .replace(/[,/()]+/g, ' ')
+          .replace(/\s*\+\s*/g, '+')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .toLowerCase()
+      }
+
+      function aliases(value: string): string[] {
+        const out = new Set<string>([value])
+        if (value === 'yes' || value === 'true') {
+          for (const alias of ['agree', 'agreed', 'accept', 'accepted', 'consent', 'acknowledge', 'read', 'opt in']) {
+            out.add(alias)
+          }
+        }
+        if (value === 'no' || value === 'false') {
+          for (const alias of ['decline', 'declined', 'disagree', 'deny', 'opt out', 'prefer not']) {
+            out.add(alias)
+          }
+        }
+        return [...out]
+      }
+
+      function hasNegativeCue(value: string): boolean {
+        return /\b(no|not|do not|don't|decline|disagree|deny|opt out|prefer not)\b/.test(value)
+      }
+
+      function hasPositiveCue(value: string): boolean {
+        return /\b(yes|agree|accept|consent|acknowledge|opt in|allow|read)\b/.test(value)
+      }
+
+      function matchScore(candidate: string | undefined, expected: string): number | null {
+        if (!candidate) return null
+        const normalizedCandidate = normalize(candidate)
+        const normalizedExpected = normalize(expected)
+        if (!normalizedCandidate || !normalizedExpected) return null
+        const expectsPositive = normalizedExpected === 'yes' || normalizedExpected === 'true'
+        const expectsNegative =
+          normalizedExpected === 'no' || normalizedExpected === 'false' || normalizedExpected === 'decline'
+        if (payload.exact) return normalizedCandidate === normalizedExpected ? 0 : null
+        if (normalizedCandidate === normalizedExpected) return 0
+        if (normalizedCandidate.includes(normalizedExpected)) return normalizedCandidate.length - normalizedExpected.length
+        if (expectsPositive && hasNegativeCue(normalizedCandidate)) return null
+        if (expectsNegative && hasPositiveCue(normalizedCandidate)) return null
+        for (const alias of aliases(normalizedExpected)) {
+          if (alias !== normalizedExpected && normalizedCandidate.includes(alias)) {
+            return 40 + normalizedCandidate.length - alias.length
+          }
+        }
+        return null
+      }
+
+      function visible(el: Element | null): el is HTMLElement {
+        if (!(el instanceof HTMLElement)) return false
+        const rect = el.getBoundingClientRect()
+        if (rect.width <= 0 || rect.height <= 0) return false
+        const style = getComputedStyle(el)
+        return style.display !== 'none' && style.visibility !== 'hidden'
+      }
+
+      // Stamp a unique data attribute on the target so we can re-find it from the outer Locator API.
+      // This avoids re-running expensive matching logic when we're ready to click.
+      function stampAndDescribe(target: HTMLElement): ScopedHit | null {
+        const text = target.getAttribute('aria-label')?.trim() || target.textContent?.trim() || ''
+        const stamp = `geometra-scoped-${Math.random().toString(36).slice(2, 10)}`
+        target.setAttribute('data-geometra-scoped-pick', stamp)
+        return { selector: `[data-geometra-scoped-pick="${stamp}"]`, text }
+      }
+
+      const optionSelector = [
+        '[role="option"]',
+        '[role="menuitem"]',
+        '[role="treeitem"]',
+        'button',
+        'li',
+        '[data-value]',
+        '[aria-selected]',
+        '[aria-checked]',
+        '[class*="option"]',
+        '[class*="menu-item"]',
+        '[class*="dropdown-item"]',
+        '[class*="listbox-option"]',
+      ].join(', ')
+
+      // Make sure the popup itself is visible. If it's been collapsed since open, bail.
+      if (!visible(root)) return null
+
+      const candidates = Array.from(root.querySelectorAll(optionSelector)).filter(visible)
+      let best: { el: HTMLElement; score: number } | null = null
+      for (const candidate of candidates) {
+        const text = candidate.getAttribute('aria-label')?.trim() || candidate.textContent?.trim() || ''
+        const score = matchScore(text, payload.label)
+        if (score === null) continue
+        if (!best || score < best.score) best = { el: candidate, score }
+      }
+      if (!best) return null
+      return stampAndDescribe(best.el)
+    }, { label, exact })
+  } catch {
+    return null
+  }
+  if (!hit) return null
+
+  // Re-find the stamped element via the popup handle and click it.
+  try {
+    const target = (await popupScope.evaluateHandle((root, selector) => {
+      const found = (root as Element).querySelector(selector)
+      return found ?? null
+    }, hit.selector)).asElement() as ElementHandle<Element> | null
+    if (!target) return null
+    try {
+      await target.scrollIntoViewIfNeeded({ timeout: 500 })
+    } catch {
+      /* popups inside their own scroll container handle this internally */
+    }
+    try {
+      await target.click()
+    } catch {
+      return null
+    }
+    // Clean up the marker so we don't pollute the page state for inspectors.
+    try {
+      await target.evaluate(el => el.removeAttribute('data-geometra-scoped-pick'))
+    } catch { /* element may have been removed by the click handler */ }
+    return hit.text || null
+  } catch {
+    return null
+  }
+}
+
 async function clickVisibleOptionCandidate(
   page: Page,
   label: string,
   exact: boolean,
   anchor?: AnchorPoint,
+  popupScope?: ElementHandle<Element> | null,
 ): Promise<string | null> {
+  // When we know which popup the trigger owns, restrict the search to that popup's
+  // descendants. This prevents an option from a sibling combobox's stale popup from
+  // being clicked when multiple comboboxes share option labels (Yes/No, country lists, etc.).
+  if (popupScope) {
+    const scoped = await clickScopedOptionCandidate(popupScope, label, exact)
+    if (scoped !== null) return scoped
+    // Fall through to the global search only if the scoped popup didn't contain a match.
+    // This is a defensive fallback for forms where the popup root resolution missed the
+    // real listbox (rare in practice).
+  }
+
   for (const frame of page.frames()) {
     const candidates = frame.locator(OPTION_PICKER_SELECTOR)
     const count = await candidates.count()
@@ -1522,16 +1859,34 @@ async function dismissAndReVerifySelection(
   currentHandle?: ElementHandle<Element> | null,
   selectedOptionText?: string,
 ): Promise<boolean> {
-  await page.keyboard.press('Tab')
+  // Blur the active element instead of pressing Tab. Pressing Tab moves focus to the next
+  // focusable element on the page; in forms with several adjacent custom selects (Greenhouse,
+  // Workday, Ashby), the next field's focus handler will immediately reopen *its* popup,
+  // breaking subsequent selections in surprising ways. Blurring the active element fires the
+  // same `blur` / `change` events most React-Select-style controls use to commit, without
+  // dragging focus into the next field.
+  try {
+    await page.evaluate(() => {
+      const active = document.activeElement
+      if (active && active instanceof HTMLElement && typeof active.blur === 'function') {
+        active.blur()
+      }
+    })
+  } catch {
+    // Page may be navigating; fall back to Tab as the legacy behavior.
+    try { await page.keyboard.press('Tab') } catch { /* ignore */ }
+  }
   await delay(50)
 
   if (!currentHandle) return true
 
   // Re-verify using the original element handle (immune to DOM reordering)
   const deadline = Date.now() + 800
+  let sawAnyValue = false
   while (Date.now() < deadline) {
     try {
       const values = await elementHandleDisplayedValues(currentHandle)
+      if (values.length > 0) sawAnyValue = true
       if (values.some(value => displayedValueMatchesSelection(value, label, exact, selectedOptionText))) {
         return true
       }
@@ -1563,7 +1918,11 @@ async function dismissAndReVerifySelection(
     }
     await delay(100)
   }
-  return true
+  // Deadline elapsed without a positive signal. If the field never reported any displayed
+  // value, the previous confirmListboxSelection step is the only signal we have — keep the
+  // legacy optimistic behavior so well-formed selects don't suddenly fail.
+  // If the field DID report values but none of them matched, treat that as a silent revert.
+  return !sawAnyValue
 }
 
 /**
@@ -2814,6 +3173,21 @@ export async function pickListboxOption(
   let openedEditable = false
   let queryUsed: string | undefined
   let queryReset = false
+  // Popup scope: handle for the popup container that the trigger actually owns. We resolve it
+  // immediately after opening so all subsequent option searches restrict themselves to that
+  // popup, instead of scanning every popup-shaped element on the page. This is what makes the
+  // picker reliable on forms with multiple comboboxes that share option text (Yes/No, etc.).
+  let popupScope: ElementHandle<Element> | null = null
+  const releasePopupScope = async (): Promise<void> => {
+    if (popupScope) {
+      try { await popupScope.dispose() } catch { /* ignore */ }
+      popupScope = null
+    }
+  }
+  const refreshPopupScope = async (): Promise<void> => {
+    await releasePopupScope()
+    popupScope = await resolveOwnedPopupHandle(openedHandle)
+  }
 
   if (opts?.fieldLabel) {
     let opened
@@ -2839,6 +3213,7 @@ export async function pickListboxOption(
     } else if (queryUsed && await typeIntoActiveEditableElement(page, queryUsed)) {
       await delay(80)
     }
+    await refreshPopupScope()
   } else if (opts?.openX !== undefined && opts?.openY !== undefined) {
     await page.mouse.click(opts.openX, opts.openY)
     anchor = { x: opts.openX, y: opts.openY }
@@ -2846,7 +3221,7 @@ export async function pickListboxOption(
   }
 
   const attemptClickSelection = async (): Promise<boolean> => {
-    selectedOptionText = (await clickVisibleOptionCandidate(page, label, exact, anchor)) ?? undefined
+    selectedOptionText = (await clickVisibleOptionCandidate(page, label, exact, anchor, popupScope)) ?? undefined
     if (!selectedOptionText) return false
     attemptedSelection = true
     if (
@@ -2878,60 +3253,67 @@ export async function pickListboxOption(
     return false
   }
 
-  if (await attemptClickSelection()) {
-    if (await dismissAfterSelection()) return
-  }
-
-  let visibleHints = await collectVisibleOptionHints(page, anchor)
-  const visibleMatchExists = visibleHints.options.some(option => selectionMatchScore(option.label, label, exact) !== null)
-  if (queryUsed && !visibleMatchExists) {
-    queryReset = await resetTypedListboxQuery(page, openedLocator)
-    if (queryReset) {
-      await delay(80)
-      if (await attemptClickSelection()) {
-        if (await dismissAfterSelection()) return
-      }
-      visibleHints = await collectVisibleOptionHints(page, anchor)
-    }
-  }
-
-  const keyboardSelection = await tryKeyboardSelectVisibleOption(page, label, exact, anchor, openedLocator)
-  if (keyboardSelection) {
-    selectedOptionText = keyboardSelection
-    attemptedSelection = true
-    if (
-      !opts?.fieldLabel ||
-      await confirmListboxSelection(page, opts.fieldLabel, label, exact, anchor, openedHandle, selectedOptionText, {
-        editable: openedEditable,
-      })
-    ) {
+  try {
+    if (await attemptClickSelection()) {
       if (await dismissAfterSelection()) return
     }
-  }
 
-  visibleHints = await collectVisibleOptionHints(page, anchor)
-  if (opts?.fieldLabel && attemptedSelection) {
+    let visibleHints = await collectVisibleOptionHints(page, anchor)
+    const visibleMatchExists = visibleHints.options.some(option => selectionMatchScore(option.label, label, exact) !== null)
+    if (queryUsed && !visibleMatchExists) {
+      queryReset = await resetTypedListboxQuery(page, openedLocator)
+      if (queryReset) {
+        await delay(80)
+        // Popup may have been re-rendered after the query reset; refresh the scope so the
+        // next attempt still searches inside the right container.
+        await refreshPopupScope()
+        if (await attemptClickSelection()) {
+          if (await dismissAfterSelection()) return
+        }
+        visibleHints = await collectVisibleOptionHints(page, anchor)
+      }
+    }
+
+    const keyboardSelection = await tryKeyboardSelectVisibleOption(page, label, exact, anchor, openedLocator)
+    if (keyboardSelection) {
+      selectedOptionText = keyboardSelection
+      attemptedSelection = true
+      if (
+        !opts?.fieldLabel ||
+        await confirmListboxSelection(page, opts.fieldLabel, label, exact, anchor, openedHandle, selectedOptionText, {
+          editable: openedEditable,
+        })
+      ) {
+        if (await dismissAfterSelection()) return
+      }
+    }
+
+    visibleHints = await collectVisibleOptionHints(page, anchor)
+    if (opts?.fieldLabel && attemptedSelection) {
+      throw new Error(listboxErrorMessage({
+        reason: 'selection_not_confirmed',
+        requestedLabel: label,
+        fieldLabel: opts.fieldLabel,
+        query: queryUsed,
+        exact,
+        visibleOptions: visibleHints.options,
+        listEmpty: visibleHints.hasPopup && visibleHints.options.length === 0,
+        queryReset,
+      }))
+    }
     throw new Error(listboxErrorMessage({
-      reason: 'selection_not_confirmed',
+      reason: 'no_visible_option_match',
       requestedLabel: label,
-      fieldLabel: opts.fieldLabel,
+      fieldLabel: opts?.fieldLabel,
       query: queryUsed,
       exact,
       visibleOptions: visibleHints.options,
       listEmpty: visibleHints.hasPopup && visibleHints.options.length === 0,
       queryReset,
     }))
+  } finally {
+    await releasePopupScope()
   }
-  throw new Error(listboxErrorMessage({
-    reason: 'no_visible_option_match',
-    requestedLabel: label,
-    fieldLabel: opts?.fieldLabel,
-    query: queryUsed,
-    exact,
-    visibleOptions: visibleHints.options,
-    listEmpty: visibleHints.hasPopup && visibleHints.options.length === 0,
-    queryReset,
-  }))
 }
 
 export interface SetCheckedPayload {

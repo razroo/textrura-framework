@@ -279,6 +279,140 @@ describe('pickListboxOption', () => {
     await page.close()
   })
 
+  it('targets the right popup when multiple comboboxes share Yes/No options (Greenhouse-style)', async () => {
+    // Regression for the failure mode that breaks Greenhouse application forms:
+    // three distinct comboboxes (work auth, sponsorship, prior employment) all expose a
+    // Yes/No popup. Without popup-scoped option resolution the picker would click the
+    // first matching option in document order, leaving the requested field untouched and
+    // letting the form's required-field validation fire on submit.
+    const page = await browser.newPage({ viewport: { width: 900, height: 800 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; }
+        .field { width: 480px; margin-bottom: 24px; position: relative; }
+        .control { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border: 1px solid #ccc; min-height: 36px; }
+        .control[data-state="invalid"] { border-color: #c00; }
+        .menu[hidden] { display: none; }
+        .menu { border: 1px solid #ccc; margin-top: 6px; padding: 4px; display: grid; gap: 4px; background: #fff; }
+        [role="option"][data-highlighted="true"] { background: #def; }
+        [role="option"] { padding: 6px 8px; cursor: pointer; }
+      </style>
+      <form id="application">
+        <div class="field" id="field-auth">
+          <label id="auth-label">Are you legally authorized to work in the country in which you are applying?</label>
+          <div class="control" id="auth-control" data-state="invalid">
+            <input id="auth-input" role="combobox" aria-labelledby="auth-label" aria-controls="auth-menu" aria-expanded="false" aria-haspopup="listbox" />
+            <span id="auth-display" data-placeholder="true">Select...</span>
+          </div>
+          <div class="menu" id="auth-menu" role="listbox" aria-labelledby="auth-label" hidden>
+            <div role="option">Yes</div>
+            <div role="option">No</div>
+          </div>
+        </div>
+        <div class="field" id="field-sponsor">
+          <label id="sponsor-label">Do you now or will you in the future need sponsorship for employment visa status?</label>
+          <div class="control" id="sponsor-control" data-state="invalid">
+            <input id="sponsor-input" role="combobox" aria-labelledby="sponsor-label" aria-controls="sponsor-menu" aria-expanded="false" aria-haspopup="listbox" />
+            <span id="sponsor-display" data-placeholder="true">Select...</span>
+          </div>
+          <div class="menu" id="sponsor-menu" role="listbox" aria-labelledby="sponsor-label" hidden>
+            <div role="option">Yes</div>
+            <div role="option">No</div>
+          </div>
+        </div>
+        <div class="field" id="field-prior">
+          <label id="prior-label">Have you previously worked for the company?</label>
+          <div class="control" id="prior-control" data-state="invalid">
+            <input id="prior-input" role="combobox" aria-labelledby="prior-label" aria-controls="prior-menu" aria-expanded="false" aria-haspopup="listbox" />
+            <span id="prior-display" data-placeholder="true">Select...</span>
+          </div>
+          <div class="menu" id="prior-menu" role="listbox" aria-labelledby="prior-label" hidden>
+            <div role="option">Yes</div>
+            <div role="option">No</div>
+          </div>
+        </div>
+      </form>
+      <script>
+        function wireField(controlId, inputId, displayId, menuId) {
+          const control = document.getElementById(controlId)
+          const input = document.getElementById(inputId)
+          const display = document.getElementById(displayId)
+          const menu = document.getElementById(menuId)
+          const options = Array.from(menu.querySelectorAll('[role="option"]'))
+
+          function open() {
+            menu.hidden = false
+            input.setAttribute('aria-expanded', 'true')
+          }
+          function close() {
+            menu.hidden = true
+            input.setAttribute('aria-expanded', 'false')
+          }
+          function commit(value) {
+            display.textContent = value
+            display.removeAttribute('data-placeholder')
+            control.removeAttribute('data-state')
+            close()
+          }
+
+          control.addEventListener('click', open)
+          input.addEventListener('focus', open)
+          input.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+              const highlighted = options.find(o => o.getAttribute('data-highlighted') === 'true')
+              if (highlighted) {
+                event.preventDefault()
+                commit(highlighted.textContent)
+              }
+            }
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault()
+              const currentIndex = options.findIndex(o => o.getAttribute('data-highlighted') === 'true')
+              const nextIndex =
+                event.key === 'ArrowDown'
+                  ? (currentIndex + 1 + options.length) % options.length
+                  : (currentIndex - 1 + options.length) % options.length
+              for (const o of options) o.removeAttribute('data-highlighted')
+              options[nextIndex].setAttribute('data-highlighted', 'true')
+            }
+          })
+          for (const option of options) {
+            option.addEventListener('mousedown', (event) => {
+              event.preventDefault()
+              commit(option.textContent)
+            })
+          }
+        }
+
+        wireField('auth-control', 'auth-input', 'auth-display', 'auth-menu')
+        wireField('sponsor-control', 'sponsor-input', 'sponsor-display', 'sponsor-menu')
+        wireField('prior-control', 'prior-input', 'prior-display', 'prior-menu')
+      </script>
+    `)
+
+    // Pick the middle field's "No" option. The first and third fields must remain untouched.
+    await pickListboxOption(page, 'No', {
+      fieldLabel: 'Do you now or will you in the future need sponsorship for employment visa status?',
+      exact: false,
+    })
+
+    expect(await page.locator('#sponsor-display').textContent()).toBe('No')
+    expect(await page.locator('#auth-display').textContent()).toBe('Select...')
+    expect(await page.locator('#prior-display').textContent()).toBe('Select...')
+
+    // And the first field still works after the second one closed.
+    await pickListboxOption(page, 'Yes', {
+      fieldLabel: 'Are you legally authorized to work in the country in which you are applying?',
+      exact: false,
+    })
+
+    expect(await page.locator('#auth-display').textContent()).toBe('Yes')
+    expect(await page.locator('#sponsor-display').textContent()).toBe('No')
+    expect(await page.locator('#prior-display').textContent()).toBe('Select...')
+
+    await page.close()
+  })
+
   it('falls back to keyboard navigation for searchable comboboxes when click selection does not update the field', async () => {
     const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
     await page.setContent(`
