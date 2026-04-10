@@ -25,6 +25,9 @@ export interface StreamText {
   /**
    * Replace the entire text content synchronously.
    * Non-string values are ignored (same guard as `append`) so the buffer and signal stay strings.
+   *
+   * `set('')` clears visible text like an empty buffer but does **not** set {@link StreamText.streaming}
+   * back to `true` — use {@link StreamText.clear} when starting a new streaming session after {@link StreamText.done}.
    */
   set(text: string): void
   /**
