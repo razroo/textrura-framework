@@ -387,6 +387,9 @@ function generateSessionId(): string { return `s${++nextSessionId}` }
 
 let reusableProxies: ReusableProxyEntry[] = []
 const REUSABLE_PROXY_POOL_LIMIT = 6
+/** Close idle reusable proxies after 5 minutes of inactivity. */
+const REUSABLE_PROXY_IDLE_TTL_MS = 5 * 60 * 1000
+let idleProxyTimer: ReturnType<typeof setInterval> | null = null
 const trackedReusableProxyChildren = new WeakSet<ChildProcess>()
 const ACTION_UPDATE_TIMEOUT_MS = 2000
 const LISTBOX_UPDATE_TIMEOUT_MS = 4500
@@ -464,9 +467,11 @@ function closeReusableProxy(entry: ReusableProxyEntry): void {
     } catch {
       /* ignore */
     }
+    ensureIdleProxyTimer()
     return
   }
   void entry.runtime?.close().catch(() => {})
+  ensureIdleProxyTimer()
 }
 
 function closeReusableProxies(): void {
@@ -483,6 +488,28 @@ function closeReusableProxies(): void {
       continue
     }
     void entry.runtime?.close().catch(() => {})
+  }
+}
+
+function evictIdleReusableProxies(): void {
+  clearReusableProxiesIfExited()
+  const now = Date.now()
+  const stale = reusableProxies.filter(
+    entry => !reusableProxyEntryIsActive(entry) && (now - entry.lastUsedAt) > REUSABLE_PROXY_IDLE_TTL_MS,
+  )
+  for (const entry of stale) {
+    closeReusableProxy(entry)
+  }
+  ensureIdleProxyTimer()
+}
+
+function ensureIdleProxyTimer(): void {
+  if (reusableProxies.length > 0 && !idleProxyTimer) {
+    idleProxyTimer = setInterval(evictIdleReusableProxies, 60_000)
+    idleProxyTimer.unref()
+  } else if (reusableProxies.length === 0 && idleProxyTimer) {
+    clearInterval(idleProxyTimer)
+    idleProxyTimer = null
   }
 }
 
@@ -545,6 +572,7 @@ function setReusableProxy(
       child.once('error', clear)
     }
     enforceReusableProxyPoolLimit()
+    ensureIdleProxyTimer()
     return
   }
 
@@ -560,6 +588,7 @@ function setReusableProxy(
     lastUsedAt: now,
   })
   enforceReusableProxyPoolLimit()
+  ensureIdleProxyTimer()
 }
 
 function rememberReusableProxyPageUrl(session: Session): void {

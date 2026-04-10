@@ -10,7 +10,7 @@ function cleanupActiveSession() {
   if (cleanedUp) return
   cleanedUp = true
   try {
-    disconnect()
+    disconnect({ closeProxy: true })
   } catch {
     /* ignore */
   }
