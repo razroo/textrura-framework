@@ -345,8 +345,18 @@ async function handleClientMessage(
 
 async function fillFieldsAckResult(page: Page): Promise<Record<string, unknown>> {
   const frames = page.frames()
+  // `:invalid` only matches native HTML5 validity errors. It misses custom
+  // ARIA listboxes / comboboxes (react-select, Radix Select, Headless UI,
+  // Downshift, Ashby/Lever/Greenhouse/Workday form libraries) that advertise
+  // their invalid state via `aria-invalid="true"` on a <div role="combobox">
+  // or similar. Counting both gives fill_form a reliable signal for whether
+  // a custom dropdown commit actually landed, which is the authoritative
+  // check used throughout the listbox pick pipeline (see readAriaInvalid in
+  // dom-actions.ts). The `:is()` selector de-duplicates the two passes so
+  // elements that match both just count once.
+  const invalidSelector = ':is(:invalid, [aria-invalid="true"]:is(input, textarea, select, [role="combobox"], [role="listbox"], [role="spinbutton"], [role="searchbox"], [role="textbox"]))'
   const [invalidCount, alertCount, dialogCount, busyCount] = await Promise.all([
-    countAcrossFrames(frames, ':invalid'),
+    countAcrossFrames(frames, invalidSelector),
     countAcrossFrames(frames, '[role="alert"], [role="alertdialog"]'),
     countAcrossFrames(frames, '[role="dialog"], [role="alertdialog"]'),
     countAcrossFrames(frames, '[aria-busy="true"]'),
@@ -374,24 +384,74 @@ async function collectInvalidFieldErrors(
     frames.map(frame =>
       frame.evaluate(() => {
         const fields: Array<{ name?: string; error?: string }> = []
-        const invalidEls = document.querySelectorAll(':invalid')
-        for (const el of invalidEls) {
-          if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement)) continue
+        const seen = new Set<Element>()
+
+        const describeNative = (el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement): { name?: string; error?: string } => {
           const label =
             el.getAttribute('aria-label')?.trim() ||
             (el.labels && el.labels.length > 0 ? el.labels[0]?.textContent?.trim() : undefined) ||
             el.getAttribute('placeholder')?.trim() ||
             el.name ||
             undefined
-          const errorId = el.getAttribute('aria-errormessage')
-          const errorEl = errorId ? document.getElementById(errorId) : null
+          const errorId = el.getAttribute('aria-errormessage') || el.getAttribute('aria-describedby')
+          const errorEl = errorId ? document.getElementById(errorId.split(/\s+/)[0]!) : null
           const error =
             errorEl?.textContent?.trim() ||
             el.validationMessage ||
             undefined
-          if (label || error) fields.push({ ...(label ? { name: label } : {}), ...(error ? { error } : {}) })
+          return { ...(label ? { name: label } : {}), ...(error ? { error } : {}) }
         }
-        return fields.slice(0, 10)
+
+        const describeAria = (el: Element): { name?: string; error?: string } => {
+          // Try ARIA name computation, then labelled-by, then nearest <label for>
+          const ariaLabel = el.getAttribute('aria-label')?.trim()
+          let name = ariaLabel || undefined
+          if (!name) {
+            const labelledBy = el.getAttribute('aria-labelledby')
+            if (labelledBy) {
+              const parts = labelledBy.split(/\s+/).map(id => document.getElementById(id)?.textContent?.trim() ?? '').filter(Boolean)
+              if (parts.length > 0) name = parts.join(' ')
+            }
+          }
+          if (!name && el.id) {
+            const lbl = document.querySelector(`label[for="${CSS.escape(el.id)}"]`)
+            name = lbl?.textContent?.trim() || undefined
+          }
+          const errorId = el.getAttribute('aria-errormessage') || el.getAttribute('aria-describedby')
+          const errorEl = errorId ? document.getElementById(errorId.split(/\s+/)[0]!) : null
+          const error = errorEl?.textContent?.trim() || undefined
+          return { ...(name ? { name } : {}), ...(error ? { error } : {}) }
+        }
+
+        // Native HTML5 validity
+        const nativeInvalid = document.querySelectorAll(':invalid')
+        for (const el of nativeInvalid) {
+          if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement)) continue
+          if (seen.has(el)) continue
+          seen.add(el)
+          const row = describeNative(el)
+          if (row.name || row.error) fields.push(row)
+          if (fields.length >= 10) return fields
+        }
+
+        // ARIA-declared invalid (react-select, Radix, Headless UI, Downshift,
+        // etc.). Restrict to recognised form-control roles so ambient
+        // aria-invalid on irrelevant elements doesn't pollute the list.
+        const ariaInvalid = document.querySelectorAll(
+          '[aria-invalid="true"]:is(input, textarea, select, [role="combobox"], [role="listbox"], [role="spinbutton"], [role="searchbox"], [role="textbox"])',
+        )
+        for (const el of ariaInvalid) {
+          if (seen.has(el)) continue
+          seen.add(el)
+          const row =
+            el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement
+              ? describeNative(el)
+              : describeAria(el)
+          if (row.name || row.error) fields.push(row)
+          if (fields.length >= 10) return fields
+        }
+
+        return fields
       }).catch(() => [] as Array<{ name?: string; error?: string }>),
     ),
   )

@@ -4057,9 +4057,22 @@ async function executeBatchAction(
       for (let index = 0; index < resolvedFields.fields.length; index++) {
         const field = resolvedFields.fields[index]!
         const result = await executeFillField(session, field, detail)
+        // A step is only honestly "ok" when the proxy's underlying action
+        // both (a) did not throw and (b) reported a tree-updating ack —
+        // `wait: 'timed_out'` means the action was sent but the proxy never
+        // confirmed a DOM change that matched the request, which is the
+        // silent-failure mode that used to leak through as a false positive
+        // (e.g. react-select listbox picks that revert on the next render).
+        // Choice fields that land in this branch are almost always failed
+        // commits, not slow commits, so we surface the failure to the caller
+        // instead of pretending the field was set.
+        const waitStatus = result.compact && typeof result.compact === 'object' && 'wait' in result.compact
+          ? (result.compact as { wait?: unknown }).wait
+          : undefined
+        const ok = waitStatus !== 'timed_out'
         steps.push(detail === 'verbose'
-          ? { index, kind: field.kind, ok: true, summary: result.summary }
-          : { index, kind: field.kind, ok: true, ...result.compact })
+          ? { index, kind: field.kind, ok, summary: result.summary }
+          : { index, kind: field.kind, ok, ...result.compact })
       }
       return {
         summary: steps.map(step => String(step.summary ?? '')).filter(Boolean).join('\n'),

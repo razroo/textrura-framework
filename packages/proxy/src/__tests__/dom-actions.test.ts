@@ -515,6 +515,115 @@ describe('pickListboxOption', () => {
     await page.close()
   })
 
+  it('surfaces selection_not_confirmed when a react-select-style listbox keeps aria-invalid=true after click', async () => {
+    // Regression: on some forms (Greenhouse's forked react-select instance on
+    // Anthropic-style ATS pages, and various Workday PTX flows) the library
+    // briefly renders the selected option in `.select__single-value` on click,
+    // but its internal form state never commits, so the trigger keeps
+    // advertising `aria-invalid="true"`. Before the aria-invalid veto,
+    // confirmListboxSelection happily returned true on the brief
+    // `.select__single-value` match and dismissAndReVerifySelection then
+    // optimistically returned true because the sawAnyValue fallback treated
+    // "no displayed values" as success. pickListboxOption would return
+    // cleanly, and fill_form would report a 100% success that was a lie.
+    //
+    // The fix is to consult the trigger's aria-invalid attribute as the
+    // authoritative commit signal and treat a still-invalid field as a
+    // definitive failure, regardless of what other heuristics say.
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; }
+        .field { width: 360px; display: grid; gap: 8px; }
+        .rs-control { border: 1px solid #ccc; min-height: 40px; display: flex; align-items: center; padding: 0 12px; cursor: pointer; }
+        .rs-single-value { color: #111; }
+        .rs-placeholder { color: #888; }
+        .rs-menu[hidden] { display: none; }
+        .rs-menu { border: 1px solid #ccc; margin-top: 4px; padding: 4px 0; }
+        .rs-option { padding: 6px 12px; cursor: pointer; }
+      </style>
+      <div class="field">
+        <label for="visa-control">Will you now or will you in the future require employment visa sponsorship?</label>
+        <div
+          id="visa-control"
+          class="rs-control"
+          role="combobox"
+          aria-haspopup="listbox"
+          aria-expanded="false"
+          aria-invalid="true"
+          aria-required="true"
+          tabindex="0"
+        >
+          <span id="visa-value" class="rs-placeholder">Select...</span>
+        </div>
+        <div id="visa-menu" class="rs-menu" role="listbox" hidden>
+          <div id="visa-option-yes" class="rs-option" role="option">Yes</div>
+          <div id="visa-option-no" class="rs-option" role="option">No</div>
+        </div>
+      </div>
+      <script>
+        const control = document.getElementById('visa-control')
+        const valueEl = document.getElementById('visa-value')
+        const menu = document.getElementById('visa-menu')
+        const options = Array.from(menu.querySelectorAll('.rs-option'))
+
+        function open() {
+          if (!menu.hidden) return
+          menu.hidden = false
+          control.setAttribute('aria-expanded', 'true')
+        }
+        function close() {
+          if (menu.hidden) return
+          menu.hidden = true
+          control.setAttribute('aria-expanded', 'false')
+        }
+
+        control.addEventListener('click', (event) => {
+          // Only the control itself opens the menu. Option clicks inside the
+          // menu do not bubble up to this handler because the menu lives in a
+          // sibling container, but we still early-return if the event came
+          // from a selector path (defensive).
+          if (event.target.closest('.rs-option')) return
+          if (menu.hidden) open(); else close()
+        })
+
+        for (const option of options) {
+          option.addEventListener('click', (event) => {
+            event.stopPropagation()
+            // Simulate the buggy library flow: flash the selection into
+            // .select__single-value so displayed-value heuristics pick it up,
+            // but NEVER clear aria-invalid. In production this is the state
+            // after react-select commits its visual side but its internal
+            // form state reverts (or never flips in the first place).
+            valueEl.textContent = option.textContent
+            valueEl.classList.remove('rs-placeholder')
+            valueEl.classList.add('rs-single-value')
+            close()
+            // Explicitly re-assert invalid to defeat any library that reads
+            // the attribute late.
+            control.setAttribute('aria-invalid', 'true')
+          })
+        }
+      </script>
+    `)
+
+    let thrown: Error | null = null
+    try {
+      await pickListboxOption(page, 'No', {
+        fieldLabel: 'Will you now or will you in the future require employment visa sponsorship?',
+        exact: false,
+      })
+    } catch (error) {
+      thrown = error as Error
+    }
+
+    // The library never clears aria-invalid, so pickListboxOption MUST
+    // surface the failure instead of silently reporting success.
+    expect(thrown).not.toBeNull()
+    expect(thrown?.message).toContain('selection_not_confirmed')
+    await page.close()
+  }, 60_000)
+
   it('returns visible options in the failure payload when no custom dropdown option matches', async () => {
     const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
     await page.setContent(`

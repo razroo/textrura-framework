@@ -1670,6 +1670,53 @@ async function elementHandleDisplayedValues(handle: ElementHandle<Element>): Pro
 }
 
 /**
+ * Read the authoritative `aria-invalid` state of a combobox trigger (or its
+ * nearest owning combobox ancestor).
+ *
+ * This is the ONLY reliable signal for whether a custom listbox library
+ * (react-select, Radix, Headless UI, Downshift, Workday PTX, Ashby, Lever
+ * forms, etc.) considers a required field committed. Displayed-value reads
+ * can return stale placeholder text or empty strings during closing
+ * animations, and the library's internal React state may revert a silent
+ * commit a few frames after an option click — but whenever that happens,
+ * the library sets `aria-invalid="true"` back on the trigger element.
+ *
+ * Returns:
+ *   - `true` if the trigger (or an owning combobox ancestor) is explicitly
+ *     marked `aria-invalid="true"`.
+ *   - `false` if it is explicitly `"false"` or unset. Callers should treat
+ *     `false` as "no veto" — not as "definitely committed" — because some
+ *     libraries simply omit the attribute when valid.
+ *   - `false` on read errors (detached handles, cross-origin frames, etc.)
+ *     so verification proceeds on the other positive signals.
+ */
+async function readAriaInvalid(handle: ElementHandle<Element> | null | undefined): Promise<boolean> {
+  if (!handle) return false
+  try {
+    return await handle.evaluate((el) => {
+      if (!(el instanceof Element)) return false
+      // Walk the element itself plus a few ancestors. react-select exposes the
+      // hidden input as the focusable trigger; its aria-invalid is mirrored on
+      // the combobox wrapper. Radix Select puts aria-invalid on the trigger
+      // button. Covering both patterns with a short climb keeps this generic.
+      let cursor: Element | null = el
+      let depth = 0
+      while (cursor && depth < 4) {
+        const attr = cursor.getAttribute('aria-invalid')
+        if (attr !== null) {
+          return attr === 'true' || attr === ''
+        }
+        cursor = cursor.parentElement
+        depth++
+      }
+      return false
+    })
+  } catch {
+    return false
+  }
+}
+
+/**
  * Read the picked option from a custom combobox's sibling presentational
  * element ONLY. Skips the input's own .value (which is the typed search
  * query for editable comboboxes), aria attributes, and the trigger's own
@@ -1882,6 +1929,15 @@ async function confirmListboxSelection(
     return !popupState.hasPopup
   }
 
+  // ARIA veto: if the combobox still advertises aria-invalid="true" after the
+  // option click, the library itself is telling us the commit did not land.
+  // Displayed-value reads can still return stale placeholder text or an in-
+  // flight sibling value during react-select's closing animation, so trusting
+  // them without consulting aria-invalid produces the silent-success bug this
+  // whole function exists to prevent. See readAriaInvalid() for why this is
+  // the right generic signal.
+  const ariaVeto = async (): Promise<boolean> => currentHandle ? readAriaInvalid(currentHandle) : false
+
   if (currentHandle) {
     // Sibling-only check first: react-select / Radix / similar libraries
     // only populate `.select__single-value` (and friends) AFTER they commit
@@ -1890,13 +1946,14 @@ async function confirmListboxSelection(
     // fast-path for the v1.34.0 silent-fill bug.
     const trustedSibling = await trustedSiblingComboboxValue(currentHandle)
     if (trustedSibling && displayedValueMatchesSelection(trustedSibling, label, exact, selectedOptionText)) {
-      return true
+      if (!(await ariaVeto())) return true
     }
 
     const immediateValues = await elementHandleDisplayedValues(currentHandle)
     if (
       immediateValues.some(value => displayedValueMatchesSelection(value, label, exact, selectedOptionText)) &&
-      await canTrustEditableDisplayMatch()
+      await canTrustEditableDisplayMatch() &&
+      !(await ariaVeto())
     ) {
       return true
     }
@@ -1910,7 +1967,7 @@ async function confirmListboxSelection(
       // schedule state updates via React transitions.
       const trustedSibling = await trustedSiblingComboboxValue(currentHandle)
       if (trustedSibling && displayedValueMatchesSelection(trustedSibling, label, exact, selectedOptionText)) {
-        return true
+        if (!(await ariaVeto())) return true
       }
     }
     for (const frame of page.frames()) {
@@ -1919,12 +1976,13 @@ async function confirmListboxSelection(
       const values = await locatorDisplayedValues(locator)
       if (
         values.some(value => displayedValueMatchesSelection(value, label, exact, selectedOptionText)) &&
-        await canTrustEditableDisplayMatch()
+        await canTrustEditableDisplayMatch() &&
+        !(await ariaVeto())
       ) {
         return true
       }
     }
-    if (await visibleOptionIsSelected(page, label, exact, anchor)) return true
+    if (await visibleOptionIsSelected(page, label, exact, anchor) && !(await ariaVeto())) return true
     // Check for multi-select chips/tags (Greenhouse-style React-Select multi)
     if (currentHandle) {
       try {
@@ -1942,7 +2000,7 @@ async function confirmListboxSelection(
           }
           return false
         }, label)
-        if (hasChip) return true
+        if (hasChip && !(await ariaVeto())) return true
       } catch { /* handle detached */ }
     }
     await delay(100)
@@ -2023,11 +2081,28 @@ async function dismissAndReVerifySelection(
     }
     await delay(100)
   }
-  // Deadline elapsed without a positive signal. If the field never reported any displayed
-  // value, the previous confirmListboxSelection step is the only signal we have — keep the
-  // legacy optimistic behavior so well-formed selects don't suddenly fail.
-  // If the field DID report values but none of them matched, treat that as a silent revert.
-  return !sawAnyValue
+  // Deadline elapsed without a positive signal. Two scenarios:
+  //
+  //   (a) sawAnyValue === true:
+  //       The field did report *some* displayed value, but none of them
+  //       matched the target label. That's a silent revert — React Select
+  //       restored the placeholder after the blur event. Return false so the
+  //       caller retries via keyboard or surfaces the failure.
+  //
+  //   (b) sawAnyValue === false:
+  //       The field never reported a displayed value during the poll. Used
+  //       to return true here (legacy "optimistic success so well-formed
+  //       selects don't suddenly fail"), but that's exactly how the silent
+  //       commit bug reached production: an unfilled required combobox with
+  //       only a sr-only placeholder would pass through this branch despite
+  //       still being empty. The authoritative check is aria-invalid: if the
+  //       library still marks the trigger invalid, it is NOT committed, full
+  //       stop. If aria-invalid is absent or false, keep the legacy optimism
+  //       so well-formed controls that never expose a displayed value (pure
+  //       ARIA patterns like Radix with SelectValue empty text) still pass.
+  if (sawAnyValue) return false
+  if (await readAriaInvalid(currentHandle)) return false
+  return true
 }
 
 /**
@@ -3398,9 +3473,32 @@ export async function pickListboxOption(
     return false
   }
 
+  /**
+   * Final post-commit sanity check. Even after `confirmListboxSelection` and
+   * `dismissAndReVerifySelection` say the option was committed, some libraries
+   * (Greenhouse's forked react-select, Workday PTX, old Ashby forms) can
+   * revert the selection a few frames later when the library re-runs its
+   * validator on the next render. The aria-invalid attribute is the
+   * authoritative signal — if the trigger advertises invalid after all the
+   * verification steps, the commit did not persist, full stop.
+   *
+   * This is defense-in-depth: confirmListboxSelection already vetos on
+   * aria-invalid, but that check runs while the popup is still closing.
+   * This check runs after the popup is fully gone, giving the library a
+   * chance to expose its final committed state.
+   */
+  const postCommitAriaValid = async (): Promise<boolean> => {
+    if (!openedHandle) return true
+    // Give React Select a couple of animation frames to settle its final
+    // aria-invalid state after the blur/commit. The cost is a few ms on the
+    // happy path and a correct failure signal on the unhappy one.
+    await delay(40)
+    return !(await readAriaInvalid(openedHandle))
+  }
+
   try {
     if (await attemptClickSelection()) {
-      if (await dismissAfterSelection()) return
+      if (await dismissAfterSelection() && await postCommitAriaValid()) return
     }
 
     let visibleHints = await collectVisibleOptionHints(page, anchor)
@@ -3413,7 +3511,7 @@ export async function pickListboxOption(
         // next attempt still searches inside the right container.
         await refreshPopupScope()
         if (await attemptClickSelection()) {
-          if (await dismissAfterSelection()) return
+          if (await dismissAfterSelection() && await postCommitAriaValid()) return
         }
         visibleHints = await collectVisibleOptionHints(page, anchor)
       }
@@ -3429,7 +3527,7 @@ export async function pickListboxOption(
           editable: openedEditable,
         })
       ) {
-        if (await dismissAfterSelection()) return
+        if (await dismissAfterSelection() && await postCommitAriaValid()) return
       }
     }
 
