@@ -26,6 +26,16 @@ describe('route ranking', () => {
     )
   })
 
+  it('scores optional-static segments (trailing ?) below required static peers (parity with matchPath tokens)', () => {
+    expect(scorePathPattern('/v1')).toBeGreaterThan(scorePathPattern('/v1?'))
+    expect(scorePathPattern('/settings')).toBeGreaterThan(scorePathPattern('/settings?'))
+  })
+
+  it('scores a lone ? path segment as optional-static (empty raw after stripping the suffix)', () => {
+    expect(scorePathPattern('/?')).toBe(300)
+    expect(scorePathPattern('/a')).toBeGreaterThan(scorePathPattern('/?'))
+  })
+
   it('uses deterministic ranking for ambiguous tree matches', () => {
     const routes: RouteNode[] = [
       { id: 'fallback', path: '/users/*' },
