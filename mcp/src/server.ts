@@ -994,13 +994,19 @@ Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / combo
         const field = resolvedFields.fields[index]!
         try {
           const result = await executeFillField(session, field, detail)
+          // Post-fill validation: choice fields may report ok but leave the field invalid
+          const readback = result.compact?.readback as Record<string, unknown> | undefined
+          const stillInvalid = field.kind === 'choice' && readback?.state && (readback.state as Record<string, unknown>).invalid === true
+          if (stillInvalid) {
+            throw new Error(`Choice field "${field.fieldLabel}" still invalid after fill: ${readback?.error ?? 'selection did not commit'}`)
+          }
           steps.push(detail === 'verbose'
             ? { index, kind: field.kind, ok: true, summary: result.summary }
             : { index, kind: field.kind, ok: true, ...result.compact })
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e)
           // Retry once for transient selection failures
-          if (message.includes('selection_not_confirmed')) {
+          if (message.includes('selection_not_confirmed') || message.includes('still invalid after fill')) {
             try {
               const retryResult = await executeFillField(session, field, detail)
               steps.push(detail === 'verbose'

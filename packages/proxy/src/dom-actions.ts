@@ -1703,6 +1703,43 @@ async function attachViaDropPlaywright(page: Page, paths: string[], dropX: numbe
  * - `drop` — requires dropX, dropY; synthetic drop with file payloads at coordinates.
  * - `auto` — chooser if x,y; else hidden; if hidden fails, first visible file input without force.
  */
+const ATTACH_BUTTON_PATTERN = /attach|upload|add.file|choose.file|browse/i
+
+/**
+ * Find an Attach/Upload button near a field label (e.g. Greenhouse's "Attach" button
+ * inside a "Resume/CV" section). Returns the button Locator or null.
+ */
+async function findAttachButtonNearLabel(page: Page, fieldLabel: string): Promise<Locator | null> {
+  for (const frame of page.frames()) {
+    // Find all buttons/links whose text matches attach-like patterns
+    const buttons = frame.locator('button, a, [role="button"]')
+    const count = await buttons.count()
+    for (let i = 0; i < count; i++) {
+      const btn = buttons.nth(i)
+      try {
+        const text = await btn.textContent({ timeout: 200 })
+        if (!text || !ATTACH_BUTTON_PATTERN.test(text)) continue
+        // Check if this button is near the field label by looking for the label text in a parent section
+        const nearLabel = await btn.evaluate(
+          (el, label) => {
+            let parent: HTMLElement | null = el as HTMLElement
+            for (let depth = 0; depth < 8 && parent; depth++) {
+              parent = parent.parentElement
+              if (!parent) break
+              const textContent = parent.textContent ?? ''
+              if (textContent.includes(label)) return true
+            }
+            return false
+          },
+          fieldLabel,
+        )
+        if (nearLabel) return btn
+      } catch { continue }
+    }
+  }
+  return null
+}
+
 export async function attachFiles(
   page: Page,
   paths: string[],
@@ -1741,6 +1778,20 @@ export async function attachFiles(
         throw new Error(`file: hidden strategy could not find input[type=file] for field "${fieldLabel}"`)
       }
       throw new Error('file: hidden strategy could not set any input[type=file]')
+    }
+    // Fallback: look for an Attach/Upload button near the field label and use the file chooser
+    if (fieldLabel && strategy === 'auto') {
+      const attachBtn = await findAttachButtonNearLabel(page, fieldLabel)
+      if (attachBtn) {
+        try {
+          await attachBtn.scrollIntoViewIfNeeded()
+          const box = await attachBtn.boundingBox()
+          if (box) {
+            await attachViaChooser(page, paths, box.x + box.width / 2, box.y + box.height / 2)
+            return
+          }
+        } catch { /* fall through */ }
+      }
     }
     if (fieldLabel) {
       throw new Error(`file: no input[type=file] matching field "${fieldLabel}"`)
