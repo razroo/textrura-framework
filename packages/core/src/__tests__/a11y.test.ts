@@ -360,6 +360,12 @@ describe('toAccessibilityTree', () => {
     expect(a11y.children[1]?.state).toEqual({ selected: true })
   })
 
+  it('maps ariaReadOnly to state.readOnly on accessibility nodes', () => {
+    const tree = box({ semantic: { tag: 'input', ariaReadOnly: true } }, [])
+    const layout = { x: 0, y: 0, width: 100, height: 30, children: [] }
+    expect(toAccessibilityTree(tree, layout).state).toEqual({ readOnly: true })
+  })
+
   it('matches accessibility snapshot for dashboard-like template', () => {
     const tree = box({ semantic: { tag: 'main' } }, [
       text({ text: 'Overview', font: 'bold 24px Inter', lineHeight: 30, semantic: { tag: 'h1' } }),

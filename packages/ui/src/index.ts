@@ -91,6 +91,11 @@ export function link(label: string, href: string, options: LinkOptions = {}): UI
 export interface InputOptions {
   /** When true, the field is non-interactive: no caret, keyboard, pointer, or composition handlers. */
   disabled?: boolean
+  /**
+   * When true, the value is treated as read-only for accessibility (`ariaReadOnly`); handlers remain
+   * wired so hosts can still route focus, selection, and navigation keys. Ignored when `disabled` is true.
+   */
+  readOnly?: boolean
   focused?: boolean
   caretOffset?: number
   selectionStart?: number
@@ -106,6 +111,7 @@ export interface InputOptions {
 
 export function input(value: string, placeholder = '', options: InputOptions = {}): UIElement {
   const disabled = options.disabled === true
+  const readOnly = !disabled && options.readOnly === true
   const focused = !disabled && options.focused === true
   const valueColor = disabled ? '#64748b' : '#e2e8f0'
   const placeholderColor = disabled ? '#475569' : '#64748b'
@@ -204,7 +210,11 @@ export function input(value: string, placeholder = '', options: InputOptions = {
       cursor: disabled ? 'not-allowed' : 'text',
       pointerEvents: disabled ? 'none' : undefined,
       backgroundColor: disabled ? '#0f172a' : focused ? '#111827' : undefined,
-      semantic: disabled ? { tag: 'input', ariaDisabled: true } : { tag: 'input' },
+      semantic: disabled
+        ? { tag: 'input', ariaDisabled: true }
+        : readOnly
+          ? { tag: 'input', ariaReadOnly: true }
+          : { tag: 'input' },
       onClick: disabled ? undefined : handleClick,
       onKeyDown: disabled ? undefined : wrappedKeyDown,
       onCompositionStart: disabled ? undefined : options.onCompositionStart,

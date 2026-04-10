@@ -88,6 +88,38 @@ describe('@geometra/ui input', () => {
     expect(focused.children.length).toBe(2)
   })
 
+  it('readOnly input sets ariaReadOnly semantic and keeps handlers (value is still app-controlled)', () => {
+    let keys = ''
+    const el = input('hi', 'p', {
+      readOnly: true,
+      focused: true,
+      onKeyDown: (e) => {
+        if (e.key.length === 1) keys += e.key
+      },
+    })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.semantic).toEqual({ tag: 'input', ariaReadOnly: true })
+    expect(el.props.pointerEvents).toBeUndefined()
+    el.handlers?.onKeyDown?.({
+      key: 'z',
+      code: 'KeyZ',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+      target: {} as KeyboardHitEvent['target'],
+    })
+    expect(keys).toBe('z')
+  })
+
+  it('disabled input wins over readOnly for semantics and styling', () => {
+    const el = input('x', 'p', { disabled: true, readOnly: true, focused: true })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.semantic).toEqual({ tag: 'input', ariaDisabled: true })
+  })
+
   it('disabled input is non-interactive and overrides focused styling', () => {
     const enabled = input('x', 'p')
     const disabled = input('x', 'p', { disabled: true })

@@ -15,6 +15,7 @@ export interface AccessibilityNode {
   name?: string
   state?: {
     disabled?: boolean
+    readOnly?: boolean
     expanded?: boolean
     selected?: boolean
   }
@@ -71,6 +72,7 @@ function stateFor(element: UIElement): AccessibilityNode['state'] | undefined {
   if (!s) return undefined
   const state: NonNullable<AccessibilityNode['state']> = {}
   if (s.ariaDisabled !== undefined) state.disabled = s.ariaDisabled
+  if (s.ariaReadOnly !== undefined) state.readOnly = s.ariaReadOnly
   if (s.ariaExpanded !== undefined) state.expanded = s.ariaExpanded
   if (s.ariaSelected !== undefined) state.selected = s.ariaSelected
   return Object.keys(state).length > 0 ? state : undefined

@@ -90,6 +90,8 @@ export interface SemanticProps {
   ariaLabel?: string
   /** State: disabled. */
   ariaDisabled?: boolean
+  /** State: read-only (e.g. immutable text fields). */
+  ariaReadOnly?: boolean
   /** State: expanded/collapsed. */
   ariaExpanded?: boolean
   /** State: selected. */
