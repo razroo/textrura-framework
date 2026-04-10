@@ -1296,6 +1296,8 @@ async function clickScopedOptionCandidate(
   exact: boolean,
 ): Promise<string | null> {
   type ScopedHit = { selector: string; text: string }
+  // Initialized to null so the catch path below can fall through into the
+  // shared `if (!hit) return null` guard without an extra early return.
   let hit: ScopedHit | null = null
   try {
     hit = await popupScope.evaluate((root, payload): ScopedHit | null => {
@@ -1405,7 +1407,7 @@ async function clickScopedOptionCandidate(
       return stampAndDescribe(best.el)
     }, { label, exact })
   } catch {
-    return null
+    // Leave hit as null and let the shared guard below handle the bail.
   }
   if (!hit) return null
 

@@ -488,7 +488,6 @@ export async function enrichSnapshotWithCdpAx(
     } finally {
       if (!sessionManager && temporarySession) {
         await detachCdpSession(temporarySession)
-        temporarySession = undefined
       }
     }
   }
