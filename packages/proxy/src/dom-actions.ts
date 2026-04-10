@@ -1266,10 +1266,18 @@ async function clickVisibleOptionCandidate(
       const selectedText =
         (await candidate.evaluate(el => el.getAttribute('aria-label')?.trim() || el.textContent?.trim() || '').catch(() => '')) || null
       const clickTarget = await resolveMeaningfulOptionClickTarget(candidate)
+      // Only scrollIntoView if the option is NOT inside a popup/dropdown container.
+      // scrollIntoViewIfNeeded on popup options can scroll the entire page instead
+      // of scrolling within the dropdown's own scroll container.
+      const isInPopup = await candidate.evaluate(
+        (el, selector) => !!el.closest(selector),
+        POPUP_CONTAINER_SELECTOR,
+      ).catch(() => false)
       if (clickTarget) {
-        await clickTarget.scrollIntoViewIfNeeded()
+        if (!isInPopup) await clickTarget.scrollIntoViewIfNeeded()
         await clickTarget.click()
       } else {
+        if (!isInPopup) await candidate.scrollIntoViewIfNeeded()
         await candidate.click()
       }
       return selectedText
