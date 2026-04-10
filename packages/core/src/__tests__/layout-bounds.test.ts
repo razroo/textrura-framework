@@ -660,6 +660,15 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(10, 20, 3, false as unknown as number)).toEqual({ ox: 7, oy: 20 })
   })
 
+  it('treats IEEE −0 scroll props like +0 for subtraction (signed-zero scroll from serializers; distinct from abs −0 preservation)', () => {
+    expect(scrollSafeChildOffsets(10, 20, -0, -0)).toEqual({ ox: 10, oy: 20 })
+    const r = scrollSafeChildOffsets(-0, 10, -0, 0)
+    expect(r).not.toBeNull()
+    expect(Object.is(r!.ox, -0)).toBe(false)
+    expect(r!.ox).toBe(0)
+    expect(r!.oy).toBe(10)
+  })
+
   it('returns null when abs minus scroll overflows to non-finite (hit-test / selection parity)', () => {
     const max = Number.MAX_VALUE
     expect(max - -max).toBe(Infinity)

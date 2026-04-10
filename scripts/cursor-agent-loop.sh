@@ -25,7 +25,9 @@ fi
 # Both trackers may already be all `[x]` — that only means unchecked checkbox backlog is exhausted there,
 # not that the repo is "done". ROADMAP "Deferred / research" uses plain bullets (no `- [ ]`), so an empty
 # roadmap grep does not mean no roadmap-backed themes — read that subsection when casting next work (RTL through
-# Textura, animation beyond helpers, extra render targets). Otherwise prefer one scoped change under
+# Textura, animation beyond helpers, extra render targets). In-repo anchors: Textura `direction` / per-node `dir`
+# and tests in packages/textura/src/__tests__/compute-layout.test.ts; core animation helpers under packages/core;
+# WebGPU geometry consumer under packages/renderer-webgpu. Otherwise prefer one scoped change under
 # packages/ (tests, perf in hit-test/text/layout paths, types, public JSDoc, or
 # `rg 'TODO|FIXME|HACK' packages`; a clean TODO grep is normal — pick a north-star bucket anyway).
 # `vitest.fast.config.ts` (used by `npm run test` / quality.yml "Fast tests") includes only
