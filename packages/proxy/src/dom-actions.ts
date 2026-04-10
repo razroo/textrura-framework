@@ -430,17 +430,44 @@ async function findLabeledControl(
   exact: boolean,
   opts?: { preferredAnchor?: AnchorPoint },
 ): Promise<Locator | null> {
-  const directCandidates = [
-    frame.getByLabel(fieldLabel, { exact }),
-    frame.getByPlaceholder(fieldLabel, { exact }),
-    frame.getByRole('combobox', { name: fieldLabel, exact }),
-    frame.getByRole('textbox', { name: fieldLabel, exact }),
-    frame.getByRole('button', { name: fieldLabel, exact }),
+  // Always try exact-match candidates first, even when the caller passed
+  // exact=false. A common Greenhouse-style failure: filling a "Country"
+  // field with exact=false matches an unrelated combobox whose label
+  // happens to contain the word "country" (e.g.
+  // "Are you legally authorized to work in the country in which you are
+  // applying?"). The exact-match pass only succeeds when a label equals
+  // the search term, so it never picks the wrong control. We only fall
+  // through to substring matching when no exact match exists.
+  const exactCandidates = [
+    frame.getByLabel(fieldLabel, { exact: true }),
+    frame.getByPlaceholder(fieldLabel, { exact: true }),
+    frame.getByRole('combobox', { name: fieldLabel, exact: true }),
+    frame.getByRole('textbox', { name: fieldLabel, exact: true }),
+    frame.getByRole('button', { name: fieldLabel, exact: true }),
   ]
 
-  for (const candidate of directCandidates) {
+  for (const candidate of exactCandidates) {
     const visible = await firstVisible(candidate, { preferredAnchor: opts?.preferredAnchor })
     if (visible) return visible
+  }
+
+  // For exact=false callers, also try the substring matching that Playwright
+  // exposes via `getByLabel({ exact: false })`. We do this after the exact
+  // pass so an unrelated label that contains the search string doesn't win
+  // over the actual target. exact=true callers skip this entirely; their
+  // fallback is the manual scoring loop below (which honors payload.exact).
+  if (!exact) {
+    const directCandidates = [
+      frame.getByLabel(fieldLabel, { exact: false }),
+      frame.getByPlaceholder(fieldLabel, { exact: false }),
+      frame.getByRole('combobox', { name: fieldLabel, exact: false }),
+      frame.getByRole('textbox', { name: fieldLabel, exact: false }),
+      frame.getByRole('button', { name: fieldLabel, exact: false }),
+    ]
+    for (const candidate of directCandidates) {
+      const visible = await firstVisible(candidate, { preferredAnchor: opts?.preferredAnchor })
+      if (visible) return visible
+    }
   }
 
   const fallbackCandidates = frame.locator(LABELED_CONTROL_SELECTOR)
@@ -1642,6 +1669,63 @@ async function elementHandleDisplayedValues(handle: ElementHandle<Element>): Pro
   }
 }
 
+/**
+ * Read the picked option from a custom combobox's sibling presentational
+ * element ONLY. Skips the input's own .value (which is the typed search
+ * query for editable comboboxes), aria attributes, and the trigger's own
+ * textContent. Returns text only when it lives in something that looks like
+ * react-select's `.select__single-value`, Radix's `<SelectValue>`, or a
+ * similar library-rendered "currently picked" presentational element.
+ *
+ * Why this is its own function instead of just using browserDisplayedValues:
+ * confirmListboxSelection has a strict gate (`canTrustEditableDisplayMatch`)
+ * for editable triggers that requires the popup to close before any value
+ * read can be trusted — otherwise a typed search query like "Yes" could be
+ * mistaken for a committed selection. That gate is correct for the input's
+ * own .value, but it's overly strict for sibling-rendered values: a value
+ * appearing in `.select__single-value` only happens *after* the library has
+ * committed the choice, regardless of popup state. By splitting the
+ * sibling-only read into its own check, we can trust the sibling
+ * unconditionally and still distrust the input's own value when the trigger
+ * is editable. This avoids the silent-fill bug where react-select v5
+ * comboboxes get filled but `confirmListboxSelection` returns false because
+ * the popup is still in its closing animation, causing pickListboxOption to
+ * fall through to the keyboard fallback which re-clicks the input and
+ * re-opens the menu.
+ */
+async function trustedSiblingComboboxValue(handle: ElementHandle<Element>): Promise<string | undefined> {
+  try {
+    return await handle.evaluate((el) => {
+      if (!(el instanceof HTMLElement)) return undefined
+      let cur: Element | null = el.parentElement
+      let depth = 0
+      while (cur && depth < 4) {
+        const candidates = cur.querySelectorAll<HTMLElement>(
+          '[class*="single-value"], [class*="singleValue"], [class*="SelectValue"], [data-radix-select-value]',
+        )
+        for (const candidate of candidates) {
+          if (candidate === el) continue
+          if (candidate.contains(el)) continue
+          if (candidate.getAttribute('aria-hidden') === 'true') continue
+          const className = (candidate.getAttribute('class') ?? '').toLowerCase()
+          if (className.includes('placeholder')) continue
+          if (className.includes('indicator')) continue
+          // Skip wrappers that contain other form controls — we want a leaf-ish
+          // presentational text node, not a container.
+          if (candidate.querySelector('input, select, textarea, button')) continue
+          const text = candidate.textContent?.trim()
+          if (text) return text
+        }
+        cur = cur.parentElement
+        depth++
+      }
+      return undefined
+    })
+  } catch {
+    return undefined
+  }
+}
+
 async function visibleOptionIsSelected(
   page: Page,
   label: string,
@@ -1799,6 +1883,16 @@ async function confirmListboxSelection(
   }
 
   if (currentHandle) {
+    // Sibling-only check first: react-select / Radix / similar libraries
+    // only populate `.select__single-value` (and friends) AFTER they commit
+    // a choice, so a match here is trustworthy regardless of editable state
+    // or whether the popup is still in its closing animation. This is the
+    // fast-path for the v1.34.0 silent-fill bug.
+    const trustedSibling = await trustedSiblingComboboxValue(currentHandle)
+    if (trustedSibling && displayedValueMatchesSelection(trustedSibling, label, exact, selectedOptionText)) {
+      return true
+    }
+
     const immediateValues = await elementHandleDisplayedValues(currentHandle)
     if (
       immediateValues.some(value => displayedValueMatchesSelection(value, label, exact, selectedOptionText)) &&
@@ -1810,6 +1904,15 @@ async function confirmListboxSelection(
 
   const deadline = Date.now() + 1500
   while (Date.now() < deadline) {
+    if (currentHandle) {
+      // Re-check the sibling on every poll iteration — the commit may land
+      // a few ms after the option click, especially for libraries that
+      // schedule state updates via React transitions.
+      const trustedSibling = await trustedSiblingComboboxValue(currentHandle)
+      if (trustedSibling && displayedValueMatchesSelection(trustedSibling, label, exact, selectedOptionText)) {
+        return true
+      }
+    }
     for (const frame of page.frames()) {
       const locator = await findLabeledControl(frame, fieldLabel, exact, { preferredAnchor: anchor })
       if (!locator) continue

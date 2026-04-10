@@ -114,9 +114,24 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
     if (tag === 'input') {
       const type = (el as HTMLInputElement).type
       if (type === 'checkbox' || type === 'radio') return true
+      // react-select v5 (and similar libraries) renders the search input
+      // with `opacity: 0` until it's been focused at least once. Filtering
+      // it kills the entire combobox node from the snapshot, which breaks
+      // verifyFills, geometra_query, and any agent that wants to verify a
+      // post-fill custom-combobox state.
+      if (!['file', 'button', 'submit', 'reset', 'hidden', 'image', 'range', 'color'].includes(type)) return true
     }
     const role = el.getAttribute('role')
-    return role === 'checkbox' || role === 'radio' || role === 'switch'
+    return (
+      role === 'checkbox' ||
+      role === 'radio' ||
+      role === 'switch' ||
+      role === 'combobox' ||
+      role === 'textbox' ||
+      role === 'listbox' ||
+      role === 'searchbox' ||
+      role === 'spinbutton'
+    )
   }
 
   function readCheckedState(el: Element): boolean | 'mixed' | undefined {
@@ -363,11 +378,33 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
     const h = el as HTMLElement
     const style = getComputedStyle(h)
     if (style.display === 'none' || style.visibility === 'hidden') return true
+    if (tag === 'input' && (el as HTMLInputElement).type === 'hidden') return true
     const rect = h.getBoundingClientRect()
-    if (rect.width <= 0 || rect.height <= 0) return true
+    if (rect.width <= 0 || rect.height <= 0) {
+      // Don't skip elements that carry an explicit interactive role or are
+      // form-control elements. react-select v5 (and similar custom-combobox
+      // libraries) renders the trigger as an `<input role="combobox">` with
+      // CSS grid layout that gives it 0 width until it's been focused at
+      // least once. Filtering it out leaves the entire combobox missing
+      // from the a11y tree, which breaks verifyFills, geometra_query, and
+      // any agent that wants to verify a custom-combobox post-fill state.
+      // pickMeaningfulControlRect will expand the rect to a visible wrapper
+      // when the snapshot node is built, so the downstream layout is sound.
+      const role = h.getAttribute('role')
+      if (role === 'combobox' || role === 'textbox' || role === 'listbox' || role === 'searchbox' || role === 'spinbutton') {
+        return false
+      }
+      if (
+        el instanceof HTMLInputElement ||
+        el instanceof HTMLSelectElement ||
+        el instanceof HTMLTextAreaElement
+      ) {
+        return false
+      }
+      return true
+    }
     const op = parseFloat(style.opacity)
     if (op === 0 && !shouldKeepDespiteOpacity(el)) return true
-    if (tag === 'input' && (el as HTMLInputElement).type === 'hidden') return true
     return false
   }
 
