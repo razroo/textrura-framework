@@ -39,5 +39,16 @@ jobs:
       - name: Full-stack browser E2E
         run: bun run e2e:demo
 
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Release readiness gate
         run: bun run release:gate
