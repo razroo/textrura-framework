@@ -221,6 +221,26 @@ describe('geometry snapshot CI', () => {
     expect(roundLayout(layout)).toMatchSnapshot()
   })
 
+  it('stable rtl document: inner flex row-reverse with dir auto inherits rtl (rounded)', async () => {
+    await init()
+    const item = { font: '16px sans-serif', lineHeight: 20 } as const
+    const tree = box(
+      { width: 200, height: 80, padding: 12 },
+      [
+        box(
+          { width: 176, height: 56, flexDirection: 'row-reverse', gap: 8, dir: 'auto' },
+          [text({ text: 'A', ...item }), text({ text: 'B', ...item })],
+        ),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), {
+      width: 200,
+      height: 80,
+      direction: 'rtl',
+    })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
+
   it('stable ltr row with per-node rtl and ltr text dir (rounded)', async () => {
     await init()
     const item = { font: '16px sans-serif', lineHeight: 20, width: 40, height: 20 } as const
