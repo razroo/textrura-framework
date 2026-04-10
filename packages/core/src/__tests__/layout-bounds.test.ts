@@ -707,6 +707,20 @@ describe('scrollSafeChildOffsets', () => {
     expect(r!.ox).toBe(10)
     expect(Object.is(r!.oy, -0)).toBe(true)
   })
+
+  it('preserves positive subnormal abs origins when scroll is 0 (tiny finite offsets stay representable)', () => {
+    const tiny = Number.MIN_VALUE
+    expect(scrollSafeChildOffsets(tiny, 5, 0, 0)).toEqual({ ox: tiny, oy: 5 })
+    expect(scrollSafeChildOffsets(5, tiny, 0, 0)).toEqual({ ox: 5, oy: tiny })
+  })
+
+  it('preserves subnormal child offsets after subtracting matching scroll (finite difference, not null)', () => {
+    const tiny = Number.MIN_VALUE
+    // 2 * MIN_VALUE - MIN_VALUE === MIN_VALUE in IEEE-754
+    const doubled = tiny + tiny
+    expect(scrollSafeChildOffsets(doubled, 10, tiny, 0)).toEqual({ ox: tiny, oy: 10 })
+    expect(scrollSafeChildOffsets(10, doubled, 0, tiny)).toEqual({ ox: 10, oy: tiny })
+  })
 })
 
 describe('finiteNumberOrZero', () => {
