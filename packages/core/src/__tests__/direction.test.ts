@@ -114,6 +114,22 @@ describe('direction model', () => {
     expect(resolveElementDirection(el, 'rtl')).toBe('rtl')
   })
 
+  it('resolveElementDirection inherits parent when dir is BigInt on text, image, and scene3d (corrupt props)', () => {
+    const t = text({
+      text: 'x',
+      font: '16px sans-serif',
+      lineHeight: 20,
+      width: 10,
+      height: 20,
+      dir: 3n as never,
+    })
+    const img = image({ src: 'a.png', width: 8, height: 8, dir: 4n as never })
+    const sc = scene3d({ width: 16, height: 16, objects: [], dir: 5n as never })
+    expect(resolveElementDirection(t, 'rtl')).toBe('rtl')
+    expect(resolveElementDirection(img, 'ltr')).toBe('ltr')
+    expect(resolveElementDirection(sc, 'rtl')).toBe('rtl')
+  })
+
   it('resolveElementDirection treats invalid parent context as ltr', () => {
     const el = box({ width: 1, height: 1 })
     expect(resolveElementDirection(el, 'sideways' as never)).toBe('ltr')
@@ -385,6 +401,30 @@ describe('resolveComputeLayoutDirection', () => {
       dir: '???' as never,
     })
     expect(resolveComputeLayoutDirection(undefined, bogusScene)).toBe('ltr')
+  })
+
+  it('derives ltr from BigInt dir on non-box roots when host override is invalid (parity with box BigInt dir)', () => {
+    const textBn = text({
+      text: 'x',
+      font: '16px sans-serif',
+      lineHeight: 20,
+      width: 10,
+      height: 20,
+      dir: 9n as never,
+    })
+    expect(resolveComputeLayoutDirection(undefined, textBn)).toBe('ltr')
+    expect(resolveComputeLayoutDirection('auto' as never, textBn)).toBe('ltr')
+
+    const imageBn = image({ src: 'a.png', width: 8, height: 8, dir: 9n as never })
+    expect(resolveComputeLayoutDirection(undefined, imageBn)).toBe('ltr')
+
+    const sceneBn = scene3d({
+      width: 16,
+      height: 16,
+      objects: [],
+      dir: 9n as never,
+    })
+    expect(resolveComputeLayoutDirection(undefined, sceneBn)).toBe('ltr')
   })
 
   it('host primitive ltr/rtl overrides non-box root dir', () => {
