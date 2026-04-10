@@ -1459,6 +1459,26 @@ async function confirmListboxSelection(
       }
     }
     if (await visibleOptionIsSelected(page, label, exact, anchor)) return true
+    // Check for multi-select chips/tags (Greenhouse-style React-Select multi)
+    if (currentHandle) {
+      try {
+        const hasChip = await currentHandle.evaluate((el, selectedLabel) => {
+          let container: Element | null = el
+          for (let d = 0; d < 5 && container; d++) {
+            const chips = container.querySelectorAll(
+              '[class*="chip"], [class*="tag"], [class*="multi-value"], [class*="multiValue"], [aria-selected="true"]',
+            )
+            for (const chip of chips) {
+              const text = chip.textContent?.trim().toLowerCase() ?? ''
+              if (text.includes(selectedLabel.toLowerCase())) return true
+            }
+            container = container.parentElement
+          }
+          return false
+        }, label)
+        if (hasChip) return true
+      } catch { /* handle detached */ }
+    }
     await delay(100)
   }
   return false
@@ -1491,6 +1511,25 @@ async function dismissAndReVerifySelection(
       if (values.some(value => displayedValueMatchesSelection(value, label, exact, selectedOptionText))) {
         return true
       }
+      // Check for multi-select chips/tags containing the selected value
+      const hasChip = await currentHandle.evaluate((el, selectedLabel) => {
+        // Walk up to find the field container
+        let container: Element | null = el
+        for (let d = 0; d < 5 && container; d++) {
+          // Look for chip/tag elements inside the container
+          const chips = container.querySelectorAll(
+            '[class*="chip"], [class*="tag"], [class*="multi-value"], [class*="multiValue"], [aria-selected="true"]',
+          )
+          for (const chip of chips) {
+            const text = chip.textContent?.trim().toLowerCase() ?? ''
+            if (text.includes(selectedLabel.toLowerCase())) return true
+          }
+          container = container.parentElement
+        }
+        return false
+      }, label)
+      if (hasChip) return true
+
       if (values.length > 0 && values.every(v => PLACEHOLDER_PATTERN.test(v.trim()))) {
         return false
       }
