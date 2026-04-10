@@ -148,6 +148,22 @@ describe('syncVirtualWindow', () => {
     expect(r.end).toBe(999)
   })
 
+  it('returns only finite start/end/selected for a grid of representative magnitudes (overflow / sanitizer invariant)', () => {
+    const vals = [0, -2, 0.9, 4.9, 99.2, 8000.1]
+    for (const totalRows of vals) {
+      for (const windowSize of vals) {
+        for (const selected of vals) {
+          for (const currentStart of vals) {
+            const r = syncVirtualWindow(totalRows, windowSize, selected, currentStart)
+            expect(Number.isFinite(r.start)).toBe(true)
+            expect(Number.isFinite(r.end)).toBe(true)
+            expect(Number.isFinite(r.selected)).toBe(true)
+          }
+        }
+      }
+    }
+  })
+
   it('when the window is larger than the list, the inclusive visible span still covers at most totalRows indices', () => {
     const r = syncVirtualWindow(5, 12, 2, 0)
     expect(r.end - r.start + 1).toBeLessThanOrEqual(5)
