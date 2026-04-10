@@ -25,6 +25,14 @@ describe('route matcher', () => {
     expect(matchPath('/settings/profile', '/settings')).toBeNull()
   })
 
+  it('static segments use JS string equality on path pieces (NFC vs NFD must match byte-for-byte)', () => {
+    const nfc = '/caf\u00e9'
+    const nfd = '/cafe\u0301'
+    expect(nfc).not.toBe(nfd)
+    expect(matchPath(nfc, nfc)).toEqual({ params: {} })
+    expect(matchPath(nfc, nfd)).toBeNull()
+  })
+
   it('matches dynamic params', () => {
     expect(matchPath('/users/:id', '/users/42')).toEqual({ params: { id: '42' } })
   })
