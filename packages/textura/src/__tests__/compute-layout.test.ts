@@ -746,6 +746,46 @@ describe('box layout', () => {
     expect(row.children[0]!.x).toBeGreaterThan(row.children[1]!.x)
   })
 
+  it('dir auto propagates through nested auto column wrappers so a deep row mirrors under rtl document direction', () => {
+    const deepRow: BoxNode = {
+      width: 200,
+      height: 30,
+      flexDirection: 'row',
+      gap: 10,
+      dir: 'auto',
+      children: [
+        { width: 50, height: 30 },
+        { width: 50, height: 30 },
+      ],
+    }
+    const tree: BoxNode = {
+      width: 200,
+      height: 200,
+      flexDirection: 'column',
+      dir: 'auto',
+      children: [
+        {
+          width: 200,
+          height: 120,
+          flexDirection: 'column',
+          dir: 'auto',
+          children: [
+            {
+              width: 200,
+              height: 80,
+              flexDirection: 'column',
+              dir: 'auto',
+              children: [deepRow],
+            },
+          ],
+        },
+      ],
+    }
+    const result = computeLayout(tree, { width: 200, height: 200, direction: 'rtl' })
+    const row = result.children[0]!.children[0]!.children[0]!
+    expect(row.children[0]!.x).toBeGreaterThan(row.children[1]!.x)
+  })
+
   it('nested row with explicit dir ltr under rtl owner keeps physical left-to-right main axis (overrides document direction)', () => {
     const tree: BoxNode = {
       width: 200,
