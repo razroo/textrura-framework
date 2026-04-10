@@ -1341,6 +1341,66 @@ export function enableFind(
     }
   }
 
+  /**
+   * Bring the active find match into the visible viewport. The canvas in most
+   * Geometra apps lives inside a scrollable HTML container (the document, or
+   * an overflowing parent div), and matches off the visible edge previously
+   * just highlighted in place — silently, from the user's perspective.
+   *
+   * Approach: locate the matched line's canvas-grid Y via the same walk
+   * `paintFindHighlights` uses, translate it to a CSS pixel offset inside the
+   * canvas, drop a 1×1 marker at that offset as a sibling of the canvas, and
+   * call `marker.scrollIntoView({ block: 'center' })`. The browser walks up
+   * to the nearest scroll ancestor on its own, so this works whether the
+   * canvas scrolls with the document or with an overflowing parent.
+   *
+   * No-op when the match is already comfortably visible (with 64px of padding
+   * on both edges to clear the find bar at the top), so stepping through
+   * nearby matches doesn't jitter the page.
+   *
+   * Note: this targets the case where the canvas itself is scrolled by an
+   * HTML ancestor. Highlights inside a Geometra `box({ overflow: 'scroll' })`
+   * sub-region still need their owning box's `scrollY` updated separately —
+   * not handled here.
+   */
+  function scrollActiveMatchIntoView(): void {
+    const idx = renderer.currentFindIndex
+    if (idx < 0) return
+    const match = renderer.findHighlights[idx]
+    if (!match) return
+    const node = renderer.textNodes[match.anchorNode]
+    if (!node) return
+
+    let globalCharOffset = 0
+    let lineY: number | null = null
+    for (const line of node.lines) {
+      const lineEnd = globalCharOffset + line.text.length
+      if (match.anchorOffset >= globalCharOffset && match.anchorOffset <= lineEnd) {
+        lineY = line.y
+        break
+      }
+      globalCharOffset = lineEnd
+    }
+    if (lineY === null) return
+
+    const rect = canvas.getBoundingClientRect()
+    if (rect.height === 0 || canvas.height === 0) return
+    const cssY = lineY * (rect.height / canvas.height)
+    const viewportY = rect.top + cssY
+    if (viewportY >= 64 && viewportY <= window.innerHeight - 64) return
+
+    const marker = document.createElement('div')
+    marker.style.position = 'absolute'
+    marker.style.left = '0'
+    marker.style.top = `${canvas.offsetTop + cssY}px`
+    marker.style.width = '1px'
+    marker.style.height = '1px'
+    marker.style.pointerEvents = 'none'
+    parent.appendChild(marker)
+    marker.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    requestAnimationFrame(() => marker.remove())
+  }
+
   function runSearch(): void {
     const query = input.value
     if (!query) {
@@ -1359,6 +1419,7 @@ export function enableFind(
       status.textContent = '0/0'
     }
     rerender()
+    scrollActiveMatchIntoView()
   }
 
   function navigate(delta: number): void {
@@ -1367,6 +1428,7 @@ export function enableFind(
     renderer.currentFindIndex = (renderer.currentFindIndex + delta + total) % total
     status.textContent = `${renderer.currentFindIndex + 1}/${total}`
     rerender()
+    scrollActiveMatchIntoView()
   }
 
   function open(): void {
