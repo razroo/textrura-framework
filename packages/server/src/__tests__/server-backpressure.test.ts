@@ -27,4 +27,16 @@ describe('server backpressure helper', () => {
     expect(shouldDeferClientSend(-1, 0)).toBe(false)
     expect(shouldDeferClientSend(-100, 1024)).toBe(false)
   })
+
+  it('defers for any non-NaN buffered amount when the threshold is negative (strict >)', () => {
+    expect(shouldDeferClientSend(0, -1)).toBe(true)
+    expect(shouldDeferClientSend(1, -1)).toBe(true)
+    expect(shouldDeferClientSend(-0, -1)).toBe(true)
+  })
+
+  it('treats IEEE −0 like +0 for strict greater-than (no spurious defer vs +0 threshold)', () => {
+    expect(Object.is(-0, 0)).toBe(false)
+    expect(shouldDeferClientSend(-0, 0)).toBe(false)
+    expect(shouldDeferClientSend(0, -0)).toBe(false)
+  })
 })
