@@ -1285,6 +1285,13 @@ describe('findInTextNodes', () => {
     expect(findInTextNodes([a], '')).toEqual([])
   })
 
+  it('returns no matches when the query is longer than the node text or the text is empty', () => {
+    const short = stubTextNode(0, 'hi')
+    expect(findInTextNodes([short], 'hello')).toEqual([])
+    const empty = stubTextNode(0, '')
+    expect(findInTextNodes([empty], 'a')).toEqual([])
+  })
+
   it('matches case-insensitively and records UTF-16 offsets in the original text', () => {
     const nodes = [stubTextNode(0, 'Hello WORLD')]
     expect(findInTextNodes(nodes, 'world')).toEqual([
