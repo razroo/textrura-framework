@@ -1327,6 +1327,28 @@ describe('box layout', () => {
     expect(result.children[1]!.x).toBe(110)
   })
 
+  it('row layout with gap under rtl owner direction mirrors main axis and keeps gap between items', () => {
+    const tree: BoxNode = {
+      width: 300,
+      flexDirection: 'row',
+      gap: 10,
+      children: [
+        { width: 100, height: 50 },
+        { width: 100, height: 50 },
+      ],
+    }
+    const ltr = computeLayout(tree, { width: 300, height: 80, direction: 'ltr' })
+    const rtl = computeLayout(tree, { width: 300, height: 80, direction: 'rtl' })
+    expect(ltr.children[0]!.x).toBe(0)
+    expect(ltr.children[1]!.x).toBe(110)
+    // Main-start is the physical right edge: first flex line item sits at x = 300 − 100.
+    expect(rtl.children[0]!.x).toBe(200)
+    expect(rtl.children[1]!.x).toBe(90)
+    const gapBetween =
+      rtl.children[0]!.x - (rtl.children[1]!.x + rtl.children[1]!.width)
+    expect(gapBetween).toBe(10)
+  })
+
   it('padding affects child position', () => {
     const tree: BoxNode = {
       width: 300,
