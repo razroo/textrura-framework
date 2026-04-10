@@ -1325,4 +1325,13 @@ describe('findInTextNodes', () => {
       { anchorNode: 0, anchorOffset: 4, focusNode: 0, focusOffset: 6 },
     ])
   })
+
+  it('does not match in lowercased space when case-folding changes UTF-16 length (İ vs i+combining)', () => {
+    const ch = '\u0130' // Turkish capital I with dot; default-locale toLowerCase() expands to two UTF-16 code units
+    expect(ch.length).toBe(1)
+    expect(ch.toLowerCase().length).toBeGreaterThan(ch.length)
+    const nodes = [stubTextNode(0, ch)]
+    // Same-length window on the original cannot equal the expanded lowercased query; avoid [0,2) ranges in a 1-unit string.
+    expect(findInTextNodes(nodes, ch.toLowerCase())).toEqual([])
+  })
 })

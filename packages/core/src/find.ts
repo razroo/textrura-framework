@@ -2,36 +2,36 @@ import type { TextNodeInfo, SelectionRange } from './selection.js'
 
 /**
  * Search all text nodes for a query string (case-insensitive; {@link String.prototype.toLowerCase} on
- * both the query and each node’s `text`).
+ * both the query and each candidate slice of the node’s `text`).
  *
  * Returns {@link SelectionRange} entries with **UTF-16 code unit** offsets into the original
  * `element.props.text`, consistent with {@link import('./selection.js').hitTestText} and canvas selection.
  *
  * @remarks
- * The implementation finds substring positions in the lowercased copy of each node’s text, then reports
- * `anchorOffset` / `focusOffset` using `query.length`. When case-folding does not preserve code-unit
- * alignment between the original string and its lowercased form (uncommon but possible for some Unicode
- * sequences), highlighted ranges can diverge from ideal grapheme boundaries; ASCII and typical Latin text
- * behave as expected.
+ * Matching slides a window of `query.length` code units in the **original** string and compares
+ * `slice(i, i + query.length).toLowerCase()` to `query.toLowerCase()`. That keeps `anchorOffset` /
+ * `focusOffset` inside the original text even when a full-string `toLowerCase()` would change total length
+ * (e.g. Turkish capital `İ`). Queries whose lowercased form cannot align with any same-length window in the
+ * original (including length mismatch at the end) yield no matches for that node.
  */
 export function findInTextNodes(nodes: TextNodeInfo[], query: string): SelectionRange[] {
   if (!query || nodes.length === 0) return []
   const lowerQuery = query.toLowerCase()
+  const qLen = query.length
   const results: SelectionRange[] = []
 
   for (const node of nodes) {
-    const fullText = node.element.props.text.toLowerCase()
-    let searchFrom = 0
-    while (searchFrom < fullText.length) {
-      const idx = fullText.indexOf(lowerQuery, searchFrom)
-      if (idx === -1) break
-      results.push({
-        anchorNode: node.index,
-        anchorOffset: idx,
-        focusNode: node.index,
-        focusOffset: idx + query.length,
-      })
-      searchFrom = idx + 1
+    const original = node.element.props.text
+    const n = original.length
+    for (let i = 0; i <= n - qLen; i++) {
+      if (original.slice(i, i + qLen).toLowerCase() === lowerQuery) {
+        results.push({
+          anchorNode: node.index,
+          anchorOffset: i,
+          focusNode: node.index,
+          focusOffset: i + qLen,
+        })
+      }
     }
   }
 
