@@ -1671,6 +1671,23 @@ describe('box layout', () => {
     expect(rtl.children[1]!.x).toBe(0)
   })
 
+  it('row with dir rtl mirrors justifyContent space-between main axis under ltr owner', () => {
+    const base = {
+      width: 300,
+      height: 50,
+      flexDirection: 'row' as const,
+      justifyContent: 'space-between' as const,
+      children: [{ width: 50, height: 50 }, { width: 50, height: 50 }],
+    }
+    const ltr = computeLayout({ ...base, dir: 'ltr' }, { width: 300, height: 50, direction: 'ltr' })
+    expect(ltr.children[0]!.x).toBe(0)
+    expect(ltr.children[1]!.x).toBe(250)
+
+    const rtl = computeLayout({ ...base, dir: 'rtl' }, { width: 300, height: 50, direction: 'ltr' })
+    expect(rtl.children[0]!.x).toBe(250)
+    expect(rtl.children[1]!.x).toBe(0)
+  })
+
   it('align items center', () => {
     const tree: BoxNode = {
       width: 300,
