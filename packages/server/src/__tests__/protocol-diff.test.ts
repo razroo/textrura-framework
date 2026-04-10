@@ -294,6 +294,16 @@ describe('coalescePatches', () => {
     expect(coalescePatches([])).toEqual([])
   })
 
+  it('skips null and undefined batch entries without throwing (sparse / corrupt patch arrays)', () => {
+    expect(
+      coalescePatches([
+        null as unknown as LayoutPatch,
+        undefined as unknown as LayoutPatch,
+        { path: [0], x: 1 },
+      ]),
+    ).toEqual([{ path: [0], x: 1 }])
+  })
+
   it('coalesces repeated path updates with last-write wins semantics', () => {
     const merged = coalescePatches([
       { path: [1, 2], x: 10 },
