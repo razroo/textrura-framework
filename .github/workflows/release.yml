@@ -54,6 +54,25 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
+      - name: Verify Quality checks passed for release commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SHA=$(git rev-parse HEAD)
+          echo "Verifying Quality checks status for $SHA"
+          # Look for the quality job's check-run on this exact commit. If
+          # there's no run, or it didn't conclude success, refuse to publish.
+          # This prevents the situation where a red CI ships to npm because
+          # the release workflow runs on `release: published` and is otherwise
+          # decoupled from push-time CI.
+          CONCLUSION=$(gh api "repos/${{ github.repository }}/commits/$SHA/check-runs" \
+            --jq '[.check_runs[] | select(.name == "quality")] | sort_by(.completed_at) | last | .conclusion // "missing"')
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "::error::Quality checks for $SHA did not succeed (conclusion: $CONCLUSION). Wait for the push-time Quality checks workflow to go green before tagging the release."
+            exit 1
+          fi
+          echo "Quality checks succeeded for $SHA"
+
       - name: Verify committed package versions match release tag
         run: node scripts/release/check-source.mjs "$VERSION"
 

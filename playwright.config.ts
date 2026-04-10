@@ -9,6 +9,10 @@ export default defineConfig({
   timeout: 45_000,
   fullyParallel: false,
   workers: 1,
+  // One retry on CI to absorb cold-runner timing flakes (e.g. the
+  // a11y-mirror→render→announce cycle in full-stack-dashboard.spec.ts).
+  // Local stays at 0 retries so flake regressions surface immediately.
+  retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['line'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL,
