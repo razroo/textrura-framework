@@ -380,6 +380,11 @@ describe('box layout', () => {
       height: 80,
       direction: 'auto' as never,
     })
+    const emptyStrOwner = computeLayout(tree, {
+      width: 200,
+      height: 80,
+      direction: '' as never,
+    })
     // Owner direction is only primitive `'rtl'` / `'ltr'` (engine uses `=== 'rtl'`); boxed strings
     // match createApp / resolveComputeLayoutDirection strict checks and must not mirror the row.
     const boxedRtl = computeLayout(tree, {
@@ -415,6 +420,8 @@ describe('box layout', () => {
     expect(upper.children[1]!.x).toBe(ltr.children[1]!.x)
     expect(autoOwner.children[0]!.x).toBe(ltr.children[0]!.x)
     expect(autoOwner.children[1]!.x).toBe(ltr.children[1]!.x)
+    expect(emptyStrOwner.children[0]!.x).toBe(ltr.children[0]!.x)
+    expect(emptyStrOwner.children[1]!.x).toBe(ltr.children[1]!.x)
     expect(boxedRtl.children[0]!.x).toBe(ltr.children[0]!.x)
     expect(boxedRtl.children[1]!.x).toBe(ltr.children[1]!.x)
     expect(boxedLtr.children[0]!.x).toBe(ltr.children[0]!.x)
