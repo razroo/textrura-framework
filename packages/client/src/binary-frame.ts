@@ -60,11 +60,19 @@ function binaryFrameBytesFitBuffer(
  * `null` / `undefined` yield `false` (mistyped JS callers) instead of throwing from buffer resolution.
  * Plain objects that are not real `ArrayBufferView` instances also yield `false` (no numeric coercion).
  * Inconsistent `(buffer, byteOffset, byteLength)` tuples that would make `Uint8Array` throw `RangeError`
- * yield `false` instead of throwing.
+ * yield `false` instead of throwing. Hostile `Proxy` / exotic accessors that throw when reading
+ * `byteLength` or `byteOffset` on the root buffer or view also yield `false` (same non-throwing contract).
  */
 export function isBinaryFrameArrayBuffer(data: BinaryFrameBytes): boolean {
   if (data == null) return false
-  const { buffer, byteOffset, byteLength } = resolveFrameBytes(data)
+  let buffer: ArrayBufferLike
+  let byteOffset: number
+  let byteLength: number
+  try {
+    ;({ buffer, byteOffset, byteLength } = resolveFrameBytes(data))
+  } catch {
+    return false
+  }
   // Mistyped non-view objects can yield undefined fields; `undefined < 9` is false in JS, so guard explicitly.
   if (
     buffer == null ||

@@ -48,6 +48,30 @@ describe('isBinaryFrameArrayBuffer', () => {
     expect(isBinaryFrameArrayBuffer(undefined as unknown as ArrayBuffer)).toBe(false)
   })
 
+  it('returns false when byteLength / byteOffset accessors throw (exotic Proxy; probe stays non-throwing)', () => {
+    const ab = new ArrayBuffer(32)
+    const proxyBuf = new Proxy(ab, {
+      get(target, prop, receiver) {
+        if (prop === 'byteLength') throw new Error('byteLength blocked')
+        return Reflect.get(target, prop, receiver) as unknown
+      },
+    }) as unknown as ArrayBuffer
+    expect(() => isBinaryFrameArrayBuffer(proxyBuf)).not.toThrow()
+    expect(isBinaryFrameArrayBuffer(proxyBuf)).toBe(false)
+    expect(() => decodeBinaryFrameJson(proxyBuf)).toThrow('Not a GEOM binary frame')
+
+    const u8 = new Uint8Array(16)
+    const proxyView = new Proxy(u8, {
+      get(target, prop, receiver) {
+        if (prop === 'byteOffset') throw new Error('byteOffset blocked')
+        return Reflect.get(target, prop, receiver) as unknown
+      },
+    }) as unknown as Uint8Array
+    expect(() => isBinaryFrameArrayBuffer(proxyView)).not.toThrow()
+    expect(isBinaryFrameArrayBuffer(proxyView)).toBe(false)
+    expect(() => decodeBinaryFrameJson(proxyView)).toThrow('Not a GEOM binary frame')
+  })
+
   it('returns false for plain objects or fake views with non-finite byte layout (undefined < 9 is not a length check)', () => {
     expect(isBinaryFrameArrayBuffer({} as unknown as ArrayBuffer)).toBe(false)
     const ab = new ArrayBuffer(16)
