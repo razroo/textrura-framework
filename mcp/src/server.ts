@@ -34,6 +34,8 @@ import {
   hasUiDelta,
   nodeIdForPath,
   nodeContextForNode,
+  parseSectionId,
+  findNodeByPath,
   summarizeCompactIndex,
   summarizePageModel,
   summarizeUiDelta,
@@ -2118,7 +2120,7 @@ Use this for dropdowns, location pickers, or any scrollable list where items are
       scrollDelta: z.number().optional().default(300).describe('Vertical scroll delta per step (default 300)'),
       sessionId: sessionIdInput,
     },
-    async ({ listId: _listId, role, scrollX, scrollY, maxItems, maxScrollSteps, scrollDelta, sessionId }) => {
+    async ({ listId, role, scrollX, scrollY, maxItems, maxScrollSteps, scrollDelta, sessionId }) => {
       const session = getSession(sessionId)
       if (!session) return err('Not connected. Call geometra_connect first.')
 
@@ -2131,7 +2133,17 @@ Use this for dropdowns, location pickers, or any scrollable list where items are
         const a11y = await sessionA11yWhenReady(session)
         if (!a11y) break
 
-        const items = findNodes(a11y, { role: itemRole })
+        // Scope to subtree if listId is provided
+        let searchRoot = a11y
+        if (listId) {
+          const parsed = parseSectionId(listId)
+          if (parsed) {
+            const node = findNodeByPath(a11y, parsed.path)
+            if (node) searchRoot = node
+          }
+        }
+
+        const items = findNodes(searchRoot, { role: itemRole })
         let newCount = 0
         for (const item of items) {
           const id = nodeIdForPath(item.path)

@@ -632,6 +632,22 @@ async function openDropdownControl(
     } else {
       await locator.click()
     }
+
+    // Wait for options to render (React comboboxes may load async).
+    // Only poll if no popup content is visible yet — avoids adding latency when
+    // the dropdown already expanded synchronously.
+    const initialOptionCount = await page.locator('[role="option"]').count()
+    if (initialOptionCount === 0) {
+      const optionDeadline = Date.now() + 1000
+      while (Date.now() < optionDeadline) {
+        const count = await page.locator('[role="option"]').count()
+        if (count > 0) break
+        const listboxCount = await page.locator('[role="listbox"] > *').count()
+        if (listboxCount > 0) break
+        await delay(50)
+      }
+    }
+
     return {
       locator,
       handle,
@@ -1446,6 +1462,45 @@ async function confirmListboxSelection(
     await delay(100)
   }
   return false
+}
+
+const PLACEHOLDER_PATTERN = /^(select|choose|pick|--|—\s)/i
+
+/**
+ * Dismiss the dropdown (Tab) and re-verify the field value didn't revert to a placeholder.
+ * Catches silent selection failures in React comboboxes where the value appears briefly
+ * but isn't committed to form state.
+ */
+async function dismissAndReVerifySelection(
+  page: Page,
+  label: string,
+  exact: boolean,
+  currentHandle?: ElementHandle<Element> | null,
+  selectedOptionText?: string,
+): Promise<boolean> {
+  await page.keyboard.press('Tab')
+  await delay(50)
+
+  if (!currentHandle) return true
+
+  // Re-verify using the original element handle (immune to DOM reordering)
+  const deadline = Date.now() + 800
+  while (Date.now() < deadline) {
+    try {
+      const values = await elementHandleDisplayedValues(currentHandle)
+      if (values.some(value => displayedValueMatchesSelection(value, label, exact, selectedOptionText))) {
+        return true
+      }
+      if (values.length > 0 && values.every(v => PLACEHOLDER_PATTERN.test(v.trim()))) {
+        return false
+      }
+    } catch {
+      // Handle detached — trust the earlier confirmation
+      return true
+    }
+    await delay(100)
+  }
+  return true
 }
 
 /**
@@ -2673,7 +2728,27 @@ export async function pickListboxOption(
     return false
   }
 
-  if (await attemptClickSelection()) return
+  const dismissAfterSelection = async (): Promise<boolean> => {
+    if (!opts?.fieldLabel) {
+      await page.keyboard.press('Tab')
+      await delay(50)
+      return true
+    }
+    if (await dismissAndReVerifySelection(page, label, exact, openedHandle, selectedOptionText)) {
+      return true
+    }
+    // Value reverted — retry with Enter then re-verify
+    await page.keyboard.press('Enter')
+    await delay(50)
+    if (await dismissAndReVerifySelection(page, label, exact, openedHandle, selectedOptionText)) {
+      return true
+    }
+    return false
+  }
+
+  if (await attemptClickSelection()) {
+    if (await dismissAfterSelection()) return
+  }
 
   let visibleHints = await collectVisibleOptionHints(page, anchor)
   const visibleMatchExists = visibleHints.options.some(option => selectionMatchScore(option.label, label, exact) !== null)
@@ -2681,7 +2756,9 @@ export async function pickListboxOption(
     queryReset = await resetTypedListboxQuery(page, openedLocator)
     if (queryReset) {
       await delay(80)
-      if (await attemptClickSelection()) return
+      if (await attemptClickSelection()) {
+        if (await dismissAfterSelection()) return
+      }
       visibleHints = await collectVisibleOptionHints(page, anchor)
     }
   }
@@ -2696,7 +2773,7 @@ export async function pickListboxOption(
         editable: openedEditable,
       })
     ) {
-      return
+      if (await dismissAfterSelection()) return
     }
   }
 

@@ -1623,7 +1623,7 @@ function sectionIdForPath(kind: PageSectionKind, path: number[]): string {
   return `${sectionPrefix(kind)}:${encodePath(path)}`
 }
 
-function parseSectionId(id: string): { kind: PageSectionKind; path: number[] } | null {
+export function parseSectionId(id: string): { kind: PageSectionKind; path: number[] } | null {
   const [prefix, encoded] = id.split(':', 2)
   if (!prefix || !encoded) return null
   const path = decodePath(encoded)
@@ -1896,7 +1896,7 @@ function firstNamedDescendant(node: A11yNode, allowedRoles?: ReadonlySet<string>
   return undefined
 }
 
-function findNodeByPath(root: A11yNode, path: number[]): A11yNode | null {
+export function findNodeByPath(root: A11yNode, path: number[]): A11yNode | null {
   let current: A11yNode = root
   for (const index of path) {
     if (!current.children[index]) return null
@@ -2726,10 +2726,26 @@ export function buildFormSchemas(
   root: A11yNode,
   options?: FormSchemaBuildOptions,
 ): FormSchemaModel[] {
-  const forms = sortByBounds([
+  const explicitForms = [
     ...(root.role === 'form' ? [root] : []),
     ...collectDescendants(root, candidate => candidate.role === 'form'),
-  ])
+  ]
+
+  // Infer forms from group/region containers with 2+ form fields (e.g. Ashby-style UIs without <form>)
+  const inferredForms = collectDescendants(root, candidate => {
+    if (candidate.role !== 'group' && candidate.role !== 'region') return false
+    // Skip descendants of explicit forms
+    for (const form of explicitForms) {
+      if (candidate.path.length > form.path.length &&
+        form.path.every((v, i) => candidate.path[i] === v)) {
+        return false
+      }
+    }
+    const fields = collectDescendants(candidate, child => FORM_FIELD_ROLES.has(child.role))
+    return fields.length >= 2
+  })
+
+  const forms = sortByBounds([...explicitForms, ...inferredForms])
   return forms
     .filter(form => !options?.formId || sectionIdForPath('form', form.path) === options.formId)
     .map(form => buildFormSchemaForNode(root, form, options))
