@@ -1317,4 +1317,12 @@ describe('findInTextNodes', () => {
       { anchorNode: 0, anchorOffset: 1, focusNode: 0, focusOffset: 3 },
     ])
   })
+
+  it('uses UTF-16 code unit offsets for astral-plane characters (matches selection / canvas indices)', () => {
+    const nodes = [stubTextNode(0, 'x😀y😀z')]
+    expect(findInTextNodes(nodes, '😀')).toEqual([
+      { anchorNode: 0, anchorOffset: 1, focusNode: 0, focusOffset: 3 },
+      { anchorNode: 0, anchorOffset: 4, focusNode: 0, focusOffset: 6 },
+    ])
+  })
 })
