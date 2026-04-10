@@ -1970,6 +1970,7 @@ function demoSection(): UIElement {
     { key: 'animation', label: 'Animation' }, { key: 'design', label: 'Design' },
     { key: 'seo', label: 'SEO' }, { key: 'agent', label: 'AI Agent' }, { key: 'auth', label: 'Auth' },
     { key: 'security', label: 'Security' },
+    { key: 'benchmarks', label: 'Benchmarks' },
   ]
   const scenarioFn = SCENARIOS[scenario.value] ?? cardGrid
 
