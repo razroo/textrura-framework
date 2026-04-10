@@ -494,7 +494,9 @@ export function createServer(): McpServer {
 
 Use \`url\` (ws://…) only when a Geometra/native server or an already-running proxy is listening. If you accidentally pass \`https://…\` in \`url\`, MCP treats it like \`pageUrl\` and starts the proxy for you.
 
-Chromium opens **visible** by default unless \`headless: true\`. File upload / wheel / native \`<select>\` need the proxy path (\`pageUrl\` or ws to proxy). Set \`returnForms: true\` and/or \`returnPageModel: true\` when you want a lower-turn startup response. When connect first-response latency matters more than inlining the page model, pair \`returnPageModel: true\` with \`pageModelMode: "deferred"\` and call \`geometra_page_model\` next.`,
+Chromium opens **visible** by default unless \`headless: true\`. File upload / wheel / native \`<select>\` need the proxy path (\`pageUrl\` or ws to proxy). Set \`returnForms: true\` and/or \`returnPageModel: true\` when you want a lower-turn startup response. When connect first-response latency matters more than inlining the page model, pair \`returnPageModel: true\` with \`pageModelMode: "deferred"\` and call \`geometra_page_model\` next.
+
+**Parallelism:** by default, geometra MCP pools and reuses Chromium instances across sessions for speed. That pooling is safe for read-only exploration, but it shares localStorage / cookies / page state across whichever sessions land on the same proxy — which means **two parallel form-submission flows can contaminate each other** (one job's email/autocomplete state leaks into another, or worse, two agents end up driving the same browser tab). For parallel apply / form submission, pass \`isolated: true\`. Each isolated session gets its own brand-new Chromium that is destroyed on disconnect, never enters the pool, and is guaranteed independent of every other session. The cost is ~1–2s of extra startup vs the ~50ms reusable-proxy attach.`,
     {
       url: z
         .string()
@@ -529,6 +531,11 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
         .nonnegative()
         .optional()
         .describe('Playwright slowMo (ms) on spawned proxy for easier visual following.'),
+      isolated: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('When true, bypass the reusable proxy pool and spawn a brand-new Chromium for this session that is destroyed on disconnect. Required for safe parallel form submission — without this, two parallel sessions can land on the same pooled proxy and contaminate each other. Default false (use the pool for speed).'),
       returnForms: z
         .boolean()
         .optional()
@@ -585,6 +592,7 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
             width: input.width,
             height: input.height,
             slowMo: input.slowMo,
+            isolated: input.isolated,
             awaitInitialFrame: deferInlinePageModel ? false : undefined,
             eagerInitialExtract: deferInlinePageModel ? true : undefined,
           })
@@ -1090,10 +1098,15 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
         .optional()
         .default(false)
         .describe('Skip fields that already contain a matching value. Avoids overwriting good data from resume parsing or previous fills.'),
+      isolated: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('When auto-connecting via pageUrl/url, request an isolated proxy (own brand-new Chromium, destroyed on disconnect). Required for safe parallel form submission. See geometra_connect for details. Ignored when reusing an existing sessionId — set isolated on the original geometra_connect for that case.'),
       detail: detailInput(),
       sessionId: sessionIdInput,
     },
-    async ({ url, pageUrl, port, headless, width, height, slowMo, formId, valuesById, valuesByLabel, stopOnError, failOnInvalid, includeSteps, resumeFromIndex, verifyFills, skipPreFilled, detail, sessionId }) => {
+    async ({ url, pageUrl, port, headless, width, height, slowMo, formId, valuesById, valuesByLabel, stopOnError, failOnInvalid, includeSteps, resumeFromIndex, verifyFills, skipPreFilled, isolated, detail, sessionId }) => {
       const directFields =
         !includeSteps && !formId && Object.keys(valuesById ?? {}).length === 0
           ? directLabelBatchFields(valuesByLabel)
@@ -1109,6 +1122,7 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
           width,
           height,
           slowMo,
+          isolated,
           awaitInitialFrame: directFields ? false : undefined,
         },
         'Not connected. Call geometra_connect first, or pass pageUrl/url to geometra_fill_form.',
@@ -1374,6 +1388,11 @@ Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_lis
       width: z.number().int().positive().optional().describe('Viewport width for auto-connected sessions.'),
       height: z.number().int().positive().optional().describe('Viewport height for auto-connected sessions.'),
       slowMo: z.number().int().nonnegative().optional().describe('Playwright slowMo (ms) when auto-spawning a proxy.'),
+      isolated: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('When auto-connecting via pageUrl/url, request an isolated proxy. See geometra_connect for details.'),
       actions: z.array(batchActionSchema).min(1).max(80).describe('Ordered high-level action steps to run sequentially'),
       stopOnError: z.boolean().optional().default(true).describe('Stop at the first failing step (default true)'),
       includeSteps: z
@@ -1385,7 +1404,7 @@ Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_lis
       detail: detailInput(),
       sessionId: sessionIdInput,
     },
-    async ({ url, pageUrl, port, headless, width, height, slowMo, actions, stopOnError, includeSteps, output, detail, sessionId }) => {
+    async ({ url, pageUrl, port, headless, width, height, slowMo, isolated, actions, stopOnError, includeSteps, output, detail, sessionId }) => {
       const resolved = await ensureToolSession(
         {
           sessionId,
@@ -1396,6 +1415,7 @@ Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_lis
           width,
           height,
           slowMo,
+          isolated,
           awaitInitialFrame: canDeferInitialFrameForRunActions(actions) ? false : undefined,
         },
         'Not connected. Call geometra_connect first, or pass pageUrl/url to geometra_run_actions.',
@@ -1549,6 +1569,11 @@ Unlike geometra_expand_section, this collapses repeated radio/button groups into
       width: z.number().int().positive().optional().describe('Viewport width for auto-connected sessions.'),
       height: z.number().int().positive().optional().describe('Viewport height for auto-connected sessions.'),
       slowMo: z.number().int().nonnegative().optional().describe('Playwright slowMo (ms) when auto-spawning a proxy.'),
+      isolated: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('When auto-connecting via pageUrl/url, request an isolated proxy. See geometra_connect for details.'),
       formId: z.string().optional().describe('Optional form id from geometra_page_model. If omitted, returns every form schema on the page.'),
       maxFields: z.number().int().min(1).max(120).optional().default(80).describe('Cap returned fields per form'),
       onlyRequiredFields: z.boolean().optional().default(false).describe('Only include required fields'),
@@ -1559,9 +1584,9 @@ Unlike geometra_expand_section, this collapses repeated radio/button groups into
       format: formSchemaFormatInput(),
       sessionId: sessionIdInput,
     },
-    async ({ url, pageUrl, port, headless, width, height, slowMo, formId, maxFields, onlyRequiredFields, onlyInvalidFields, includeOptions, includeContext, sinceSchemaId, format, sessionId }) => {
+    async ({ url, pageUrl, port, headless, width, height, slowMo, isolated, formId, maxFields, onlyRequiredFields, onlyInvalidFields, includeOptions, includeContext, sinceSchemaId, format, sessionId }) => {
       const resolved = await ensureToolSession(
-        { sessionId, url, pageUrl, port, headless, width, height, slowMo },
+        { sessionId, url, pageUrl, port, headless, width, height, slowMo, isolated },
         'Not connected. Call geometra_connect first, or pass pageUrl/url to geometra_form_schema.',
       )
       if (!resolved.ok) return err(resolved.error)
@@ -2685,6 +2710,8 @@ async function ensureToolSession(
     height?: number
     slowMo?: number
     awaitInitialFrame?: boolean
+    /** When true and an auto-connect is needed, request an isolated proxy. */
+    isolated?: boolean
   },
   missingConnectionMessage = 'Not connected. Call geometra_connect first.',
 ): Promise<
@@ -2722,6 +2749,7 @@ async function ensureToolSession(
         height: target.height,
         slowMo: target.slowMo,
         awaitInitialFrame: target.awaitInitialFrame,
+        isolated: target.isolated,
       })
       return {
         ok: true,

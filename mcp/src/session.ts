@@ -344,6 +344,15 @@ export interface Session {
   proxyChild?: ChildProcess
   proxyRuntime?: EmbeddedProxyRuntime
   proxyReusable?: boolean
+  /**
+   * True when this session was started with `isolated: true`. Isolated sessions
+   * never enter the reusable proxy pool — they always spawn a fresh Chromium
+   * and the proxy is destroyed on disconnect rather than pooled. This gives
+   * each parallel agent its own independent localStorage / cookies / page
+   * state, which is the only safe configuration for parallel form submission
+   * (see the v1.37.0 release notes for the JobForge bug-report context).
+   */
+  isolated?: boolean
   connectTrace?: SessionConnectTrace
   cachedA11y?: A11yNode | null
   cachedA11yRevision?: number
@@ -627,8 +636,14 @@ function shutdownSession(id: string, opts?: { closeProxy?: boolean }): void {
   } catch {
     /* ignore */
   }
+  // Isolated sessions always destroy their proxy on disconnect — they
+  // never went into the reusable pool in the first place, and leaking
+  // the underlying browser would defeat the entire point of the
+  // isolation flag (the next non-isolated connect could attach to a
+  // proxy with stale storage from this session's job).
+  const forceCloseProxy = prev.isolated === true
   if (prev.proxyChild) {
-    const shouldKeepProxy = prev.proxyReusable && opts?.closeProxy === false
+    const shouldKeepProxy = !forceCloseProxy && prev.proxyReusable && opts?.closeProxy === false
     rememberReusableProxyPageUrl(prev)
     if (shouldKeepProxy) {
       const entry = reusableProxyEntryForSession(prev)
@@ -648,7 +663,7 @@ function shutdownSession(id: string, opts?: { closeProxy?: boolean }): void {
     return
   }
   if (prev.proxyRuntime) {
-    const shouldKeepProxy = prev.proxyReusable && opts?.closeProxy === false
+    const shouldKeepProxy = !forceCloseProxy && prev.proxyReusable && opts?.closeProxy === false
     rememberReusableProxyPageUrl(prev)
     if (shouldKeepProxy) {
       const entry = reusableProxyEntryForSession(prev)
@@ -924,6 +939,12 @@ async function startFreshProxySession(options: {
   slowMo?: number
   awaitInitialFrame?: boolean
   eagerInitialExtract?: boolean
+  /**
+   * When true, do not register this proxy with the reusable pool and tag
+   * the resulting session as isolated. The proxy stays bound 1:1 to this
+   * session and is destroyed on disconnect.
+   */
+  isolated?: boolean
 }): Promise<Session> {
   const startedAt = performance.now()
   const eagerInitialExtract =
@@ -950,15 +971,19 @@ async function startFreshProxySession(options: {
       awaitInitialFrame: options.awaitInitialFrame,
     })
     session.proxyRuntime = runtime
-    session.proxyReusable = true
-    setReusableProxy({ runtime }, wsUrl, {
-      headless: options.headless,
-      slowMo: options.slowMo,
-      width: options.width,
-      height: options.height,
-      pageUrl: options.pageUrl,
-      snapshotReady: Boolean(session.tree && session.layout),
-    })
+    session.proxyReusable = !options.isolated
+    if (options.isolated) {
+      session.isolated = true
+    } else {
+      setReusableProxy({ runtime }, wsUrl, {
+        headless: options.headless,
+        slowMo: options.slowMo,
+        width: options.width,
+        height: options.height,
+        pageUrl: options.pageUrl,
+        snapshotReady: Boolean(session.tree && session.layout),
+      })
+    }
     const baseConnectTrace = session.connectTrace
     session.connectTrace = {
       mode: 'fresh-proxy',
@@ -992,15 +1017,19 @@ async function startFreshProxySession(options: {
         awaitInitialFrame: options.awaitInitialFrame,
       })
       session.proxyChild = child
-      session.proxyReusable = true
-      setReusableProxy({ child }, wsUrl, {
-        headless: options.headless,
-        slowMo: options.slowMo,
-        width: options.width,
-        height: options.height,
-        pageUrl: options.pageUrl,
-        snapshotReady: Boolean(session.tree && session.layout),
-      })
+      session.proxyReusable = !options.isolated
+      if (options.isolated) {
+        session.isolated = true
+      } else {
+        setReusableProxy({ child }, wsUrl, {
+          headless: options.headless,
+          slowMo: options.slowMo,
+          width: options.width,
+          height: options.height,
+          pageUrl: options.pageUrl,
+          snapshotReady: Boolean(session.tree && session.layout),
+        })
+      }
       const baseConnectTrace = session.connectTrace
       session.connectTrace = {
         mode: 'fresh-proxy',
@@ -1180,8 +1209,26 @@ export async function connectThroughProxy(options: {
   slowMo?: number
   awaitInitialFrame?: boolean
   eagerInitialExtract?: boolean
+  /**
+   * When true, bypass the reusable proxy pool entirely and always spawn a
+   * fresh Chromium for this session. The session is tagged isolated, never
+   * entered into the pool on disconnect, and its underlying browser is
+   * destroyed when the session disconnects. Use for parallel form
+   * submission so localStorage / cookies / page state from one job cannot
+   * leak into another. Default false preserves the existing pool behavior.
+   */
+  isolated?: boolean
 }): Promise<Session> {
   clearReusableProxiesIfExited()
+
+  // Isolated sessions skip the pool entirely. They always get their own
+  // brand-new Chromium and never reuse a proxy from a prior call. The
+  // tag flows down so startFreshProxySession knows to keep this proxy out
+  // of the pool on success and so shutdownSession knows to force-close it.
+  if (options.isolated) {
+    return await startFreshProxySession({ ...options, isolated: true })
+  }
+
   let reuseFailure: unknown
 
   const reusableProxy = findReusableProxy(options)
