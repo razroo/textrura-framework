@@ -249,6 +249,10 @@ describe('tw()', () => {
       expect(tw('rtl dir-auto')).toEqual({ dir: 'auto' })
     })
 
+    it('last dir utility wins (ltr then rtl)', () => {
+      expect(tw('ltr rtl')).toEqual({ dir: 'rtl' })
+    })
+
     it('inset then override single side', () => {
       expect(tw('inset-4 top-8')).toEqual({ top: 32, right: 16, bottom: 16, left: 16 })
     })
