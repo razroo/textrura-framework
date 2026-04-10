@@ -1302,6 +1302,21 @@ describe('findInTextNodes', () => {
     expect(findInTextNodes([empty], 'a')).toEqual([])
   })
 
+  it('skips nodes whose props.text is not a string (corrupt tree; no throw)', () => {
+    const bad = {
+      ...stubTextNode(0, ''),
+      element: {
+        kind: 'text' as const,
+        props: { text: 42 as unknown as string, font: '14px sans-serif', lineHeight: 18 },
+      },
+    }
+    const good = stubTextNode(1, 'hello')
+    expect(() => findInTextNodes([bad, good], 'hello')).not.toThrow()
+    expect(findInTextNodes([bad, good], 'hello')).toEqual([
+      { anchorNode: 1, anchorOffset: 0, focusNode: 1, focusOffset: 5 },
+    ])
+  })
+
   it('matches case-insensitively and records UTF-16 offsets in the original text', () => {
     const nodes = [stubTextNode(0, 'Hello WORLD')]
     expect(findInTextNodes(nodes, 'world')).toEqual([

@@ -15,6 +15,11 @@ import type { TextNodeInfo, SelectionRange } from './selection.js'
  * original (including length mismatch at the end) yield no matches for that node.
  *
  * Non-string `query` values return no matches so corrupt host data cannot throw via `toLowerCase`.
+ *
+ * @param nodes — Text nodes in document order (typically from {@link import('./selection.js').collectTextNodes}).
+ *   Entries whose `element.props.text` is not a string are skipped so mistyped or partially deserialized trees
+ *   cannot throw in `slice` / `length` paths.
+ * @param query — Search string; must be a non-empty string for any matches.
  */
 export function findInTextNodes(nodes: TextNodeInfo[], query: string): SelectionRange[] {
   if (typeof query !== 'string' || !query || nodes.length === 0) return []
@@ -24,7 +29,9 @@ export function findInTextNodes(nodes: TextNodeInfo[], query: string): Selection
 
   for (const node of nodes) {
     const original = node.element.props.text
+    if (typeof original !== 'string') continue
     const n = original.length
+    if (qLen > n) continue
     for (let i = 0; i <= n - qLen; i++) {
       if (original.slice(i, i + qLen).toLowerCase() === lowerQuery) {
         results.push({
