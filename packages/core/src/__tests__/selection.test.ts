@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { ComputedLayout } from 'textura'
+import { findInTextNodes } from '../find.js'
 import { collectTextNodes, getSelectedText, hitTestText } from '../selection.js'
 import type { TextNodeInfo } from '../selection.js'
 import { box, image, scene3d, sphere, text } from '../elements.js'
@@ -1261,5 +1262,59 @@ describe('hitTestText direction mapping', () => {
     expect(() => hitTestText(textNodes, 2, 5)).not.toThrow()
     expect(hitTestText(textNodes, 2, 5)).toEqual({ nodeIndex: 0, charOffset: 0 })
     expect(hitTestText(textNodes, 12, 5)).toEqual({ nodeIndex: 0, charOffset: 2 })
+  })
+})
+
+describe('findInTextNodes', () => {
+  function stubTextNode(index: number, t: string): TextNodeInfo {
+    return {
+      element: { kind: 'text' as const, props: { text: t, font: '14px sans-serif', lineHeight: 18 } },
+      direction: 'ltr' as const,
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 18,
+      index,
+      lines: [],
+    }
+  }
+
+  it('returns an empty list when the query is empty or nodes are empty', () => {
+    const a = stubTextNode(0, 'hello')
+    expect(findInTextNodes([], 'x')).toEqual([])
+    expect(findInTextNodes([a], '')).toEqual([])
+  })
+
+  it('matches case-insensitively and records UTF-16 offsets in the original text', () => {
+    const nodes = [stubTextNode(0, 'Hello WORLD')]
+    expect(findInTextNodes(nodes, 'world')).toEqual([
+      { anchorNode: 0, anchorOffset: 6, focusNode: 0, focusOffset: 11 },
+    ])
+    expect(findInTextNodes(nodes, 'HELLO')).toEqual([
+      { anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 5 },
+    ])
+  })
+
+  it('returns every overlapping occurrence (not just non-overlapping matches)', () => {
+    const nodes = [stubTextNode(0, 'aaa')]
+    expect(findInTextNodes(nodes, 'aa')).toEqual([
+      { anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 2 },
+      { anchorNode: 0, anchorOffset: 1, focusNode: 0, focusOffset: 3 },
+    ])
+  })
+
+  it('walks multiple text nodes in order with distinct anchorNode indices', () => {
+    const nodes = [stubTextNode(0, 'foo'), stubTextNode(1, 'Foo')]
+    expect(findInTextNodes(nodes, 'foo')).toEqual([
+      { anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 3 },
+      { anchorNode: 1, anchorOffset: 0, focusNode: 1, focusOffset: 3 },
+    ])
+  })
+
+  it('matches interior substrings when only letter casing differs', () => {
+    const nodes = [stubTextNode(0, 'aBcDe')]
+    expect(findInTextNodes(nodes, 'bc')).toEqual([
+      { anchorNode: 0, anchorOffset: 1, focusNode: 0, focusOffset: 3 },
+    ])
   })
 })
