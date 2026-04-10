@@ -468,6 +468,23 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(-10, -19, -10, -20, 0, 0)).toBe(false)
   })
 
+  it('treats subnormal width at extreme absX as a collapsed rect: absX+width rounds to absX; inclusive min corner still hits', () => {
+    const absX = Number.MAX_VALUE
+    const w = Number.MIN_VALUE
+    expect(absX + w).toBe(absX)
+    expect(pointInInclusiveLayoutRect(absX, 5, absX, 0, w, 10)).toBe(true)
+    // Strictly left of absX (1e292 is large enough to decrease MAX_VALUE in IEEE-754 doubles).
+    expect(pointInInclusiveLayoutRect(absX - 1e292, 5, absX, 0, w, 10)).toBe(false)
+  })
+
+  it('treats subnormal height at extreme absY as a collapsed rect: absY+height rounds to absY; inclusive min corner still hits', () => {
+    const absY = Number.MAX_VALUE
+    const h = Number.MIN_VALUE
+    expect(absY + h).toBe(absY)
+    expect(pointInInclusiveLayoutRect(5, absY, 0, absY, 10, h)).toBe(true)
+    expect(pointInInclusiveLayoutRect(5, absY - 1e292, 0, absY, 10, h)).toBe(false)
+  })
+
   it('returns false when abs origin + size overflows to Infinity (naive edge sum would accept all finite coords)', () => {
     const max = Number.MAX_VALUE
     expect(max + max).toBe(Infinity)
