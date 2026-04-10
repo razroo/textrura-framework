@@ -1285,6 +1285,14 @@ describe('findInTextNodes', () => {
     expect(findInTextNodes([a], '')).toEqual([])
   })
 
+  it('matches whitespace-only queries when the original text contains the same UTF-16 run', () => {
+    const padded = stubTextNode(0, '  x  ')
+    expect(findInTextNodes([padded], '  ')).toEqual([
+      { anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 2 },
+      { anchorNode: 0, anchorOffset: 3, focusNode: 0, focusOffset: 5 },
+    ])
+  })
+
   it('returns empty when query is not a string (mistyped / hostile host data)', () => {
     const a = stubTextNode(0, 'hello')
     expect(() => findInTextNodes([a], null as never)).not.toThrow()

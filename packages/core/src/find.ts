@@ -18,8 +18,10 @@ import type { TextNodeInfo, SelectionRange } from './selection.js'
  *
  * @param nodes — Text nodes in document order (typically from {@link import('./selection.js').collectTextNodes}).
  *   Entries whose `element.props.text` is not a string are skipped so mistyped or partially deserialized trees
- *   cannot throw in `slice` / `length` paths.
- * @param query — Search string; must be a non-empty string for any matches.
+ *   cannot throw in `slice` / `length` paths. An empty `nodes` array yields `[]`.
+ * @param query — Candidate substring. Only a **non-empty primitive string** can produce matches: `''`, `null`,
+ *   `undefined`, boxed strings, and other non-strings return `[]` without throwing. Whitespace-only queries are
+ *   valid when the same UTF-16 run exists in the original text (same sliding-window rules as other queries).
  */
 export function findInTextNodes(nodes: TextNodeInfo[], query: string): SelectionRange[] {
   if (typeof query !== 'string' || !query || nodes.length === 0) return []
