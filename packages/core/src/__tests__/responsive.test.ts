@@ -254,6 +254,13 @@ describe('breakpoint non-finite min-width', () => {
     expect(breakpoint(signal(800), bps).value).toBe('sm')
     expect(breakpoint(signal(1200), bps).value).toBe('lg')
   })
+
+  it('skips bigint min-width entries (typeof bigint; no mixing with number in comparisons) without throwing', () => {
+    const bps = { sm: 0, bogus: 640n as unknown as number, lg: 1024 }
+    expect(() => breakpoint(signal(800), bps)).not.toThrow()
+    expect(breakpoint(signal(800), bps).value).toBe('sm')
+    expect(breakpoint(signal(1200), bps).value).toBe('lg')
+  })
 })
 
 describe('createViewport edge cases', () => {
