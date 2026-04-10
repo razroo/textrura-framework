@@ -1285,6 +1285,16 @@ describe('findInTextNodes', () => {
     expect(findInTextNodes([a], '')).toEqual([])
   })
 
+  it('returns empty when query is not a string (mistyped / hostile host data)', () => {
+    const a = stubTextNode(0, 'hello')
+    expect(() => findInTextNodes([a], null as never)).not.toThrow()
+    expect(findInTextNodes([a], null as never)).toEqual([])
+    expect(findInTextNodes([a], undefined as never)).toEqual([])
+    expect(findInTextNodes([a], 0 as never)).toEqual([])
+    expect(findInTextNodes([a], {} as never)).toEqual([])
+    expect(findInTextNodes([a], Object('q') as never)).toEqual([])
+  })
+
   it('returns no matches when the query is longer than the node text or the text is empty', () => {
     const short = stubTextNode(0, 'hi')
     expect(findInTextNodes([short], 'hello')).toEqual([])

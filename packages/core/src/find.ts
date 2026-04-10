@@ -13,9 +13,11 @@ import type { TextNodeInfo, SelectionRange } from './selection.js'
  * `focusOffset` inside the original text even when a full-string `toLowerCase()` would change total length
  * (e.g. Turkish capital `İ`). Queries whose lowercased form cannot align with any same-length window in the
  * original (including length mismatch at the end) yield no matches for that node.
+ *
+ * Non-string `query` values return no matches so corrupt host data cannot throw via `toLowerCase`.
  */
 export function findInTextNodes(nodes: TextNodeInfo[], query: string): SelectionRange[] {
-  if (!query || nodes.length === 0) return []
+  if (typeof query !== 'string' || !query || nodes.length === 0) return []
   const lowerQuery = query.toLowerCase()
   const qLen = query.length
   const results: SelectionRange[] = []
