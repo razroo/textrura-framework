@@ -326,6 +326,8 @@ export interface WorkflowState {
 }
 
 export interface Session {
+  /** Short stable identifier (e.g. "s1", "s2") returned by geometra_connect. */
+  id: string
   ws: WebSocket
   layout: Record<string, unknown> | null
   tree: Record<string, unknown> | null
@@ -377,9 +379,14 @@ interface ReusableProxyEntry {
   lastUsedAt: number
 }
 
-let activeSession: Session | null = null
+const activeSessions = new Map<string, Session>()
+let defaultSessionId: string | null = null
+const MAX_ACTIVE_SESSIONS = 5
+let nextSessionId = 0
+function generateSessionId(): string { return `s${++nextSessionId}` }
+
 let reusableProxies: ReusableProxyEntry[] = []
-const REUSABLE_PROXY_POOL_LIMIT = 2
+const REUSABLE_PROXY_POOL_LIMIT = 6
 const trackedReusableProxyChildren = new WeakSet<ChildProcess>()
 const ACTION_UPDATE_TIMEOUT_MS = 2000
 const LISTBOX_UPDATE_TIMEOUT_MS = 4500
@@ -421,10 +428,13 @@ function reusableProxyEntryForSession(session: Session): ReusableProxyEntry | un
 }
 
 function reusableProxyEntryIsActive(entry: ReusableProxyEntry): boolean {
-  return !!activeSession && (
-    (!!entry.child && activeSession.proxyChild === entry.child)
-    || (!!entry.runtime && activeSession.proxyRuntime === entry.runtime)
-  )
+  for (const session of activeSessions.values()) {
+    if ((entry.child && session.proxyChild === entry.child)
+      || (entry.runtime && session.proxyRuntime === entry.runtime)) {
+      return true
+    }
+  }
+  return false
 }
 
 function clearReusableProxiesIfExited(): void {
@@ -563,10 +573,19 @@ function rememberReusableProxyPageUrl(session: Session): void {
   touchReusableProxy(entry)
 }
 
-function shutdownPreviousSession(opts?: { closeProxy?: boolean }): void {
-  const prev = activeSession
+function promoteDefaultSession(): void {
+  if (activeSessions.size > 0) {
+    defaultSessionId = Array.from(activeSessions.keys()).pop()!
+  } else {
+    defaultSessionId = null
+  }
+}
+
+function shutdownSession(id: string, opts?: { closeProxy?: boolean }): void {
+  const prev = activeSessions.get(id)
   if (!prev) return
-  activeSession = null
+  activeSessions.delete(id)
+  if (defaultSessionId === id) promoteDefaultSession()
   try {
     prev.ws.close()
   } catch {
@@ -607,6 +626,13 @@ function shutdownPreviousSession(opts?: { closeProxy?: boolean }): void {
     }
     void prev.proxyRuntime.close().catch(() => {})
   }
+}
+
+/** Evict the oldest session when at capacity. */
+function evictOldestSession(): void {
+  if (activeSessions.size < MAX_ACTIVE_SESSIONS) return
+  const oldestId = activeSessions.keys().next().value as string
+  shutdownSession(oldestId, { closeProxy: false })
 }
 
 function formatUnknownError(err: unknown): string {
@@ -790,13 +816,14 @@ async function attachToReusableProxy(proxy: ReusableProxyEntry, options: {
   const desiredWidth = options.width ?? proxy.width
   const desiredHeight = options.height ?? proxy.height
   const needsSnapshotKickoff = options.awaitInitialFrame !== false && !proxy.snapshotReady
-  const reusedActiveSession = (
-    (proxy.child && activeSession?.proxyChild === proxy.child) ||
-    (proxy.runtime && activeSession?.proxyRuntime === proxy.runtime)
-  )
-    ? activeSession
-    : null
-  const session = reusedActiveSession ?? await connect(proxy.wsUrl, {
+  let reusedExistingSession: Session | null = null
+  for (const s of activeSessions.values()) {
+    if ((proxy.child && s.proxyChild === proxy.child) || (proxy.runtime && s.proxyRuntime === proxy.runtime)) {
+      reusedExistingSession = s
+      break
+    }
+  }
+  const session = reusedExistingSession ?? await connect(proxy.wsUrl, {
     skipInitialResize: true,
     closePreviousProxy: false,
     awaitInitialFrame: needsSnapshotKickoff ? false : options.awaitInitialFrame,
@@ -834,7 +861,7 @@ async function attachToReusableProxy(proxy: ReusableProxyEntry, options: {
     updateReusableProxySnapshotState(proxy, session)
   }
 
-  const baseConnectTrace = !reusedActiveSession ? session.connectTrace : undefined
+  const baseConnectTrace = !reusedExistingSession ? session.connectTrace : undefined
   session.connectTrace = {
     mode: 'reused-proxy',
     reused: true,
@@ -974,10 +1001,11 @@ export function connect(
   return new Promise((resolve, reject) => {
     const startedAt = performance.now()
     clearReusableProxiesIfExited()
-    shutdownPreviousSession({ closeProxy: opts?.closePreviousProxy ?? true })
+    evictOldestSession()
 
     const ws = new WebSocket(url)
     const session: Session = {
+      id: generateSessionId(),
       ws,
       layout: null,
       tree: null,
@@ -1019,7 +1047,8 @@ export function connect(
           session.connectTrace.resolvedWithoutInitialFrame = true
           session.connectTrace.totalMs = performance.now() - startedAt
         }
-        activeSession = session
+        activeSessions.set(session.id, session)
+        defaultSessionId = session.id
         resolve(session)
       }
     })
@@ -1042,7 +1071,8 @@ export function connect(
             if (session.connectTrace) {
               session.connectTrace.totalMs = performance.now() - startedAt
             }
-            activeSession = session
+            activeSessions.set(session.id, session)
+            defaultSessionId = session.id
             resolve(session)
           }
         } else if (msg.type === 'patch' && session.layout) {
@@ -1062,8 +1092,9 @@ export function connect(
     })
 
     ws.on('close', () => {
-      if (activeSession === session) {
-        activeSession = null
+      if (activeSessions.get(session.id) === session) {
+        activeSessions.delete(session.id)
+        if (defaultSessionId === session.id) promoteDefaultSession()
         if (session.proxyChild && !session.proxyReusable) {
           try {
             session.proxyChild.kill('SIGTERM')
@@ -1123,12 +1154,26 @@ export async function connectThroughProxy(options: {
   }
 }
 
-export function getSession(): Session | null {
-  return activeSession
+export function getSession(id?: string): Session | null {
+  if (id) return activeSessions.get(id) ?? null
+  if (defaultSessionId) return activeSessions.get(defaultSessionId) ?? null
+  return null
 }
 
-export function disconnect(opts?: { closeProxy?: boolean }): void {
-  shutdownPreviousSession({ closeProxy: opts?.closeProxy ?? false })
+export function listSessions(): Array<{ id: string; url: string }> {
+  return Array.from(activeSessions.values()).map(s => ({ id: s.id, url: s.url }))
+}
+
+export function getDefaultSessionId(): string | null {
+  return defaultSessionId
+}
+
+export function disconnect(opts?: { closeProxy?: boolean; sessionId?: string }): void {
+  if (opts?.sessionId) {
+    shutdownSession(opts.sessionId, { closeProxy: opts.closeProxy ?? false })
+  } else if (defaultSessionId) {
+    shutdownSession(defaultSessionId, { closeProxy: opts?.closeProxy ?? false })
+  }
   if (opts?.closeProxy) closeReusableProxies()
 }
 
