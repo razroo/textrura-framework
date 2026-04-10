@@ -66,6 +66,9 @@ export { dispatchCompositionEvent, dispatchKeyboardEvent } from './keyboard.js'
 export { collectTextNodes, getSelectedText, hitTestText } from './selection.js'
 export type { TextNodeInfo, TextLineInfo, SelectionRange } from './selection.js'
 
+// Find in canvas text
+export { findInTextNodes } from './find.js'
+
 // Animation
 export {
   transition,

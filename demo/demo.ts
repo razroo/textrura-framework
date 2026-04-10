@@ -12,7 +12,7 @@ import {
   animationLoop,
 } from '@geometra/core'
 import type { App, UIElement } from '@geometra/core'
-import { CanvasRenderer, enableSelection, enableAccessibilityMirror, enableInputForwarding } from '@geometra/renderer-canvas'
+import { CanvasRenderer, enableSelection, enableFind, enableAccessibilityMirror, enableInputForwarding } from '@geometra/renderer-canvas'
 import {
   button as uiButton,
   checkbox as uiCheckbox,
@@ -2377,10 +2377,12 @@ let app: App | null = null
 let cleanupSelection: (() => void) | null = null
 let cleanupA11yMirror: (() => void) | null = null
 let cleanupInputForwarding: (() => void) | null = null
+let cleanupFind: (() => void) | null = null
 
 async function mount() {
   if (cleanupSelection) { cleanupSelection(); cleanupSelection = null }
   if (cleanupA11yMirror) { cleanupA11yMirror(); cleanupA11yMirror = null }
+  if (cleanupFind) { cleanupFind(); cleanupFind = null }
   if (app) app.destroy()
 
   app = await createApp(view, renderer, { width: vw.peek(), waitForFonts: true })
@@ -2400,6 +2402,7 @@ async function mount() {
   cleanupA11yMirror = enableAccessibilityMirror(document.body, renderer, {
     rootLabel: 'Geometra canvas accessibility mirror',
   })
+  cleanupFind = enableFind(canvas, renderer)
   app.update()
 }
 

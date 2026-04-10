@@ -23,6 +23,7 @@ import {
   collectFocusOrder,
   readPerformanceNow,
   finiteNumberOrZero,
+  findInTextNodes,
 } from '@geometra/core'
 
 export interface CanvasRendererOptions {
@@ -172,6 +173,10 @@ export class CanvasRenderer implements Renderer {
   textNodesByY: TextNodeInfo[] = []
   /** Current text selection range, or null if nothing is selected. */
   selection: SelectionRange | null = null
+  /** Highlighted find matches. */
+  findHighlights: SelectionRange[] = []
+  /** Index of the currently active find match (-1 = none). */
+  currentFindIndex = -1
   /** The last rendered tree + layout (for cursor queries). */
   lastTree: UIElement | null = null
   lastLayout: ComputedLayout | null = null
@@ -687,6 +692,9 @@ export class CanvasRenderer implements Renderer {
     if (selRanges) {
       this.paintSelectionHighlight(nodeInfo!, lines, lineHeight)
     }
+    if (nodeInfo && this.findHighlights.length > 0) {
+      this.paintFindHighlights(nodeInfo, lineHeight)
+    }
 
     for (let i = 0; i < lines.length; i++) {
       const lineText = lines[i]!
@@ -801,6 +809,31 @@ export class CanvasRenderer implements Renderer {
         ctx.fillRect(rectX, line.y, endCharOffset - (line.charOffsets[selStart] ?? 0), lineHeight)
       }
       globalCharOffset = lineEnd
+    }
+  }
+
+  private paintFindHighlights(node: TextNodeInfo, lineHeight: number): void {
+    const { ctx } = this
+    for (let hi = 0; hi < this.findHighlights.length; hi++) {
+      const match = this.findHighlights[hi]!
+      if (match.anchorNode !== node.index) continue
+      const isActive = hi === this.currentFindIndex
+      ctx.fillStyle = isActive ? 'rgba(234, 179, 8, 0.6)' : 'rgba(234, 179, 8, 0.3)'
+      let globalCharOffset = 0
+      for (const line of node.lines) {
+        const lineStart = globalCharOffset
+        const lineEnd = globalCharOffset + line.text.length
+        const selStart = Math.max(match.anchorOffset, lineStart) - lineStart
+        const selEnd = Math.min(match.focusOffset, lineEnd) - lineStart
+        if (selStart < selEnd && selStart < line.charOffsets.length) {
+          const rectX = line.x + (line.charOffsets[selStart] ?? 0)
+          const endCharOffset = selEnd < line.charOffsets.length
+            ? line.charOffsets[selEnd]!
+            : (line.charOffsets[line.charOffsets.length - 1] ?? 0) + (line.charWidths[line.charWidths.length - 1] ?? 0)
+          ctx.fillRect(rectX, line.y, endCharOffset - (line.charOffsets[selStart] ?? 0), lineHeight)
+        }
+        globalCharOffset = lineEnd
+      }
     }
   }
 
@@ -1249,6 +1282,139 @@ export function enableSelection(
     canvas.removeEventListener('pointerup', onPointerUp)
     canvas.removeEventListener('mousemove', onMouseMove)
     document.removeEventListener('keydown', onKeyDown)
+  }
+}
+
+/**
+ * Enable Cmd/Ctrl+F find overlay for canvas-rendered text.
+ * Returns a cleanup function.
+ */
+export function enableFind(
+  canvas: HTMLCanvasElement,
+  renderer: CanvasRenderer,
+): () => void {
+  const parent = canvas.parentElement ?? document.body
+
+  // --- DOM overlay ---
+  const bar = document.createElement('div')
+  bar.style.cssText =
+    'position:absolute;top:8px;right:8px;display:none;align-items:center;gap:6px;' +
+    'padding:6px 10px;background:#1e1e2e;border:1px solid #444;border-radius:6px;' +
+    'box-shadow:0 2px 8px rgba(0,0,0,.4);z-index:9999;font-family:system-ui,sans-serif;font-size:13px;color:#e0e0e0;'
+
+  const input = document.createElement('input')
+  input.type = 'text'
+  input.placeholder = 'Find…'
+  input.style.cssText =
+    'width:180px;padding:3px 6px;border:1px solid #555;border-radius:4px;' +
+    'background:#2a2a3a;color:#e0e0e0;font-size:13px;outline:none;'
+
+  const status = document.createElement('span')
+  status.style.cssText = 'min-width:48px;text-align:center;font-size:12px;color:#999;'
+
+  const btnStyle =
+    'padding:2px 8px;border:1px solid #555;border-radius:4px;background:#333;color:#ccc;cursor:pointer;font-size:12px;'
+  const prevBtn = document.createElement('button')
+  prevBtn.textContent = '▲'
+  prevBtn.style.cssText = btnStyle
+  const nextBtn = document.createElement('button')
+  nextBtn.textContent = '▼'
+  nextBtn.style.cssText = btnStyle
+  const closeBtn = document.createElement('button')
+  closeBtn.textContent = '✕'
+  closeBtn.style.cssText = btnStyle
+
+  bar.appendChild(input)
+  bar.appendChild(status)
+  bar.appendChild(prevBtn)
+  bar.appendChild(nextBtn)
+  bar.appendChild(closeBtn)
+
+  // Ensure parent can anchor absolute positioning
+  const parentPos = getComputedStyle(parent).position
+  if (parentPos === 'static') parent.style.position = 'relative'
+  parent.appendChild(bar)
+
+  function rerender(): void {
+    if (renderer.lastLayout && renderer.lastTree) {
+      renderer.render(renderer.lastLayout, renderer.lastTree)
+    }
+  }
+
+  function runSearch(): void {
+    const query = input.value
+    if (!query) {
+      renderer.findHighlights = []
+      renderer.currentFindIndex = -1
+      status.textContent = ''
+      rerender()
+      return
+    }
+    renderer.findHighlights = findInTextNodes(renderer.textNodes, query)
+    if (renderer.findHighlights.length > 0) {
+      renderer.currentFindIndex = 0
+      status.textContent = `1/${renderer.findHighlights.length}`
+    } else {
+      renderer.currentFindIndex = -1
+      status.textContent = '0/0'
+    }
+    rerender()
+  }
+
+  function navigate(delta: number): void {
+    const total = renderer.findHighlights.length
+    if (total === 0) return
+    renderer.currentFindIndex = (renderer.currentFindIndex + delta + total) % total
+    status.textContent = `${renderer.currentFindIndex + 1}/${total}`
+    rerender()
+  }
+
+  function open(): void {
+    bar.style.display = 'flex'
+    input.focus()
+    input.select()
+  }
+
+  function close(): void {
+    bar.style.display = 'none'
+    renderer.findHighlights = []
+    renderer.currentFindIndex = -1
+    input.value = ''
+    status.textContent = ''
+    rerender()
+  }
+
+  input.addEventListener('input', runSearch)
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      navigate(e.shiftKey ? -1 : 1)
+      e.preventDefault()
+    }
+    if (e.key === 'Escape') {
+      close()
+      e.preventDefault()
+    }
+    e.stopPropagation()
+  })
+  // Prevent other Geometra key handlers from seeing input keystrokes
+  input.addEventListener('keyup', (e) => e.stopPropagation())
+  prevBtn.addEventListener('click', () => navigate(-1))
+  nextBtn.addEventListener('click', () => navigate(1))
+  closeBtn.addEventListener('click', close)
+
+  function onGlobalKeyDown(e: KeyboardEvent): void {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
+      e.preventDefault()
+      open()
+    }
+  }
+  document.addEventListener('keydown', onGlobalKeyDown, true)
+
+  return () => {
+    document.removeEventListener('keydown', onGlobalKeyDown, true)
+    bar.remove()
+    renderer.findHighlights = []
+    renderer.currentFindIndex = -1
   }
 }
 
