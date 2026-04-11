@@ -74,6 +74,18 @@ async function main() {
     )
   }
 
+  if (segments.length !== 3) {
+    throw new Error(
+      `release:gate: expected exactly three && segments (verify-release-gate.mjs, single vitest run batch, bun run test:terminal-input); got ${segments.length}`,
+    )
+  }
+  const vitestSegment = segments[1] ?? ''
+  if (!/^\s*vitest\s+run\b/.test(vitestSegment)) {
+    throw new Error(
+      'release:gate: second && segment must be the single vitest allowlist batch (must start with `vitest run`)',
+    )
+  }
+
   const tokens = gate.split(/\s+/).filter(Boolean)
   const paths = tokens.filter(t => t.startsWith('packages/') && t.endsWith('.test.ts'))
 
