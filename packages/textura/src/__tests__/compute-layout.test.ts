@@ -430,6 +430,11 @@ describe('box layout', () => {
       height: 80,
       direction: 'rtl ' as never,
     })
+    const ltrTrimmed = computeLayout(tree, {
+      width: 200,
+      height: 80,
+      direction: 'ltr ' as never,
+    })
     const upper = computeLayout(tree, {
       width: 200,
       height: 80,
@@ -478,6 +483,8 @@ describe('box layout', () => {
     expect(rtl.children[0]!.x).toBeGreaterThan(rtl.children[1]!.x)
     expect(trimmed.children[0]!.x).toBe(ltr.children[0]!.x)
     expect(trimmed.children[1]!.x).toBe(ltr.children[1]!.x)
+    expect(ltrTrimmed.children[0]!.x).toBe(ltr.children[0]!.x)
+    expect(ltrTrimmed.children[1]!.x).toBe(ltr.children[1]!.x)
     expect(upper.children[0]!.x).toBe(ltr.children[0]!.x)
     expect(upper.children[1]!.x).toBe(ltr.children[1]!.x)
     expect(autoOwner.children[0]!.x).toBe(ltr.children[0]!.x)
