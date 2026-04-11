@@ -261,6 +261,13 @@ describe('breakpoint non-finite min-width', () => {
     expect(breakpoint(signal(800), bps).value).toBe('sm')
     expect(breakpoint(signal(1200), bps).value).toBe('lg')
   })
+
+  it('skips boxed Number min-width entries (typeof object; no numeric unboxing) like other non-number thresholds', () => {
+    const bps = { sm: 0, bogus: Object(640) as unknown as number, lg: 1024 }
+    expect(() => breakpoint(signal(800), bps)).not.toThrow()
+    expect(breakpoint(signal(800), bps).value).toBe('sm')
+    expect(breakpoint(signal(1200), bps).value).toBe('lg')
+  })
 })
 
 describe('createViewport edge cases', () => {
