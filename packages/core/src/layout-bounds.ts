@@ -54,7 +54,7 @@ export function scrollSafeChildOffsets(
  * numbers and bigint never coerce).
  *
  * @param value — Typically `AppOptions.width` / `height`; accepts `unknown` so corrupt runtime options
- *   cannot slip through widened casts.
+ *   cannot slip through widened casts. JSON `null` is non-number and yields `undefined` (unconstrained), same as omission.
  */
 export function finiteRootExtent(value: unknown): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value)) return undefined

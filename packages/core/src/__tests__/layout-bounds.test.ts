@@ -619,7 +619,9 @@ describe('finiteRootExtent', () => {
   })
 
   it('returns undefined for non-number runtime values without coercion', () => {
+    expect(finiteRootExtent(null as unknown as number)).toBeUndefined()
     expect(finiteRootExtent('100' as unknown as number)).toBeUndefined()
+    expect(finiteRootExtent('' as unknown as number)).toBeUndefined()
     expect(finiteRootExtent(1n as unknown as number)).toBeUndefined()
     expect(finiteRootExtent(Object(50) as unknown as number)).toBeUndefined()
     // Boxed numbers are typeof object; must not normalize IEEE −0 via primitive path.
@@ -662,6 +664,12 @@ describe('finiteRootExtent', () => {
 })
 
 describe('scrollSafeChildOffsets', () => {
+  it('treats undefined scroll props like 0 (omitted JSON keys; parity with finiteNumberOrZero)', () => {
+    expect(scrollSafeChildOffsets(10, 20, undefined, 4)).toEqual({ ox: 10, oy: 16 })
+    expect(scrollSafeChildOffsets(10, 20, 3, undefined)).toEqual({ ox: 7, oy: 20 })
+    expect(scrollSafeChildOffsets(10, 20, undefined, undefined)).toEqual({ ox: 10, oy: 20 })
+  })
+
   it('returns abs minus finite scroll offsets', () => {
     expect(scrollSafeChildOffsets(10, 20, 3, 4)).toEqual({ ox: 7, oy: 16 })
     expect(scrollSafeChildOffsets(0, 0, 0, 0)).toEqual({ ox: 0, oy: 0 })
