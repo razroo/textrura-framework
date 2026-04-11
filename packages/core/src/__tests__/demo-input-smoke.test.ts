@@ -180,4 +180,31 @@ describe('demo input scenario smoke', () => {
     expect(el.semantic).toEqual({ tag: 'input', ariaDisabled: true })
     expect(calls).toBe(0)
   })
+
+  it('readOnly uiInput sets ariaReadOnly and keeps keyboard routing (value stays app-controlled)', () => {
+    let keys = 0
+    const el = uiInput('abc', 'field', {
+      readOnly: true,
+      focused: true,
+      onKeyDown: () => {
+        keys++
+      },
+    })
+    expect(el.kind).toBe('box')
+    expect(el.semantic).toEqual({ tag: 'input', ariaReadOnly: true })
+    expect(el.props.pointerEvents).toBeUndefined()
+    expect(el.handlers?.onKeyDown).toBeDefined()
+
+    const target = {} as KeyboardHitEvent['target']
+    el.handlers?.onKeyDown?.({
+      key: 'ArrowLeft',
+      code: 'ArrowLeft',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+      target,
+    })
+    expect(keys).toBe(1)
+  })
 })
