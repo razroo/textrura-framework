@@ -20,6 +20,8 @@ describe('streamText', () => {
     expect(streamText({} as unknown as string).value).toBe('')
     expect(streamText(1n as unknown as string).value).toBe('')
     expect(streamText(Symbol('seed') as unknown as string).value).toBe('')
+    expect(streamText(false as unknown as string).value).toBe('')
+    expect(streamText(true as unknown as string).value).toBe('')
   })
 
   it('treats boxed String initial as empty (typeof is object, not string)', () => {
@@ -159,6 +161,8 @@ describe('streamText', () => {
     s.append(null as unknown as string)
     s.append(undefined as unknown as string)
     s.append(42 as unknown as string)
+    s.append(false as unknown as string)
+    s.append(true as unknown as string)
     s.append({} as unknown as string)
     s.append(Object('y') as unknown as string)
     await Promise.resolve()
@@ -183,6 +187,8 @@ describe('streamText', () => {
     s.set(null as unknown as string)
     s.set(undefined as unknown as string)
     s.set(99 as unknown as string)
+    s.set(false as unknown as string)
+    s.set(true as unknown as string)
     s.set({} as unknown as string)
     s.set(Object('new') as unknown as string)
     expect(s.value).toBe('keep')
