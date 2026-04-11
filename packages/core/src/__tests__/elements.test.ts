@@ -229,6 +229,26 @@ describe('bodyText', () => {
     expect((el.props as { whiteSpace?: string }).whiteSpace).toBe('nowrap')
   })
 
+  it('defaults whiteSpace when the prop is explicitly undefined (nullish coalescing, not ||)', () => {
+    const el = bodyText({
+      text: 'Hi',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      whiteSpace: undefined,
+    })
+    expect((el.props as { whiteSpace?: string }).whiteSpace).toBe('normal')
+  })
+
+  it('preserves explicit empty-string whiteSpace (only nullish values use the normal default)', () => {
+    const el = bodyText({
+      text: 'Hi',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      whiteSpace: '' as never,
+    })
+    expect((el.props as { whiteSpace?: string }).whiteSpace).toBe('')
+  })
+
   it('lifts key and semantic like text()', () => {
     const el = bodyText({
       text: 'Hi',
