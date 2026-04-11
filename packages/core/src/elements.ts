@@ -158,30 +158,37 @@ export function scene3d(props: Scene3dProps): Scene3dElement {
 // Scene3d object helpers — plain data factories for the `objects` array.
 // ---------------------------------------------------------------------------
 
+/** Build a {@link Scene3dSphere} entry for {@link Scene3dElement.props.objects} (JSON-serializable; streamable with geometry). */
 export function sphere(opts: Omit<Scene3dSphere, 'type'>): Scene3dSphere {
   return { type: 'sphere', ...opts }
 }
 
+/** Build a {@link Scene3dPoints} entry for {@link Scene3dElement.props.objects}. */
 export function points(opts: Omit<Scene3dPoints, 'type'>): Scene3dPoints {
   return { type: 'points', ...opts }
 }
 
+/** Build a {@link Scene3dLine} entry for {@link Scene3dElement.props.objects}. */
 export function line(opts: Omit<Scene3dLine, 'type'>): Scene3dLine {
   return { type: 'line', ...opts }
 }
 
+/** Build a {@link Scene3dRing} entry for {@link Scene3dElement.props.objects}. */
 export function ring(opts: Omit<Scene3dRing, 'type'>): Scene3dRing {
   return { type: 'ring', ...opts }
 }
 
+/** Build an {@link Scene3dAmbientLight} entry for {@link Scene3dElement.props.objects}. */
 export function ambientLight(opts: Omit<Scene3dAmbientLight, 'type'> = {}): Scene3dAmbientLight {
   return { type: 'ambientLight', ...opts }
 }
 
+/** Build a {@link Scene3dDirectionalLight} entry for {@link Scene3dElement.props.objects}. */
 export function directionalLight(opts: Omit<Scene3dDirectionalLight, 'type'>): Scene3dDirectionalLight {
   return { type: 'directionalLight', ...opts }
 }
 
+/** Build a {@link Scene3dGroup} entry nesting further {@link Scene3dObject} values under {@link Scene3dGroup.objects}. */
 export function group(opts: Omit<Scene3dGroup, 'type'>): Scene3dGroup {
   return { type: 'group', ...opts }
 }
