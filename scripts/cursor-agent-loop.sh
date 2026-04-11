@@ -70,7 +70,9 @@ fi
 # repo root to validate the vitest argv (duplicate paths, `..` escapes, forward slashes) without waiting for the full
 # vitest batch — same verifier as the first `&&` segment of `npm run release:gate`.
 # CI runs the same gate: `.github/workflows/quality.yml` invokes `bun run release:gate` after lint, fast tests
-# (`bun run test` / vitest.fast.config.ts), `bun run build`, `bun run examples:smoke`, and `bun run e2e:demo`.
+# (`bun run test` / vitest.fast.config.ts), `bun run build`, `bun run benchmark:mcp-flow:all -- --assert`,
+# `bun run examples:smoke`, and `bun run e2e:demo`. When editing MCP benchmark scripts or harness expectations,
+# run that benchmark locally (or the relevant `benchmark:mcp-*` variant), not only `release:gate`.
 # A green `release:gate` alone does not imply those steps passed — re-run the relevant ones when touching demos,
 # create:app templates, examples tooling, or Playwright-covered demo flows.
 # Extend an allowlisted file when adding release-critical tests unless you intentionally widen the gate.
@@ -203,7 +205,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
    npm run release:gate
    The gate ends with \`bun run test:terminal-input\` (see root package.json) — \`bun\` must be on PATH. If that fails, fix issues and re-run until it passes (or stop with a clear explanation if blocked by environment).
    If you edited \`scripts.release:gate\` in package.json, run \`node scripts/release/verify-release-gate.mjs\` first to catch duplicate/malformed vitest paths before the long vitest batch (same check as the first \`&&\` segment of the gate).
-   CI (\`.github/workflows/quality.yml\`) also runs lint, fast tests, build, examples:smoke, and e2e:demo before this gate; when your change touches demos, \`create:app\`, examples scripts, or demo E2E surfaces, run the matching subset locally (not only the gate).
+   CI (\`.github/workflows/quality.yml\`) also runs lint, fast tests, build, \`benchmark:mcp-flow:all -- --assert\`, examples:smoke, and e2e:demo before this gate; when your change touches demos, \`create:app\`, examples scripts, demo E2E surfaces, or MCP benchmark scripts / harness expectations, run the matching subset locally (not only the gate).
 
 5. If you made real changes: git add only what belongs to this task, then git commit with a conventional message (feat:/fix:/chore:/docs:/test:/perf:/refactor: as appropriate).
    ${PUSH_TEXT}
