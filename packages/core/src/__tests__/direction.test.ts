@@ -262,6 +262,18 @@ describe('resolveComputeLayoutDirection', () => {
     expect(resolveComputeLayoutDirection('LTR' as never, rtlRoot)).toBe('rtl')
   })
 
+  it('ignores host layoutDirection strings that only look like ltr/rtl (Unicode homoglyphs / zero-width; strict ===)', () => {
+    const rtlRoot = box({ width: 1, height: 1, flexDirection: 'row', dir: 'rtl' }, [])
+    const ltrRoot = box({ width: 1, height: 1, flexDirection: 'row', dir: 'ltr' }, [])
+    // U+200C ZERO WIDTH NON-JOINER inside or before the token — not equal to primitive 'ltr' | 'rtl'.
+    expect(resolveComputeLayoutDirection('l\u200Ctr' as never, rtlRoot)).toBe('rtl')
+    expect(resolveComputeLayoutDirection('\u200Cltr' as never, rtlRoot)).toBe('rtl')
+    expect(resolveComputeLayoutDirection('rtl\u200C' as never, ltrRoot)).toBe('ltr')
+    // Cyrillic / Greek homoglyphs for Latin letters (still not ASCII ltr|rtl).
+    expect(resolveComputeLayoutDirection('rt\u043Bl' as never, ltrRoot)).toBe('ltr')
+    expect(resolveComputeLayoutDirection('lt\u0440' as never, rtlRoot)).toBe('rtl')
+  })
+
   it('derives ltr when root element dir is trimmed or wrong-case (strict equality; loose serializers do not imply RTL)', () => {
     const spacedRtl = box({ width: 1, height: 1, dir: 'rtl ' as never })
     const prefixedRtl = box({ width: 1, height: 1, dir: ' rtl' as never })
