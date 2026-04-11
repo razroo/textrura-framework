@@ -1849,6 +1849,240 @@ async function readTriggerShowsPlaceholder(
 }
 
 /**
+ * Detect whether a combobox trigger is a "searchable/autocomplete style"
+ * combobox (React Select, Headless UI, Radix, Ant Design Select, etc.).
+ *
+ * These libraries commit their controlled `onChange` state on **keyboard
+ * Enter**, not on a synthetic mouse click dispatched via Playwright's
+ * `.click()`. For regular mouse interactions they use a bubbling
+ * `mousedown`/`pointerdown` path that does not round-trip through React
+ * Select's internal `selectOption` handler in some Remix-wrapped builds
+ * (notably Greenhouse's ATS embed), so the option click fires visually but
+ * the form state stays empty. Pressing Enter on the focused combobox input
+ * after the click puts the selection through the keyboard code path which
+ * ALWAYS commits.
+ *
+ * Detection is fully generic — no hostname or site-specific branching.
+ * The signals we look for are:
+ *
+ *   1. `aria-autocomplete` on the element or its nearest ancestor input is
+ *      `"list"` or `"both"`. This is the standards-aligned signal for any
+ *      combobox that filters options as the user types.
+ *   2. A class pattern indicative of React Select (`select__control`,
+ *      `select__`), React Suite picker (`rs-picker`), or Ant Design Select
+ *      (`ant-select`) on the element or any ancestor up to 5 levels.
+ *   3. `role="combobox"` present together with `aria-expanded` on the
+ *      element or an ancestor — the ARIA 1.2 combobox pattern.
+ *
+ * Native `<select>` elements do NOT match any of these signals, so the
+ * caller can safely gate its `Enter` dispatch on this check without
+ * breaking non-searchable listboxes.
+ */
+async function isAutocompleteCombobox(
+  handle: ElementHandle<Element> | null | undefined,
+): Promise<boolean> {
+  if (!handle) return false
+  try {
+    return await handle.evaluate((el) => {
+      if (!(el instanceof Element)) return false
+      let cur: Element | null = el
+      let depth = 0
+      while (cur && depth < 5) {
+        // aria-autocomplete on the element or an ancestor input/combobox.
+        const ac = cur.getAttribute('aria-autocomplete')
+        if (ac === 'list' || ac === 'both') return true
+
+        // Class-based fingerprint for known autocomplete libraries.
+        const className = (cur.getAttribute('class') ?? '').toLowerCase()
+        if (className) {
+          if (
+            className.includes('select__control') ||
+            className.includes('select__') ||
+            className.includes('rs-picker') ||
+            className.includes('ant-select') ||
+            className.includes('headlessui-combobox') ||
+            className.includes('cmdk-')
+          ) {
+            return true
+          }
+        }
+
+        // ARIA 1.2 combobox pattern: role="combobox" + aria-expanded is a
+        // strong signal that the control commits via keyboard semantics.
+        if (cur.getAttribute('role') === 'combobox' && cur.hasAttribute('aria-expanded')) {
+          return true
+        }
+        cur = cur.parentElement
+        depth++
+      }
+
+      // Also look downward for a descendant input that declares
+      // aria-autocomplete — some Headless UI wrappers expose the control via
+      // a sibling input inside the trigger container.
+      const descendant = (el as Element).querySelector?.(
+        '[aria-autocomplete="list"], [aria-autocomplete="both"]',
+      )
+      return !!descendant
+    })
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Dispatch a keyboard `Enter` to commit an autocomplete-style combobox's
+ * selection after the option has been clicked. Only fires if the trigger
+ * looks like a searchable combobox per {@link isAutocompleteCombobox}.
+ *
+ * Why this exists: Playwright's `.click()` on a React Select option DOM
+ * element dispatches a synthetic `pointerdown`/`mouseup`/`click` sequence
+ * that a subset of React Select forks (and every Remix-wrapped Greenhouse
+ * ATS build we've seen) will NOT commit through `selectOption`. The
+ * library's `keydown Enter` handler, however, unconditionally commits via
+ * the same internal `setValue` the visual selection uses. Pressing Enter
+ * after the click is therefore a universal "force commit" primitive for
+ * searchable comboboxes that benefit every library without touching the
+ * native-<select> happy path.
+ *
+ * Intentionally swallows errors — this is a best-effort commit helper and
+ * a missing page/focus should not break the surrounding selection flow.
+ */
+async function pressEnterToCommitListbox(
+  page: Page,
+  handle: ElementHandle<Element> | null | undefined,
+): Promise<boolean> {
+  if (!handle) return false
+  if (!(await isAutocompleteCombobox(handle))) return false
+  try {
+    await page.keyboard.press('Enter')
+    // Short settle window for the library to run its onChange -> form
+    // state update. 80ms is the same budget used elsewhere in this file
+    // for React Select commit propagation.
+    await delay(80)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Read form-level invalid state for a combobox trigger.
+ *
+ * `readAriaInvalid` / `readTriggerShowsPlaceholder` only consult attributes
+ * on the trigger element and its direct ancestors. That catches react-select's
+ * revert pattern and the Greenhouse "stay at placeholder" pattern, but it
+ * misses the case where the combobox's visible chrome says "committed"
+ * while the surrounding *form's* controlled state still reports the field
+ * as invalid. The form-level source of truth lives in sibling hidden
+ * inputs and in react-hook-form / Formik style `role="alert"` /
+ * `.error` / `[data-invalid]` elements inside the field wrapper.
+ *
+ * This function walks up to the closest `<form>` ancestor of the trigger
+ * and, within the trigger's nearest field wrapper (the closest ancestor
+ * with a `<label>`-like role, bounded by the form), checks for any of:
+ *
+ *   - `<input>` hidden siblings with `aria-invalid="true"` or `[data-invalid]`
+ *   - `[role="alert"]` or `.error` / `[data-error]` siblings (rendered by
+ *     react-hook-form's `<ErrorMessage>`, Formik, Ashby's form lib, etc.)
+ *   - A sibling with the `invalid:required` / `required` error text class
+ *
+ * Returns `true` if the form reports the field as invalid — callers should
+ * treat this as a definitive "commit failed" signal and retry. Returns
+ * `false` if everything looks clean OR if the walk fails (handle detached,
+ * no form ancestor, etc.) — "unknown" is NOT a veto, same convention as
+ * `readAriaInvalid`.
+ */
+async function readFormLevelInvalidState(
+  handle: ElementHandle<Element> | null | undefined,
+): Promise<boolean> {
+  if (!handle) return false
+  try {
+    return await handle.evaluate((el) => {
+      if (!(el instanceof Element)) return false
+
+      // Find the closest <form>. No form = can't verify, not a veto.
+      const form = el.closest('form')
+      if (!form) return false
+
+      // Find the field wrapper — the closest ancestor that "contains a label"
+      // and is still inside the form. This is the react-hook-form convention:
+      // every field lives under a wrapper that renders both the control and
+      // the error message as siblings. If we can't find one, use a bounded
+      // walk up to ~6 ancestors and look at each one's siblings.
+      let wrapper: Element | null = el
+      let depth = 0
+      while (wrapper && wrapper !== form && depth < 6) {
+        // A "field wrapper" is anything that contains a <label>, a legend,
+        // or a [class*="field"] class up to 6 ancestors deep.
+        const hasLabel =
+          wrapper.querySelector && (wrapper.querySelector('label') || wrapper.querySelector('legend'))
+        const className = (wrapper.getAttribute('class') ?? '').toLowerCase()
+        const looksLikeField =
+          className.includes('field') ||
+          className.includes('form-group') ||
+          className.includes('form-control') ||
+          className.includes('input-wrapper')
+        if (hasLabel || looksLikeField) break
+        wrapper = wrapper.parentElement
+        depth++
+      }
+      if (!wrapper || wrapper === form) wrapper = el.parentElement ?? el
+
+      // 1. Hidden sibling <input> with aria-invalid / data-invalid. This is
+      //    the react-hook-form + react-select pattern: the Controller writes
+      //    the value into a hidden input, and form validation marks that
+      //    hidden input invalid.
+      const hiddenInputs = wrapper.querySelectorAll<HTMLInputElement>(
+        'input[type="hidden"], input[aria-hidden="true"]',
+      )
+      for (const input of hiddenInputs) {
+        const ariaInvalid = input.getAttribute('aria-invalid')
+        if (ariaInvalid === 'true' || ariaInvalid === '') return true
+        if (input.hasAttribute('data-invalid')) return true
+        // Required + empty value is a definitive "not committed" signal,
+        // but only when the element is actually marked required AND the
+        // hidden input is blank. react-select writes an empty string to
+        // its hidden input when uncommitted.
+        if (input.required && (input.value === '' || input.value == null)) {
+          // Only veto if SOMETHING in the wrapper also flags the field as
+          // in-error. A blank hidden input on a page that hasn't attempted
+          // submit yet is common and non-authoritative.
+          const flaggedInWrapper =
+            wrapper.querySelector('[role="alert"]') ||
+            wrapper.querySelector('[data-invalid]') ||
+            wrapper.querySelector('[data-error]')
+          if (flaggedInWrapper) return true
+        }
+      }
+
+      // 2. role="alert" or [data-invalid] / [data-error] / .error inside the
+      //    wrapper. react-hook-form's ErrorMessage renders role=alert when a
+      //    validator fires; Formik renders a div.error; Ashby uses
+      //    data-invalid.
+      const alerts = wrapper.querySelectorAll(
+        '[role="alert"], [data-invalid], [data-error], [class*="error-message"], [class*="errorMessage"]',
+      )
+      for (const alert of alerts) {
+        if (!(alert instanceof HTMLElement)) continue
+        // Must be visible — hidden slots don't count as a veto.
+        const rect = alert.getBoundingClientRect()
+        if (rect.width <= 0 || rect.height <= 0) continue
+        const style = getComputedStyle(alert)
+        if (style.display === 'none' || style.visibility === 'hidden') continue
+        const text = alert.textContent?.trim() ?? ''
+        // Empty alerts are placeholders rendered for layout; skip them.
+        if (!text) continue
+        return true
+      }
+
+      return false
+    })
+  } catch {
+    return false
+  }
+}
+
+/**
  * Read the picked option from a custom combobox's sibling presentational
  * element ONLY. Skips the input's own .value (which is the typed search
  * query for editable comboboxes), aria attributes, and the trigger's own
@@ -3666,6 +3900,15 @@ export async function pickListboxOption(
     selectedOptionText = (await clickVisibleOptionCandidate(page, label, exact, anchor, popupScope)) ?? undefined
     if (!selectedOptionText) return false
     attemptedSelection = true
+    // Force-commit for searchable/autocomplete comboboxes (React Select,
+    // Headless UI, Radix, Ant Design, etc.). Some library versions — most
+    // notably Greenhouse's Remix-wrapped react-select — visually select the
+    // option on synthetic mouse click but never invoke `onChange`, leaving
+    // the controlled form state empty. Dispatching a keyboard `Enter` on
+    // the focused combobox input puts the selection through the keyboard
+    // commit path, which ALL tested libraries honor. No-op for native
+    // <select> / plain ARIA listboxes — see isAutocompleteCombobox.
+    await pressEnterToCommitListbox(page, openedHandle)
     if (
       !opts?.fieldLabel ||
       await confirmListboxSelection(page, opts.fieldLabel, label, exact, anchor, openedHandle, selectedOptionText, {
@@ -3731,6 +3974,13 @@ export async function pickListboxOption(
     await delay(40)
     if (await readAriaInvalid(openedHandle)) return false
     if (await readTriggerShowsPlaceholder(openedHandle)) return false
+    // Form-level validation: even if the trigger chrome says "committed",
+    // the surrounding <form> may still report the field as invalid via a
+    // hidden input's aria-invalid, a role=alert error message, or a
+    // [data-invalid] flag inside the field wrapper (react-hook-form,
+    // Formik, Ashby forms, etc.). If the form disagrees with the trigger,
+    // the commit did not land and the caller should retry.
+    if (await readFormLevelInvalidState(openedHandle)) return false
     return true
   }
 

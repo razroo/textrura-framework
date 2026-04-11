@@ -731,6 +731,197 @@ describe('pickListboxOption', () => {
     await page.close()
   }, 60_000)
 
+  it('commits a React-Select/Greenhouse-Remix combobox that only honors keyboard Enter after the option click', async () => {
+    // Regression: Greenhouse's Remix-wrapped react-select build (used by
+    // Anthropic, Intercom, Glean, Databricks, GitLab, etc.) has a silent-
+    // fill shape that none of the existing checks catch: the option click
+    // visually updates the trigger AND sets .select__single-value AND
+    // clears aria-invalid on the trigger, so every heuristic in
+    // confirmListboxSelection reports success. But the library only commits
+    // its controlled form state when the underlying combobox input receives
+    // `keydown Enter` — Playwright's synthetic click doesn't route through
+    // React Select's keydown handler in this build. The hidden <input>
+    // backing the field therefore stays empty, and the next form submit
+    // fails with `invalid:required`.
+    //
+    // The fix dispatches Enter on the combobox input after the option click
+    // whenever the trigger looks like a searchable/autocomplete combobox.
+    // No hostname branching — detection is via aria-autocomplete and React
+    // Select's class pattern, so this same commit path benefits Greenhouse,
+    // Lever, Ashby, Workday, Intercom, GitLab, etc. equally.
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; }
+        .field { width: 360px; display: grid; gap: 8px; }
+        .select__control {
+          border: 1px solid #ccc;
+          min-height: 40px;
+          display: flex;
+          align-items: center;
+          padding: 0 12px;
+          cursor: text;
+          position: relative;
+        }
+        .select__value-container { flex: 1; display: flex; align-items: center; gap: 4px; }
+        .select__single-value { color: #111; }
+        .select__placeholder { color: #888; }
+        .select__input { border: 0; outline: 0; flex: 1; min-width: 2px; }
+        .rs-menu[hidden] { display: none; }
+        .rs-menu { border: 1px solid #ccc; margin-top: 4px; padding: 4px 0; }
+        .rs-option { padding: 6px 12px; cursor: pointer; }
+        .rs-option[data-highlighted="true"] { background: #eef; }
+      </style>
+      <form id="greenhouse-form">
+        <div class="field">
+          <label for="auth-input">Are you legally authorized to work in the United States?</label>
+          <div
+            id="auth-control"
+            class="select__control"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            aria-required="true"
+            aria-owns="auth-menu"
+            tabindex="-1"
+          >
+            <div class="select__value-container">
+              <span id="auth-placeholder" class="select__placeholder">Select...</span>
+              <input
+                id="auth-input"
+                class="select__input"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded="false"
+                aria-controls="auth-menu"
+                autocomplete="off"
+              />
+            </div>
+          </div>
+          <input type="hidden" id="auth-hidden" name="authorized" required aria-invalid="true" value="" />
+          <div id="auth-menu" class="rs-menu" role="listbox" hidden>
+            <div id="auth-opt-yes" class="rs-option" role="option" data-value="yes">Yes</div>
+            <div id="auth-opt-no" class="rs-option" role="option" data-value="no">No</div>
+          </div>
+        </div>
+      </form>
+      <script>
+        const control = document.getElementById('auth-control')
+        const input = document.getElementById('auth-input')
+        const menu = document.getElementById('auth-menu')
+        const placeholder = document.getElementById('auth-placeholder')
+        const hidden = document.getElementById('auth-hidden')
+        const valueContainer = control.querySelector('.select__value-container')
+        const options = Array.from(menu.querySelectorAll('.rs-option'))
+        let highlighted = null
+
+        function highlight(opt) {
+          for (const o of options) o.removeAttribute('data-highlighted')
+          if (opt) {
+            opt.setAttribute('data-highlighted', 'true')
+            input.setAttribute('aria-activedescendant', opt.id)
+          } else {
+            input.removeAttribute('aria-activedescendant')
+          }
+          highlighted = opt
+        }
+        function open() {
+          if (!menu.hidden) return
+          menu.hidden = false
+          control.setAttribute('aria-expanded', 'true')
+          input.setAttribute('aria-expanded', 'true')
+          if (!highlighted) highlight(options[0])
+        }
+        function close() {
+          if (menu.hidden) return
+          menu.hidden = true
+          control.setAttribute('aria-expanded', 'false')
+          input.setAttribute('aria-expanded', 'false')
+          highlight(null)
+        }
+        // The "real" commit path — the ONLY path that updates the hidden
+        // input. Production Greenhouse Remix only invokes this from a
+        // keyboard Enter handler, which is what this test models.
+        function commit(opt) {
+          if (!opt) return
+          // Render .select__single-value the way react-select does.
+          let singleValue = valueContainer.querySelector('.select__single-value')
+          if (!singleValue) {
+            singleValue = document.createElement('div')
+            singleValue.className = 'select__single-value'
+            valueContainer.insertBefore(singleValue, placeholder)
+          }
+          singleValue.textContent = opt.textContent
+          placeholder.style.display = 'none'
+          hidden.value = opt.getAttribute('data-value')
+          hidden.setAttribute('aria-invalid', 'false')
+          control.setAttribute('aria-invalid', 'false')
+          input.value = ''
+          close()
+        }
+
+        control.addEventListener('click', (event) => {
+          if (event.target.closest('.rs-option')) return
+          input.focus()
+          if (menu.hidden) open(); else close()
+        })
+
+        // Option click path — highlights the option, visually flashes
+        // .select__single-value (so display-value heuristics pass), but
+        // does NOT call commit(). Only keydown Enter does. This is the
+        // exact silent-fail shape Greenhouse ships on the Remix build.
+        for (const opt of options) {
+          opt.addEventListener('mouseenter', () => highlight(opt))
+          opt.addEventListener('click', (event) => {
+            event.stopPropagation()
+            highlight(opt)
+            // Visually reflect selection on the trigger (so the existing
+            // aria-invalid / placeholder checks pass) but do NOT touch
+            // the hidden input. Form state stays empty.
+            let singleValue = valueContainer.querySelector('.select__single-value')
+            if (!singleValue) {
+              singleValue = document.createElement('div')
+              singleValue.className = 'select__single-value'
+              valueContainer.insertBefore(singleValue, placeholder)
+            }
+            singleValue.textContent = opt.textContent
+            placeholder.style.display = 'none'
+            control.setAttribute('aria-invalid', 'false')
+            // Intentionally leave hidden.value and hidden.aria-invalid
+            // untouched — this is the broken library behavior the fix
+            // has to survive.
+            close()
+          })
+        }
+
+        // Keyboard commit path — real commit. pressEnterToCommitListbox
+        // must route through here for the fix to work.
+        input.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            if (highlighted) commit(highlighted)
+          }
+        })
+        input.addEventListener('focus', open)
+      </script>
+    `)
+
+    await pickListboxOption(page, 'Yes', {
+      fieldLabel: 'Are you legally authorized to work in the United States?',
+      exact: false,
+    })
+
+    // The fix must have committed the controlled form state. The hidden
+    // input is the source of truth — if it's empty, the form submit would
+    // have failed with invalid:required regardless of what the trigger
+    // visually shows.
+    const hiddenValue = await page.locator('#auth-hidden').inputValue()
+    expect(hiddenValue).toBe('yes')
+    const ariaInvalid = await page.locator('#auth-hidden').getAttribute('aria-invalid')
+    expect(ariaInvalid).toBe('false')
+    await page.close()
+  }, 60_000)
+
   it('returns visible options in the failure payload when no custom dropdown option matches', async () => {
     const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
     await page.setContent(`
