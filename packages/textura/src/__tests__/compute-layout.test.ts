@@ -646,6 +646,19 @@ describe('box layout', () => {
     expect(explicitUndefined.children[0]!.x).toBeLessThan(explicitUndefined.children[1]!.x)
   })
 
+  it('explicit ltr owner direction matches omitted owner direction (default Yoga owner is LTR)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 40,
+      flexDirection: 'row',
+      gap: 10,
+      children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+    }
+    const omitted = computeLayout(tree, { width: 200, height: 80 })
+    const explicitLtr = computeLayout(tree, { width: 200, height: 80, direction: 'ltr' })
+    expect(explicitLtr).toEqual(omitted)
+  })
+
   it('owner direction rtl with only ComputeOptions.direction (no width/height) matches explicit owner extents', () => {
     const tree: BoxNode = {
       width: 200,
