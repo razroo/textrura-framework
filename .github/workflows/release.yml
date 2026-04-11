@@ -60,15 +60,34 @@ jobs:
         run: |
           SHA=$(git rev-parse HEAD)
           echo "Verifying Quality checks status for $SHA"
-          # Look for the quality job's check-run on this exact commit. If
-          # there's no run, or it didn't conclude success, refuse to publish.
-          # This prevents the situation where a red CI ships to npm because
-          # the release workflow runs on `release: published` and is otherwise
-          # decoupled from push-time CI.
-          CONCLUSION=$(gh api "repos/${{ github.repository }}/commits/$SHA/check-runs" \
-            --jq '[.check_runs[] | select(.name == "quality")] | sort_by(.completed_at) | last | .conclusion // "missing"')
+          # Wait for the push-triggered `quality` check-run on this exact
+          # commit to appear and finish. If it concludes anything other than
+          # success, refuse to publish. This prevents the situation where a
+          # red CI ships to npm because the release workflow runs on
+          # `release: published` and is otherwise decoupled from push-time CI.
+          #
+          # Polling (rather than a single snapshot) is required because
+          # `release: published` often fires before the push-triggered
+          # Quality workflow has even registered its check-run — the tag and
+          # the push typically land within the same second.
+          DEADLINE=$(( $(date +%s) + 1800 ))  # 30 min
+          STATUS=""
+          CONCLUSION=""
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            read -r STATUS CONCLUSION <<<"$(gh api "repos/${{ github.repository }}/commits/$SHA/check-runs" \
+              --jq '[.check_runs[] | select(.name == "quality")] | sort_by(.started_at) | last | "\(.status // "missing") \(.conclusion // "null")"')"
+            echo "quality check-run: status=$STATUS conclusion=$CONCLUSION"
+            if [ "$STATUS" = "completed" ]; then
+              break
+            fi
+            sleep 15
+          done
+          if [ "$STATUS" != "completed" ]; then
+            echo "::error::Quality checks for $SHA never completed within 30min (last status: $STATUS). Investigate the Quality checks workflow run."
+            exit 1
+          fi
           if [ "$CONCLUSION" != "success" ]; then
-            echo "::error::Quality checks for $SHA did not succeed (conclusion: $CONCLUSION). Wait for the push-time Quality checks workflow to go green before tagging the release."
+            echo "::error::Quality checks for $SHA did not succeed (conclusion: $CONCLUSION). Fix the red Quality run before re-releasing."
             exit 1
           fi
           echo "Quality checks succeeded for $SHA"
