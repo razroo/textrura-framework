@@ -1940,4 +1940,58 @@ describe('fillOtp', () => {
     )
     await page.close()
   })
+
+  // Regression: JobForge Hex AI Engineering Lead #310 apply flow on
+  // 2026-04-11. Greenhouse's 8-cell security-code widget does not attach
+  // an auto-advance handler to cell 0 in some build configurations — only
+  // cell 0 is maxlength=1 so typing "c" lands cleanly, but subsequent
+  // chars ("t", "U", ...) are silently dropped because focus never moves
+  // off cell 0 and maxlength=1 rejects additional chars. Cells 1..7 end
+  // up empty. A naive readback-mismatch throw forces callers to retry and
+  // hit the same race. The per-cell recovery path should detect the
+  // partial fill and explicitly click + type each cell exactly once.
+  it('recovers from partial fill (auto-advance failed) via per-cell recovery', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    // 8 cells, all maxlength=1. Cells 1..7 have the normal auto-advance
+    // handler. Cell 0 does NOT — typing "c" lands in cell 0 and stops.
+    // Recovery should click each cell and type exactly one char.
+    await page.setContent(`
+      <div class="otp" data-otp style="display: flex; gap: 4px">
+        <input id="c0" maxlength="1" type="text" />
+        <input id="c1" maxlength="1" type="text" />
+        <input id="c2" maxlength="1" type="text" />
+        <input id="c3" maxlength="1" type="text" />
+        <input id="c4" maxlength="1" type="text" />
+        <input id="c5" maxlength="1" type="text" />
+        <input id="c6" maxlength="1" type="text" />
+        <input id="c7" maxlength="1" type="text" />
+      </div>
+      <style>
+        .otp input { width: 32px; height: 32px; text-align: center; font-size: 16px }
+      </style>
+      <script>
+        const cells = Array.from(document.querySelectorAll('.otp input'))
+        // Cells 1..7 auto-advance, cell 0 does NOT — simulates a broken
+        // first-cell handler. After typing "c" in cell 0 the initial
+        // keyboard.type batch has no way to move forward.
+        cells.forEach((cell, idx) => {
+          if (idx === 0) return
+          cell.addEventListener('input', () => {
+            if (cell.value.length > 0 && idx < cells.length - 1) cells[idx + 1].focus()
+          })
+        })
+      </script>
+    `)
+
+    const result = await fillOtp(page, 'ctUwV31q')
+    expect(result.cellCount).toBe(8)
+    expect(result.filledCount).toBe(8)
+
+    const readback = await page.evaluate(() => {
+      const cells = Array.from(document.querySelectorAll<HTMLInputElement>('.otp input'))
+      return cells.map(cell => cell.value)
+    })
+    expect(readback).toEqual(['c', 't', 'U', 'w', 'V', '3', '1', 'q'])
+    await page.close()
+  })
 })

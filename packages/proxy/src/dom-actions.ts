@@ -3930,37 +3930,33 @@ export async function fillOtp(
 
     // Per-cell typing: click each cell at its center, then type the single
     // expected char. We do NOT rely on the widget's auto-advance — we
-    // always explicitly click the next cell for the next char.
+    // always explicitly click the next cell for the next char. Before
+    // typing, reset the target cell's value directly in the DOM so the
+    // new char overwrites instead of appending. This is faster and more
+    // deterministic than going through the keyboard Select-All + Delete
+    // path on every cell.
     for (let i = 0; i < expected.length; i++) {
       const cellBox = cellBoxes[i]
       if (!cellBox) continue
-      const cx = cellBox.x + cellBox.width / 2
-      const cy = cellBox.y + cellBox.height / 2
-      await page.mouse.click(cx, cy)
-      // Small settle so the click's focus event propagates before we type.
-      await delay(20)
-      // Select whatever is there so the new char overwrites instead of
-      // appending. Some browsers preserve the existing value on click and
-      // naive typing would append the new char after it.
       try {
-        await page.keyboard.press('Meta+A')
-      } catch {
-        try {
-          await page.keyboard.press('Control+A')
-        } catch {
-          /* tolerate */
-        }
-      }
-      try {
-        await page.keyboard.press('Delete')
+        await liveGroup.boxes.nth(i).evaluate((el) => {
+          if (el instanceof HTMLInputElement) {
+            el.value = ''
+            el.dispatchEvent(new Event('input', { bubbles: true }))
+            el.dispatchEvent(new Event('change', { bubbles: true }))
+          }
+        })
       } catch {
         /* tolerate */
       }
+      const cx = cellBox.x + cellBox.width / 2
+      const cy = cellBox.y + cellBox.height / 2
+      await page.mouse.click(cx, cy)
       await page.keyboard.type(expected[i]!, { delay: perCharDelay })
     }
 
     // Settle, re-read, re-compare.
-    await delay(120)
+    await delay(60)
     readback = await readCurrentCells()
     mismatches = computeOtpMismatches(readback, expected)
   }
