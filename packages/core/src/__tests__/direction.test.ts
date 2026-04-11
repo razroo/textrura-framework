@@ -342,6 +342,25 @@ describe('resolveComputeLayoutDirection', () => {
     expect(resolveComputeLayoutDirection('rtl', boxedLtr)).toBe('rtl')
   })
 
+  it('derives ltr from boxed-string root dir on image and scene3d when host override is invalid (parity with box)', () => {
+    const boxedRtlImg = image({ src: 'a.png', width: 8, height: 8, dir: Object('rtl') as never })
+    expect(resolveComputeLayoutDirection(undefined, boxedRtlImg)).toBe('ltr')
+    expect(resolveComputeLayoutDirection('auto' as never, boxedRtlImg)).toBe('ltr')
+    expect(resolveComputeLayoutDirection(Object('rtl') as never, boxedRtlImg)).toBe('ltr')
+    expect(resolveComputeLayoutDirection('rtl', boxedRtlImg)).toBe('rtl')
+
+    const boxedRtlScene = scene3d({
+      width: 16,
+      height: 16,
+      objects: [],
+      dir: Object('rtl') as never,
+    })
+    expect(resolveComputeLayoutDirection(undefined, boxedRtlScene)).toBe('ltr')
+    expect(resolveComputeLayoutDirection('auto' as never, boxedRtlScene)).toBe('ltr')
+    expect(resolveComputeLayoutDirection(Object('rtl') as never, boxedRtlScene)).toBe('ltr')
+    expect(resolveComputeLayoutDirection('rtl', boxedRtlScene)).toBe('rtl')
+  })
+
   it('derives ltr from JSON null root dir when host override is invalid (loose deserialization)', () => {
     const nullDirRoot = box({ width: 1, height: 1, dir: null as never })
     expect(resolveComputeLayoutDirection(undefined, nullDirRoot)).toBe('ltr')
