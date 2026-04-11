@@ -359,4 +359,10 @@ describe('createViewport edge cases', () => {
     expect(vp.width.value).toBe(5)
     expect(Object.is(vp.height.peek(), -0)).toBe(true)
   })
+
+  it('feeds IEEE −0 viewport width into breakpoint as the lowest tier (sm: 0 matches; w >= 0)', () => {
+    const vp = createViewport(-0, 600)
+    expect(Object.is(vp.width.peek(), -0)).toBe(true)
+    expect(breakpoint(vp.width, { sm: 0, md: 640, lg: 1024 }).value).toBe('sm')
+  })
 })
