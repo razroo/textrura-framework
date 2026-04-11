@@ -3151,7 +3151,23 @@ function fieldStatePayload(session: Session, fieldLabel: string): FieldStatePayl
 }
 
 function waitStatusPayload(wait: UpdateWaitResult | undefined): Record<string, unknown> {
-  return wait ? { wait: wait.status } : {}
+  if (!wait) return {}
+  const payload: Record<string, unknown> = { wait: wait.status }
+  // Surface navigation info from proxy click handlers so callers can tell
+  // when a click triggered a full-page nav (form submit → thank-you page).
+  // Without this, the proxy session may die on the next request and the
+  // caller would see session_not_found with no clue WHY. Bug surfaced by
+  // JobForge round-2 marathon — Cloudflare FDE NYC #312 and Airtable PM
+  // AI #94 both had Submit-clicks that navigated and tore down the proxy.
+  if (wait.result && typeof wait.result === 'object') {
+    const result = wait.result as Record<string, unknown>
+    if (result.navigated === true) {
+      payload.navigated = true
+      if (typeof result.pageUrl === 'string') payload.pageUrl = result.pageUrl
+      if (typeof result.urlBefore === 'string') payload.urlBefore = result.urlBefore
+    }
+  }
+  return payload
 }
 
 function compactFilterPayload(filter: NodeFilter): Record<string, unknown> {
@@ -4259,12 +4275,29 @@ function digitSignature(value: string): string {
   return value.replace(/\D+/g, '')
 }
 
-function valuesEquivalent(expected: string, actual: string): boolean {
+export function valuesEquivalent(expected: string, actual: string): boolean {
   if (expected.toLowerCase() === actual.toLowerCase()) return true
 
-  // Both look like phones → compare digit signatures only
+  // Both look like phones → compare digit signatures, but allow one to be
+  // a suffix of the other so that an explicit country code on the expected
+  // side ("+1-929-608-1737" → digits "19296081737") still matches an ATS
+  // readback that omits it ("(929) 608-1737" → digits "9296081737"). The
+  // suffix check is direction-agnostic — either side may carry the country
+  // code. Without this, Greenhouse/Workday/Lever auto-formatted phone
+  // fields false-flag as mismatched even though the value is correct.
+  // Bug surfaced by JobForge round-2 marathon — Cloudflare FDE NYC #312.
   if (looksLikePhoneNumber(expected) && looksLikePhoneNumber(actual)) {
-    return digitSignature(expected) === digitSignature(actual)
+    const eDigits = digitSignature(expected)
+    const aDigits = digitSignature(actual)
+    if (!eDigits || !aDigits) return false
+    if (eDigits === aDigits) return true
+    // Suffix tolerance for country-code drift — only accept if the longer
+    // signature ends with the shorter, AND the shorter is at least 7 digits
+    // (NANP local minimum) so we don't false-match on tiny extension ids.
+    const longer = eDigits.length >= aDigits.length ? eDigits : aDigits
+    const shorter = eDigits.length >= aDigits.length ? aDigits : eDigits
+    if (shorter.length >= 7 && longer.endsWith(shorter)) return true
+    return false
   }
 
   // Both look like formatted numbers → compare digit signatures only

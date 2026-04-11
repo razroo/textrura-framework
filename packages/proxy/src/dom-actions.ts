@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import type { ElementHandle, Frame, Locator, Page } from 'playwright'
 import type { ClientChoiceType, ClientFillField } from './types.js'
 
-function delay(ms: number): Promise<void> {
+export function delay(ms: number): Promise<void> {
   return new Promise(r => setTimeout(r, ms))
 }
 
@@ -1994,10 +1994,22 @@ async function pressEnterToCommitListbox(
  */
 async function readFormLevelInvalidState(
   handle: ElementHandle<Element> | null | undefined,
+  opts?: { requireWrapperFlag?: boolean },
 ): Promise<boolean> {
   if (!handle) return false
+  // Default behavior preserves the existing veto logic: a blank required
+  // hidden input only counts as invalid when SOMETHING else in the wrapper
+  // also flags an error (role=alert / data-invalid / data-error). That's
+  // safe for read-only checks where we don't know whether a commit was
+  // recently attempted. When `requireWrapperFlag: false`, the function
+  // becomes stricter and treats a blank required hidden input as
+  // definitively-not-committed even without a visible error flag — the
+  // caller (postCommitVerify) is asserting that a commit was just attempted,
+  // so the hidden input's emptiness IS authoritative. Bug surfaced by
+  // JobForge round-2 marathon — Airtable PM AI #94 phone-country combobox.
+  const requireWrapperFlag = opts?.requireWrapperFlag ?? true
   try {
-    return await handle.evaluate((el) => {
+    return await handle.evaluate((el, requireWrapperFlagFn) => {
       if (!(el instanceof Element)) return false
 
       // Find the closest <form>. No form = can't verify, not a veto.
@@ -2044,9 +2056,15 @@ async function readFormLevelInvalidState(
         // hidden input is blank. react-select writes an empty string to
         // its hidden input when uncommitted.
         if (input.required && (input.value === '' || input.value == null)) {
-          // Only veto if SOMETHING in the wrapper also flags the field as
-          // in-error. A blank hidden input on a page that hasn't attempted
-          // submit yet is common and non-authoritative.
+          if (!requireWrapperFlagFn) {
+            // Caller (postCommitVerify) just attempted a commit; a blank
+            // required hidden input is authoritative even without a
+            // visible error flag.
+            return true
+          }
+          // Read-only mode: only veto if SOMETHING in the wrapper also
+          // flags the field as in-error. A blank hidden input on a page
+          // that hasn't attempted submit yet is common and non-authoritative.
           const flaggedInWrapper =
             wrapper.querySelector('[role="alert"]') ||
             wrapper.querySelector('[data-invalid]') ||
@@ -2076,7 +2094,7 @@ async function readFormLevelInvalidState(
       }
 
       return false
-    })
+    }, requireWrapperFlag)
   } catch {
     return false
   }
@@ -3266,6 +3284,24 @@ async function attemptNativeBatchFill(page: Page, fields: FormFieldFill[]): Prom
         return el.textContent?.trim() || undefined
       }
 
+      // Snapshot every state attribute that React-style stateful buttons
+      // typically toggle on selection. Used to verify that a click on a
+      // button-shaped group radio actually committed (not a structural
+      // no-op). Mirrors `selectionSignature` in `chooseValueFromLabeledGroup`
+      // — kept in sync because they live in different page.evaluate scopes.
+      function selectionSignature(opts: Element[]): string {
+        return opts.map(el => {
+          const ariaPressed = el.getAttribute('aria-pressed') ?? ''
+          const ariaChecked = el.getAttribute('aria-checked') ?? ''
+          const ariaSelected = el.getAttribute('aria-selected') ?? ''
+          const dataState = el.getAttribute('data-state') ?? ''
+          const dataSelected = el.getAttribute('data-selected') ?? ''
+          const className = (el instanceof HTMLElement ? el.className : '') ?? ''
+          const checked = el instanceof HTMLInputElement ? String(el.checked) : ''
+          return `${ariaPressed}|${ariaChecked}|${ariaSelected}|${dataState}|${dataSelected}|${className}|${checked}`
+        }).join('||')
+      }
+
       function setGroupedChoice(fieldLabel: string, value: string, exact: boolean): boolean {
         const groups = Array.from(document.querySelectorAll('fieldset, [role="radiogroup"], [role="group"]'))
           .filter((el): el is HTMLElement => visible(el) && matches(groupPrompt(el), fieldLabel, exact))
@@ -3291,7 +3327,31 @@ async function attemptNativeBatchFill(page: Page, fields: FormFieldFill[]): Prom
               if (control instanceof HTMLInputElement) return control.checked
               return true
             }
+            // role=radio / role=checkbox: click and verify aria-checked
+            // / aria-selected. The native batch fill used to silently return
+            // true here, which masked Pinecone's commit-on-rerender bug.
+            if (option.getAttribute('role') === 'radio' || option.getAttribute('role') === 'checkbox') {
+              option.click()
+              return (
+                option.getAttribute('aria-checked') === 'true' ||
+                option.getAttribute('aria-selected') === 'true'
+              )
+            }
+            // Plain <button> path. This is where Pinecone / LangChain Ashby
+            // Yes/No groups land. The native batch fill previously returned
+            // true unconditionally, masking the silent-fail mode where the
+            // form re-renders mid-flow with a shifted field-id prefix that
+            // wipes the radio's commit state. Snapshot the group's selection
+            // signature, click, then re-snapshot — if nothing changed, the
+            // click was a structural no-op and we return false so the higher-
+            // level setFieldChoice fallback (chooseValueFromLabeledGroup,
+            // which has its own retry logic) can take over. Bug surfaced by
+            // JobForge round-2 marathon — Pinecone Sr SWE Database Team
+            // #320 and LangChain SE Manager #325.
+            const beforeSig = selectionSignature(options)
             option.click()
+            const afterSig = selectionSignature(options)
+            if (beforeSig === afterSig) return false
             return true
           }
         }
@@ -3549,9 +3609,25 @@ async function findOtpBoxGroup(
         // address them unambiguously via a single selector. Using a
         // content-hash-ish random id avoids collisions with existing
         // data attributes and re-renders across re-entry.
+        //
+        // Before stamping the new marker, strip any STALE markers from
+        // ALL prior calls anywhere in the document. Without this, a re-rendered
+        // OTP form (e.g. after a stale-OTP submit failure) can leave detached
+        // nodes carrying old data-geometra-otp-* attributes that selectors
+        // could otherwise hit before resolving the live cells. (Bug surfaced
+        // by JobForge round-2 marathon — Glean ML Engineer #174.)
+        const stale = document.querySelectorAll('[data-geometra-otp-stamp]')
+        for (const node of Array.from(stale)) {
+          for (const attr of Array.from(node.attributes)) {
+            if (attr.name.startsWith('data-geometra-otp-')) {
+              node.removeAttribute(attr.name)
+            }
+          }
+        }
         const marker = `data-geometra-otp-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
         best.inputs.forEach((input, index) => {
           input.setAttribute(marker, String(index))
+          input.setAttribute('data-geometra-otp-stamp', '1')
         })
         return { cssSelector: `[${marker}]`, count: best.inputs.length }
       },
@@ -3604,6 +3680,20 @@ export async function fillOtp(
     )
   }
 
+  // Sanity check: the locator we just stamped must resolve to exactly the
+  // expected number of cells, all connected to the live document. If the
+  // form re-rendered between findOtpBoxGroup's marker stamp and now, the
+  // marker may have been wiped from the DOM and the count drops to 0.
+  // Throw a clear stale-cell error rather than proceeding to type into
+  // nothing. (Bug surfaced by JobForge round-2 marathon — Glean ML
+  // Engineer #174 second-attempt failure.)
+  const liveCount = await group.boxes.count()
+  if (liveCount !== group.cellCount) {
+    throw new Error(
+      `fillOtp: OTP cell group went stale before fill (expected ${group.cellCount} cells, found ${liveCount}). The form likely re-rendered between detection and fill — retry the call.`,
+    )
+  }
+
   // Click the leftmost box via its center point. We use a low-level
   // bounding-box click because a semantic "click the first input" path
   // resolves to whichever input paints topmost in the stacking order,
@@ -3617,6 +3707,24 @@ export async function fillOtp(
     throw new Error('fillOtp: first OTP cell has no bounding box (detached or invisible?)')
   }
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+
+  // Verify focus actually landed on a cell of THIS group (not a stacked
+  // overlay or a sibling element that happened to share the click point).
+  // If the click missed, typing would feed characters to whatever element
+  // happens to hold focus — usually nothing useful — and the readback
+  // would mysteriously show all-empty cells.
+  const focusedOnGroup = await firstBox.evaluate((el) => {
+    const active = document.activeElement
+    if (!active) return false
+    // Either the click landed on cell 0 itself, or focus auto-advanced to
+    // a sibling cell with the same data-geometra-otp-stamp.
+    return active === el || (active instanceof HTMLElement && active.hasAttribute('data-geometra-otp-stamp'))
+  })
+  if (!focusedOnGroup) {
+    throw new Error(
+      'fillOtp: bounding-box click on cell 0 did not land focus inside the OTP group. The cell may be covered by an overlay or the group is stale — retry after re-detecting.',
+    )
+  }
 
   // Clear any pre-existing values in all cells so we write a clean slate.
   // Some widgets pre-populate cells with zero-width spaces or previous
@@ -3671,6 +3779,17 @@ export async function fillOtp(
     }
   }
   if (mismatches.length > 0) {
+    // Special case: if EVERY cell within the typed range is empty, the
+    // typing went somewhere else entirely (focus lost mid-flow, cells
+    // re-rendered after the click, etc.). Surface that as a distinct
+    // diagnostic instead of a generic per-cell mismatch list — the caller
+    // can retry with fresh detection rather than fighting per-char errors.
+    const allEmpty = readback.slice(0, expected.length).every((v) => v === '')
+    if (allEmpty) {
+      throw new Error(
+        `fillOtp: typed ${expected.length} chars but ALL ${expected.length} target cells are still empty. Focus was lost mid-flow or the cell group was re-rendered after detection. Retry the call to re-detect the live cells.`,
+      )
+    }
     const summary = mismatches
       .map((m) => `cell ${m.index}: expected "${m.expected}", got "${m.got}"`)
       .join('; ')
@@ -4400,7 +4519,16 @@ export async function pickListboxOption(
     // [data-invalid] flag inside the field wrapper (react-hook-form,
     // Formik, Ashby forms, etc.). If the form disagrees with the trigger,
     // the commit did not land and the caller should retry.
-    if (await readFormLevelInvalidState(openedHandle)) return false
+    //
+    // We use the STRICT variant here (`requireWrapperFlag: false`) because
+    // we just attempted a commit — a required hidden input that is still
+    // empty IS authoritative even before the user submits the form. Without
+    // this, Greenhouse's phone-country-code combobox (Airtable PM AI #94)
+    // false-passes verification: the trigger shows "+1" but the hidden
+    // input stays blank because react-select's keyboard-Enter commit
+    // didn't bind to the country sub-control. Bug surfaced by JobForge
+    // round-2 marathon.
+    if (await readFormLevelInvalidState(openedHandle, { requireWrapperFlag: false })) return false
     return true
   }
 

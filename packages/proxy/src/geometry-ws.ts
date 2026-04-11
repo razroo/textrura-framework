@@ -5,6 +5,7 @@ import {
   attachFiles,
   clearFillLookupCache,
   createFillLookupCache,
+  delay,
   fillFields,
   fillOtp,
   pickListboxOption,
@@ -202,8 +203,38 @@ async function handleClientMessage(
       const x = msg.x
       const y = msg.y
       if (typeof x === 'number' && typeof y === 'number' && Number.isFinite(x) && Number.isFinite(y)) {
+        // Capture the URL before clicking so we can detect submit-triggered
+        // navigation. When a click submits a form that POSTs to a thank-you
+        // page, the proxy session would otherwise die without telling the
+        // caller WHY — the next geometra_query would return session_not_found
+        // and the caller couldn't distinguish "successful submit + nav" from
+        // "session crashed for unknown reason". Bug surfaced by JobForge
+        // round-2 marathon — Cloudflare FDE NYC #312 and Airtable PM AI #94.
+        const urlBefore = page.url()
         await page.mouse.click(x, y)
-        onViewportOrInput('input', requestId)
+        // Give the navigation a brief window to start. We don't await
+        // waitForNavigation here because most clicks DON'T navigate, and
+        // adding a 30s wait to every click would tank latency. A short
+        // settle window is enough to let synchronous SPA route changes and
+        // doc-loaded navigations register on page.url().
+        await delay(120)
+        let urlAfter = urlBefore
+        try {
+          urlAfter = page.url()
+        } catch {
+          // If page.url() throws, the page is gone — emit a minimal nav
+          // signal so the caller knows the click did *something*.
+          onViewportOrInput('input', requestId, { navigated: true, pageUrl: undefined })
+          return
+        }
+        if (urlAfter !== urlBefore) {
+          // Navigation happened. Report the new URL so callers (especially
+          // form-submit flows) know the click was a successful submit even
+          // if the proxy session goes down on the next request.
+          onViewportOrInput('input', requestId, { navigated: true, pageUrl: urlAfter, urlBefore })
+        } else {
+          onViewportOrInput('input', requestId)
+        }
       }
       return
     }

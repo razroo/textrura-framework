@@ -922,6 +922,134 @@ describe('pickListboxOption', () => {
     await page.close()
   }, 60_000)
 
+  it('surfaces selection_not_confirmed when a phone-country combobox visually picks but the required hidden input stays empty', async () => {
+    // Regression: JobForge round-2 marathon Airtable PM AI #94. Greenhouse's
+    // phone-country combobox (the "+1" picker that sits next to the tel
+    // input) had a silent-fail shape that NONE of the existing checks
+    // caught:
+    //
+    //   - aria-invalid is never set on the trigger (Greenhouse only
+    //     flips it AFTER the user clicks Submit).
+    //   - The trigger visibly shows "+1" so readTriggerShowsPlaceholder
+    //     returns false.
+    //   - There is NO role=alert / data-error / data-invalid in the field
+    //     wrapper (the form hasn't been submitted yet).
+    //   - The keyboard-Enter commit path runs but binds to the WRONG
+    //     internal state because the country picker uses a different
+    //     hidden-input shape than the regular listbox fields.
+    //
+    // The hidden <input required value=""> is the only authoritative signal
+    // that the commit didn't actually land. The original
+    // readFormLevelInvalidState gated this signal on `flaggedInWrapper`
+    // also being true — which it never is pre-submit. The fix runs the
+    // hidden-input check in STRICT mode from postCommitVerify, treating
+    // a required+empty hidden input as definitively-not-committed.
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; }
+        .field { width: 360px; display: grid; gap: 8px; }
+        .cc-control { border: 1px solid #ccc; min-height: 40px; display: flex; align-items: center; padding: 0 12px; cursor: pointer; }
+        .cc-single-value { color: #111; }
+        .cc-placeholder { color: #888; }
+        .cc-menu[hidden] { display: none; }
+        .cc-menu { border: 1px solid #ccc; margin-top: 4px; padding: 4px 0; }
+        .cc-option { padding: 6px 12px; cursor: pointer; }
+      </style>
+      <form id="airtable-form">
+        <div class="field">
+          <label for="cc-control">Country</label>
+          <div
+            id="cc-control"
+            class="cc-control"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            aria-required="true"
+            tabindex="0"
+          >
+            <span id="cc-value" class="cc-placeholder">Select...</span>
+          </div>
+          <!-- Required hidden input that backs the field. The library
+               is supposed to write the picked country code here on commit
+               but never does — this is the silent-fail shape. -->
+          <input id="cc-hidden" type="hidden" name="country" required value="" />
+          <div id="cc-menu" class="cc-menu" role="listbox" hidden>
+            <div class="cc-option" role="option" data-value="us">United States (+1)</div>
+            <div class="cc-option" role="option" data-value="ca">Canada (+1)</div>
+            <div class="cc-option" role="option" data-value="gb">United Kingdom (+44)</div>
+          </div>
+        </div>
+        <button type="submit">Submit</button>
+      </form>
+      <script>
+        const control = document.getElementById('cc-control')
+        const valueEl = document.getElementById('cc-value')
+        const hidden = document.getElementById('cc-hidden')
+        const menu = document.getElementById('cc-menu')
+        const options = Array.from(menu.querySelectorAll('.cc-option'))
+
+        function open() {
+          if (!menu.hidden) return
+          menu.hidden = false
+          control.setAttribute('aria-expanded', 'true')
+        }
+        function close() {
+          if (menu.hidden) return
+          menu.hidden = true
+          control.setAttribute('aria-expanded', 'false')
+        }
+
+        control.addEventListener('click', (event) => {
+          if (event.target.closest('.cc-option')) return
+          if (menu.hidden) open(); else close()
+        })
+
+        for (const option of options) {
+          // Buggy commit path: the option click flashes the visual value
+          // and clears the placeholder, but the hidden input is NEVER
+          // updated — this is the production bug from Airtable's phone
+          // country picker. aria-invalid stays false. No role=alert.
+          // Keyboard Enter on the control ALSO doesn't update the hidden
+          // input, so the existing pressEnterToCommitListbox path doesn't
+          // rescue this case either.
+          option.addEventListener('click', (event) => {
+            event.stopPropagation()
+            valueEl.textContent = option.textContent
+            valueEl.classList.remove('cc-placeholder')
+            valueEl.classList.add('cc-single-value')
+            close()
+            // Intentionally leave hidden.value as ''.
+          })
+        }
+      </script>
+    `)
+
+    let thrown: Error | null = null
+    try {
+      await pickListboxOption(page, 'United States (+1)', {
+        fieldLabel: 'Country',
+        exact: false,
+      })
+    } catch (error) {
+      thrown = error as Error
+    }
+
+    // postCommitVerify in strict mode must catch the empty required hidden
+    // input even though every other heuristic reports the field looks
+    // committed. Without the fix, the call returns silently and the form
+    // submit blows up with "Country: Select a country" — exactly what
+    // happened on Airtable PM AI #94.
+    expect(thrown).not.toBeNull()
+    expect(thrown?.message).toContain('selection_not_confirmed')
+
+    // Sanity check: the hidden input is indeed still empty (the fixture is
+    // exercising the right failure mode, not a different bug).
+    const hiddenValue = await page.locator('#cc-hidden').inputValue()
+    expect(hiddenValue).toBe('')
+    await page.close()
+  }, 60_000)
+
   it('returns visible options in the failure payload when no custom dropdown option matches', async () => {
     const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
     await page.setContent(`
@@ -1344,6 +1472,112 @@ describe('fillFields auto', () => {
     await page.close()
   })
 
+  it('refuses to silently mark a button-shaped group radio as committed when the click is a structural no-op', async () => {
+    // Regression: JobForge round-2 marathon Pinecone Sr SWE Database Team
+    // #320 / LangChain SE Manager #325. Pinecone's Ashby form re-renders
+    // with a shifted field-id prefix on submit-failure, wiping the
+    // selected sponsorship/pronouns radio buttons. The buttons are
+    // <button> elements (not <input type="radio">), so the native batch
+    // fill's setGroupedChoice path was returning true unconditionally
+    // after the click — masking the silent-fail mode.
+    //
+    // The fix snapshots a selection signature (aria-checked / aria-pressed
+    // / data-state / className / etc.) before and after the click. If
+    // nothing changes, the click was a structural no-op and the function
+    // returns false so fillFields' higher-level fallback can take over.
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; }
+        [role="radiogroup"] { display: flex; gap: 8px; }
+        [role="radio"] { padding: 8px 16px; border: 1px solid #ccc; cursor: pointer; }
+      </style>
+      <form>
+        <div id="sponsorship-label">Will you require sponsorship?</div>
+        <div role="radiogroup" aria-labelledby="sponsorship-label">
+          <button type="button" role="radio" aria-checked="false" id="sponsor-yes">Yes</button>
+          <button type="button" role="radio" aria-checked="false" id="sponsor-no">No</button>
+        </div>
+      </form>
+      <script>
+        // Simulate the Pinecone re-render bug: clicking a button briefly
+        // sets aria-checked, but a synchronous form re-render in the same
+        // tick wipes it back to false. The structural signature ends up
+        // identical before and after the click. This is the silent-fail
+        // mode the fix has to detect.
+        const buttons = document.querySelectorAll('[role="radio"]')
+        for (const btn of buttons) {
+          btn.addEventListener('click', () => {
+            // Simulate "set then immediately reset" by re-asserting
+            // aria-checked=false synchronously after the React state
+            // would have updated it.
+            btn.setAttribute('aria-checked', 'false')
+          })
+        }
+      </script>
+    `)
+
+    let thrown: Error | null = null
+    try {
+      await fillFields(page, [
+        { kind: 'choice', fieldLabel: 'Will you require sponsorship?', value: 'No', choiceType: 'group' },
+      ])
+    } catch (error) {
+      thrown = error as Error
+    }
+
+    // The fix must surface the failure — either by throwing from fillFields
+    // or by leaving aria-checked at false (so the caller doesn't
+    // optimistically advance to a submit that will fail).
+    const ariaChecked = await page.locator('#sponsor-no').getAttribute('aria-checked')
+    expect(ariaChecked).toBe('false')
+    expect(thrown).not.toBeNull()
+    await page.close()
+  })
+
+  it('commits a button-shaped group radio when the click DOES update the selection signature', async () => {
+    // Sibling test to the regression above. When a button-shaped group
+    // radio actually toggles its aria-checked attribute on click (the
+    // happy path — most well-behaved Ashby forms), fillFields must
+    // succeed without unnecessary fallbacks. This guards against the
+    // verification check being too aggressive and rejecting legitimate
+    // commits.
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; }
+        [role="radiogroup"] { display: flex; gap: 8px; }
+        [role="radio"] { padding: 8px 16px; border: 1px solid #ccc; cursor: pointer; }
+      </style>
+      <form>
+        <div id="hybrid-label">Are you available 5 days in office?</div>
+        <div role="radiogroup" aria-labelledby="hybrid-label">
+          <button type="button" role="radio" aria-checked="false" id="hybrid-yes">Yes</button>
+          <button type="button" role="radio" aria-checked="false" id="hybrid-no">No</button>
+        </div>
+      </form>
+      <script>
+        const buttons = Array.from(document.querySelectorAll('[role="radio"]'))
+        for (const btn of buttons) {
+          btn.addEventListener('click', () => {
+            for (const sib of buttons) sib.setAttribute('aria-checked', 'false')
+            btn.setAttribute('aria-checked', 'true')
+          })
+        }
+      </script>
+    `)
+
+    await fillFields(page, [
+      { kind: 'choice', fieldLabel: 'Are you available 5 days in office?', value: 'Yes', choiceType: 'group' },
+    ])
+
+    const yesChecked = await page.locator('#hybrid-yes').getAttribute('aria-checked')
+    const noChecked = await page.locator('#hybrid-no').getAttribute('aria-checked')
+    expect(yesChecked).toBe('true')
+    expect(noChecked).toBe('false')
+    await page.close()
+  })
+
   it('recovers from a truncated label (U+2026 ellipsis) by stripping and retrying', async () => {
     // Regression: geometra_form_schema truncates long labels to ~80 chars
     // and marks the truncation with a Unicode U+2026 ellipsis. When the MCP
@@ -1583,10 +1817,13 @@ describe('fillOtp', () => {
     await page.close()
   })
 
-  it('throws a descriptive error when the typed value does not land in the cells', async () => {
+  it('throws a per-cell readback-mismatch error when only some cells fail to commit', async () => {
     const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
-    // Build an OTP-like widget whose input listener aggressively clears
-    // the value after each keystroke, so the final readback is empty.
+    // Build an OTP-like widget whose 2nd cell rewrites whatever is typed
+    // to "X" — first cell takes the char, second cell is corrupted, third
+    // takes the char. Produces a partial mismatch (not all empty), which
+    // should hit the per-cell readback-mismatch error path rather than
+    // the "all cells empty" diagnostic.
     await page.setContent(`
       <div class="otp" data-otp>
         <input id="c0" maxlength="1" type="text" />
@@ -1594,9 +1831,16 @@ describe('fillOtp', () => {
         <input id="c2" maxlength="1" type="text" />
       </div>
       <script>
-        for (const cell of document.querySelectorAll('.otp input')) {
-          cell.addEventListener('input', () => { cell.value = '' })
-        }
+        const cells = Array.from(document.querySelectorAll('.otp input'))
+        cells.forEach((cell, idx) => {
+          cell.addEventListener('input', () => {
+            if (cell.value.length > 0 && idx < cells.length - 1) cells[idx + 1].focus()
+          })
+        })
+        // Cell 1 corrupts its value to "X" after the input event runs.
+        cells[1].addEventListener('input', () => {
+          queueMicrotask(() => { cells[1].value = 'X' })
+        })
       </script>
     `)
 
@@ -1615,6 +1859,85 @@ describe('fillOtp', () => {
     `)
 
     await expect(fillOtp(page, '12345')).rejects.toThrow(/no OTP box group found/)
+    await page.close()
+  })
+
+  // Regression: JobForge round-2 marathon Glean ML Engineer #174 — second
+  // fill_otp call after a stale-OTP submit failure left the form re-rendered
+  // with new cells, but the second call reported success while populating
+  // zero cells. Ensure a re-render between calls is handled by re-detection.
+  it('handles a full form re-render between fillOtp calls (re-detects fresh cells)', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(OTP_PAGE_HTML)
+
+    // First call fills the original cells.
+    const first = await fillOtp(page, '11111111', { fieldLabel: 'Security code' })
+    expect(first.filledCount).toBe(8)
+
+    // Simulate a Greenhouse-style re-render: blow away the form and put
+    // a fresh one in its place. The new cells have NO geometra-otp marker
+    // and a new auto-advance handler.
+    await page.evaluate(() => {
+      document.body.innerHTML = `
+        <form>
+          <label for="cell-0">Security code</label>
+          <div class="otp" data-otp>
+            <input id="cell-0" maxlength="1" type="text" />
+            <input id="cell-1" maxlength="1" type="text" />
+            <input id="cell-2" maxlength="1" type="text" />
+            <input id="cell-3" maxlength="1" type="text" />
+            <input id="cell-4" maxlength="1" type="text" />
+            <input id="cell-5" maxlength="1" type="text" />
+            <input id="cell-6" maxlength="1" type="text" />
+            <input id="cell-7" maxlength="1" type="text" />
+          </div>
+        </form>`
+      const cells = Array.from(document.querySelectorAll<HTMLInputElement>('.otp input'))
+      cells.forEach((cell, idx) => {
+        cell.addEventListener('input', () => {
+          if (cell.value.length > 0 && idx < cells.length - 1) cells[idx + 1].focus()
+        })
+      })
+    })
+
+    // Second call must successfully populate the NEW cells, not silently
+    // type into the stale ones. fillOtp should re-detect via findOtpBoxGroup.
+    const second = await fillOtp(page, '22222222', { fieldLabel: 'Security code' })
+    expect(second.filledCount).toBe(8)
+
+    const readback = await page.evaluate(() => {
+      const cells = Array.from(document.querySelectorAll<HTMLInputElement>('.otp input'))
+      return cells.map((cell) => cell.value)
+    })
+    expect(readback).toEqual(['2', '2', '2', '2', '2', '2', '2', '2'])
+    await page.close()
+  })
+
+  // Regression: when typing produces zero filled cells (focus lost or
+  // post-detection re-render), fillOtp should throw the explicit "all empty"
+  // diagnostic instead of a per-cell mismatch list, so callers can retry
+  // with fresh detection.
+  it('throws an "all cells empty" diagnostic when typing populates nothing', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    // Build an OTP-like widget where every cell aggressively self-clears
+    // on input, AND removes itself from the tab order so focus never lands
+    // anywhere typing-relevant.
+    await page.setContent(`
+      <div class="otp" data-otp>
+        <input id="c0" maxlength="1" type="text" />
+        <input id="c1" maxlength="1" type="text" />
+        <input id="c2" maxlength="1" type="text" />
+      </div>
+      <script>
+        for (const cell of document.querySelectorAll('.otp input')) {
+          cell.addEventListener('input', () => { cell.value = '' })
+        }
+      </script>
+    `)
+
+    await expect(fillOtp(page, '123')).rejects.toThrow(
+      /ALL 3 target cells are still empty/i,
+    )
     await page.close()
   })
 })
