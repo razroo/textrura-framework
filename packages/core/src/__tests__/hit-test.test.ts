@@ -1778,6 +1778,34 @@ describe('dispatchHit', () => {
     expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(true)
   })
 
+  it('overlapping siblings: equal z-index on five children prefers last source order (identical-z fast path)', () => {
+    const log: string[] = []
+    const a = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('a') } })
+    const b = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('b') } })
+    const c = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('c') } })
+    const d = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('d') } })
+    const e = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('e') } })
+    const root = box({ width: 100, height: 100 }, [a, b, c, d, e])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['e'])
+    expect(hitPathAtPoint(root, layout, 10, 10)).toEqual([4])
+    expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(true)
+  })
+
   it('overlapping siblings: non-numeric zIndex coerces to 0 (no string parsing; corrupt runtime props)', () => {
     const log: string[] = []
     const low = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('low') } })
