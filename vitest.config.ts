@@ -29,6 +29,7 @@ export default defineConfig({
   test: {
     pool: 'threads',
     testTimeout: 30_000,
+    hookTimeout: 60_000,
     setupFiles: [fromRoot('vitest.setup.ts')],
   },
 })
