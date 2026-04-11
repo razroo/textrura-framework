@@ -15,6 +15,9 @@ fi
 # pattern so you target GitHub-style unchecked items, not accidental substring matches:
 #   rg '^- \[ \]' ROADMAP.md ROUTING_COMPETITIVENESS_CHECKLIST.md
 #   grep -E '^- \[ \]' ROADMAP.md   # portable; add the second file as needed
+# Nested list items indent the bullet (`  - [ ]` under a parent). Those do not match `^- \[ \]`; use optional
+# leading whitespace, e.g. `rg '^[[:space:]]*- \[ \]' ROADMAP.md` (or `grep -E '^[[:space:]]*- \[ \]'`), when you
+# expect sub-list checkboxes or want a single pass over every task checkbox in the file.
 # Default `grep` without `-E` uses BRE where `[` starts a bracket expression — do not copy `grep '^- \[ \]'`
 # without `-E` / `rg` / `grep -F` or you can get false negatives or surprising matches on macOS/BSD.
 # A bare `[ ]` (unanchored) in regex is a one-space character class and matches ordinary prose; that is not
