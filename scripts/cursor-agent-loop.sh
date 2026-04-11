@@ -66,6 +66,9 @@ fi
 # (@geometra/demo-terminal). The gate fails if `bun` is missing from PATH even when Node/npm work — install Bun or run
 # only the vitest segment locally when debugging. The allowlist evolves; read package.json instead of copying examples
 # from older prompts or transcripts.
+# Commit hygiene for autonomous runs: `git add -A` from a dirty workspace can sweep unrelated files into the
+# iteration commit — prefer `git status` first, then `git add <paths>` listing only this task’s files (same idea as
+# the built-in loop prompt’s step 5).
 # After hand-editing `scripts.release:gate` in package.json, run `node scripts/release/verify-release-gate.mjs` from the
 # repo root to validate the vitest argv (duplicate paths, `..` escapes, forward slashes) without waiting for the full
 # vitest batch — same verifier as the first `&&` segment of `npm run release:gate`.
@@ -208,6 +211,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
    CI (\`.github/workflows/quality.yml\`) also runs lint, fast tests, build, \`benchmark:mcp-flow:all -- --assert\`, examples:smoke, and e2e:demo before this gate; when your change touches demos, \`create:app\`, examples scripts, demo E2E surfaces, or MCP benchmark scripts / harness expectations, run the matching subset locally (not only the gate).
 
 5. If you made real changes: git add only what belongs to this task, then git commit with a conventional message (feat:/fix:/chore:/docs:/test:/perf:/refactor: as appropriate).
+   Prefer \`git status\` first, then \`git add <file...>\` with explicit paths (avoid \`git add -A\` when the workspace has unrelated edits that must not ship in this commit).
    ${PUSH_TEXT}
 
 6. Do not force-push. Do not rewrite published history.
