@@ -1265,6 +1265,35 @@ describe('box layout', () => {
     expect(rtl.children[1]!.x).toBe(rtl.children[0]!.x)
   })
 
+  it('column with flexWrap wrap mirrors cross-axis (inline) positions when document owner direction is rtl', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'column',
+      flexWrap: 'wrap',
+      gap: 10,
+      children: [
+        { width: 50, height: 50 },
+        { width: 50, height: 50 },
+        { width: 50, height: 50 },
+      ],
+    }
+    const opts = { width: 200, height: 80 } as const
+    const ltr = computeLayout(tree, { ...opts, direction: 'ltr' })
+    const rtl = computeLayout(tree, { ...opts, direction: 'rtl' })
+    expect(ltr.children).toHaveLength(3)
+    expect(rtl.children).toHaveLength(3)
+    const w = ltr.width
+    for (let i = 0; i < 3; i++) {
+      const a = ltr.children[i]!
+      const b = rtl.children[i]!
+      expect(a.y).toBe(b.y)
+      expect(a.width).toBe(b.width)
+      expect(a.height).toBe(b.height)
+      expect(a.x + b.x + a.width).toBe(w)
+    }
+  })
+
   it('row with flexWrap wrap-reverse and dir rtl mirrors main-axis x like wrap (cross-axis reversed per line)', () => {
     const rtlTree: BoxNode = {
       width: 150,
