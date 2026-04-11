@@ -3,7 +3,8 @@
  * Public entry for `@geometra/core`: reactive primitives, element constructors (`box`, `text`, {@link bodyText},
  * `image`, `scene3d`), app mount, layout-tree
  * conversion, hit-testing, focus and keyboard/composition dispatch, text selection and input, web font
- * helpers, animation and virtual-scroll utilities, SEO and accessibility snapshots,
+ * helpers, {@link streamText} for coalesced token streams, viewport/breakpoint helpers ({@link createViewport},
+ * {@link breakpoint}, {@link responsive}), animation and virtual-scroll utilities, SEO and accessibility snapshots,
  * {@link import('./focus-candidates.js').hasFocusCandidateHandlers} for parity with Tab / click-to-focus
  * routing, and shared element types (`UIElement`, `Renderer`, `FrameTimings`, …).
  *
