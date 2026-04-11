@@ -61,6 +61,15 @@ describe('history adapters', () => {
     expect(history.location.pathname).toBe('/a')
   })
 
+  it('memory history treats boxed number delta as no-op (Number.isFinite is false for boxed numbers)', () => {
+    const history = createMemoryHistory({ initialEntries: ['/a', '/b'] })
+    expect(history.location.pathname).toBe('/b')
+    expect(() => history.go(Object(1) as never)).not.toThrow()
+    expect(history.location.pathname).toBe('/b')
+    history.go(-1)
+    expect(history.location.pathname).toBe('/a')
+  })
+
   it('memory history notifies listeners with correct action for push, replace, and go', () => {
     const history = createMemoryHistory({ initialEntries: ['/a'] })
     const updates: HistoryUpdate[] = []
