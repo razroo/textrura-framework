@@ -1592,6 +1592,28 @@ describe('dispatchHit', () => {
     expect(log).toEqual(['front'])
   })
 
+  it('overlapping siblings: three distinct z-index values prefer the highest (multi-child sort path)', () => {
+    const log: string[] = []
+    const low = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('low') } })
+    const mid = box({ width: 50, height: 50, zIndex: 5, onClick: () => { log.push('mid') } })
+    const high = box({ width: 50, height: 50, zIndex: 10, onClick: () => { log.push('high') } })
+    const root = box({ width: 100, height: 100 }, [low, mid, high])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['high'])
+  })
+
   it('overlapping siblings: focusable overlay does not beat clickable sibling behind', () => {
     const log: string[] = []
     const back = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('back') } })
