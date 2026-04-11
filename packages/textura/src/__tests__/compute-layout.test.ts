@@ -133,6 +133,22 @@ describe('box layout', () => {
     expect(result.children).toEqual([])
   })
 
+  it('nested box with omitted children matches explicit empty children (leaf box parity)', () => {
+    const explicit: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'row',
+      children: [{ width: 100, height: 80, children: [] }],
+    }
+    const omitted: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'row',
+      children: [{ width: 100, height: 80 }],
+    }
+    expect(computeLayout(omitted)).toEqual(computeLayout(explicit))
+  })
+
   it('column layout with two fixed children', () => {
     const tree: BoxNode = {
       width: 300,
