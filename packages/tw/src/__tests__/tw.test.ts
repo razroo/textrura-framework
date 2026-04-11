@@ -224,6 +224,12 @@ describe('tw()', () => {
   })
 
   describe('arbitrary values', () => {
+    it('rejects extra closing brackets so parseFloat cannot match a numeric prefix (e.g. 200] → 200)', () => {
+      expect(tw('w-[200]]')).toEqual({})
+      expect(tw('p-[13]]')).toEqual({})
+      expect(tw('bg-[#ff00ff]]')).toEqual({})
+    })
+
     it('w-[200]', () => expect(tw('w-[200]')).toEqual({ width: 200 }))
     it('h-[100]', () => expect(tw('h-[100]')).toEqual({ height: 100 }))
     it('p-[13]', () => expect(tw('p-[13]')).toEqual({ padding: 13 }))

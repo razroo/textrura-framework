@@ -40,10 +40,24 @@ const dynamicPrefixes: Array<[string, PrefixCategory]> = [
 /** Extract an arbitrary value from brackets: "w-[200]" → "200", "bg-[#ff00ff]" → "#ff00ff". */
 function extractArbitrary(token: string): { base: string; arbitrary: string } | undefined {
   const openBracket = token.indexOf('[')
-  if (openBracket === -1 || !token.endsWith(']')) return undefined
-  const base = token.slice(0, openBracket - 1) // strip trailing dash before [
-  const arbitrary = token.slice(openBracket + 1, -1)
-  return { base, arbitrary }
+  // Require a non-empty prefix before `[` (e.g. `w-[200]` → base `w`); bare `[200]` is not a utility token.
+  if (openBracket < 1) return undefined
+  let depth = 0
+  for (let i = openBracket; i < token.length; i++) {
+    const c = token[i]!
+    if (c === '[') depth++
+    else if (c === ']') {
+      depth--
+      if (depth === 0) {
+        // Closing `]` must be the last character — rejects `w-[200]]` and other trailing junk.
+        if (i !== token.length - 1) return undefined
+        const base = token.slice(0, openBracket - 1)
+        const arbitrary = token.slice(openBracket + 1, i)
+        return { base, arbitrary }
+      }
+    }
+  }
+  return undefined
 }
 
 /** Resolve a single class token to props. Returns undefined for unknown tokens. */
