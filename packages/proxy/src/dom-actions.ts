@@ -623,6 +623,22 @@ async function findLabeledControl(
   return bestIndex >= 0 ? fallbackCandidates.nth(bestIndex) : null
 }
 
+/**
+ * Strip a trailing ellipsis (Unicode U+2026 or "...") plus any whitespace
+ * before it. Geometra's form schemas truncate long labels to ~80 chars and
+ * mark the truncation with an ellipsis — but the actual DOM label has the
+ * full text. Substring-matching the truncated version against the full DOM
+ * text would fail unless we strip the ellipsis first, leaving the prefix
+ * which IS a real substring of the DOM label.
+ *
+ * Returns the original label unchanged when no ellipsis is present.
+ */
+function stripTruncationEllipsis(label: string): string {
+  // Match either Unicode horizontal ellipsis (U+2026) or three ASCII dots,
+  // optionally preceded by whitespace, anchored at the end.
+  return label.replace(/\s*(?:\u2026|\.\.\.)\s*$/u, '').trimEnd()
+}
+
 async function findLabeledControlInPage(
   page: Page,
   fieldLabel: string,
@@ -635,11 +651,29 @@ async function findLabeledControlInPage(
     return cached
   }
 
+  // Try the label as-is first. If the caller passed a fully-qualified DOM
+  // label, that's the most accurate match.
   for (const frame of page.frames()) {
     const locator = await findLabeledControl(frame, fieldLabel, exact, { preferredAnchor: opts?.preferredAnchor })
     if (!locator) continue
     if (cacheable) writeCachedLocator(opts?.cache, 'control', fieldLabel, exact, opts?.fieldId, locator)
     return locator
+  }
+
+  // Fallback: if the label looks truncated (ends in U+2026 or "..."), strip
+  // the truncation marker and retry. This is the recovery path for callers
+  // that pass schema-truncated labels — geometra_form_schema returns labels
+  // truncated to ~80 chars with U+2026, and substring-matching against full
+  // DOM text only works after the ellipsis is removed. Exact matches are
+  // skipped because exact=true callers presumably have the full label.
+  const stripped = stripTruncationEllipsis(fieldLabel)
+  if (!exact && stripped !== fieldLabel && stripped.length > 0) {
+    for (const frame of page.frames()) {
+      const locator = await findLabeledControl(frame, stripped, exact, { preferredAnchor: opts?.preferredAnchor })
+      if (!locator) continue
+      if (cacheable) writeCachedLocator(opts?.cache, 'control', fieldLabel, exact, opts?.fieldId, locator)
+      return locator
+    }
   }
 
   if (cacheable) writeCachedLocator(opts?.cache, 'control', fieldLabel, exact, opts?.fieldId, null)
@@ -2595,6 +2629,36 @@ async function findLabeledEditableField(
     }
   }
 
+  // Truncated-label recovery: if the caller passed a label ending in U+2026
+  // (or "..."), strip the truncation marker and retry. Geometra schemas
+  // truncate long labels for the agent's benefit, but the actual DOM has the
+  // full text — substring matching only works after the ellipsis is stripped.
+  // See findLabeledControlInPage for the parallel fix on the choice path.
+  const stripped = stripTruncationEllipsis(fieldLabel)
+  if (!exact && stripped !== fieldLabel && stripped.length > 0) {
+    for (const frame of page.frames()) {
+      const candidates = [
+        frame.getByLabel(stripped, { exact: false }),
+        frame.getByPlaceholder(stripped, { exact: false }),
+        frame.getByRole('textbox', { name: stripped, exact: false }),
+        frame.getByRole('combobox', { name: stripped, exact: false }),
+      ]
+      for (const candidate of candidates) {
+        const visible = await firstVisible(candidate, { minWidth: 1, minHeight: 1 })
+        if (!visible) continue
+        if (await locatorIsEditable(visible)) {
+          writeCachedLocator(cache, 'editable', fieldLabel, exact, fieldId, visible)
+          return visible
+        }
+      }
+      const fallback = await findLabeledControl(frame, stripped, exact)
+      if (fallback && await locatorIsEditable(fallback)) {
+        writeCachedLocator(cache, 'editable', fieldLabel, exact, fieldId, fallback)
+        return fallback
+      }
+    }
+  }
+
   writeCachedLocator(cache, 'editable', fieldLabel, exact, fieldId, null)
   return null
 }
@@ -3386,44 +3450,101 @@ export async function fillFields(page: Page, fields: FormFieldFill[], cache = cr
     }
   }
 
-  // Fill text fields in parallel (they don't trigger DOM changes that affect each other)
+  // Fill text fields concurrently using allSettled, NOT all. Previously this
+  // used Promise.all, which fails-fast on the first rejection — and the
+  // remaining fills (including ALL choice/toggle/file fills below) never run.
+  // This is exactly the partial-failure cascade that produced the Greenhouse
+  // silent-fill bug: a text field with a truncated label (e.g. ellipsis from
+  // a schema) couldn't be matched, threw, and left every required combobox
+  // empty even though they would have committed cleanly on their own.
+  //
+  // Switching to allSettled means each text fill is honestly attempted, and
+  // a partial failure surfaces as a single thrown error AT THE END (containing
+  // all failed labels) instead of cascading through the rest of the batch.
+  // The choice/toggle/file loop below always runs regardless.
+  const textFillFailures: Array<{ label: string; error: string }> = []
   if (textFills.length > 0) {
-    await Promise.all(textFills.map(({ field }) =>
+    const results = await Promise.allSettled(textFills.map(({ field }) =>
       setFieldText(page, field.fieldLabel, field.value, { fieldId: field.fieldId, exact: field.exact, cache }),
     ))
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i]!
+      if (result.status === 'rejected') {
+        const field = textFills[i]!.field
+        textFillFailures.push({
+          label: field.fieldLabel,
+          error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+        })
+      }
+    }
   }
+
+  // Track choice/toggle/file failures the same way so the entire batch can
+  // surface a complete picture instead of bailing on the first one. The
+  // proxy used to use stopOnError default behavior implicitly via the
+  // sequential loop below, but partial-batch failures should be opaque to
+  // the agent only at the end — not mid-batch — so subsequent fills can
+  // still land.
+  const otherFillFailures: Array<{ label: string; error: string }> = []
 
   // Fill interactive fields sequentially (choice/toggle/file/auto may trigger DOM changes)
   for (const { field } of otherFills) {
-    if (field.kind === 'auto') {
-      await setAutoFieldValue(page, field.fieldLabel, field.value, {
-        fieldId: field.fieldId,
-        exact: field.exact,
-        cache,
+    const labelForReport = field.kind === 'toggle' ? field.label : field.fieldLabel
+    try {
+      if (field.kind === 'auto') {
+        await setAutoFieldValue(page, field.fieldLabel, field.value, {
+          fieldId: field.fieldId,
+          exact: field.exact,
+          cache,
+        })
+        continue
+      }
+      if (field.kind === 'choice') {
+        await setFieldChoice(page, field.fieldLabel, field.value, {
+          fieldId: field.fieldId,
+          exact: field.exact,
+          query: field.query,
+          choiceType: field.choiceType,
+          cache,
+        })
+        continue
+      }
+      if (field.kind === 'toggle') {
+        await setCheckedControl(page, field.label, {
+          checked: field.checked,
+          exact: field.exact,
+          controlType: field.controlType,
+        })
+        continue
+      }
+      if (field.kind === 'file') {
+        await attachFiles(page, field.paths, { fieldId: field.fieldId, fieldLabel: field.fieldLabel, exact: field.exact, cache })
+      }
+    } catch (e) {
+      otherFillFailures.push({
+        label: labelForReport,
+        error: e instanceof Error ? e.message : String(e),
       })
-      continue
     }
-    if (field.kind === 'choice') {
-      await setFieldChoice(page, field.fieldLabel, field.value, {
-        fieldId: field.fieldId,
-        exact: field.exact,
-        query: field.query,
-        choiceType: field.choiceType,
-        cache,
-      })
-      continue
+  }
+
+  // Surface aggregate failures at the end. If both text and choice fills had
+  // failures, the error message includes everything so the agent can see the
+  // full picture of which fields didn't land. The thrown error preserves the
+  // legacy behavior of fillFields rejecting on partial failure (so callers
+  // that wrap it in try/catch still see an error), but it no longer cascades
+  // mid-batch to skip subsequent fills.
+  if (textFillFailures.length > 0 || otherFillFailures.length > 0) {
+    const lines: string[] = []
+    if (textFillFailures.length > 0) {
+      lines.push(`text fill failures (${textFillFailures.length}):`)
+      for (const f of textFillFailures) lines.push(`  - "${f.label}": ${f.error}`)
     }
-    if (field.kind === 'toggle') {
-      await setCheckedControl(page, field.label, {
-        checked: field.checked,
-        exact: field.exact,
-        controlType: field.controlType,
-      })
-      continue
+    if (otherFillFailures.length > 0) {
+      lines.push(`choice/toggle/file fill failures (${otherFillFailures.length}):`)
+      for (const f of otherFillFailures) lines.push(`  - "${f.label}": ${f.error}`)
     }
-    if (field.kind === 'file') {
-      await attachFiles(page, field.paths, { fieldId: field.fieldId, fieldLabel: field.fieldLabel, exact: field.exact, cache })
-    }
+    throw new Error(`fillFields: partial batch failure\n${lines.join('\n')}`)
   }
 }
 

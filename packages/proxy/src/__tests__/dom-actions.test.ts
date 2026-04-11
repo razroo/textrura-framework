@@ -1153,6 +1153,106 @@ describe('fillFields auto', () => {
     await page.close()
   })
 
+  it('recovers from a truncated label (U+2026 ellipsis) by stripping and retrying', async () => {
+    // Regression: geometra_form_schema truncates long labels to ~80 chars
+    // and marks the truncation with a Unicode U+2026 ellipsis. When the MCP
+    // fill_form path plans a fill using those schema labels, the proxy's
+    // findLabeledControlInPage / findLabeledEditableField then has to match
+    // a truncated label against the full DOM text — substring matching only
+    // works if the ellipsis is stripped first. Before the v1.40.0 fix, this
+    // failed silently for choice fields (listbox stayed at placeholder) and
+    // threw for text fields ("no visible editable field matching ...").
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; display: grid; gap: 16px; width: 600px; }
+        label { display: grid; gap: 8px; }
+      </style>
+      <label>
+        What is the address from which you plan on working? If you would need to relocate, please type "relocating" followed by your target city.
+        <input id="work-address" />
+      </label>
+      <label>
+        Will you now or will you in the future require employment visa sponsorship to work in the country in which you are applying?
+        <input id="visa-sponsor" />
+      </label>
+    `)
+
+    // The ellipsis labels here mimic exactly what Geometra's schema
+    // truncation produces — the first ~80 chars followed by U+2026.
+    await fillFields(page, [
+      { kind: 'text', fieldLabel: 'What is the address from which you plan on working? If you would need to reloca\u2026', value: 'Austin, Texas' },
+      { kind: 'text', fieldLabel: 'Will you now or will you in the future require employment visa sponsorship to w\u2026', value: 'yes' },
+    ])
+
+    const result = await page.evaluate(() => ({
+      address: (document.getElementById('work-address') as HTMLInputElement).value,
+      visa: (document.getElementById('visa-sponsor') as HTMLInputElement).value,
+    }))
+
+    expect(result).toEqual({
+      address: 'Austin, Texas',
+      visa: 'yes',
+    })
+    await page.close()
+  })
+
+  it('completes choice fills even when an earlier text fill rejects (no fail-fast cascade)', async () => {
+    // Regression: fillFields used to run text fills in parallel via
+    // Promise.all and the FIRST rejection aborted the whole batch — so any
+    // subsequent choice fills never ran. On Greenhouse Anthropic forms this
+    // manifested as the visa/AI Policy comboboxes staying at placeholder
+    // even though they would have committed cleanly if the text fill order
+    // had been different. v1.40.0 switches text fills to allSettled and
+    // keeps the choice fill loop running regardless.
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; display: grid; gap: 16px; width: 420px; }
+        label, fieldset { display: grid; gap: 8px; }
+      </style>
+      <label>
+        Legitimate field
+        <input id="legit" />
+      </label>
+      <fieldset>
+        <legend>Choice question</legend>
+        <label><input type="radio" name="choice" value="yes" /> Yes</label>
+        <label><input type="radio" name="choice" value="no" /> No</label>
+      </fieldset>
+    `)
+
+    let thrown: Error | null = null
+    try {
+      await fillFields(page, [
+        { kind: 'text', fieldLabel: 'Legitimate field', value: 'ok' },
+        // This text field does not exist. Before v1.40.0, its rejection
+        // inside Promise.all would abort the whole batch and the choice
+        // below would never run.
+        { kind: 'text', fieldLabel: 'Field that does not exist anywhere on the page', value: 'also ok' },
+        { kind: 'choice', fieldLabel: 'Choice question', value: 'No' },
+      ])
+    } catch (e) {
+      thrown = e as Error
+    }
+
+    // fillFields still throws at the end to surface the partial failure...
+    expect(thrown).not.toBeNull()
+    expect(thrown?.message).toContain('Field that does not exist')
+
+    // ...but the legitimate text AND the choice both committed.
+    const legitValue = await page.evaluate(() =>
+      (document.getElementById('legit') as HTMLInputElement).value,
+    )
+    expect(legitValue).toBe('ok')
+
+    const choiceCommitted = await page.evaluate(() =>
+      (document.querySelector('input[name="choice"][value="no"]') as HTMLInputElement).checked,
+    )
+    expect(choiceCommitted).toBe(true)
+    await page.close()
+  })
+
   it('fills placeholder-labeled text inputs in one batch', async () => {
     const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
     await page.setContent(`
