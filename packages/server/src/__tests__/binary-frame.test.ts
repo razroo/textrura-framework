@@ -64,6 +64,20 @@ describe('isBinaryFrameBuffer', () => {
     expect(() => decodeBinaryFrameJson(proxyView)).toThrow('Not a GEOM binary frame')
   })
 
+  it('returns false when root buffer byteLength is non-finite (Proxy; NaN/±Infinity must not pass length guards)', () => {
+    const ab = new ArrayBuffer(32)
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY] as const) {
+      const proxyBuf = new Proxy(ab, {
+        get(target, prop, receiver) {
+          if (prop === 'byteLength') return bad
+          return Reflect.get(target, prop, receiver) as unknown
+        },
+      }) as unknown as ArrayBuffer
+      expect(isBinaryFrameBuffer(proxyBuf)).toBe(false)
+      expect(() => decodeBinaryFrameJson(proxyBuf)).toThrow('Not a GEOM binary frame')
+    }
+  })
+
   it('returns false for plain objects or fake views with non-finite byte layout (undefined < 9 is not a length check)', () => {
     expect(isBinaryFrameBuffer({} as unknown as Buffer)).toBe(false)
     const ab = new ArrayBuffer(16)
