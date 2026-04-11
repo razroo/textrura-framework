@@ -2678,26 +2678,127 @@ async function attachViaChooser(page: Page, paths: string[], clickX: number, cli
   await chooser.setFiles(paths)
 }
 
-/** Synthetic drop at (x,y) using file bytes from the proxy host (targets elementFromPoint). */
+/**
+ * Map common file extensions to MIME types so react-dropzone's `accept` filter
+ * does not silently drop our synthetic files. Defaults to application/octet-stream
+ * for unknowns, which is rejected by most dropzones configured with accept.
+ */
+function mimeTypeForPath(path: string): string {
+  const ext = path.toLowerCase().split('.').pop() ?? ''
+  switch (ext) {
+    case 'pdf': return 'application/pdf'
+    case 'doc': return 'application/msword'
+    case 'docx': return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    case 'txt': return 'text/plain'
+    case 'rtf': return 'application/rtf'
+    case 'png': return 'image/png'
+    case 'jpg':
+    case 'jpeg': return 'image/jpeg'
+    case 'gif': return 'image/gif'
+    case 'webp': return 'image/webp'
+    case 'svg': return 'image/svg+xml'
+    default: return 'application/octet-stream'
+  }
+}
+
+/**
+ * Synthetic drop at (x,y) using file bytes from the proxy host.
+ *
+ * react-dropzone (widely used by Greenhouse, Ashby, and others) does NOT listen
+ * for a bare `drop` event — its `getRootProps` wires up a full
+ * `dragenter` → `dragover` → `drop` sequence, and react-dropzone's internal
+ * state machine silently ignores a `drop` that never saw `dragenter`/`dragover`.
+ * It also requires a proper `dataTransfer.types` containing "Files" AND correct
+ * MIME types for any configured `accept` filter, otherwise the file is
+ * rejected.
+ *
+ * We dispatch the full sequence on the deepest visible element at (x,y) and
+ * bubble up — plus a fallback walk-up that targets any ancestor whose class
+ * names, data-attributes, or role look dropzone-ish, so we hit both the inner
+ * button layer and the wrapper that actually has the listeners.
+ */
 async function attachViaDropPlaywright(page: Page, paths: string[], dropX: number, dropY: number): Promise<void> {
   const fs = await import('node:fs/promises')
   const buffers = await Promise.all(paths.map(p => fs.readFile(p)))
   const names = paths.map(p => p.split(/[/\\\\]/).pop() ?? 'file')
+  const mimes = paths.map(mimeTypeForPath)
   await page.mouse.move(dropX, dropY)
   await page.mainFrame().evaluate(
-    ({ bufs, ns, x, y }: { bufs: number[][]; ns: string[]; x: number; y: number }) => {
-      const dt = new DataTransfer()
-      for (let i = 0; i < bufs.length; i++) {
-        const u8 = new Uint8Array(bufs[i]!)
-        const blob = new Blob([u8])
-        dt.items.add(new File([blob], ns[i]!, { type: 'application/octet-stream' }))
+    ({ bufs, ns, ms, x, y }: { bufs: number[][]; ns: string[]; ms: string[]; x: number; y: number }) => {
+      const makeDataTransfer = (): DataTransfer => {
+        const dt = new DataTransfer()
+        for (let i = 0; i < bufs.length; i++) {
+          const u8 = new Uint8Array(bufs[i]!)
+          const blob = new Blob([u8], { type: ms[i]! })
+          dt.items.add(new File([blob], ns[i]!, { type: ms[i]! }))
+        }
+        return dt
       }
-      const target = document.elementFromPoint(x, y) ?? document.body
-      target.dispatchEvent(
-        new DragEvent('drop', { bubbles: true, cancelable: true, clientX: x, clientY: y, dataTransfer: dt }),
-      )
+      const dispatchSequence = (target: Element): void => {
+        // Each event needs its own DataTransfer because some frameworks
+        // consume the items list during dragenter/dragover inspection.
+        for (const type of ['dragenter', 'dragover', 'drop'] as const) {
+          const dt = makeDataTransfer()
+          const ev = new DragEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            clientX: x,
+            clientY: y,
+            dataTransfer: dt,
+          })
+          // Some browsers/frameworks freeze the dataTransfer getter; re-define
+          // it defensively so listeners read the files.
+          try {
+            Object.defineProperty(ev, 'dataTransfer', { value: dt, configurable: true })
+          } catch { /* ignore */ }
+          target.dispatchEvent(ev)
+        }
+      }
+      const deepest = document.elementFromPoint(x, y)
+      const targets: Element[] = []
+      if (deepest) targets.push(deepest)
+      // Walk up a few ancestors looking for anything that looks like a dropzone
+      // root (react-dropzone emits `data-rfd-*`; Greenhouse uses div.drop-zone;
+      // Ashby uses role="button" wrappers). We dispatch on the first dropzone-ish
+      // ancestor AND the deepest element, because we cannot tell statically
+      // which one has the real listener.
+      let p: Element | null = deepest?.parentElement ?? null
+      for (let depth = 0; depth < 12 && p; depth++) {
+        const tag = p.tagName.toLowerCase()
+        const attrs = p.getAttributeNames()
+        const looksLikeDropzone =
+          attrs.some(a => a.startsWith('data-rfd') || a === 'data-dropzone' || a === 'data-testid') ||
+          (p.className && typeof p.className === 'string' && /drop[-_]?zone|file[-_]?upload|attach|upload/i.test(p.className)) ||
+          tag === 'label' ||
+          p.getAttribute('role') === 'button'
+        if (looksLikeDropzone && !targets.includes(p)) targets.push(p)
+        p = p.parentElement
+      }
+      if (targets.length === 0) targets.push(document.body)
+      for (const t of targets) dispatchSequence(t)
+      // As a final fallback, if there is a hidden input[type=file] scoped to
+      // the nearest form/section, set its `files` via DataTransfer and dispatch
+      // the React-friendly native input value setter so react-hook-form notices.
+      const host = deepest?.closest('form, [role="form"], fieldset, section, div') ?? document.body
+      const fileInput = host.querySelector('input[type="file"]') as HTMLInputElement | null
+      if (fileInput) {
+        const dt = makeDataTransfer()
+        try {
+          Object.defineProperty(fileInput, 'files', { value: dt.files, configurable: true })
+        } catch { /* ignore */ }
+        try {
+          // React overrides the input value setter; we need the native prototype
+          // setter so React sees the change.
+          const proto = Object.getPrototypeOf(fileInput)
+          const descriptor = Object.getOwnPropertyDescriptor(proto, 'value')
+          descriptor?.set?.call(fileInput, '')
+        } catch { /* ignore */ }
+        fileInput.dispatchEvent(new Event('input', { bubbles: true }))
+        fileInput.dispatchEvent(new Event('change', { bubbles: true }))
+      }
     },
-    { bufs: buffers.map(b => Array.from(b)), ns: names, x: dropX, y: dropY },
+    { bufs: buffers.map(b => Array.from(b)), ns: names, ms: mimes, x: dropX, y: dropY },
   )
 }
 
@@ -3758,47 +3859,144 @@ export async function fillOtp(
   // Small settle window for the last cell's onChange propagation.
   await delay(80)
 
-  // Verify: read every cell's value and confirm per-char match.
-  const readback: string[] = []
-  for (let i = 0; i < perCellCount; i++) {
-    const cellValue = await group.boxes.nth(i).evaluate((el) => {
-      if (el instanceof HTMLInputElement) return el.value
-      if (el instanceof HTMLElement) return el.textContent ?? ''
-      return ''
-    })
-    readback.push(cellValue ?? '')
+  const expected = Array.from(value)
+  const liveGroup = group
+
+  // Readback helper — reads every cell's current value / text content so
+  // we can compare against the expected char at the same index.
+  async function readCurrentCells(): Promise<string[]> {
+    const out: string[] = []
+    for (let i = 0; i < perCellCount; i++) {
+      const cellValue = await liveGroup.boxes.nth(i).evaluate((el) => {
+        if (el instanceof HTMLInputElement) return el.value
+        if (el instanceof HTMLElement) return el.textContent ?? ''
+        return ''
+      })
+      out.push(cellValue ?? '')
+    }
+    return out
   }
 
-  // For each typed char, the corresponding cell must contain exactly that
-  // char. Cells beyond the typed length are allowed to be empty.
-  const expected = Array.from(value)
-  const mismatches: Array<{ index: number; expected: string; got: string }> = []
-  for (let i = 0; i < expected.length; i++) {
-    if (readback[i] !== expected[i]) {
-      mismatches.push({ index: i, expected: expected[i]!, got: readback[i] ?? '' })
-    }
-  }
+  let readback = await readCurrentCells()
+  let mismatches = computeOtpMismatches(readback, expected)
+
+  // Recovery path: some Greenhouse / React builds let cell 0 accept the
+  // entire string because the onKeyDown auto-advance handler fires after
+  // the input event, so the first char lands in cell 0 but the second
+  // char also lands there (no maxlength enforcement on a controlled input)
+  // — cells 1..N-1 end up empty and cell 0 holds the full value. Also
+  // observed: partial fills where cells 0..K hold multiple chars and
+  // cells K+1.. hold the rest. Rather than throwing and asking the caller
+  // to retry fresh (which often hits the same race), we do a deterministic
+  // per-cell recovery: clear every cell again, then for EACH cell
+  // individually click its center and type exactly one char. This is
+  // slower (~N clicks) but guarantees a 1:1 mapping regardless of whether
+  // the widget's focus-advance handler is working. Surfaced by the
+  // JobForge Hex AI Engineering Lead #310 apply flow on 2026-04-11, where
+  // the initial `page.keyboard.type` dumped "ctUwV3" into cell 0 and
+  // "c"/"t"/"U" into cells 5/6/7 (focus advanced erratically late in the
+  // typing sequence), and the post-verify readback momentarily showed a
+  // stale-but-matching state so the tool returned success.
   if (mismatches.length > 0) {
-    // Special case: if EVERY cell within the typed range is empty, the
-    // typing went somewhere else entirely (focus lost mid-flow, cells
-    // re-rendered after the click, etc.). Surface that as a distinct
-    // diagnostic instead of a generic per-cell mismatch list — the caller
-    // can retry with fresh detection rather than fighting per-char errors.
+    // Capture per-cell bounding boxes BEFORE any clearing / re-typing so
+    // we have stable screen coordinates to click even if the widget
+    // re-renders mid-recovery.
+    const cellBoxes: Array<{ x: number; y: number; width: number; height: number } | null> = []
+    for (let i = 0; i < perCellCount; i++) {
+      try {
+        cellBoxes.push(await group.boxes.nth(i).boundingBox())
+      } catch {
+        cellBoxes.push(null)
+      }
+    }
+
+    // Clear every cell again. React-controlled cells sometimes reject a
+    // direct `.value = ''` the first time; pairing the DOM reset with a
+    // keyboard Select-All + Delete cycle per cell during the type loop
+    // below is more reliable.
+    for (let i = 0; i < perCellCount; i++) {
+      try {
+        await group.boxes.nth(i).evaluate((el) => {
+          if (el instanceof HTMLInputElement) {
+            el.value = ''
+            el.dispatchEvent(new Event('input', { bubbles: true }))
+            el.dispatchEvent(new Event('change', { bubbles: true }))
+          }
+        })
+      } catch {
+        /* tolerate */
+      }
+    }
+
+    // Per-cell typing: click each cell at its center, then type the single
+    // expected char. We do NOT rely on the widget's auto-advance — we
+    // always explicitly click the next cell for the next char.
+    for (let i = 0; i < expected.length; i++) {
+      const cellBox = cellBoxes[i]
+      if (!cellBox) continue
+      const cx = cellBox.x + cellBox.width / 2
+      const cy = cellBox.y + cellBox.height / 2
+      await page.mouse.click(cx, cy)
+      // Small settle so the click's focus event propagates before we type.
+      await delay(20)
+      // Select whatever is there so the new char overwrites instead of
+      // appending. Some browsers preserve the existing value on click and
+      // naive typing would append the new char after it.
+      try {
+        await page.keyboard.press('Meta+A')
+      } catch {
+        try {
+          await page.keyboard.press('Control+A')
+        } catch {
+          /* tolerate */
+        }
+      }
+      try {
+        await page.keyboard.press('Delete')
+      } catch {
+        /* tolerate */
+      }
+      await page.keyboard.type(expected[i]!, { delay: perCharDelay })
+    }
+
+    // Settle, re-read, re-compare.
+    await delay(120)
+    readback = await readCurrentCells()
+    mismatches = computeOtpMismatches(readback, expected)
+  }
+
+  // Final verification. If recovery did not resolve the mismatch, throw
+  // with the full diagnostic so callers get an honest failure instead of
+  // a silent "success" that leaves cells holding the wrong chars.
+  if (mismatches.length > 0) {
     const allEmpty = readback.slice(0, expected.length).every((v) => v === '')
     if (allEmpty) {
       throw new Error(
-        `fillOtp: typed ${expected.length} chars but ALL ${expected.length} target cells are still empty. Focus was lost mid-flow or the cell group was re-rendered after detection. Retry the call to re-detect the live cells.`,
+        `fillOtp: typed ${expected.length} chars but ALL ${expected.length} target cells are still empty after per-cell recovery. Focus was lost mid-flow or the cell group was re-rendered after detection. Retry the call to re-detect the live cells.`,
       )
     }
     const summary = mismatches
       .map((m) => `cell ${m.index}: expected "${m.expected}", got "${m.got}"`)
       .join('; ')
     throw new Error(
-      `fillOtp: typed ${expected.length} chars into ${perCellCount}-cell group but readback mismatch — ${summary}. Readback: [${readback.map((v) => JSON.stringify(v)).join(', ')}]`,
+      `fillOtp: typed ${expected.length} chars into ${perCellCount}-cell group but readback mismatch even after per-cell recovery — ${summary}. Readback: [${readback.map((v) => JSON.stringify(v)).join(', ')}]`,
     )
   }
 
   return { cellCount: perCellCount, filledCount: expected.length }
+}
+
+function computeOtpMismatches(
+  readback: string[],
+  expected: string[],
+): Array<{ index: number; expected: string; got: string }> {
+  const mismatches: Array<{ index: number; expected: string; got: string }> = []
+  for (let i = 0; i < expected.length; i++) {
+    if (readback[i] !== expected[i]) {
+      mismatches.push({ index: i, expected: expected[i]!, got: readback[i] ?? '' })
+    }
+  }
+  return mismatches
 }
 
 export async function setFieldText(
