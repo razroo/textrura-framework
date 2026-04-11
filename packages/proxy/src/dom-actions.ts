@@ -1717,6 +1717,104 @@ async function readAriaInvalid(handle: ElementHandle<Element> | null | undefined
 }
 
 /**
+ * Read whether a combobox trigger is currently displaying a *placeholder*
+ * (uncommitted) instead of a committed value.
+ *
+ * The aria-invalid veto in `confirmListboxSelection` /
+ * `dismissAndReVerifySelection` / `pickListboxOption.postCommitVerify`
+ * catches libraries that flip aria-invalid back to "true" after a failed
+ * commit (Workday PTX, some Ashby flows, certain react-select forks). It does
+ * NOT catch the more common Greenhouse / Lever pattern where the library
+ * leaves the field at the "Select..." placeholder with aria-invalid simply
+ * absent — that field is empty and required, but no library-side validation
+ * has fired yet, so aria-invalid won't be set until Submit. The verification
+ * pipeline still has to know the field is empty so it can refuse to claim a
+ * silent success.
+ *
+ * The authoritative signal for this case is the trigger's *visible text*.
+ * react-select renders `.select__placeholder` when empty and
+ * `.select__single-value` when committed; Radix Select renders the
+ * `<SelectValue placeholder="...">` text when empty and the option text when
+ * committed; Lever / generic ARIA listboxes leave the trigger's textContent
+ * matching the original "Select..." prompt until something is chosen. Looking
+ * at the trigger's visible text and matching it against
+ * PLACEHOLDER_PATTERN tells us reliably whether anything was actually
+ * selected, regardless of which library is in play.
+ *
+ * Returns:
+ *   - `true` only if the trigger has visible text AND that text matches the
+ *     placeholder pattern. This is "definitely empty".
+ *   - `false` if the trigger shows text that does NOT match a placeholder, or
+ *     if no visible text could be read at all (read errors, empty trigger,
+ *     handle detached). Treat `false` as "no veto" — same convention as
+ *     readAriaInvalid — so verification keeps running on positive signals.
+ */
+async function readTriggerShowsPlaceholder(
+  handle: ElementHandle<Element> | null | undefined,
+): Promise<boolean> {
+  if (!handle) return false
+  try {
+    const visibleText = await handle.evaluate((el) => {
+      if (!(el instanceof HTMLElement)) return null
+
+      function visible(node: Element | null): node is HTMLElement {
+        if (!(node instanceof HTMLElement)) return false
+        const rect = node.getBoundingClientRect()
+        if (rect.width <= 0 || rect.height <= 0) return false
+        const style = getComputedStyle(node)
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false
+        return true
+      }
+
+      function readPresentational(root: Element): string | null {
+        // react-select / Radix / Headless UI all render the "currently
+        // displayed value" inside a leaf-ish presentational element near the
+        // trigger. Walk a few ancestors looking for either the placeholder
+        // class or the single-value class. The first match wins because the
+        // library renders one or the other, never both.
+        let cur: Element | null = root
+        let depth = 0
+        while (cur && depth < 4) {
+          const candidates = cur.querySelectorAll<HTMLElement>(
+            '[class*="placeholder"], [class*="Placeholder"], [class*="single-value"], [class*="singleValue"], [class*="SelectValue"], [data-radix-select-value]',
+          )
+          for (const candidate of candidates) {
+            if (!visible(candidate)) continue
+            if (candidate.getAttribute('aria-hidden') === 'true') continue
+            if (candidate.querySelector('input, select, textarea, button')) continue
+            const text = candidate.textContent?.trim()
+            if (!text) continue
+            return text
+          }
+          cur = cur.parentElement
+          depth++
+        }
+        return null
+      }
+
+      // Try the presentational read first — most accurate for react-select /
+      // Radix style libraries.
+      const presentational = readPresentational(el)
+      if (presentational) return presentational
+
+      // Fall back to the trigger's own textContent. For libraries that don't
+      // use a sibling presentational element (Lever, plain ARIA listboxes,
+      // some Ashby forms), the trigger itself shows the current selection or
+      // the placeholder text directly.
+      const direct = el.textContent?.trim()
+      return direct || null
+    })
+
+    if (!visibleText) return false
+    // PLACEHOLDER_PATTERN already exists in this module — reuse it so the
+    // detection rules stay in one place.
+    return PLACEHOLDER_PATTERN.test(visibleText)
+  } catch {
+    return false
+  }
+}
+
+/**
  * Read the picked option from a custom combobox's sibling presentational
  * element ONLY. Skips the input's own .value (which is the typed search
  * query for editable comboboxes), aria attributes, and the trigger's own
@@ -2095,13 +2193,16 @@ async function dismissAndReVerifySelection(
   //       selects don't suddenly fail"), but that's exactly how the silent
   //       commit bug reached production: an unfilled required combobox with
   //       only a sr-only placeholder would pass through this branch despite
-  //       still being empty. The authoritative check is aria-invalid: if the
-  //       library still marks the trigger invalid, it is NOT committed, full
-  //       stop. If aria-invalid is absent or false, keep the legacy optimism
-  //       so well-formed controls that never expose a displayed value (pure
-  //       ARIA patterns like Radix with SelectValue empty text) still pass.
+  //       still being empty. The authoritative checks are aria-invalid AND
+  //       the trigger's visible text — if the library still marks the trigger
+  //       invalid, OR the trigger still shows a "Select..." placeholder, it
+  //       is NOT committed, full stop. Only if BOTH signals are clear do we
+  //       keep the legacy optimism so well-formed controls that never expose
+  //       a displayed value (pure ARIA patterns like Radix with SelectValue
+  //       empty text) still pass.
   if (sawAnyValue) return false
   if (await readAriaInvalid(currentHandle)) return false
+  if (await readTriggerShowsPlaceholder(currentHandle)) return false
   return true
 }
 
@@ -3475,30 +3576,46 @@ export async function pickListboxOption(
 
   /**
    * Final post-commit sanity check. Even after `confirmListboxSelection` and
-   * `dismissAndReVerifySelection` say the option was committed, some libraries
-   * (Greenhouse's forked react-select, Workday PTX, old Ashby forms) can
-   * revert the selection a few frames later when the library re-runs its
-   * validator on the next render. The aria-invalid attribute is the
-   * authoritative signal — if the trigger advertises invalid after all the
-   * verification steps, the commit did not persist, full stop.
+   * `dismissAndReVerifySelection` say the option was committed, two distinct
+   * silent-failure modes can leave the field empty:
+   *
+   *   1. The library reverts the selection a few frames later by flipping
+   *      `aria-invalid` back to "true" (Workday PTX, certain react-select
+   *      forks, some Ashby flows). The aria-invalid attribute is the
+   *      authoritative signal here.
+   *
+   *   2. The library never commits the selection but ALSO never sets
+   *      aria-invalid (Greenhouse, Lever, plain ARIA listboxes). The trigger
+   *      stays at the "Select..." placeholder until the user submits the
+   *      form, at which point validation finally fires. There is no aria
+   *      flag during the silent window, so the only reliable signal is the
+   *      trigger's visible text — if it still matches the placeholder
+   *      pattern, the field is empty regardless of what the verification
+   *      heuristics said.
+   *
+   * Both checks run together because they cover disjoint library patterns
+   * and a failed commit on either signal is a failed commit. Returns true
+   * only when BOTH signals say the field looks committed.
    *
    * This is defense-in-depth: confirmListboxSelection already vetos on
    * aria-invalid, but that check runs while the popup is still closing.
    * This check runs after the popup is fully gone, giving the library a
    * chance to expose its final committed state.
    */
-  const postCommitAriaValid = async (): Promise<boolean> => {
+  const postCommitVerify = async (): Promise<boolean> => {
     if (!openedHandle) return true
     // Give React Select a couple of animation frames to settle its final
     // aria-invalid state after the blur/commit. The cost is a few ms on the
     // happy path and a correct failure signal on the unhappy one.
     await delay(40)
-    return !(await readAriaInvalid(openedHandle))
+    if (await readAriaInvalid(openedHandle)) return false
+    if (await readTriggerShowsPlaceholder(openedHandle)) return false
+    return true
   }
 
   try {
     if (await attemptClickSelection()) {
-      if (await dismissAfterSelection() && await postCommitAriaValid()) return
+      if (await dismissAfterSelection() && await postCommitVerify()) return
     }
 
     let visibleHints = await collectVisibleOptionHints(page, anchor)
@@ -3511,7 +3628,7 @@ export async function pickListboxOption(
         // next attempt still searches inside the right container.
         await refreshPopupScope()
         if (await attemptClickSelection()) {
-          if (await dismissAfterSelection() && await postCommitAriaValid()) return
+          if (await dismissAfterSelection() && await postCommitVerify()) return
         }
         visibleHints = await collectVisibleOptionHints(page, anchor)
       }
@@ -3527,7 +3644,7 @@ export async function pickListboxOption(
           editable: openedEditable,
         })
       ) {
-        if (await dismissAfterSelection() && await postCommitAriaValid()) return
+        if (await dismissAfterSelection() && await postCommitVerify()) return
       }
     }
 

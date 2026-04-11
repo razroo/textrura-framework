@@ -624,6 +624,113 @@ describe('pickListboxOption', () => {
     await page.close()
   }, 60_000)
 
+  it('surfaces selection_not_confirmed when a Greenhouse-style listbox stays at the placeholder without ever flipping aria-invalid', async () => {
+    // Regression: Greenhouse / Lever / plain ARIA listboxes use a different
+    // silent-fail pattern than the react-select aria-invalid revert covered
+    // by the v1.38.0 test. They simply leave the trigger at the
+    // ".select__placeholder" element ("Select...") and never set
+    // aria-invalid on the combobox until the user clicks Submit, at which
+    // point the form library finally runs validation and flips the flag.
+    //
+    // Before the placeholder-stays check landed, pickListboxOption couldn't
+    // detect this case during the silent window — confirmListboxSelection
+    // saw nothing matching in displayed values and fell through to the
+    // sawAnyValue=false optimistic-success branch, which returned true
+    // because aria-invalid was absent. The ack reported success, fill_form
+    // claimed the field was filled, and Submit was the first thing to
+    // notice the field was actually empty.
+    //
+    // The fix is generic: read the trigger's visible text and check it
+    // against PLACEHOLDER_PATTERN. Works on Greenhouse / Lever / plain ARIA
+    // — any library that renders a "Select..." prompt while the field is
+    // uncommitted.
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; }
+        .field { width: 360px; display: grid; gap: 8px; }
+        .gh-control { border: 1px solid #ccc; min-height: 40px; display: flex; align-items: center; padding: 0 12px; cursor: pointer; }
+        .gh-single-value { color: #111; }
+        .gh-placeholder { color: #888; }
+        .gh-menu[hidden] { display: none; }
+        .gh-menu { border: 1px solid #ccc; margin-top: 4px; padding: 4px 0; }
+        .gh-option { padding: 6px 12px; cursor: pointer; }
+      </style>
+      <div class="field">
+        <label for="prior-control">Have you previously worked at or consulted for GitLab?</label>
+        <div
+          id="prior-control"
+          class="gh-control"
+          role="combobox"
+          aria-haspopup="listbox"
+          aria-expanded="false"
+          aria-required="true"
+          tabindex="0"
+        >
+          <span id="prior-value" class="gh-placeholder">Select...</span>
+        </div>
+        <div id="prior-menu" class="gh-menu" role="listbox" hidden>
+          <div id="prior-option-yes" class="gh-option" role="option">Yes</div>
+          <div id="prior-option-no" class="gh-option" role="option">No</div>
+        </div>
+      </div>
+      <script>
+        const control = document.getElementById('prior-control')
+        const menu = document.getElementById('prior-menu')
+        const options = Array.from(menu.querySelectorAll('.gh-option'))
+
+        function open() {
+          if (!menu.hidden) return
+          menu.hidden = false
+          control.setAttribute('aria-expanded', 'true')
+        }
+        function close() {
+          if (menu.hidden) return
+          menu.hidden = true
+          control.setAttribute('aria-expanded', 'false')
+        }
+
+        control.addEventListener('click', (event) => {
+          if (event.target.closest('.gh-option')) return
+          if (menu.hidden) open(); else close()
+        })
+
+        for (const option of options) {
+          // Buggy library behavior: option click closes the menu but never
+          // commits the selection to the trigger. The placeholder stays
+          // exactly where it was. aria-invalid is NEVER set during the
+          // silent window — only Submit would flip it. This is the
+          // Greenhouse pattern.
+          option.addEventListener('click', (event) => {
+            event.stopPropagation()
+            close()
+            // Re-assert that the trigger remains at its placeholder text
+            // (defensive — emulates a library that explicitly resets the
+            // visual state on every option click failure).
+            const valueEl = document.getElementById('prior-value')
+            valueEl.textContent = 'Select...'
+            valueEl.classList.add('gh-placeholder')
+            valueEl.classList.remove('gh-single-value')
+          })
+        }
+      </script>
+    `)
+
+    let thrown: Error | null = null
+    try {
+      await pickListboxOption(page, 'No', {
+        fieldLabel: 'Have you previously worked at or consulted for GitLab?',
+        exact: false,
+      })
+    } catch (error) {
+      thrown = error as Error
+    }
+
+    expect(thrown).not.toBeNull()
+    expect(thrown?.message).toContain('selection_not_confirmed')
+    await page.close()
+  }, 60_000)
+
   it('returns visible options in the failure payload when no custom dropdown option matches', async () => {
     const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
     await page.setContent(`
