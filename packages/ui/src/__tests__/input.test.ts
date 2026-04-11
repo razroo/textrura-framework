@@ -113,6 +113,38 @@ describe('@geometra/ui input', () => {
     expect(keys).toBe('z')
   })
 
+  it('readOnly input still invokes onSelectAll for Ctrl/Meta+A without forwarding to onKeyDown', () => {
+    const order: string[] = []
+    const el = input('abc', 'p', {
+      readOnly: true,
+      focused: true,
+      onSelectAll: () => order.push('selectAll'),
+      onKeyDown: () => order.push('keyDown'),
+    })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+
+    el.handlers?.onKeyDown?.({
+      key: 'a',
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: true,
+      metaKey: false,
+      altKey: false,
+      target: {} as KeyboardHitEvent['target'],
+    })
+    el.handlers?.onKeyDown?.({
+      key: 'a',
+      code: 'KeyA',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: true,
+      altKey: false,
+      target: {} as KeyboardHitEvent['target'],
+    })
+    expect(order).toEqual(['selectAll', 'selectAll'])
+  })
+
   it('disabled input wins over readOnly for semantics and styling', () => {
     const el = input('x', 'p', { disabled: true, readOnly: true, focused: true })
     expect(el.kind).toBe('box')
