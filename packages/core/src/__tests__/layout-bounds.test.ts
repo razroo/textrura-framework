@@ -722,6 +722,17 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(0, -big, 0, big)).toBeNull()
   })
 
+  it('returns finite child origins when large abs and scroll cancel (no overflow; parity with null cases above)', () => {
+    const max = Number.MAX_VALUE
+    expect(max - max).toBe(0)
+    expect(scrollSafeChildOffsets(max, 10, max, 0)).toEqual({ ox: 0, oy: 10 })
+    expect(scrollSafeChildOffsets(10, max, 0, max)).toEqual({ ox: 10, oy: 0 })
+    const big = 1e308
+    expect(big - big).toBe(0)
+    expect(scrollSafeChildOffsets(big, 5, big, 0)).toEqual({ ox: 0, oy: 5 })
+    expect(scrollSafeChildOffsets(7, big, 0, big)).toEqual({ ox: 7, oy: 0 })
+  })
+
   it('returns null when abs origin is non-finite (corrupt layout chain; must not walk children with NaN/∞ offsets)', () => {
     expect(scrollSafeChildOffsets(Number.NaN, 0, 0, 0)).toBeNull()
     expect(scrollSafeChildOffsets(0, Number.NaN, 0, 0)).toBeNull()
