@@ -39,6 +39,34 @@ describe('dispatchKeyboardEvent', () => {
     expect(pressed).toBe('a')
   })
 
+  it('forwards modifier flags on non-Tab key events (alt/meta/ctrl/shift)', () => {
+    let received: KeyboardHitEvent | null = null
+    const tree = box({ onKeyDown: (e) => { received = e } }, [])
+    const layout = { x: 0, y: 0, width: 200, height: 100, children: [] }
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+    })
+    dispatchKeyboardEvent(tree, layout, 'onKeyDown', {
+      key: 'ArrowLeft',
+      code: 'ArrowLeft',
+      shiftKey: true,
+      ctrlKey: true,
+      metaKey: true,
+      altKey: true,
+    })
+    expect(received).not.toBeNull()
+    expect(received!.key).toBe('ArrowLeft')
+    expect(received!.shiftKey).toBe(true)
+    expect(received!.ctrlKey).toBe(true)
+    expect(received!.metaKey).toBe(true)
+    expect(received!.altKey).toBe(true)
+  })
+
   it('dispatches keyup only to focused target', () => {
     let released = ''
     const tree = box({ onKeyUp: (e) => { released = e.key } }, [])
