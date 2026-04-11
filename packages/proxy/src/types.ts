@@ -174,6 +174,15 @@ export type ClientScreenshotMessage = {
   protocolVersion?: number
 }
 
+export type ClientFillOtpMessage = {
+  type: 'fillOtp'
+  value: string
+  fieldLabel?: string
+  perCharDelayMs?: number
+  requestId?: string
+  protocolVersion?: number
+}
+
 export type ClientPdfGenerateMessage = {
   type: 'pdfGenerate'
   /** Optional HTML string to render instead of the current page. */
@@ -200,6 +209,7 @@ export type ParsedClientMessage =
   | ClientSetFieldTextMessage
   | ClientSetFieldChoiceMessage
   | ClientFillFieldsMessage
+  | ClientFillOtpMessage
   | ClientListboxPickMessage
   | ClientSelectOptionMessage
   | ClientSetCheckedMessage
@@ -254,6 +264,14 @@ export function isSetFieldChoiceMessage(msg: ParsedClientMessage): msg is Client
 
 export function isFillFieldsMessage(msg: ParsedClientMessage): msg is ClientFillFieldsMessage {
   return msg.type === 'fillFields' && 'fields' in msg && Array.isArray((msg as ClientFillFieldsMessage).fields)
+}
+
+export function isFillOtpMessage(msg: ParsedClientMessage): msg is ClientFillOtpMessage {
+  return (
+    msg.type === 'fillOtp' &&
+    'value' in msg &&
+    typeof (msg as ClientFillOtpMessage).value === 'string'
+  )
 }
 
 export function isSelectOptionMessage(msg: ParsedClientMessage): msg is ClientSelectOptionMessage {

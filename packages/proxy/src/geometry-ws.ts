@@ -6,6 +6,7 @@ import {
   clearFillLookupCache,
   createFillLookupCache,
   fillFields,
+  fillOtp,
   pickListboxOption,
   resolveExistingFiles,
   setFieldChoice,
@@ -22,6 +23,7 @@ import {
   isClickEventMessage,
   isCompositionMessage,
   isFillFieldsMessage,
+  isFillOtpMessage,
   isFileMessage,
   isKeyMessage,
   isListboxPickMessage,
@@ -263,6 +265,19 @@ async function handleClientMessage(
       await fillFields(page, msg.fields, fieldLookupCache)
       const result = await fillFieldsAckResult(page)
       onViewportOrInput('input', requestId, result)
+      return
+    }
+
+    if (isFillOtpMessage(msg)) {
+      const result = await fillOtp(page, msg.value, {
+        fieldLabel: msg.fieldLabel,
+        perCharDelayMs: msg.perCharDelayMs,
+      })
+      onViewportOrInput('input', requestId, {
+        ok: true,
+        cellCount: result.cellCount,
+        filledCount: result.filledCount,
+      })
       return
     }
 

@@ -3009,6 +3009,19 @@ async function attemptNativeBatchFill(page: Page, fields: FormFieldFill[]): Prom
         continue
       }
       if (field.kind === 'text') {
+        // Bug #2 (v1.43): if this text field's label looks like a
+        // verification-code / OTP prompt AND its value is a plausible code
+        // (4+ chars, no whitespace), skip the in-page native batch fill.
+        // The native path writes `el.value = value` on the first matching
+        // textbox, which for an OTP widget is cell 0 (maxlength=1) — the
+        // assignment silently truncates to the first char, the readback
+        // then reports "mismatch", and the fallback path tries again with
+        // the same broken strategy. Leaving this field out of the native
+        // batch means it falls through to `setFieldText`, which auto-
+        // routes to the `fillOtp` primitive.
+        if (labelLooksLikeOtp(field.fieldLabel) && /^\S{4,}$/.test(field.value)) {
+          continue
+        }
         pending.push({
           index,
           kind: 'text',
@@ -3324,12 +3337,341 @@ async function attemptNativeBatchFill(page: Page, fields: FormFieldFill[]): Prom
   return results
 }
 
+/**
+ * Regex covering every field label the Greenhouse / Ashby / Lever / Workday
+ * verification-code / security-code / 2FA UIs use. Matching this on a fill
+ * target triggers the OTP-box detection path before falling back to the
+ * plain text-fill pipeline. Shared between setFieldText, fillFields, and
+ * the explicit geometra_fill_otp tool so any entry point auto-handles the
+ * 8-cell input pattern. See Bug #2 in the v1.43 release notes for the
+ * Greenhouse 8-box security-code flow that broke without this.
+ */
+const OTP_LABEL_HINT_PATTERN =
+  /(security|verification|one[- ]?time|authentication|access)\s*code|\botp\b|\bpasscode\b|\b2fa\b|\bmfa\b/i
+
+function labelLooksLikeOtp(label: string | undefined): boolean {
+  if (!label) return false
+  return OTP_LABEL_HINT_PATTERN.test(label)
+}
+
+interface OtpBoxGroup {
+  /** Playwright locator resolving to the full list of OTP cells in visual order. */
+  boxes: Locator
+  /** Count of cells — same as the value length we expect to type. */
+  cellCount: number
+}
+
+/**
+ * Find an OTP / verification-code input group on the page.
+ *
+ * An OTP group is detected when a frame contains ≥2 sibling `<input>`
+ * elements where each:
+ *   - has `maxlength="1"` (or `maxLength: 1` via the DOM property)
+ *   - has `type="text"`, `type="tel"`, `type="number"`, `inputmode="numeric"`,
+ *     or an empty type (defaults to text)
+ *   - shares a common parent with the others
+ *   - has a roughly comparable y-coordinate (same row) and strictly
+ *     increasing x-coordinates (left-to-right visual order)
+ *
+ * When `fieldLabel` is passed, the search is scoped to the nearest
+ * labelled form section containing that label (so the generic detector
+ * cannot be hijacked by an unrelated per-character autosave field
+ * elsewhere on the page).
+ *
+ * Returns the group as a Playwright `Locator` referring to ALL boxes in
+ * DOM order, plus the cell count. The caller clicks box 0 via the
+ * center-of-bounds coordinate path (semantic click resolves to whichever
+ * box paints topmost, which in Greenhouse's layout is always box 7) and
+ * uses `page.keyboard.type(value, { delay })` to feed characters one by
+ * one, letting React's onKeyDown focus-advance handler commit each cell.
+ */
+async function findOtpBoxGroup(
+  page: Page,
+  fieldLabel: string | undefined,
+  expectedLength: number | undefined,
+): Promise<OtpBoxGroup | null> {
+  for (const frame of page.frames()) {
+    // If a label is provided, scope the search to that label's nearest
+    // ancestor form section. Without this, the generic detector could
+    // hijack an unrelated row of per-character inputs elsewhere on the
+    // page (e.g. a zip-code splitter elsewhere in the form).
+    let scope: ElementHandle<Element> | null = null
+    if (fieldLabel) {
+      try {
+        const labeledInput = await frame
+          .getByLabel(fieldLabel, { exact: false })
+          .first()
+          .elementHandle({ timeout: 500 })
+        if (labeledInput) {
+          // Walk up to the nearest form/fieldset/group wrapper so the
+          // sibling scan has a stable root even when the label is not a
+          // direct parent.
+          scope = await labeledInput.evaluateHandle((el) => {
+            let cur: Element | null = el
+            for (let depth = 0; depth < 6 && cur; depth++) {
+              if (
+                cur.tagName === 'FORM' ||
+                cur.tagName === 'FIELDSET' ||
+                cur.getAttribute('role') === 'group' ||
+                cur.getAttribute('role') === 'form' ||
+                (cur.getAttribute('class') ?? '').toLowerCase().includes('otp') ||
+                (cur.getAttribute('data-otp') !== null)
+              ) {
+                return cur
+              }
+              cur = cur.parentElement
+            }
+            return el.parentElement ?? el
+          }) as ElementHandle<Element> | null
+        }
+      } catch {
+        scope = null
+      }
+    }
+
+    type OtpCandidate = { cssSelector: string; count: number }
+    const candidate: OtpCandidate | null = await frame.evaluate(
+      ({ scopeHint, wantLength }) => {
+        const scopeRoot: Element = scopeHint ?? document.body
+        if (!scopeRoot) return null
+
+        // Gather every <input> in the scope whose maxlength is 1.
+        const all = Array.from(scopeRoot.querySelectorAll('input')) as HTMLInputElement[]
+        const singles = all.filter((input) => {
+          if (!input.isConnected) return false
+          const style = getComputedStyle(input)
+          if (style.display === 'none' || style.visibility === 'hidden') return false
+          const rect = input.getBoundingClientRect()
+          if (rect.width <= 0 || rect.height <= 0) return false
+          const maxAttr = input.getAttribute('maxlength')
+          const max = maxAttr !== null ? Number(maxAttr) : input.maxLength
+          if (!Number.isFinite(max) || max !== 1) return false
+          const type = (input.type ?? 'text').toLowerCase()
+          if (type && !['text', 'tel', 'number', 'password', ''].includes(type)) return false
+          return true
+        })
+
+        if (singles.length < 2) return null
+
+        // Group by direct parent — all cells of an OTP widget are siblings
+        // inside a single wrapper (the `<input>`s might be wrapped in a
+        // span each, but the wrappers share the same grandparent row).
+        const byParent = new Map<Element, HTMLInputElement[]>()
+        for (const input of singles) {
+          // Climb up to the nearest wrapper that contains ALL siblings
+          // on the same row.
+          let wrapper: Element | null = input.parentElement
+          for (let depth = 0; depth < 3 && wrapper; depth++) {
+            const group = byParent.get(wrapper) ?? []
+            group.push(input)
+            byParent.set(wrapper, group)
+            wrapper = wrapper.parentElement
+          }
+        }
+
+        // Score candidate groups: a group qualifies if all its inputs are
+        // on the same row (y-delta < 8px) and their x-coordinates are
+        // strictly increasing (left-to-right). Accept the largest
+        // qualifying group.
+        let best: { inputs: HTMLInputElement[]; root: Element } | null = null
+        for (const [root, inputs] of byParent.entries()) {
+          if (inputs.length < 2) continue
+          // De-dup since a given input will be counted under multiple
+          // wrapper ancestors during the climb above.
+          const unique = Array.from(new Set(inputs))
+          if (unique.length < 2) continue
+          const sorted = unique
+            .map((input) => ({ input, rect: input.getBoundingClientRect() }))
+            .sort((a, b) => a.rect.left - b.rect.left)
+          const rows = sorted.map((entry) => entry.rect.top)
+          const yMin = Math.min(...rows)
+          const yMax = Math.max(...rows)
+          if (yMax - yMin > 8) continue
+          let increasing = true
+          for (let i = 1; i < sorted.length; i++) {
+            if (sorted[i]!.rect.left <= sorted[i - 1]!.rect.left) {
+              increasing = false
+              break
+            }
+          }
+          if (!increasing) continue
+          if (!best || sorted.length > best.inputs.length) {
+            best = { inputs: sorted.map((entry) => entry.input), root }
+          }
+        }
+
+        if (!best) return null
+        if (wantLength !== undefined && best.inputs.length !== wantLength) {
+          // Only accept the group if its cell count is compatible with
+          // the typed value. Compatibility: either exact match, or the
+          // group is ≥ the value length (allow typing a 6-char code into
+          // an 8-box group with 2 empty trailing boxes).
+          if (best.inputs.length < wantLength) return null
+        }
+
+        // Stamp a unique data attribute on each cell so the caller can
+        // address them unambiguously via a single selector. Using a
+        // content-hash-ish random id avoids collisions with existing
+        // data attributes and re-renders across re-entry.
+        const marker = `data-geometra-otp-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+        best.inputs.forEach((input, index) => {
+          input.setAttribute(marker, String(index))
+        })
+        return { cssSelector: `[${marker}]`, count: best.inputs.length }
+      },
+      { scopeHint: scope, wantLength: expectedLength },
+    )
+
+    if (candidate) {
+      return {
+        boxes: frame.locator(candidate.cssSelector),
+        cellCount: candidate.count,
+      }
+    }
+  }
+  return null
+}
+
+/**
+ * Fill an OTP / verification-code input group with a value, char by char.
+ *
+ * Detection is generic — see `findOtpBoxGroup`. The actual typing strategy
+ * uses `page.keyboard.type()` (not a low-level `keyboard.insertText()`
+ * batch) so that every char dispatches a real keydown/keypress/keyup event
+ * cycle, which is what React's per-cell onKeyDown handler listens for to
+ * auto-advance focus to the next box.
+ *
+ * Why not `fill_form` or `fill_fields` for this? The 8 boxes share
+ * accessible bounds because they're visually adjacent and a11y collapses
+ * them into one logical textbox node. Any semantic "find the textbox and
+ * write 8 chars" path writes the entire string to box 0, which has
+ * maxlength=1 and silently truncates to one char. The pattern can only be
+ * driven through physical key events.
+ *
+ * Verification: after typing, read the `.value` of every box and confirm
+ * it matches the expected per-cell char. Throws a descriptive error if
+ * verification fails so callers get an honest failure instead of a silent
+ * "success" that leaves the form in a bad state.
+ */
+export async function fillOtp(
+  page: Page,
+  value: string,
+  opts?: { fieldLabel?: string; perCharDelayMs?: number },
+): Promise<{ cellCount: number; filledCount: number }> {
+  if (!value) {
+    throw new Error('fillOtp: value is empty — nothing to type')
+  }
+  const group = await findOtpBoxGroup(page, opts?.fieldLabel, value.length)
+  if (!group) {
+    throw new Error(
+      `fillOtp: no OTP box group found${opts?.fieldLabel ? ` near label "${opts.fieldLabel}"` : ''}. Expected ≥2 sibling <input maxlength="1"> elements on the same row.`,
+    )
+  }
+
+  // Click the leftmost box via its center point. We use a low-level
+  // bounding-box click because a semantic "click the first input" path
+  // resolves to whichever input paints topmost in the stacking order,
+  // which in Greenhouse's CSS grid layout is always box N-1 (the last
+  // cell). The bounding-box center click is unambiguous and puts focus on
+  // cell 0 every time.
+  const firstBox = group.boxes.nth(0)
+  await firstBox.scrollIntoViewIfNeeded()
+  const box = await firstBox.boundingBox()
+  if (!box) {
+    throw new Error('fillOtp: first OTP cell has no bounding box (detached or invisible?)')
+  }
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+
+  // Clear any pre-existing values in all cells so we write a clean slate.
+  // Some widgets pre-populate cells with zero-width spaces or previous
+  // values after a re-render; typing over them would offset the
+  // auto-advance count by one.
+  const perCellCount = group.cellCount
+  for (let i = 0; i < perCellCount; i++) {
+    try {
+      await group.boxes.nth(i).evaluate((el) => {
+        if (el instanceof HTMLInputElement) {
+          el.value = ''
+          el.dispatchEvent(new Event('input', { bubbles: true }))
+          el.dispatchEvent(new Event('change', { bubbles: true }))
+        }
+      })
+    } catch {
+      /* individual cell may have been removed/re-rendered; tolerate */
+    }
+  }
+  // Re-focus cell 0 after clearing — dispatching input events may have
+  // blurred the active element on some React builds.
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+
+  // Type the value char by char. `page.keyboard.type` already dispatches
+  // keydown+keypress+input+keyup for each character and honors the delay.
+  // 30ms is enough for React's onKeyDown handler to run and move focus
+  // to the next cell before the next char arrives.
+  const perCharDelay = opts?.perCharDelayMs ?? 30
+  await page.keyboard.type(value, { delay: perCharDelay })
+
+  // Small settle window for the last cell's onChange propagation.
+  await delay(80)
+
+  // Verify: read every cell's value and confirm per-char match.
+  const readback: string[] = []
+  for (let i = 0; i < perCellCount; i++) {
+    const cellValue = await group.boxes.nth(i).evaluate((el) => {
+      if (el instanceof HTMLInputElement) return el.value
+      if (el instanceof HTMLElement) return el.textContent ?? ''
+      return ''
+    })
+    readback.push(cellValue ?? '')
+  }
+
+  // For each typed char, the corresponding cell must contain exactly that
+  // char. Cells beyond the typed length are allowed to be empty.
+  const expected = Array.from(value)
+  const mismatches: Array<{ index: number; expected: string; got: string }> = []
+  for (let i = 0; i < expected.length; i++) {
+    if (readback[i] !== expected[i]) {
+      mismatches.push({ index: i, expected: expected[i]!, got: readback[i] ?? '' })
+    }
+  }
+  if (mismatches.length > 0) {
+    const summary = mismatches
+      .map((m) => `cell ${m.index}: expected "${m.expected}", got "${m.got}"`)
+      .join('; ')
+    throw new Error(
+      `fillOtp: typed ${expected.length} chars into ${perCellCount}-cell group but readback mismatch — ${summary}. Readback: [${readback.map((v) => JSON.stringify(v)).join(', ')}]`,
+    )
+  }
+
+  return { cellCount: perCellCount, filledCount: expected.length }
+}
+
 export async function setFieldText(
   page: Page,
   fieldLabel: string,
   value: string,
   opts?: { exact?: boolean; cache?: FillLookupCache; fieldId?: string },
 ): Promise<void> {
+  // Bug #2 (v1.43) auto-routing: if the caller's label looks like a
+  // verification-code / security-code / OTP prompt, try the dedicated OTP
+  // path first. If no OTP group is detected, fall through to the normal
+  // text-fill path — the label match alone is not enough to guarantee the
+  // field is split into cells.
+  if (labelLooksLikeOtp(fieldLabel) && /^\S{4,}$/.test(value)) {
+    try {
+      const group = await findOtpBoxGroup(page, fieldLabel, value.length)
+      if (group) {
+        await fillOtp(page, value, { fieldLabel })
+        return
+      }
+    } catch (err) {
+      // If OTP detection/fill failed, surface the error — silent fallback
+      // to plain text-fill would write the whole string into box 0 and
+      // pretend success, which is exactly the bug we're fixing.
+      throw err
+    }
+  }
+
   const exact = opts?.exact ?? false
   const locator = await findLabeledEditableField(page, fieldLabel, exact, opts?.cache, opts?.fieldId)
   if (!locator) {

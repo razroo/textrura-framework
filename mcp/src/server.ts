@@ -7,12 +7,13 @@ import {
   connect,
   connectThroughProxy,
   disconnect,
-  getSession,
+  resolveSession,
   listSessions,
   getDefaultSessionId,
   prewarmProxy,
   sendClick,
   sendFillFields,
+  sendFillOtp,
   sendType,
   sendKey,
   sendFileUpload,
@@ -690,8 +691,9 @@ Unknown parameter names are rejected (strict schema). To wait until visible text
       inputSchema: geometraQueryInputSchema,
     },
     async ({ id, role, name, text, contextText, promptText, sectionText, itemText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, maxResults, detail, sessionId }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
 
       const a11y = await sessionA11yWhenReady(session)
       if (!a11y) return err('No UI tree available')
@@ -753,8 +755,9 @@ Use this when geometra_page_model tells you the page shape, but you want one dir
       sessionId: sessionIdInput,
     },
     async ({ name, role, sectionText, promptText, itemText, maxResults, detail, sessionId }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
 
       const a11y = await sessionA11yWhenReady(session)
       if (!a11y) return err('No UI tree available')
@@ -794,8 +797,9 @@ The filter matches the same fields as geometra_query (strict schema — unknown 
       inputSchema: geometraWaitForInputSchema,
     },
     async ({ id, role, name, text, contextText, promptText, sectionText, itemText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, present, timeoutMs, detail, sessionId }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
 
       const filterProbe: NodeFilter = {
         id,
@@ -853,8 +857,9 @@ Equivalent to \`geometra_wait_for\` with \`present: false\` and \`text\` set to 
       inputSchema: geometraWaitForResumeParseInputSchema,
     },
     async ({ text, timeoutMs, sessionId }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
 
       const filter: NodeFilter = { text }
       const waited = await waitForSemanticCondition(session, {
@@ -885,8 +890,9 @@ Captures the current URL, then polls until the URL changes and a stable UI tree 
       sessionId: sessionIdInput,
     },
     async ({ timeoutMs, expectedUrl, sessionId }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
 
       const beforeA11y = sessionA11y(session)
       const beforeUrl = beforeA11y?.meta?.pageUrl ?? session.url
@@ -966,8 +972,9 @@ Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / combo
       sessionId: sessionIdInput,
     },
     async ({ fields, stopOnError, failOnInvalid, includeSteps, detail, sessionId }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
       const resolvedFields = resolveFillFieldInputs(session, fields)
       if (!resolvedFields.ok) return err(resolvedFields.error)
 
@@ -1545,8 +1552,9 @@ Use this first on normal HTML pages when you want to understand the page shape w
       sessionId: sessionIdInput,
     },
     async ({ maxPrimaryActions, maxSectionsPerKind, includeScreenshot, sessionId }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
 
       const a11y = await sessionA11yWhenReady(session)
       if (!a11y) return err('No UI tree available')
@@ -1654,8 +1662,9 @@ Use this after geometra_page_model when you know which form/dialog/list/landmark
       includeBounds,
       sessionId,
     }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
 
       const a11y = await sessionA11yWhenReady(session)
       if (!a11y) return err('No UI tree available')
@@ -1700,8 +1709,9 @@ This is the preferred approach for scrolling — no need to guess pixel offsets 
       sessionId: sessionIdInput,
     },
     async ({ id, role, name, text, contextText, promptText, sectionText, itemText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, index, fullyVisible, maxSteps, timeoutMs, sessionId }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
 
       const filter: NodeFilter = {
         id,
@@ -1774,8 +1784,9 @@ After clicking, returns a compact semantic delta when possible (dialogs/forms/li
       sessionId: sessionIdInput,
     },
     async ({ x, y, id, role, name, text, contextText, promptText, sectionText, itemText, value, checked, disabled, focused, selected, expanded, invalid, required, busy, index, fullyVisible, maxRevealSteps, revealTimeoutMs, waitFor, timeoutMs, detail, sessionId }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
       const before = sessionA11y(session)
       const resolved = await resolveClickLocation(session, {
         x,
@@ -1875,8 +1886,9 @@ Each character is sent as a key event through the geometry protocol. Returns a c
       sessionId: sessionIdInput,
     },
     async ({ text, timeoutMs, detail, sessionId }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
       const before = sessionA11y(session)
 
       const wait = await sendType(session, text, timeoutMs)
@@ -1910,8 +1922,9 @@ Each character is sent as a key event through the geometry protocol. Returns a c
       sessionId: sessionIdInput,
     },
     async ({ key, shift, ctrl, meta, alt, timeoutMs, detail, sessionId }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
       const before = sessionA11y(session)
 
       const wait = await sendKey(session, key, { shift, ctrl, meta, alt }, timeoutMs)
@@ -1921,6 +1934,60 @@ Each character is sent as a key event through the geometry protocol. Returns a c
         key: formatKeyCombo(key, { shift, ctrl, meta, alt }),
         ...waitStatusPayload(wait),
       }, detail))
+    }
+  )
+
+  // ── fill OTP / verification-code box group ─────────────────────
+  server.tool(
+    'geometra_fill_otp',
+    `Fill a multi-cell OTP / verification-code input group (e.g. Greenhouse's 8-box security code, generic 6-digit 2FA widgets, Auth0 / Clerk per-char inputs). Auto-detects a row of sibling <input maxlength="1"> elements at adjacent x-coordinates and types each character through a real keyboard event cycle so React's per-cell onKeyDown handler can auto-advance focus.
+
+Use this when geometra_fill_fields / geometra_fill_form fail on a 6-digit code field because the cells share accessibility bounds and the whole string gets written into cell 0 (which has maxlength=1 and silently truncates). This primitive is also auto-invoked by geometra_fill_fields and geometra_fill_form when a labeled field matches a verification-code / security-code / OTP pattern AND the underlying DOM is a cell group — you should only need to call it directly when the label doesn't match the auto-detection heuristic.
+
+Detection is fully generic (no site branding). It refuses to run if the detected group's cell count is smaller than the typed value length, and it post-verifies every cell's value so you get an honest error instead of a silent "success" that leaves boxes empty.`,
+    {
+      value: z.string().min(1).max(32).describe('The code to type (e.g. "12345678" for an 8-digit security code)'),
+      fieldLabel: z.string().optional().describe('Optional label to scope the OTP search (e.g. "Security code", "Verification code"). When omitted, scans the whole document for any qualifying cell group.'),
+      perCharDelayMs: z.number().int().min(0).max(500).optional().describe('Optional per-character typing delay in milliseconds (default 30). Raise this if the widget needs longer to run its onKeyDown auto-advance.'),
+      timeoutMs: z
+        .number()
+        .int()
+        .min(500)
+        .max(60_000)
+        .optional()
+        .describe('Optional action wait timeout'),
+      detail: detailInput(),
+      sessionId: sessionIdInput,
+    },
+    async ({ value, fieldLabel, perCharDelayMs, timeoutMs, detail, sessionId }) => {
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
+      const before = sessionA11y(session)
+
+      try {
+        const wait = await sendFillOtp(
+          session,
+          value,
+          { fieldLabel, perCharDelayMs },
+          timeoutMs,
+        )
+        const summary = postActionSummary(session, before, wait, detail)
+        const result = wait.result as Record<string, unknown> | undefined
+        return ok(detailText(
+          `Filled OTP code (${value.length} chars).\n${summary}`,
+          {
+            ...compactTextValue(value),
+            ...(fieldLabel ? { fieldLabel } : {}),
+            ...(result?.cellCount !== undefined ? { cellCount: result.cellCount } : {}),
+            ...(result?.filledCount !== undefined ? { filledCount: result.filledCount } : {}),
+            ...waitStatusPayload(wait),
+          },
+          detail,
+        ))
+      } catch (e) {
+        return err((e as Error).message)
+      }
     }
   )
 
@@ -1955,8 +2022,9 @@ Strategies: **auto** (default) tries chooser click if x,y given, else a labeled 
       sessionId: sessionIdInput,
     },
     async ({ paths, x, y, fieldLabel, exact, strategy, dropX, dropY, contextText: _contextText, sectionText: _sectionText, timeoutMs, detail, sessionId }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
       const before = sessionA11y(session)
       try {
         const wait = await sendFileUpload(session, paths, {
@@ -2005,8 +2073,9 @@ Pass \`fieldLabel\` to open a labeled dropdown semantically instead of relying o
       sessionId: sessionIdInput,
     },
     async ({ label, exact, openX, openY, fieldLabel, contextText, sectionText, query, timeoutMs, detail, sessionId }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
       const before = sessionA11y(session)
       try {
         const wait = await sendListboxPick(session, label, {
@@ -2059,8 +2128,9 @@ Custom React/Vue dropdowns are not supported here — use \`geometra_pick_listbo
       sessionId: sessionIdInput,
     },
     async ({ x, y, value, label, index, contextText: _contextText, sectionText: _sectionText, timeoutMs, detail, sessionId }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
       if (value === undefined && label === undefined && index === undefined) {
         return err('Provide at least one of value, label, or index')
       }
@@ -2104,8 +2174,9 @@ Prefer this over raw coordinate clicks for custom forms that keep the real input
       sessionId: sessionIdInput,
     },
     async ({ label, checked, exact, controlType, contextText: _contextText, sectionText: _sectionText, timeoutMs, detail, sessionId }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
       const before = sessionA11y(session)
       try {
         const wait = await sendSetChecked(session, label, { checked, exact, controlType }, timeoutMs)
@@ -2142,8 +2213,9 @@ Prefer this over raw coordinate clicks for custom forms that keep the real input
       sessionId: sessionIdInput,
     },
     async ({ deltaY, deltaX, x, y, timeoutMs, detail, sessionId }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
       const before = sessionA11y(session)
       try {
         const wait = await sendWheel(session, deltaY, { deltaX, x, y }, timeoutMs)
@@ -2177,8 +2249,9 @@ Use this for dropdowns, location pickers, or any scrollable list where items are
       sessionId: sessionIdInput,
     },
     async ({ listId, role, scrollX, scrollY, maxItems, maxScrollSteps, scrollDelta, sessionId }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
 
       const itemRole = role ?? 'listitem'
       const collected = new Map<string, { name?: string; value?: string }>()
@@ -2261,8 +2334,9 @@ JSON is minified in compact view to save tokens. For a summary-first overview, u
       sessionId: sessionIdInput,
     },
     async ({ view, maxNodes, formId, maxFields, includeOptions, includeScreenshot, sessionId }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
 
       const a11y = await sessionA11yWhenReady(session)
       if (!a11y) return err('No UI tree available')
@@ -2301,10 +2375,14 @@ JSON is minified in compact view to save tokens. For a summary-first overview, u
     `Get the raw computed layout geometry — the exact {x, y, width, height} for every node in the UI tree. This is the lowest-level view, useful for pixel-precise assertions in tests.
 
 For a token-efficient semantic view, use geometra_snapshot (default compact). For the complete nested tree, geometra_snapshot with view=full.`,
-    {},
-    async () => {
-      const session = getSession()
-      if (!session?.layout) return err('Not connected. Call geometra_connect first.')
+    {
+      sessionId: sessionIdInput,
+    },
+    async ({ sessionId }) => {
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
+      if (!session.layout) return err('No layout available yet. Wait for the next frame or call geometra_page_model.')
 
       return ok(JSON.stringify(session.layout, null, 2))
     }
@@ -2321,8 +2399,9 @@ Use this after navigating to a new page in a multi-step flow (e.g. job applicati
       sessionId: sessionIdInput,
     },
     async ({ clear, sessionId }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
 
       if (clear) {
         session.workflowState = undefined
@@ -2394,8 +2473,9 @@ Returns \`{ pdf, pageUrl }\` where \`pdf\` is the base64-encoded PDF bytes.`,
       sessionId: sessionIdInput,
     },
     async ({ html, format, landscape, margin, printBackground, sessionId }) => {
-      const session = getSession(sessionId)
-      if (!session) return err('Not connected. Call geometra_connect first.')
+      const sessionResult = resolveToolSession(sessionId)
+      if ('error' in sessionResult) return sessionResult.error
+      const session = sessionResult.session
 
       try {
         const wait = await sendPdfGenerate(session, {
@@ -2730,9 +2810,24 @@ async function ensureToolSession(
     }
 > {
   if (!target.url && !target.pageUrl) {
-    const session = getSession(target.sessionId)
-    if (!session) return { ok: false, error: missingConnectionMessage }
-    return { ok: true, session, autoConnected: false }
+    const resolved = resolveSession(target.sessionId)
+    if (resolved.kind === 'ok') {
+      return { ok: true, session: resolved.session, autoConnected: false }
+    }
+    if (resolved.kind === 'not_found') {
+      return {
+        ok: false,
+        error: `session_not_found: no active session with id "${resolved.id}". Active sessions: ${resolved.activeIds.join(', ') || '(none)'}.`,
+      }
+    }
+    if (resolved.kind === 'ambiguous') {
+      const isolatedSuffix = resolved.isolatedIds.length > 0 ? ` (isolated: ${resolved.isolatedIds.join(', ')})` : ''
+      return {
+        ok: false,
+        error: `multiple_active_sessions_provide_id: ${resolved.activeIds.length} active sessions — ${resolved.activeIds.join(', ')}${isolatedSuffix}. Pass sessionId explicitly.`,
+      }
+    }
+    return { ok: false, error: missingConnectionMessage }
   }
 
   const normalized = normalizeConnectTarget({ url: target.url, pageUrl: target.pageUrl })
@@ -4313,6 +4408,51 @@ async function captureScreenshotBase64(session: Session): Promise<string | undef
 
 function err(text: string) {
   return { content: [{ type: 'text' as const, text }], isError: true }
+}
+
+/**
+ * Resolve a tool call's target session with strict routing. Returns either
+ * a `Session` or a tool error response that the caller should propagate
+ * verbatim. This is the server-side entry point for the Bug #1 fix — every
+ * tool that used to do `const session = getSession(sessionId); if (!session)
+ * return err('Not connected...')` should use this helper instead so that
+ * ambiguous / not-found / none conditions get distinct, honest errors
+ * instead of silently routing onto a stale default or a peer worker's
+ * isolated session. The typical call site is:
+ *
+ *     const sessionResult = resolveToolSession(sessionId)
+ *     if ('error' in sessionResult) return sessionResult.error
+ *     const session = sessionResult.session
+ */
+function resolveToolSession(
+  sessionId: string | undefined,
+): { session: Session } | { error: ReturnType<typeof err> } {
+  const result = resolveSession(sessionId)
+  switch (result.kind) {
+    case 'ok':
+      return { session: result.session }
+    case 'none':
+      return { error: err('Not connected. Call geometra_connect first.') }
+    case 'not_found':
+      return {
+        error: err(
+          `session_not_found: no active session with id "${result.id}". Active sessions: ${
+            result.activeIds.length > 0 ? result.activeIds.join(', ') : '(none)'
+          }. Call geometra_connect again to start a new session — the MCP server never silently routes an explicit sessionId onto a different session.`,
+        ),
+      }
+    case 'ambiguous': {
+      const isolatedSuffix =
+        result.isolatedIds.length > 0
+          ? ` (isolated: ${result.isolatedIds.join(', ')})`
+          : ''
+      return {
+        error: err(
+          `multiple_active_sessions_provide_id: ${result.activeIds.length} active sessions — ${result.activeIds.join(', ')}${isolatedSuffix}. Pass sessionId explicitly; the implicit-default fallback is disabled while multiple sessions or any isolated session is active to prevent cross-contamination under parallel-worker load.`,
+        ),
+      }
+    }
+  }
 }
 
 function hasNodeFilter(filter: NodeFilter): boolean {

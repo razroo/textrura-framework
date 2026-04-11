@@ -530,6 +530,77 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
     return undefined
   }
 
+  /**
+   * Detect whether an `<input>` (or any element) lives inside an
+   * autocomplete / searchable combobox wrapper. This mirrors
+   * `isAutocompleteCombobox` in `dom-actions.ts` (the v1.42 pickListboxOption
+   * commit-via-Enter helper) so that extractor classification stays in sync
+   * with action-side commit semantics.
+   *
+   * Used by Bug #3 (v1.43): a React Select Country picker in Greenhouse's
+   * Remix address block renders as a plain `<input>` with no `role="combobox"`
+   * ancestor, so the form-schema classifier used to flag it as `text`. The
+   * fill_form pipeline then routed through the text-fill path, which cannot
+   * commit a React Select's controlled value. The fix is to surface the
+   * autocomplete-wrapper signal into the semantic tree so the MCP's
+   * `simpleSchemaField` classifier can re-tag it as `choice`/`listbox` and
+   * route the fill through `pick_listbox_option` (which does the click +
+   * Enter-commit dance).
+   *
+   * Detection signals (same as dom-actions.ts:isAutocompleteCombobox):
+   *   1. `aria-autocomplete="list"` / `="both"` on the element or up to 5
+   *      ancestor levels.
+   *   2. Class pattern indicative of a known library: React Select
+   *      (`select__control`, `select__`), React Suite picker (`rs-picker`),
+   *      Ant Design (`ant-select`), Headless UI combobox (`headlessui-combobox`),
+   *      cmdk command menu (`cmdk-`).
+   *   3. `role="combobox"` + `aria-expanded` on the element or an ancestor
+   *      (ARIA 1.2 combobox pattern).
+   *
+   * Native `<select>` / plain ARIA listboxes do NOT match any of these, so
+   * classifying on this signal cannot break non-searchable listboxes.
+   */
+  function isAutocompleteComboboxAncestry(el: Element): boolean {
+    let cur: Element | null = el
+    let depth = 0
+    while (cur && depth < 5) {
+      const ac = cur.getAttribute('aria-autocomplete')
+      if (ac === 'list' || ac === 'both') return true
+
+      const className = (cur.getAttribute('class') ?? '').toLowerCase()
+      if (className) {
+        if (
+          className.includes('select__control') ||
+          className.includes('select__') ||
+          className.includes('rs-picker') ||
+          className.includes('ant-select') ||
+          className.includes('headlessui-combobox') ||
+          className.includes('cmdk-')
+        ) {
+          return true
+        }
+      }
+
+      if (cur.getAttribute('role') === 'combobox' && cur.hasAttribute('aria-expanded')) {
+        return true
+      }
+      cur = cur.parentElement
+      depth++
+    }
+    // Look downward for a descendant input that declares aria-autocomplete —
+    // some Headless UI / Downshift wrappers expose the control via a sibling
+    // input inside the trigger container.
+    try {
+      const descendant = el.querySelector?.(
+        '[aria-autocomplete="list"], [aria-autocomplete="both"]',
+      )
+      if (descendant) return true
+    } catch {
+      /* querySelector can throw on detached nodes — ignore */
+    }
+    return false
+  }
+
   function semanticFor(el: Element, tag: string): Record<string, unknown> {
     const semantic: Record<string, unknown> = { tag }
     const role = defaultRoleForTag(el, tag)
@@ -557,6 +628,13 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
       const autocomplete = el.getAttribute('autocomplete')?.trim()
       if (autocomplete && autocomplete !== 'off' && autocomplete !== 'on') {
         semantic.autocomplete = autocomplete
+      }
+      // Bug #3 (v1.43): tag the element when its ancestry fingerprints a
+      // searchable combobox wrapper. The MCP's form-schema classifier reads
+      // this to re-tag the field as choice/listbox so fill_form routes
+      // through pick_listbox_option instead of the plain text-fill path.
+      if (isAutocompleteComboboxAncestry(el)) {
+        semantic.isAutocompleteCombobox = true
       }
     }
     const h = el as HTMLElement

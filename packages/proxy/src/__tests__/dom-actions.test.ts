@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { chromium, type Browser } from 'playwright'
-import { attachFiles, fillFields, pickListboxOption, setFieldChoice, setFieldText, wheelAt } from '../dom-actions.ts'
+import { attachFiles, fillFields, fillOtp, pickListboxOption, setFieldChoice, setFieldText, wheelAt } from '../dom-actions.ts'
 
 describe('pickListboxOption', () => {
   let browser: Browser
@@ -1476,6 +1476,145 @@ describe('fillFields auto', () => {
       firstName: 'Taylor',
       postalCode: '10001',
     })
+    await page.close()
+  })
+})
+
+// ── Bug #2 (v1.43): fillOtp primitive for multi-cell OTP widgets ────────
+describe('fillOtp', () => {
+  let browser: Browser
+
+  beforeAll(async () => {
+    browser = await chromium.launch({ headless: true })
+  })
+
+  afterAll(async () => {
+    await browser.close()
+  })
+
+  const OTP_PAGE_HTML = `
+    <style>
+      body { margin: 24px; font-family: sans-serif; }
+      form { display: grid; gap: 12px; max-width: 520px; }
+      .otp { display: flex; gap: 8px; }
+      .otp input {
+        width: 40px;
+        height: 48px;
+        text-align: center;
+        font-size: 20px;
+        border: 1px solid #ccc;
+      }
+    </style>
+    <form>
+      <label for="cell-0">Security code</label>
+      <div class="otp" data-otp>
+        <input id="cell-0" maxlength="1" type="text" />
+        <input id="cell-1" maxlength="1" type="text" />
+        <input id="cell-2" maxlength="1" type="text" />
+        <input id="cell-3" maxlength="1" type="text" />
+        <input id="cell-4" maxlength="1" type="text" />
+        <input id="cell-5" maxlength="1" type="text" />
+        <input id="cell-6" maxlength="1" type="text" />
+        <input id="cell-7" maxlength="1" type="text" />
+      </div>
+      <button type="submit">Verify</button>
+    </form>
+    <script>
+      // Simulate the React-style per-cell onKeyDown auto-advance handler.
+      // When a user types a char into cell N, focus moves to cell N+1.
+      const cells = Array.from(document.querySelectorAll('.otp input'))
+      cells.forEach((cell, index) => {
+        cell.addEventListener('input', () => {
+          if (cell.value.length > 0 && index < cells.length - 1) {
+            cells[index + 1].focus()
+          }
+        })
+      })
+    </script>
+  `
+
+  it('auto-detects an 8-cell OTP group and types char-by-char with focus auto-advance', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(OTP_PAGE_HTML)
+
+    const result = await fillOtp(page, '81234567', { fieldLabel: 'Security code' })
+    expect(result.cellCount).toBe(8)
+    expect(result.filledCount).toBe(8)
+
+    const readback = await page.evaluate(() => {
+      const cells = Array.from(document.querySelectorAll<HTMLInputElement>('.otp input'))
+      return cells.map(cell => cell.value)
+    })
+    // Each cell must hold exactly one corresponding char.
+    expect(readback).toEqual(['8', '1', '2', '3', '4', '5', '6', '7'])
+    await page.close()
+  })
+
+  it('routes a setFieldText call labeled "Security code" through the OTP path automatically', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(OTP_PAGE_HTML)
+
+    // The caller uses the plain setFieldText API — no mention of OTP.
+    // The label hint `Security code` + 8-char no-whitespace value should
+    // auto-route to fillOtp under the hood.
+    await setFieldText(page, 'Security code', '12345678')
+
+    const readback = await page.evaluate(() => {
+      const cells = Array.from(document.querySelectorAll<HTMLInputElement>('.otp input'))
+      return cells.map(cell => cell.value)
+    })
+    expect(readback).toEqual(['1', '2', '3', '4', '5', '6', '7', '8'])
+    await page.close()
+  })
+
+  it('routes a fillFields text field labeled "Verification code" through the OTP path automatically', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(OTP_PAGE_HTML.replace('Security code', 'Verification code'))
+
+    await fillFields(page, [
+      { kind: 'text', fieldLabel: 'Verification code', value: '99887766' },
+    ])
+
+    const readback = await page.evaluate(() => {
+      const cells = Array.from(document.querySelectorAll<HTMLInputElement>('.otp input'))
+      return cells.map(cell => cell.value)
+    })
+    expect(readback).toEqual(['9', '9', '8', '8', '7', '7', '6', '6'])
+    await page.close()
+  })
+
+  it('throws a descriptive error when the typed value does not land in the cells', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    // Build an OTP-like widget whose input listener aggressively clears
+    // the value after each keystroke, so the final readback is empty.
+    await page.setContent(`
+      <div class="otp" data-otp>
+        <input id="c0" maxlength="1" type="text" />
+        <input id="c1" maxlength="1" type="text" />
+        <input id="c2" maxlength="1" type="text" />
+      </div>
+      <script>
+        for (const cell of document.querySelectorAll('.otp input')) {
+          cell.addEventListener('input', () => { cell.value = '' })
+        }
+      </script>
+    `)
+
+    await expect(fillOtp(page, '123')).rejects.toThrow(/readback mismatch/i)
+    await page.close()
+  })
+
+  it('refuses to run when the cell group is smaller than the typed value length', async () => {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <div class="otp">
+        <input id="c0" maxlength="1" type="text" />
+        <input id="c1" maxlength="1" type="text" />
+        <input id="c2" maxlength="1" type="text" />
+      </div>
+    `)
+
+    await expect(fillOtp(page, '12345')).rejects.toThrow(/no OTP box group found/)
     await page.close()
   })
 })

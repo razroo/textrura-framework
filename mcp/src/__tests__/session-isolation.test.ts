@@ -29,7 +29,13 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import http from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { buildA11yTree, connectThroughProxy, disconnect } from '../session.js'
+import {
+  buildA11yTree,
+  connectThroughProxy,
+  disconnect,
+  getDefaultSessionId,
+  resolveSession,
+} from '../session.js'
 import type { A11yNode, Session } from '../session.js'
 
 const PAGE_HTML = `<!doctype html>
@@ -211,5 +217,131 @@ describe('connectThroughProxy({ isolated: true })', () => {
     expect(sessionA.id).toBe(sessionB.id)
 
     disconnect({ sessionId: sessionA.id, closeProxy: true })
+  }, 30_000)
+
+  // ── Bug #1 regression: parallel isolated sessions must never share a
+  // default pointer, and tool-call resolution must refuse to implicitly
+  // route to an isolated session when no sessionId is passed.
+  it(
+    'three parallel isolated sessions stay strictly independent — no shared default, strict id routing',
+    async () => {
+      // Spawn three isolated sessions in parallel, each pinned to a
+      // different local URL. Each session gets its own Chromium instance
+      // (isolated: true forces a fresh proxy every time), and each tool
+      // call in real usage would address its session by the returned id.
+      const [sessionA, sessionB, sessionC] = await Promise.all([
+        connectThroughProxy({
+          pageUrl: `${baseUrl}/page-a`,
+          headless: true,
+          isolated: true,
+        }),
+        connectThroughProxy({
+          pageUrl: `${baseUrl}/page-b`,
+          headless: true,
+          isolated: true,
+        }),
+        connectThroughProxy({
+          pageUrl: `${baseUrl}/page-a`,
+          headless: true,
+          isolated: true,
+        }),
+      ])
+
+      try {
+        // Invariant 1: every isolated session is flagged, and all three got
+        // distinct session ids (no collision).
+        expect(sessionA.isolated).toBe(true)
+        expect(sessionB.isolated).toBe(true)
+        expect(sessionC.isolated).toBe(true)
+        expect(new Set([sessionA.id, sessionB.id, sessionC.id]).size).toBe(3)
+
+        // Invariant 2: the implicit default-session pointer must not be set
+        // to any of these isolated sessions. This is the contamination fix —
+        // before v1.43, `connect()` unconditionally set defaultSessionId to
+        // whichever session most recently finished connecting, so parallel
+        // workers without an explicit sessionId would race onto each
+        // other's browsers.
+        const implicitDefault = getDefaultSessionId()
+        expect(implicitDefault).toBeNull()
+
+        // Invariant 3: resolveSession() with no id must refuse to pick any
+        // of these isolated sessions. Callers that omit sessionId get an
+        // ambiguous error and are forced to pass an explicit id.
+        const ambiguous = resolveSession()
+        expect(ambiguous.kind).toBe('ambiguous')
+        if (ambiguous.kind === 'ambiguous') {
+          expect(ambiguous.activeIds).toEqual(
+            expect.arrayContaining([sessionA.id, sessionB.id, sessionC.id]),
+          )
+          expect(ambiguous.isolatedIds).toEqual(
+            expect.arrayContaining([sessionA.id, sessionB.id, sessionC.id]),
+          )
+        }
+
+        // Invariant 4: explicit id routing must return exactly the
+        // requested session — never a peer — even under parallel load.
+        const lookupA = resolveSession(sessionA.id)
+        const lookupB = resolveSession(sessionB.id)
+        const lookupC = resolveSession(sessionC.id)
+        expect(lookupA.kind).toBe('ok')
+        expect(lookupB.kind).toBe('ok')
+        expect(lookupC.kind).toBe('ok')
+        if (lookupA.kind === 'ok') expect(lookupA.session).toBe(sessionA)
+        if (lookupB.kind === 'ok') expect(lookupB.session).toBe(sessionB)
+        if (lookupC.kind === 'ok') expect(lookupC.session).toBe(sessionC)
+
+        // Invariant 5: each session's page still reads its own per-URL
+        // marker. This is the end-to-end "different browsers" check —
+        // even though they share the same MCP server process, the
+        // underlying Chromium / localStorage is distinct per session.
+        const [markerA, markerB, markerC] = await Promise.all([
+          waitForMarkerText(sessionA, 'marker-from-'),
+          waitForMarkerText(sessionB, 'marker-from-'),
+          waitForMarkerText(sessionC, 'marker-from-'),
+        ])
+        expect(markerA).toBe('marker-from-/page-a')
+        expect(markerB).toBe('marker-from-/page-b')
+        expect(markerC).toBe('marker-from-/page-a')
+
+        // Invariant 6: looking up a session id that no longer exists must
+        // return `not_found` with the full active-id list, NEVER silently
+        // fall back to the default. This is the v1.42-era contamination
+        // vector: workers were seeing their tool calls routed to whatever
+        // the "most recent" session happened to be.
+        disconnect({ sessionId: sessionB.id, closeProxy: true })
+        const afterDisconnect = resolveSession(sessionB.id)
+        expect(afterDisconnect.kind).toBe('not_found')
+        if (afterDisconnect.kind === 'not_found') {
+          expect(afterDisconnect.id).toBe(sessionB.id)
+        }
+
+        // And the implicit default is STILL null — disconnecting one
+        // isolated session doesn't promote the next one to default.
+        expect(getDefaultSessionId()).toBeNull()
+      } finally {
+        disconnect({ sessionId: sessionA.id, closeProxy: true })
+        disconnect({ sessionId: sessionC.id, closeProxy: true })
+      }
+    },
+    60_000,
+  )
+
+  it('a single non-isolated session DOES become the implicit default (back-compat)', async () => {
+    // Single pooled session — the default-fallback behavior is retained
+    // for callers that don't pass sessionId and aren't running in
+    // parallel. This preserves every existing single-worker script.
+    const session = await connectThroughProxy({
+      pageUrl: `${baseUrl}/page-a`,
+      headless: true,
+    })
+    try {
+      expect(session.isolated).toBeFalsy()
+      expect(getDefaultSessionId()).toBe(session.id)
+      const resolved = resolveSession()
+      expect(resolved.kind).toBe('ok')
+      if (resolved.kind === 'ok') expect(resolved.session.id).toBe(session.id)
+    } finally {
+      disconnect({ sessionId: session.id, closeProxy: true })
+    }
   }, 30_000)
 })

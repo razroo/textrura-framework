@@ -23,7 +23,29 @@ export interface A11yNode {
     busy?: boolean
   }
   validation?: { description?: string; error?: string }
-  meta?: { pageUrl?: string; scrollX?: number; scrollY?: number; controlTag?: string; placeholder?: string; inputPattern?: string; inputType?: string; autocomplete?: string }
+  meta?: {
+    pageUrl?: string
+    scrollX?: number
+    scrollY?: number
+    controlTag?: string
+    placeholder?: string
+    inputPattern?: string
+    inputType?: string
+    autocomplete?: string
+    /**
+     * True when the extractor detected that this `<input>` (or role=textbox)
+     * lives inside an autocomplete / searchable combobox wrapper — React
+     * Select, Radix Select, Headless UI combobox, Ant Select, cmdk, etc.
+     * Set from the extractor's `isAutocompleteComboboxAncestry` detector,
+     * which mirrors `isAutocompleteCombobox` in `dom-actions.ts`. The
+     * form-schema classifier reads this to re-tag the field as
+     * `choice` / `listbox` instead of `text`, so `fill_form` routes through
+     * `pick_listbox_option` (which does the click + Enter-commit dance that
+     * plain text-fill cannot do for a controlled React Select state).
+     * See Bug #3 in the v1.43 release notes.
+     */
+    isAutocompleteCombobox?: boolean
+  }
   bounds: { x: number; y: number; width: number; height: number }
   path: number[]
   children: A11yNode[]
@@ -630,10 +652,37 @@ function rememberReusableProxyPageUrl(session: Session): void {
 }
 
 function promoteDefaultSession(): void {
-  if (activeSessions.size > 0) {
-    defaultSessionId = Array.from(activeSessions.keys()).pop()!
-  } else {
-    defaultSessionId = null
+  // Never promote an isolated session to be the implicit default. The whole
+  // point of `isolated: true` is that parallel workers should only address
+  // their session by its explicit id — falling back to "most recent" picks
+  // a random peer's browser and is exactly the contamination vector that
+  // made v1.42 apply marathons blow up. Walk the active sessions from newest
+  // to oldest and pick the newest non-isolated one; if none exist, the
+  // default goes null and `getSession(undefined)` will surface an
+  // `ambiguous_default` or `no_session` error instead of silently handing
+  // out a random isolated session.
+  const ids = Array.from(activeSessions.keys())
+  for (let i = ids.length - 1; i >= 0; i--) {
+    const id = ids[i]!
+    const session = activeSessions.get(id)
+    if (session && !session.isolated) {
+      defaultSessionId = id
+      return
+    }
+  }
+  defaultSessionId = null
+}
+
+/**
+ * Clear `defaultSessionId` if it currently points at the given session id.
+ * Used after tagging a fresh session as isolated — `connect()` set the
+ * default pointer before the isolation flag was applied, and we need to
+ * retract that assignment so this session is only addressable by its
+ * explicit id.
+ */
+function retractDefaultIfPointsTo(sessionId: string): void {
+  if (defaultSessionId === sessionId) {
+    promoteDefaultSession()
   }
 }
 
@@ -990,6 +1039,12 @@ async function startFreshProxySession(options: {
     session.proxyReusable = !options.isolated
     if (options.isolated) {
       session.isolated = true
+      // connect() already set defaultSessionId to this session. Retract
+      // that assignment so the isolated session is only addressable by its
+      // explicit id — the implicit-default fallback is the contamination
+      // vector we're fixing, and an isolated session must never be the
+      // implicit target of a tool call that omits sessionId.
+      retractDefaultIfPointsTo(session.id)
     } else {
       setReusableProxy({ runtime }, wsUrl, {
         headless: options.headless,
@@ -1046,6 +1101,9 @@ async function startFreshProxySession(options: {
       session.proxyReusable = !options.isolated
       if (options.isolated) {
         session.isolated = true
+        // See the embedded-runtime path above — an isolated session must
+        // not be the implicit default. Retract the pointer set by connect().
+        retractDefaultIfPointsTo(session.id)
       } else {
         setReusableProxy({ child }, wsUrl, {
           headless: options.headless,
@@ -1302,6 +1360,59 @@ export function getSession(id?: string): Session | null {
   return null
 }
 
+/**
+ * Tool-side session resolution with strict routing semantics.
+ *
+ * - If `id` is passed, return exactly that session or `session_not_found`.
+ *   Never fall back to the default — explicit ids mean the caller is tracking
+ *   its own session and silently rerouting to some other session is worse
+ *   than an honest failure.
+ * - If no `id` is passed, resolve to the default session IF AND ONLY IF
+ *   there is exactly one active session AND it is not isolated. Otherwise
+ *   return `ambiguous_default` so the caller is forced to provide an
+ *   explicit sessionId.
+ *
+ * This is the Bug #1 session-contamination fix: tool calls that omit
+ * `sessionId` under parallel-worker load used to get routed to "most recent
+ * session", which was whatever parallel peer last called `geometra_connect`.
+ * That made cross-worker browser stomping inevitable. Forcing an explicit
+ * `sessionId` once >1 session is active (or whenever an isolated session is
+ * active) makes that class of bug structurally impossible.
+ */
+export type ResolveSessionResult =
+  | { kind: 'ok'; session: Session }
+  | { kind: 'not_found'; id: string; activeIds: string[] }
+  | { kind: 'ambiguous'; activeIds: string[]; isolatedIds: string[] }
+  | { kind: 'none' }
+
+export function resolveSession(id?: string): ResolveSessionResult {
+  if (id) {
+    const found = activeSessions.get(id)
+    if (found) return { kind: 'ok', session: found }
+    return {
+      kind: 'not_found',
+      id,
+      activeIds: Array.from(activeSessions.keys()),
+    }
+  }
+  const active = Array.from(activeSessions.values())
+  if (active.length === 0) return { kind: 'none' }
+  const isolatedIds = active.filter(s => s.isolated).map(s => s.id)
+  // Strict routing: if there is more than one active session, OR any active
+  // session is isolated (even if it's the only one), require an explicit id.
+  // The "only one isolated session" case still demands an explicit id
+  // because the point of isolation is that the caller tracks its own session
+  // and other tools must never implicitly attach to it.
+  if (active.length > 1 || isolatedIds.length > 0) {
+    return {
+      kind: 'ambiguous',
+      activeIds: active.map(s => s.id),
+      isolatedIds,
+    }
+  }
+  return { kind: 'ok', session: active[0]! }
+}
+
 export function listSessions(): Array<{ id: string; url: string }> {
   return Array.from(activeSessions.values()).map(s => ({ id: s.id, url: s.url }))
 }
@@ -1551,6 +1662,29 @@ export function sendFillFields(
   timeoutMs = estimateFillBatchTimeout(fields),
 ): Promise<UpdateWaitResult> {
   return sendAndWaitForUpdate(session, { type: 'fillFields', fields }, timeoutMs)
+}
+
+/**
+ * Fill an OTP / verification-code input group by typing char-by-char into
+ * the leftmost cell. See `fillOtp` in `packages/proxy/src/dom-actions.ts`
+ * for the detection and typing strategy. Bug #2 (v1.43) release notes
+ * cover the Greenhouse 8-box widget that made this primitive necessary.
+ */
+export function sendFillOtp(
+  session: Session,
+  value: string,
+  opts?: { fieldLabel?: string; perCharDelayMs?: number },
+  timeoutMs?: number,
+): Promise<UpdateWaitResult> {
+  const payload: Record<string, unknown> = {
+    type: 'fillOtp',
+    value,
+  }
+  if (opts?.fieldLabel) payload.fieldLabel = opts.fieldLabel
+  if (opts?.perCharDelayMs !== undefined) payload.perCharDelayMs = opts.perCharDelayMs
+  // Budget: base 3s + 150ms/char to cover the per-cell delay plus verify.
+  const budget = timeoutMs ?? Math.max(3_000, 3_000 + value.length * 150)
+  return sendAndWaitForUpdate(session, payload, budget)
 }
 
 /** ARIA `role=option` listbox (e.g. React Select). Optional click opens the list. */
@@ -2428,9 +2562,28 @@ function simpleSchemaField(root: A11yNode, node: A11yNode): FormSchemaField | nu
   const context = nodeContextForNode(root, node)
   const label = fieldLabel(node) ?? sanitizeInlineName(node.name, 80) ?? context?.prompt
   if (!label) return null
-  const choiceType =
-    node.role === 'combobox'
-      ? node.meta?.controlTag === 'select'
+
+  // Bug #3 (v1.43): if this node LOOKS like a plain textbox but its
+  // ancestry fingerprints an autocomplete / searchable combobox wrapper
+  // (React Select, Radix Select, Headless UI combobox, Ant Select, cmdk),
+  // re-tag it as a listbox choice field. Without this, a React Select
+  // Country picker in a Greenhouse Remix form gets classified as `text`,
+  // fill_form routes through sendFieldText, and the controlled form
+  // state never actually commits — Greenhouse's validator then says
+  // "Country is required" and clears the value on submit-attempt scroll.
+  // The autocomplete-combobox signal is set by the extractor's
+  // isAutocompleteComboboxAncestry detector, which mirrors the
+  // isAutocompleteCombobox helper used by pickListboxOption in
+  // dom-actions.ts (v1.42 fix). Keeping the two detectors aligned is how
+  // we guarantee that fill_form's classification matches what
+  // pick_listbox_option can actually commit.
+  const extractorSaysTextbox = node.role === 'textbox' && node.meta?.isAutocompleteCombobox === true
+  const classifiedRole = extractorSaysTextbox ? 'combobox' : node.role
+  const classifiedChoiceType =
+    classifiedRole === 'combobox'
+      ? // Native <select> stays on choiceType 'select'; any wrapper pattern
+        // routes through 'listbox' so pick_listbox_option handles it.
+        node.meta?.controlTag === 'select' && node.meta?.isAutocompleteCombobox !== true
         ? 'select'
         : 'listbox'
       : undefined
@@ -2438,9 +2591,9 @@ function simpleSchemaField(root: A11yNode, node: A11yNode): FormSchemaField | nu
   const format = buildFieldFormat(node)
   return {
     id: formFieldIdForPath(node.path),
-    kind: node.role === 'combobox' ? 'choice' : 'text',
+    kind: classifiedRole === 'combobox' ? 'choice' : 'text',
     label,
-    ...(choiceType ? { choiceType } : {}),
+    ...(classifiedChoiceType ? { choiceType: classifiedChoiceType } : {}),
     ...(node.state?.required ? { required: true } : {}),
     ...(node.state?.invalid ? { invalid: true } : {}),
     ...compactSchemaValue(node.value, 72),
@@ -3502,6 +3655,7 @@ function walkNode(element: Record<string, unknown>, layout: Record<string, unkno
   if (typeof semantic?.inputPattern === 'string') meta.inputPattern = semantic.inputPattern
   if (typeof semantic?.inputType === 'string') meta.inputType = semantic.inputType
   if (typeof semantic?.autocomplete === 'string') meta.autocomplete = semantic.autocomplete
+  if (semantic?.isAutocompleteCombobox === true) meta.isAutocompleteCombobox = true
 
   const children: A11yNode[] = []
   const elementChildren = element.children as Record<string, unknown>[] | undefined

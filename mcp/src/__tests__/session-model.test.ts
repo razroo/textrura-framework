@@ -476,6 +476,82 @@ describe('buildFormSchemas', () => {
       },
     })
   })
+
+  // Bug #3 regression (v1.43): a React Select / Headless UI / Radix
+  // autocomplete combobox renders as a plain <input role="textbox"> in the
+  // accessibility tree. The extractor tags it with meta.isAutocompleteCombobox
+  // when its ancestry matches the autocomplete-wrapper fingerprint
+  // (see isAutocompleteComboboxAncestry in packages/proxy/src/extractor.ts,
+  // which mirrors isAutocompleteCombobox in packages/proxy/src/dom-actions.ts).
+  // The form-schema classifier MUST re-tag that field as choice/listbox so
+  // fill_form routes it through pick_listbox_option — otherwise Greenhouse
+  // Remix Country pickers (and every other React Select) get fed through
+  // the plain text-fill path, the controlled form state never commits, and
+  // Submit fails with "This field is required" while the field looks filled.
+  it('re-classifies autocomplete-combobox-wrapped textboxes as choice/listbox', () => {
+    const tree = node('group', undefined, { x: 0, y: 0, width: 900, height: 700 }, {
+      children: [
+        node('form', 'Address', { x: 20, y: 20, width: 760, height: 480 }, {
+          path: [0],
+          children: [
+            // A plain text field — should stay classified as `text`.
+            node('textbox', 'Postal code', { x: 40, y: 60, width: 200, height: 36 }, {
+              path: [0, 0],
+              state: { required: true },
+              meta: { controlTag: 'input', inputType: 'text' },
+            }),
+            // The React Select Country picker: role=textbox but the
+            // extractor flagged its ancestry as autocomplete-combobox. The
+            // classifier must re-tag this as choice/listbox.
+            node('textbox', 'Country', { x: 40, y: 120, width: 320, height: 36 }, {
+              path: [0, 1],
+              state: { required: true, invalid: true },
+              meta: {
+                controlTag: 'input',
+                isAutocompleteCombobox: true,
+              },
+            }),
+            // A real native <combobox> wrapping a <select> — should stay
+            // classified as choice/select (NOT listbox) because the
+            // controlTag is 'select' and no autocomplete flag is set.
+            node('combobox', 'State / Region', { x: 40, y: 180, width: 320, height: 36 }, {
+              path: [0, 2],
+              state: { required: true },
+              value: 'California',
+              meta: { controlTag: 'select' },
+            }),
+          ],
+        }),
+      ],
+    })
+
+    const schemas = buildFormSchemas(tree)
+    expect(schemas).toHaveLength(1)
+    const fields = schemas[0]?.fields ?? []
+    expect(fields).toHaveLength(3)
+    expect(fields[0]).toMatchObject({
+      kind: 'text',
+      label: 'Postal code',
+      required: true,
+    })
+    // Critical assertion: the Country textbox comes out as a listbox
+    // choice so fill_form will use pick_listbox_option.
+    expect(fields[1]).toMatchObject({
+      kind: 'choice',
+      choiceType: 'listbox',
+      label: 'Country',
+      required: true,
+      invalid: true,
+    })
+    // Back-compat: native <select> still classified as choice/select.
+    expect(fields[2]).toMatchObject({
+      kind: 'choice',
+      choiceType: 'select',
+      label: 'State / Region',
+      required: true,
+      value: 'California',
+    })
+  })
 })
 
 describe('buildFormRequiredSnapshot', () => {
