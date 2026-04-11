@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { toLayoutTree } from '../tree.js'
 import { ambientLight, box, image, scene3d, sphere, text } from '../elements.js'
+import type { UIElement } from '../types.js'
 
 type BoxLayoutNode = ReturnType<typeof toLayoutTree> & { children: Array<Record<string, unknown>> }
 
@@ -606,6 +607,46 @@ describe('toLayoutTree', () => {
       font: '14px sans-serif',
       lineHeight: 18,
       width: 20,
+      height: 18,
+    })
+    expect(textLayout).not.toHaveProperty('key')
+    expect(textLayout).not.toHaveProperty('semantic')
+  })
+
+  it('strips key and semantic from props on manual / corrupt elements (metadata must not reach Textura)', () => {
+    const badBox = {
+      kind: 'box' as const,
+      props: {
+        width: 10,
+        height: 10,
+        key: 'on-props',
+        semantic: { role: 'navigation' as const },
+      },
+      children: [] as UIElement[],
+    } as unknown as UIElement
+    const boxLayout = toLayoutTree(badBox) as BoxLayoutNode
+    expect(boxLayout).toMatchObject({ width: 10, height: 10, children: [] })
+    expect(boxLayout).not.toHaveProperty('key')
+    expect(boxLayout).not.toHaveProperty('semantic')
+
+    const badText = {
+      kind: 'text' as const,
+      props: {
+        text: 'x',
+        font: '14px sans-serif',
+        lineHeight: 18,
+        width: 8,
+        height: 18,
+        key: 't',
+        semantic: { role: 'link' as const },
+      },
+    } as unknown as UIElement
+    const textLayout = toLayoutTree(badText) as Record<string, unknown>
+    expect(textLayout).toMatchObject({
+      text: 'x',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      width: 8,
       height: 18,
     })
     expect(textLayout).not.toHaveProperty('key')

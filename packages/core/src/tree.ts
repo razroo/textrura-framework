@@ -3,7 +3,9 @@ import type { UIElement } from './types.js'
 
 /**
  * Removes paint, hit-target, scroll-container, and non-Yoga metadata from element props.
- * Keep this list aligned with {@link StyleProps}, text/image-only fields, and `selectable`
+ * Keep this list aligned with {@link StyleProps}, text/image-only fields, `selectable`, and runtime
+ * metadata (`key`, `semantic`) that belong on {@link UIElement} but must never reach Yoga when mistakenly
+ * present on `props` (bad casts / corrupt snapshots).
  * (see tests in `tree.test.ts`). Per-node `dir` is forwarded to Textura for non-root nodes only
  * (see {@link toLayoutTree}).
  *
@@ -30,6 +32,8 @@ function stripStyleProps(props: Record<string, unknown>): Record<string, unknown
   delete layoutProps.boxShadow
   delete layoutProps.gradient
   delete layoutProps.selectable
+  delete layoutProps.key
+  delete layoutProps.semantic
   // Image-only props
   delete layoutProps.src
   delete layoutProps.alt
@@ -52,7 +56,8 @@ function stripStyleProps(props: Record<string, unknown>): Record<string, unknown
  *
  * Strips everything that is not consumed by Textura layout: colors, borders, opacity, cursor,
  * `pointerEvents`, `zIndex`, `overflow` / `scrollX` / `scrollY`, `boxShadow`, `gradient`,
- * `selectable`, `dir` on the layout root only, image `src` / `alt` / `objectFit`, and scene3d host fields (`background`,
+ * `selectable`, `key` / `semantic` (runtime metadata; constructors normally lift these off `props`),
+ * `dir` on the layout root only, image `src` / `alt` / `objectFit`, and scene3d host fields (`background`,
  * `objects`, `fov`, `near`, `far`, `cameraPosition`, `cameraTarget`, `orbitControls`, `maxPixelRatio`).
  * Remaining props are flex and sizing fields that belong in the layout pipeline.
  *
