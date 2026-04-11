@@ -272,7 +272,13 @@ export function coalescePatches(patches: LayoutPatch[]): LayoutPatch[] {
  * subtree pairing so patch generation does not throw; root `x`/`y`/`width`/`height` are still compared.
  *
  * `NaN` on a field compares equal to `NaN` on the same field (no patch) so repeated corrupt geometry
- * does not spam patches; changing a field from `NaN` to a finite number (or vice versa) still diffs.
+ * does not spam patches. When a scalar **changes**, only **wire-safe** target values are emitted:
+ * finite primitive `x` / `y`, and non-negative finite `width` / `height` (same rules as GEOM v1 client
+ * patch validation in `@geometra/client`). If the new snapshot has corrupt
+ * `next` coordinates for a field (e.g. `NaN` or negative size), that field is omitted from the patch
+ * so `createServer` never sends patch messages the client would reject — callers keep prior geometry
+ * for that field until a valid update arrives (full `frame` messages may still carry corrupt layouts;
+ * those are a separate validation path).
  */
 export function diffLayout(
   prev: ComputedLayout,
@@ -287,20 +293,28 @@ export function diffLayout(
   let changed = false
 
   if (!sameLayoutScalar(prev.x, next.x)) {
-    patch.x = next.x
-    changed = true
+    if (isFinitePatchNumber(next.x)) {
+      patch.x = next.x
+      changed = true
+    }
   }
   if (!sameLayoutScalar(prev.y, next.y)) {
-    patch.y = next.y
-    changed = true
+    if (isFinitePatchNumber(next.y)) {
+      patch.y = next.y
+      changed = true
+    }
   }
   if (!sameLayoutScalar(prev.width, next.width)) {
-    patch.width = next.width
-    changed = true
+    if (isNonNegativePatchDimension(next.width)) {
+      patch.width = next.width
+      changed = true
+    }
   }
   if (!sameLayoutScalar(prev.height, next.height)) {
-    patch.height = next.height
-    changed = true
+    if (isNonNegativePatchDimension(next.height)) {
+      patch.height = next.height
+      changed = true
+    }
   }
 
   if (changed) patches.push(patch)

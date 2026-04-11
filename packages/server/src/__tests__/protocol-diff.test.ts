@@ -110,14 +110,38 @@ describe('diffLayout', () => {
     expect(diffLayout(prev, next)).toEqual([])
   })
 
-  it('still emits a patch when NaN on a field changes to a finite number (or finite to NaN)', () => {
+  it('emits finite x/y when recovering from NaN; omits x/y when the target is non-finite (GEOM v1 wire-safe)', () => {
     const prev: TestLayout = { x: Number.NaN, y: 0, width: 10, height: 10, children: [] }
     const next: TestLayout = { x: 3, y: 0, width: 10, height: 10, children: [] }
     expect(diffLayout(prev, next)).toEqual([{ path: [], x: 3 }])
 
     const back: TestLayout = { x: 3, y: 0, width: 10, height: 10, children: [] }
     const toNan: TestLayout = { x: Number.NaN, y: 0, width: 10, height: 10, children: [] }
-    expect(diffLayout(back, toNan)).toEqual([{ path: [], x: Number.NaN }])
+    expect(diffLayout(back, toNan)).toEqual([])
+
+    const prevInf: TestLayout = { x: 0, y: 0, width: 10, height: 10, children: [] }
+    const nextInf: TestLayout = { x: Number.POSITIVE_INFINITY, y: 0, width: 10, height: 10, children: [] }
+    expect(diffLayout(prevInf, nextInf)).toEqual([])
+  })
+
+  it('omits width/height when the target dimension is negative or non-finite (GEOM v1 wire-safe)', () => {
+    const ok: TestLayout = { x: 0, y: 0, width: 10, height: 10, children: [] }
+    const negW: TestLayout = { x: 0, y: 0, width: -1, height: 10, children: [] }
+    expect(diffLayout(ok, negW)).toEqual([])
+
+    const negSub = -Number.MIN_VALUE
+    expect(negSub).toBeLessThan(0)
+    const negH: TestLayout = { x: 0, y: 0, width: 10, height: negSub, children: [] }
+    expect(diffLayout(ok, negH)).toEqual([])
+
+    const nanW: TestLayout = { x: 0, y: 0, width: Number.NaN, height: 10, children: [] }
+    expect(diffLayout(ok, nanW)).toEqual([])
+  })
+
+  it('still emits non-negative width/height when recovering from corrupt prior dimensions', () => {
+    const bad: TestLayout = { x: 0, y: 0, width: -2, height: 8, children: [] }
+    const good: TestLayout = { x: 0, y: 0, width: 12, height: 8, children: [] }
+    expect(diffLayout(bad, good)).toEqual([{ path: [], width: 12 }])
   })
 
   it('skips walking a child subtree when both sides reuse the same child reference', () => {
