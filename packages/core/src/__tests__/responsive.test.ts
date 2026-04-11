@@ -299,6 +299,12 @@ describe('createViewport edge cases', () => {
     expect(two.height.value).toBe(0)
   })
 
+  it('coerces boolean initial dimensions to zero (typeof guard; parity with finiteNumberOrZero / corrupt JSON)', () => {
+    const vp = createViewport(true as unknown as number, false as unknown as number)
+    expect(vp.width.value).toBe(0)
+    expect(vp.height.value).toBe(0)
+  })
+
   it('coerces non-finite initial dimensions to zero (parity with layout / hit-test guards)', () => {
     const vp = createViewport(Number.NaN, Number.POSITIVE_INFINITY)
     expect(vp.width.value).toBe(0)
@@ -354,6 +360,13 @@ describe('createViewport edge cases', () => {
     expect(vp.width.value).toBe(400)
     expect(vp.height.value).toBe(300)
     vp.resize('1024' as unknown as number, null as unknown as number)
+    expect(vp.width.value).toBe(0)
+    expect(vp.height.value).toBe(0)
+  })
+
+  it('resize coerces boolean dimensions to zero (typeof guard; parity with finiteNumberOrZero)', () => {
+    const vp = createViewport(800, 600)
+    vp.resize(true as unknown as number, false as unknown as number)
     expect(vp.width.value).toBe(0)
     expect(vp.height.value).toBe(0)
   })
