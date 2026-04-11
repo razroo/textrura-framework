@@ -27,6 +27,15 @@ describe('history adapters', () => {
     expect(high.location.pathname).toBe('/b')
   })
 
+  it('memory history treats empty initialEntries as a single "/" entry (documented default)', () => {
+    const history = createMemoryHistory({ initialEntries: [] })
+    expect(history.location.pathname).toBe('/')
+    history.push('/x')
+    expect(history.location.pathname).toBe('/x')
+    history.go(-1)
+    expect(history.location.pathname).toBe('/')
+  })
+
   it('memory history does not notify listeners when go(0) is a no-op', () => {
     const history = createMemoryHistory({ initialEntries: ['/a'] })
     const updates: HistoryUpdate[] = []
