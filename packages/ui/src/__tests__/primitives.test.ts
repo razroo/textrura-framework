@@ -372,6 +372,33 @@ describe('@geometra/ui primitives', () => {
     }
   })
 
+  it('pagination clamps page above totalPages so next is disabled and prev still works', () => {
+    let page = -1
+    const el = pagination({ page: 99, totalPages: 3, onPageChange: (p) => { page = p } })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    const next = el.children[el.children.length - 1]
+    if (next?.kind === 'box') {
+      expect(next.handlers?.onClick).toBeUndefined()
+    }
+    const prev = el.children[0]
+    if (prev?.kind === 'box') {
+      prev.handlers?.onClick?.({ x: 0, y: 0, target: {} as HitEvent['target'] })
+      expect(page).toBe(2)
+    }
+  })
+
+  it('pagination with zero totalPages clamps current to 1 and disables prev and next', () => {
+    const el = pagination({ page: 1, totalPages: 0, onPageChange: () => {} })
+    expect(el.kind).toBe('box')
+    if (el.kind !== 'box') return
+    expect(el.children.length).toBe(2)
+    const prev = el.children[0]
+    const next = el.children[1]
+    if (prev?.kind === 'box') expect(prev.handlers?.onClick).toBeUndefined()
+    if (next?.kind === 'box') expect(next.handlers?.onClick).toBeUndefined()
+  })
+
   it('switchControl toggles on click and keyboard', () => {
     let val: boolean | null = null
     const el = switchControl({ checked: false, onChange: (v) => { val = v }, label: 'Dark mode' })
