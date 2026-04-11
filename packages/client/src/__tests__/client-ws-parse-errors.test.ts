@@ -3189,4 +3189,33 @@ describe('createHeadlessClient', () => {
 
     client.close()
   })
+
+  it('invokes onError when binary event.data is a Blob (headless; same transport guard as createClient)', async () => {
+    if (typeof Blob === 'undefined') return
+
+    const sockets: Array<{ emit(type: string, event?: unknown): void }> = []
+    installMockWebSocket(sockets)
+
+    const errors: unknown[] = []
+
+    const client = createHeadlessClient({
+      url: 'ws://mock.test',
+      reconnect: false,
+      forwardKeyboard: false,
+      forwardComposition: false,
+      forwardResize: false,
+      keyboardTarget: {} as Document,
+      onError: err => errors.push(err),
+    })
+
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+
+    sockets[0]!.emit('message', { data: new Blob(['x']) })
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()))
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(Error)
+    expect(String((errors[0] as Error).message)).toMatch(/binaryType/)
+
+    client.close()
+  })
 })
