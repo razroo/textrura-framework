@@ -96,12 +96,13 @@ async function main() {
   /** Invariants: do not drop these from `scripts.release:gate` without an explicit docs/gate update. */
   const requiredVitestAllowlistPaths = [
     'packages/core/src/__tests__/geometry-snapshot-ci.test.ts',
+    'packages/core/src/__tests__/layout-bounds.test.ts',
     'packages/core/src/__tests__/hit-test.test.ts',
   ]
   for (const required of requiredVitestAllowlistPaths) {
     if (!paths.includes(required)) {
       throw new Error(
-        `release:gate: required vitest allowlist entry missing: ${required} (geometry CI + hit-test are release-critical; see GEOMETRY_SNAPSHOT_TESTING.md / FRAMEWORK_NORTH_STAR)`,
+        `release:gate: required vitest allowlist entry missing: ${required} (geometry CI, shared layout-bounds invariants, and hit-test are release-critical; see GEOMETRY_SNAPSHOT_TESTING.md / FRAMEWORK_NORTH_STAR)`,
       )
     }
   }
