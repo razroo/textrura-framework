@@ -1173,16 +1173,43 @@ export function connect(
     let resolved = false
     let lastMessageAt = Date.now()
     let heartbeatInterval: ReturnType<typeof setInterval> | null = null
+    let pendingPongBy: number | null = null
 
+    // Heartbeat: send a real WS-level ping every 15s and only tear the socket
+    // down if the peer fails to respond to two consecutive pings (i.e. ~45s of
+    // true unresponsiveness). Previous versions used a dumb idle timer that
+    // closed the socket after 30s of no inbound frames — which killed sessions
+    // during normal form-submission flows where the DOM is legitimately idle
+    // for 20-30+ seconds while the backend processes (Greenhouse submit →
+    // security-code dialog is the canonical repro). A real ping/pong cycle
+    // distinguishes a silent-but-healthy session from a dead one.
     function startHeartbeat(): void {
       if (heartbeatInterval) return
       heartbeatInterval = setInterval(() => {
-        if (Date.now() - lastMessageAt > 30_000) {
+        // If we're waiting on a pong and it's overdue, the peer is dead.
+        if (pendingPongBy !== null && Date.now() > pendingPongBy) {
           try { ws.close() } catch { /* ignore */ }
+          return
         }
-      }, 30_000)
+        // Only send a new ping if we haven't heard anything for a while,
+        // to avoid spamming a chatty session.
+        if (Date.now() - lastMessageAt > 10_000) {
+          try {
+            ws.ping()
+            // Allow 30s for the pong before declaring the peer dead.
+            pendingPongBy = Date.now() + 30_000
+          } catch {
+            /* if ping throws, the socket is already gone — let 'close' handle */
+          }
+        }
+      }, 15_000)
       heartbeatInterval.unref()
     }
+
+    ws.on('pong', () => {
+      lastMessageAt = Date.now()
+      pendingPongBy = null
+    })
 
     const timeout = setTimeout(() => {
       if (!resolved) {
