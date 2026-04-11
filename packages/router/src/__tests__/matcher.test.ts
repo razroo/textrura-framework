@@ -150,6 +150,13 @@ describe('route matcher', () => {
     expect(matchPath('/home', '')).toBeNull()
   })
 
+  it('collapses repeated leading slashes on pathname to root (// and /// match root patterns)', () => {
+    expect(matchPath('/', '//')).toEqual({ params: {} })
+    expect(matchPath('/', '///')).toEqual({ params: {} })
+    expect(matchPath('', '//')).toEqual({ params: {} })
+    expect(matchPath('/home', '//')).toBeNull()
+  })
+
   it('empty pattern string matches only root pathnames', () => {
     expect(matchPath('', '/')).toEqual({ params: {} })
     expect(matchPath('', '')).toEqual({ params: {} })
