@@ -15,7 +15,7 @@ if (typeof globalThis.OffscreenCanvas === 'undefined') {
   }
 }
 
-import { init, destroy, computeLayout, isTextNode } from '../index.js'
+import { init, destroy, computeLayout, isTextNode, clearCache } from '../index.js'
 import type { BoxNode, LayoutNode, TextNode } from '../index.js'
 
 beforeAll(async () => {
@@ -106,6 +106,20 @@ describe('isTextNode', () => {
         height: 20,
       } as unknown as LayoutNode),
     ).toBe(false)
+  })
+})
+
+describe('clearCache', () => {
+  it('is callable after init without throwing', () => {
+    expect(() => clearCache()).not.toThrow()
+  })
+
+  it('does not break subsequent computeLayout (Pretext measurement cache reset)', () => {
+    const first = computeLayout({ width: 40, height: 20 })
+    expect(first.width).toBe(40)
+    clearCache()
+    const second = computeLayout({ width: 40, height: 20 })
+    expect(second.width).toBe(40)
   })
 })
 
