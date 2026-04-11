@@ -2939,12 +2939,47 @@ function fieldValueMatches(actual: string | null | undefined, expected: string):
 async function setLocatorTextValue(locator: Locator, value: string): Promise<boolean> {
   try {
     return await locator.evaluate((el, nextValue) => {
+      // React Greenhouse/Workday/Lever fix: React stores the previous value on
+      // a hidden `_valueTracker` property that React uses to short-circuit
+      // onChange when the value "hasn't changed". If we set el.value through
+      // the prototype setter directly, the tracker still holds the old value,
+      // React's `onChange` (synthetic event) never fires, and the controlled
+      // form state stays empty even though the DOM input visibly displays
+      // the new text. The verification step then reads the DOM value back,
+      // sees the right characters, and reports success — but the form
+      // submission fails with "this field is required" because React state
+      // is the source of truth, not the DOM.
+      //
+      // The canonical fix (used by react-testing-library, enzyme, and the
+      // React docs themselves): clear the tracker BEFORE setting the new
+      // value. React then sees a transition from "" → newValue and runs
+      // its onChange handler, which updates the controlled state.
+      //
+      // This is what was breaking Fivetran #309's "Country" and "Preferred
+      // First Name" fields and any other Greenhouse/Workday/Lever input
+      // backed by react-hook-form, formik, or react-final-form.
+      function clearReactTracker(target: HTMLInputElement | HTMLTextAreaElement | HTMLElement): void {
+        const tracker = (target as unknown as { _valueTracker?: { setValue: (value: string) => void } })._valueTracker
+        if (tracker && typeof tracker.setValue === 'function') {
+          try { tracker.setValue('') } catch { /* ignore */ }
+        }
+      }
+
       function dispatch(target: HTMLElement): void {
+        // input bubbles → drives React's onChange via the synthetic event system
+        // change bubbles → drives blur-style validators (Yup, Joi, native forms)
         target.dispatchEvent(new Event('input', { bubbles: true }))
         target.dispatchEvent(new Event('change', { bubbles: true }))
+        // beforeinput (some controlled inputs use it for IME-safe handlers)
+        try {
+          target.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'insertText' }))
+        } catch { /* ignore in non-supporting browsers */ }
       }
 
       function setInputLikeValue(target: HTMLInputElement | HTMLTextAreaElement, next: string): void {
+        // Clear the React value tracker BEFORE setting the new value so React
+        // sees a transition and runs the controlled-input onChange handler.
+        clearReactTracker(target)
         const proto = target instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype
         const descriptor = Object.getOwnPropertyDescriptor(proto, 'value')
         if (descriptor?.set) {
@@ -2971,6 +3006,7 @@ async function setLocatorTextValue(locator: Locator, value: string): Promise<boo
 
       if (el instanceof HTMLElement && (el.isContentEditable || el.getAttribute('role') === 'textbox' || el.getAttribute('role') === 'combobox')) {
         el.focus()
+        clearReactTracker(el)
         el.textContent = nextValue
         dispatch(el)
         return true
@@ -3846,6 +3882,35 @@ async function chooseValueFromLabeledGroup(
 
       candidates.sort((a, b) => a.score - b.score)
 
+      // Snapshot a stable "selection signature" for an option group so we can
+      // verify that a click actually committed the choice. This is what
+      // separates a real selection from a no-op click on a button whose
+      // aria-label is unrelated to the visible text (Modal/Ashby pattern: Yes/No
+      // buttons whose accessible name is the form name like "Application"
+      // because the rendering library passed the wrong label down). The click
+      // event fires, the DOM mutates a focus ring, and the legacy code returned
+      // true unconditionally — but the controlled-component state never moved,
+      // so the form failed validation on submit.
+      //
+      // The signature captures every state attribute and class list mutation
+      // that React-style stateful buttons typically toggle on selection:
+      // aria-pressed, aria-checked, aria-selected, data-state, class names,
+      // disabled, and the input element's `checked` if present. If NONE of
+      // these change after the click, the click was a no-op and we return false
+      // so the caller falls through to the next strategy.
+      function selectionSignature(opts: Element[]): string {
+        return opts.map(el => {
+          const ariaPressed = el.getAttribute('aria-pressed') ?? ''
+          const ariaChecked = el.getAttribute('aria-checked') ?? ''
+          const ariaSelected = el.getAttribute('aria-selected') ?? ''
+          const dataState = el.getAttribute('data-state') ?? ''
+          const dataSelected = el.getAttribute('data-selected') ?? ''
+          const className = (el instanceof HTMLElement ? el.className : '') ?? ''
+          const checked = el instanceof HTMLInputElement ? String(el.checked) : ''
+          return `${ariaPressed}|${ariaChecked}|${ariaSelected}|${dataState}|${dataSelected}|${className}|${checked}`
+        }).join('||')
+      }
+
       for (const candidate of candidates) {
         const options = Array.from(
           candidate.root.querySelectorAll('input[type="radio"], input[type="checkbox"], [role="radio"], [role="checkbox"], label, button'),
@@ -3860,14 +3925,31 @@ async function chooseValueFromLabeledGroup(
             return option.checked
           }
           if (option instanceof HTMLLabelElement) {
+            const labelBeforeSig = selectionSignature(options)
             option.click()
             const control = option.control
             if (control instanceof HTMLInputElement) return control.checked
-            return true
+            // No backing input — verify via group signature change so we don't
+            // silently no-op on label wrappers whose target is unparented.
+            const labelAfterSig = selectionSignature(options)
+            return labelBeforeSig !== labelAfterSig
           }
-          option.click()
           if (option.getAttribute('role') === 'radio' || option.getAttribute('role') === 'checkbox') {
+            option.click()
             return option.getAttribute('aria-checked') === 'true' || option.getAttribute('aria-selected') === 'true'
+          }
+
+          // Plain <button> path. This is where Modal/Ashby Yes/No buttons land
+          // when their aria-label is broken. Snapshot the group's selection
+          // signature, click, then re-snapshot. If nothing changed, the click
+          // was a no-op — return false so the caller can try the next strategy
+          // (pickListboxOption fallback, etc) instead of silently succeeding.
+          const beforeSig = selectionSignature(options)
+          option.click()
+          const afterSig = selectionSignature(options)
+          if (beforeSig === afterSig) {
+            // Click was a structural no-op. Don't silently succeed.
+            return false
           }
           return true
         }

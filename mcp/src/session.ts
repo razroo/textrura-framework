@@ -2474,11 +2474,23 @@ function compactSchemaContext(context: NodeContextModel | undefined, label: stri
 }
 
 function compactSchemaValue(value: string | undefined, inlineLimit = 80): { value?: string; valueLength?: number } {
-  const normalized = sanitizeInlineName(value, Math.max(120, inlineLimit + 32))
-  if (!normalized) return {}
-  return normalized.length <= inlineLimit
-    ? { value: normalized }
-    : { valueLength: normalized.length }
+  // Measure the length of the FULL whitespace-normalized value first, before
+  // any inline truncation. The previous implementation called sanitizeInlineName
+  // with max=120 and then read normalized.length, which capped reported length
+  // at 120 even when the actual filled content was 1000+ characters. That made
+  // form-required snapshots look like long-textarea fills had only landed
+  // ~120 chars, when in reality the field was correctly filled — agents then
+  // re-typed the same content thinking they had a partial fill, doubling the
+  // value or hitting the textarea length cap.
+  if (!value) return {}
+  const fullNormalized = normalizeUiText(value)
+  if (!fullNormalized) return {}
+  const fullLength = fullNormalized.length
+  const inlineNormalized = sanitizeInlineName(value, Math.max(120, inlineLimit + 32))
+  if (!inlineNormalized) return { valueLength: fullLength }
+  return fullLength <= inlineLimit
+    ? { value: inlineNormalized }
+    : { valueLength: fullLength }
 }
 
 function schemaOptionLabel(node: A11yNode): string | undefined {

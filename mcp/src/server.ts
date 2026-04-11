@@ -4223,6 +4223,64 @@ function suggestRecovery(field: ResolvedFillFieldInput, error: string): string |
   return undefined
 }
 
+// Normalize a value for verifyFills comparison so caller-friendly inputs
+// match site-formatted readbacks. The legacy comparison was strict lowercase
+// only — which broke every form that auto-formats phone numbers, dates, or
+// currency fields. Greenhouse turns "+1-929-608-1737" into "(929) 608-1737";
+// Workday turns "$160000" into "$160,000.00"; Lever turns "2026-01-01" into
+// "01/01/2026". The lowercase comparator flagged all of these as mismatches
+// even though the field state was correct, forcing every caller to either
+// disable verifyFills or wrap it in defensive try/catch.
+//
+// The fix: detect phone-like and number-like values and compare on the
+// canonical digit sequence. Plain text and short strings still go through
+// the strict lowercase comparator so unrelated content can't accidentally
+// match (e.g. "1234 Main St" vs "12-34 Main").
+function looksLikePhoneNumber(value: string): boolean {
+  // Heuristic: at least 7 digits, and after stripping whitespace + the
+  // common phone separator characters (+ - . ( ) space ext) only digits
+  // and a single optional leading + remain. Catches international and
+  // domestic formats without false-matching addresses or IDs.
+  const stripped = value.replace(/[\s().\-+x]|ext\.?/gi, '')
+  if (stripped.length < 7) return false
+  if (!/^\d+$/.test(stripped)) return false
+  return /\d.*[\s().\-+]|^\+\d/.test(value) || /^\d{7,}$/.test(value)
+}
+
+function looksLikeFormattedNumber(value: string): boolean {
+  // Catches "$160,000.00" / "1,000,000" / "1.5e6" style readbacks where the
+  // site adds thousands separators or currency prefixes. Requires at least
+  // one comma OR currency prefix to avoid matching plain text.
+  if (!/[$€£¥,]/.test(value)) return false
+  return /\d/.test(value)
+}
+
+function digitSignature(value: string): string {
+  return value.replace(/\D+/g, '')
+}
+
+function valuesEquivalent(expected: string, actual: string): boolean {
+  if (expected.toLowerCase() === actual.toLowerCase()) return true
+
+  // Both look like phones → compare digit signatures only
+  if (looksLikePhoneNumber(expected) && looksLikePhoneNumber(actual)) {
+    return digitSignature(expected) === digitSignature(actual)
+  }
+
+  // Both look like formatted numbers → compare digit signatures only
+  if (looksLikeFormattedNumber(expected) || looksLikeFormattedNumber(actual)) {
+    const eDigits = digitSignature(expected)
+    const aDigits = digitSignature(actual)
+    if (eDigits && aDigits && eDigits === aDigits) return true
+  }
+
+  // Whitespace normalization for everything else (handles "Charlie  Greenman"
+  // vs "Charlie Greenman" auto-collapsed by ATS forms)
+  const eNorm = expected.replace(/\s+/g, ' ').trim().toLowerCase()
+  const aNorm = actual.replace(/\s+/g, ' ').trim().toLowerCase()
+  return eNorm === aNorm
+}
+
 function verifyFormFills(
   session: Session,
   planned: PlannedFillField[],
@@ -4245,7 +4303,7 @@ function verifyFormFills(
     const actual = match?.value?.trim()
     if (!actual || !expected) {
       mismatches.push({ fieldLabel: label, expected, actual, ...(p.field.fieldId ? { fieldId: p.field.fieldId } : {}) })
-    } else if (actual.toLowerCase() !== expected.toLowerCase()) {
+    } else if (!valuesEquivalent(expected, actual)) {
       mismatches.push({ fieldLabel: label, expected, actual, ...(p.field.fieldId ? { fieldId: p.field.fieldId } : {}) })
     } else {
       verified++
