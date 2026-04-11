@@ -3656,19 +3656,15 @@ export async function setFieldText(
   // verification-code / security-code / OTP prompt, try the dedicated OTP
   // path first. If no OTP group is detected, fall through to the normal
   // text-fill path — the label match alone is not enough to guarantee the
-  // field is split into cells.
+  // field is split into cells. If the group IS detected, any thrown error
+  // from fillOtp propagates out of setFieldText unchanged: silent fallback
+  // to the plain text-fill path would write the whole string into box 0
+  // and pretend success, which is the bug we're fixing.
   if (labelLooksLikeOtp(fieldLabel) && /^\S{4,}$/.test(value)) {
-    try {
-      const group = await findOtpBoxGroup(page, fieldLabel, value.length)
-      if (group) {
-        await fillOtp(page, value, { fieldLabel })
-        return
-      }
-    } catch (err) {
-      // If OTP detection/fill failed, surface the error — silent fallback
-      // to plain text-fill would write the whole string into box 0 and
-      // pretend success, which is exactly the bug we're fixing.
-      throw err
+    const group = await findOtpBoxGroup(page, fieldLabel, value.length)
+    if (group) {
+      await fillOtp(page, value, { fieldLabel })
+      return
     }
   }
 
