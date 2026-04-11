@@ -54,6 +54,8 @@ export function resolveElementDirection(
  *
  * @returns Yoga / Textura owner direction: primitive `'ltr'` or `'rtl'` from the host when valid, otherwise
  *   {@link resolveElementDirection} on `root` with document default `'ltr'`.
+ *
+ * @see `RTL_PARITY_MATRIX.md` (repo root) for server/client RTL and text-metric parity expectations.
  */
 export function resolveComputeLayoutDirection(
   layoutDirection: unknown,

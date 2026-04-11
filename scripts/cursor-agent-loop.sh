@@ -31,7 +31,8 @@ fi
 # not that the repo is "done". ROADMAP "Deferred / research" uses plain bullets (no `- [ ]`), so an empty
 # roadmap grep does not mean no roadmap-backed themes — read that subsection when casting next work (RTL through
 # Textura, animation beyond helpers, extra render targets). In-repo anchors: Textura `direction` / per-node `dir`
-# and tests in packages/textura/src/__tests__/compute-layout.test.ts; core animation helpers under packages/core;
+# and tests in packages/textura/src/__tests__/compute-layout.test.ts; `RTL_PARITY_MATRIX.md` (repo root) for RTL
+# parity across paths; core animation helpers under packages/core;
 # WebGPU geometry consumer under packages/renderer-webgpu. Otherwise prefer one scoped change under
 # packages/ (tests, perf in hit-test/text/layout paths, types, public JSDoc, or
 # `rg 'TODO|FIXME|HACK' packages`; a clean TODO grep is normal — pick a north-star bucket anyway).
