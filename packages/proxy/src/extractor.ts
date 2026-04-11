@@ -155,10 +155,26 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
     return role === 'textbox' || role === 'combobox'
   }
 
-  function normalizedControlValue(value: string | undefined): string | undefined {
+  // Short controls (inputs, selects, custom-combobox triggers) cap at 240 chars
+  // — long values in those controls are almost always noise (autofill junk,
+  // a whole page of option text for a broken readback, etc) and capping keeps
+  // snapshots token-cheap. Textareas and contenteditable rich editors, on the
+  // other hand, legitimately hold long-form content (cover letters, "why do
+  // you want to work at X?" essays). Capping those at 240 silently truncates
+  // the readback and makes verifyFills / geometra_query report bogus
+  // mismatches on correctly-filled values, as seen on Anthropic Greenhouse
+  // 2026-04-11. Callers that extract from long-form controls must pass a
+  // larger cap.
+  const SHORT_CONTROL_VALUE_CAP = 240
+  const LONG_CONTROL_VALUE_CAP = 16_384
+
+  function normalizedControlValue(
+    value: string | undefined,
+    maxLength: number = SHORT_CONTROL_VALUE_CAP,
+  ): string | undefined {
     const trimmed = value?.replace(/\s+/g, ' ').trim()
     if (!trimmed) return undefined
-    return trimmed.length > 240 ? trimmed.slice(0, 240) : trimmed
+    return trimmed.length > maxLength ? trimmed.slice(0, maxLength) : trimmed
   }
 
   function referencedText(ids: string | null, visited?: Set<string>): string | undefined {
@@ -340,7 +356,13 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
       return undefined
     }
     if (el instanceof HTMLTextAreaElement) {
-      return normalizedControlValue(el.value || el.getAttribute('aria-valuetext') || undefined)
+      // Textareas legitimately hold long-form content (cover letters, "why X?"
+      // essays). Capping at SHORT_CONTROL_VALUE_CAP would silently truncate
+      // correct fills and make verifyFills report bogus mismatches.
+      return normalizedControlValue(
+        el.value || el.getAttribute('aria-valuetext') || undefined,
+        LONG_CONTROL_VALUE_CAP,
+      )
     }
     if (el instanceof HTMLSelectElement) {
       return normalizedControlValue(
@@ -348,13 +370,22 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
       )
     }
     if (el instanceof HTMLElement && el.isContentEditable) {
-      return normalizedControlValue(el.innerText || el.textContent || el.getAttribute('aria-valuetext') || undefined)
+      // Rich-text editors (contenteditable) are the other long-form control.
+      return normalizedControlValue(
+        el.innerText || el.textContent || el.getAttribute('aria-valuetext') || undefined,
+        LONG_CONTROL_VALUE_CAP,
+      )
     }
 
     const role = el.getAttribute('role')
     if (role === 'combobox' || role === 'textbox') {
+      // role="textbox" can be a rich-text editor (Slate, Lexical, TipTap,
+      // Draft.js). Use the long cap there too. role="combobox" triggers
+      // stay on the short cap — combobox values are always short labels,
+      // never essays.
+      const valueCap = role === 'textbox' ? LONG_CONTROL_VALUE_CAP : SHORT_CONTROL_VALUE_CAP
       // Prefer aria-valuetext when set — that's the explicit author signal.
-      const valueText = normalizedControlValue(el.getAttribute('aria-valuetext') ?? undefined)
+      const valueText = normalizedControlValue(el.getAttribute('aria-valuetext') ?? undefined, valueCap)
       if (valueText) return valueText
       // For div-/button-based combobox triggers (Radix etc.), the trigger's
       // own innerText typically includes both the picked option AND the
@@ -373,6 +404,7 @@ function browserExtractGeometry(): { layout: LayoutSnapshot; tree: TreeSnapshot 
       }
       return normalizedControlValue(
         (el as HTMLElement).innerText || el.textContent || undefined,
+        valueCap,
       )
     }
 

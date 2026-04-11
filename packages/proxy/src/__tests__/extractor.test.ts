@@ -476,4 +476,82 @@ describe('extractGeometry', () => {
 
     await page.close()
   })
+
+  it('preserves long textarea values past 240 chars (cover letters, "why X?" essays)', async () => {
+    // Regression for JobForge 2026-04-11: Anthropic Greenhouse SA fill
+    // silently truncated at ~240 chars. Cause was extractor.normalizedControlValue
+    // capping ALL control values at 240. Textareas and contenteditable need
+    // a much larger budget because they legitimately hold essays.
+    const longEssay =
+      "I've spent the past years building production AI systems — at Razroo I architected a multi-modal platform that uses Claude alongside OpenAI and Vertex AI with Pinecone-backed RAG, deployed into an Enterprise GenAI ticketing system that generates SAFe Agile tickets from a single prompt. " +
+      "The Beneficial Deployments framing is what closes the loop for me. The partners you list — education, healthcare, scientific research, civil society — are exactly the organizations that need technical translation, not more dashboards. " +
+      "I also want to build at Anthropic specifically because it's the lab whose output I already ship on. Being closer to the model — catching product gaps, surfacing edge cases from real deployments, and shaping cohort programs that scale the expertise — is where I can contribute the most from day one."
+    expect(longEssay.length).toBeGreaterThan(600)
+
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } })
+    await page.setContent(`
+      <form>
+        <label for="why">Why Anthropic?</label>
+        <textarea id="why" name="why" rows="10" cols="60"></textarea>
+        <label for="short">First name</label>
+        <input id="short" name="short" type="text" />
+      </form>
+    `)
+    await page.evaluate((value) => {
+      const textarea = document.getElementById('why') as HTMLTextAreaElement
+      textarea.value = value
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+      textarea.dispatchEvent(new Event('change', { bubbles: true }))
+      const input = document.getElementById('short') as HTMLInputElement
+      input.value = 'Charlie'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    }, longEssay)
+
+    const snapshot = await extractGeometry(page)
+    const nodes = flattenSnapshot(snapshot.tree, snapshot.layout)
+    const textarea = nodes.find(node =>
+      node.tree.semantic?.tag === 'textarea' || node.tree.semantic?.role === 'textbox',
+    )
+    const input = nodes.find(node =>
+      node.tree.semantic?.tag === 'input' && node.tree.semantic?.role === 'textbox',
+    )
+
+    expect(textarea).toBeDefined()
+    expect(input).toBeDefined()
+    // Full essay must be preserved — no silent truncation at 240 chars.
+    expect(textarea?.tree.semantic?.valueText).toBe(longEssay.replace(/\s+/g, ' ').trim())
+    // Short inputs keep the existing 240-cap behavior.
+    expect(input?.tree.semantic?.valueText).toBe('Charlie')
+
+    await page.close()
+  })
+
+  it('caps extremely long textarea values at 16384 chars to keep snapshots bounded', async () => {
+    // The textarea cap is a budget, not a license for unbounded payloads.
+    // A 50KB rich-editor default should still be capped so the snapshot
+    // stays a reasonable size. We pick 16384 as the long-form cap.
+    const huge = 'a'.repeat(20_000)
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } })
+    await page.setContent(`
+      <form>
+        <label for="huge">Huge</label>
+        <textarea id="huge" name="huge" rows="10"></textarea>
+      </form>
+    `)
+    await page.evaluate((value) => {
+      const textarea = document.getElementById('huge') as HTMLTextAreaElement
+      textarea.value = value
+    }, huge)
+
+    const snapshot = await extractGeometry(page)
+    const nodes = flattenSnapshot(snapshot.tree, snapshot.layout)
+    const textarea = nodes.find(node => node.tree.semantic?.tag === 'textarea')
+
+    expect(textarea).toBeDefined()
+    const valueText = textarea?.tree.semantic?.valueText as string | undefined
+    expect(valueText).toBeDefined()
+    expect(valueText!.length).toBe(16_384)
+
+    await page.close()
+  })
 })
