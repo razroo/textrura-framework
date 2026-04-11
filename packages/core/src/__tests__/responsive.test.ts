@@ -328,6 +328,13 @@ describe('createViewport edge cases', () => {
     expect(vp.height.value).toBe(300)
   })
 
+  it('coerces undefined resize dimensions to zero (finiteNumberOrZero; corrupt deserialized payloads)', () => {
+    const vp = createViewport(800, 600)
+    expect(() => vp.resize(undefined as unknown as number, undefined as unknown as number)).not.toThrow()
+    expect(vp.width.value).toBe(0)
+    expect(vp.height.value).toBe(0)
+  })
+
   it('resize maps bigint dimensions to 0 without throwing (finiteNumberOrZero typeof guard)', () => {
     const vp = createViewport(800, 600)
     expect(() => vp.resize(1024n as unknown as number, 200)).not.toThrow()

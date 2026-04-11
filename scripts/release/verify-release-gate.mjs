@@ -132,8 +132,9 @@ async function main() {
   }
   for (const [canonical, list] of byCanonical) {
     if (list.length > 1) {
+      const sorted = [...list].sort()
       throw new Error(
-        `release:gate: duplicate vitest entry after path resolution "${canonical}" (listed as: ${list.join(' | ')}; vitest would run the file ${list.length} times)`,
+        `release:gate: duplicate vitest entry after path resolution "${canonical}" (listed as: ${sorted.join(' | ')}; vitest would run the file ${list.length} times)`,
       )
     }
   }
