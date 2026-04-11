@@ -223,9 +223,19 @@ describe('path generation', () => {
     expect(buildPath('/items/:id', { id: 0 })).toBe('/items/0')
   })
 
+  it('includes negative finite numbers as path segments (scalar guard allows finite negatives; minus is not percent-encoded)', () => {
+    expect(buildPath('/items/:id', { id: -42 })).toBe('/items/-42')
+    expect(buildPath('/items/:id', { id: -0 })).toBe('/items/0')
+  })
+
   it('includes numeric zero as a splat remainder (not treated as missing via falsy checks)', () => {
     expect(buildPath('/docs/*rest', { rest: 0 })).toBe('/docs/0')
     expect(buildPath('/*', { '*': 0 })).toBe('/0')
+  })
+
+  it('includes negative finite numbers as splat remainders (trimSlashes preserves leading minus on single-segment values)', () => {
+    expect(buildPath('/docs/*rest', { rest: -99 })).toBe('/docs/-99')
+    expect(buildPath('/*', { '*': -0 })).toBe('/0')
   })
 
   it('encodes reserved URI characters in param values', () => {
