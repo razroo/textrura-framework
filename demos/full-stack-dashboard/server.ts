@@ -405,6 +405,7 @@ function approvalQueueTable(rows: QueueData['rows']): UIElement {
             paddingTop: 10,
             paddingBottom: 10,
             cursor: 'pointer',
+            semantic: { ariaLabel: `Approval lane ${row.service}` },
             onClick: () => {
               announce(`Selected ${row.service} (${row.severity}) routed to ${row.owner}.`)
             },

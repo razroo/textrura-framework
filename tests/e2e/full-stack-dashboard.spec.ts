@@ -123,7 +123,7 @@ test('full-stack demo supports routed actions, dialog flows, and text selection/
   await clickMirroredLabel(page, 'Promote checkout hotfix', { exact: true })
   await expectMirroredLabelContaining(page, 'Promoted a hotfix and refreshed overview release health.')
 
-  await clickMirroredLabel(page, 'Edge cache', { exact: true })
+  await clickMirroredLabel(page, 'Approval lane Edge cache', { exact: true })
   await expectMirroredLabelContaining(page, 'Selected Edge cache (P2) routed to Platform.')
 
   await clickMirroredLabel(page, 'Open settings route', { exact: true })
