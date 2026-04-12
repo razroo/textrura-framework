@@ -12,6 +12,10 @@ describe('redirect', () => {
     expect(redirect('/a')).toEqual({ kind: 'redirect', to: '/a' })
   })
 
+  it('allows an empty path string (host history adapters decide validity)', () => {
+    expect(redirect('')).toEqual({ kind: 'redirect', to: '' })
+  })
+
   it('passes replace when set', () => {
     expect(redirect('/b', { replace: true })).toEqual({
       kind: 'redirect',
@@ -30,6 +34,10 @@ describe('redirect', () => {
 })
 
 describe('response', () => {
+  it('wraps undefined data when loaders model absent payloads (explicit void)', () => {
+    expect(response(undefined)).toEqual({ kind: 'response', data: undefined })
+  })
+
   it('wraps data with optional status and headers', () => {
     expect(response({ ok: true })).toEqual({ kind: 'response', data: { ok: true } })
     expect(response(null, { status: 204 })).toEqual({
