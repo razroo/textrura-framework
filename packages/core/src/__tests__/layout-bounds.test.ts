@@ -700,6 +700,15 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(10, 20, 3, false as unknown as number)).toEqual({ ox: 7, oy: 20 })
   })
 
+  it('coerces array and binary buffer scroll props to 0 without throwing (typeof object; corrupt JSON / host bugs)', () => {
+    expect(() => scrollSafeChildOffsets(10, 20, [] as unknown as number, 4)).not.toThrow()
+    expect(scrollSafeChildOffsets(10, 20, [] as unknown as number, 4)).toEqual({ ox: 10, oy: 16 })
+    expect(() => scrollSafeChildOffsets(10, 20, 3, new Uint8Array(1) as unknown as number)).not.toThrow()
+    expect(scrollSafeChildOffsets(10, 20, 3, new Uint8Array(1) as unknown as number)).toEqual({ ox: 7, oy: 20 })
+    expect(() => scrollSafeChildOffsets(10, 20, new ArrayBuffer(0) as unknown as number, 0)).not.toThrow()
+    expect(scrollSafeChildOffsets(10, 20, new ArrayBuffer(0) as unknown as number, 0)).toEqual({ ox: 10, oy: 20 })
+  })
+
   it('treats IEEE −0 scroll props like +0 for subtraction (signed-zero scroll from serializers; distinct from abs −0 preservation)', () => {
     expect(scrollSafeChildOffsets(10, 20, -0, -0)).toEqual({ ox: 10, oy: 20 })
     const r = scrollSafeChildOffsets(-0, 10, -0, 0)
@@ -851,6 +860,10 @@ describe('finiteNumberOrZero', () => {
     const sym = Symbol('scroll') as unknown as number
     expect(() => finiteNumberOrZero(sym)).not.toThrow()
     expect(finiteNumberOrZero(sym)).toBe(0)
+
+    expect(finiteNumberOrZero([] as unknown as number)).toBe(0)
+    expect(() => finiteNumberOrZero(new ArrayBuffer(8) as unknown as number)).not.toThrow()
+    expect(finiteNumberOrZero(new ArrayBuffer(8) as unknown as number)).toBe(0)
 
     // Boxed `-0` is `typeof object`, so it does not preserve IEEE −0 (unlike primitive `-0` above).
     const boxedNegZero = Object(-0) as unknown as number
