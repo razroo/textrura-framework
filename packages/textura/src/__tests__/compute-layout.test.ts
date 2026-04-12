@@ -397,6 +397,29 @@ describe('box layout', () => {
     expect(result.children[0]!.x).toBeGreaterThan(result.children[1]!.x)
   })
 
+  it('owner direction rtl mirrors nested flex row when inner nodes omit dir (inherit document context)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'column',
+      children: [
+        {
+          width: 200,
+          height: 40,
+          flexDirection: 'row',
+          gap: 10,
+          children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+        },
+      ],
+    }
+    const ltr = computeLayout(tree, { width: 200, height: 80, direction: 'ltr' })
+    const rtl = computeLayout(tree, { width: 200, height: 80, direction: 'rtl' })
+    const rowL = ltr.children[0]!
+    const rowR = rtl.children[0]!
+    expect(rowL.children[0]!.x).toBeLessThan(rowL.children[1]!.x)
+    expect(rowR.children[0]!.x).toBeGreaterThan(rowR.children[1]!.x)
+  })
+
   it('owner direction rtl does not invert top-level column main-axis stacking (y order matches ltr)', () => {
     const tree: BoxNode = {
       width: 200,
