@@ -729,6 +729,14 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(0, -max, 0, max)).toBeNull()
   })
 
+  it('returns null when only one axis overflows: finite ox while oy = absY - scrollY is non-finite', () => {
+    const max = Number.MAX_VALUE
+    expect(max - -max).toBe(Infinity)
+    // Non-zero finite absX; Y axis alone overflows (scroll pulls past representable range).
+    expect(scrollSafeChildOffsets(42, max, 0, -max)).toBeNull()
+    expect(scrollSafeChildOffsets(-42, max, 0, -max)).toBeNull()
+  })
+
   it('returns null when scroll subtraction underflows on only one axis (finite other axis; -Infinity poisons the pair)', () => {
     const max = Number.MAX_VALUE
     expect(-max - max).toBe(-Infinity)
