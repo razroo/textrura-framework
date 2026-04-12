@@ -8,7 +8,7 @@ fi
 # Drive Cursor Agent CLI in a loop (non-interactive). Each iteration is one agent
 # session that explores the codebase, picks the next best improvement, implements
 # it, runs the release gate, commits when there are real changes, and pushes only
-# if that iteration created a new commit (HEAD advanced). Default: composer-2, 100 iterations.
+# if that iteration created a new commit (HEAD advanced). Default: composer-2 (falls back to auto if unavailable), 100 iterations.
 #
 # Task selection (humans/agents): find unchecked Markdown boxes in ROADMAP.md (Phase A–C, post-1.0 plans,
 # release polish, next frontier) and in ROUTING_COMPETITIVENESS_CHECKLIST.md (repo root, next to ROADMAP —
@@ -109,7 +109,7 @@ fi
 #   CURSOR_AGENT_PUSH         If 1, run git push after an iteration only when that iteration created a new commit (default: 1). Set to 0 to never push from this script.
 #   CURSOR_AGENT_FORCE_SHELL  If 1, pass --force so the agent can run shell without per-command approval (default: 1). Set to 0 for safer approval prompts. --force allows arbitrary commands: use a dedicated branch and review diffs.
 #   CURSOR_AGENT_WORKSPACE    Repo root (default: git top-level from current directory).
-#   CURSOR_AGENT_MODEL        Passed as --model to agent (default: composer-2). Override e.g. composer-2-fast.
+#   CURSOR_AGENT_MODEL        Passed as --model to agent (default: composer-2, falls back to auto if composer-2 is unavailable). Override e.g. composer-2-fast.
 #   CURSOR_AGENT_EXTRA        Extra instructions appended to the built-in prompt.
 #   CURSOR_AGENT_VERBOSE      If 1, stream agent progress (tools, partial text) to the terminal via stream-json (default: 1). Set to 0 for final text only.
 #
@@ -130,7 +130,17 @@ PUSH="${CURSOR_AGENT_PUSH:-1}"
 FORCE_SHELL="${CURSOR_AGENT_FORCE_SHELL:-1}"
 VERBOSE="${CURSOR_AGENT_VERBOSE:-1}"
 WORKSPACE="${CURSOR_AGENT_WORKSPACE:-}"
-MODEL="${CURSOR_AGENT_MODEL:-composer-2}"
+_default_model="composer-2"
+if [[ -z "${CURSOR_AGENT_MODEL:-}" ]]; then
+  # Check whether composer-2 appears in the model list; fall back to auto if not.
+  if agent --list-models 2>/dev/null | grep -q '^composer-2 '; then
+    _default_model="composer-2"
+  else
+    echo "info: composer-2 not available; falling back to auto" >&2
+    _default_model="auto"
+  fi
+fi
+MODEL="${CURSOR_AGENT_MODEL:-$_default_model}"
 EXTRA="${CURSOR_AGENT_EXTRA:-}"
 
 if ! command -v agent >/dev/null 2>&1; then
@@ -226,16 +236,49 @@ ${EXTRA}
 EOF
 }
 
-agent_cmd=(agent -p --trust --workspace "$WORKSPACE")
+agent_base_cmd=(agent -p --trust --workspace "$WORKSPACE")
 if [[ "$VERBOSE" == "1" ]]; then
-  agent_cmd+=(--output-format stream-json --stream-partial-output)
+  agent_base_cmd+=(--output-format stream-json --stream-partial-output)
 else
-  agent_cmd+=(--output-format text)
+  agent_base_cmd+=(--output-format text)
 fi
 if [[ "$FORCE_SHELL" == "1" ]]; then
-  agent_cmd+=(--force)
+  agent_base_cmd+=(--force)
 fi
-agent_cmd+=(--model "$MODEL")
+
+# Run the agent with a given model. Sets $agent_status and $agent_output.
+# Captures both stdout and stderr so usage-limit messages (which the CLI
+# prints to stderr) can be detected for auto-fallback.
+# Usage: run_agent <model> <prompt>
+run_agent() {
+  local model="$1" prompt="$2"
+  local cmd=("${agent_base_cmd[@]}" --model "$model")
+  local tmpout
+  tmpout="$(mktemp)"
+  agent_output=""
+  agent_status=0
+  if [[ "$VERBOSE" == "1" ]]; then
+    set +e
+    "${cmd[@]}" "$prompt" 2>&1 | tee "$tmpout" | python3 "$STREAM_FORMATTER"
+    pipe_statuses=("${PIPESTATUS[@]}")
+    set -e
+    agent_status=${pipe_statuses[0]}
+    local fmt_status=${pipe_statuses[1]:-0}
+    # formatter may exit non-zero on malformed JSON from a usage error — not fatal
+    if [[ "$agent_status" -eq 0 && "$fmt_status" -ne 0 ]]; then
+      echo "error: stream formatter exited non-zero ($fmt_status)" >&2
+      exit "$fmt_status"
+    fi
+  else
+    set +e
+    "${cmd[@]}" "$prompt" > "$tmpout" 2>&1
+    agent_status=$?
+    set -e
+    cat "$tmpout"
+  fi
+  agent_output="$(cat "$tmpout")"
+  rm -f "$tmpout"
+}
 
 i=1
 while true; do
@@ -246,25 +289,17 @@ while true; do
   echo "=== cursor-agent-loop: iteration $i of ${ITERATIONS} ===" >&2
   head_before="$(git rev-parse HEAD)"
   prompt="$(build_prompt)"
-  agent_status=0
-  if [[ "$VERBOSE" == "1" ]]; then
-    set +e
-    "${agent_cmd[@]}" "$prompt" | python3 "$STREAM_FORMATTER"
-    pipe_statuses=("${PIPESTATUS[@]}")
-    set -e
-    agent_status=${pipe_statuses[0]}
-    fmt_status=${pipe_statuses[1]:-0}
-    if [[ "$fmt_status" -ne 0 ]]; then
-      echo "error: stream formatter exited non-zero ($fmt_status) on iteration $i" >&2
-      exit "$fmt_status"
+
+  run_agent "$MODEL" "$prompt"
+
+  # If the model hit a usage limit, retry with auto (unless already auto).
+  if [[ "$agent_status" -ne 0 && "$MODEL" != "auto" ]]; then
+    if printf '%s' "$agent_output" | grep -qi 'out of usage\|increase your limit\|switch to auto'; then
+      echo "info: $MODEL out of usage on iteration $i; retrying with auto" >&2
+      run_agent "auto" "$prompt"
     fi
   fi
-  if [[ "$VERBOSE" != "1" ]]; then
-    set +e
-    "${agent_cmd[@]}" "$prompt"
-    agent_status=$?
-    set -e
-  fi
+
   if [[ "$agent_status" -ne 0 ]]; then
     echo "error: agent exited non-zero ($agent_status) on iteration $i" >&2
     exit "$agent_status"
