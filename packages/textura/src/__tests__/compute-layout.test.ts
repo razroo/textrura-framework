@@ -420,6 +420,27 @@ describe('box layout', () => {
     expect(rowR.children[0]!.x).toBeGreaterThan(rowR.children[1]!.x)
   })
 
+  it('nested row with explicit dir ltr stays left-to-right under rtl owner direction (per-node override)', () => {
+    const tree: BoxNode = {
+      width: 200,
+      height: 80,
+      flexDirection: 'column',
+      children: [
+        {
+          width: 200,
+          height: 40,
+          flexDirection: 'row',
+          gap: 10,
+          dir: 'ltr',
+          children: [{ width: 50, height: 30 }, { width: 50, height: 30 }],
+        },
+      ],
+    }
+    const result = computeLayout(tree, { width: 200, height: 80, direction: 'rtl' })
+    const row = result.children[0]!
+    expect(row.children[0]!.x).toBeLessThan(row.children[1]!.x)
+  })
+
   it('owner direction rtl does not invert top-level column main-axis stacking (y order matches ltr)', () => {
     const tree: BoxNode = {
       width: 200,
