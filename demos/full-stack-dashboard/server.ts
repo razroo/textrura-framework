@@ -592,7 +592,10 @@ function handleQueueCommand(id: string): void {
       } else {
         announce('Queue already empty. Nothing to approve.')
       }
-      void router.revalidate()
+      // Defer revalidation so the first server.update() from announce() can flush a frame with the
+      // toast before navigation enters loading (router.subscribe → update). Back-to-back broadcasts
+      // on slow CI runners were racing the a11y mirror used by Playwright E2E.
+      queueMicrotask(() => void router.revalidate())
       return
     }
     case 'ship-hotfix': {
@@ -606,7 +609,7 @@ function handleQueueCommand(id: string): void {
         ...releases.peek(),
       ].slice(0, 8))
       announce('Promoted a hotfix and refreshed overview release health.')
-      void router.revalidate()
+      queueMicrotask(() => void router.revalidate())
       return
     }
     case 'open-settings': {

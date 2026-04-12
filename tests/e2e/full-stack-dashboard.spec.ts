@@ -31,7 +31,7 @@ async function hasMirroredLabelContaining(page: Page, snippet: string): Promise<
 // interaction in a sequence has been observed to push past Playwright's 5s
 // default. Locally the same assertions resolve in well under 100ms, so the
 // bump is purely flake tolerance — a real regression will still surface.
-const MIRROR_POLL_TIMEOUT_MS = 15_000
+const MIRROR_POLL_TIMEOUT_MS = process.env.CI ? 30_000 : 15_000
 
 async function expectMirroredLabel(page: Page, label: string): Promise<void> {
   await expect
