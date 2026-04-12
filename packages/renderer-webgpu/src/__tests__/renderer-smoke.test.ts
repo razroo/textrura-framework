@@ -50,6 +50,25 @@ describe('webgpu renderer smoke', () => {
     expect(ctx.calls[0]).toEqual({ x: 0, y: 0, w: 1, h: 1, color: '#112233' })
   })
 
+  it('pre-init 2d fallback clears 1×1 when root layout width or height is ±Infinity (layoutBoundsAreFinite parity)', () => {
+    const ctx = new Fake2DContext()
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: (kind: string) => (kind === '2d' ? ctx : null),
+    } as unknown as HTMLCanvasElement
+
+    const renderer = new WebGPURenderer({ canvas, background: '#445566' })
+    const tree = box({ width: 100, height: 40 }, [])
+    const base = { x: 0, y: 0, children: [] as [] }
+
+    renderer.render({ ...base, width: Number.POSITIVE_INFINITY, height: 40 }, tree)
+    expect(ctx.calls.pop()).toEqual({ x: 0, y: 0, w: 1, h: 1, color: '#445566' })
+
+    renderer.render({ ...base, width: 100, height: Number.NEGATIVE_INFINITY }, tree)
+    expect(ctx.calls.pop()).toEqual({ x: 0, y: 0, w: 1, h: 1, color: '#445566' })
+  })
+
   it('pre-init 2d fallback clears 1×1 when root layout width or height is negative (layoutBoundsAreFinite parity)', () => {
     const ctx = new Fake2DContext()
     const canvas = {
