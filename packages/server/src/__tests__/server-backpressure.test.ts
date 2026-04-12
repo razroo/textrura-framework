@@ -23,6 +23,15 @@ describe('server backpressure helper', () => {
     expect(shouldDeferClientSend(Number.POSITIVE_INFINITY, 1024)).toBe(true)
   })
 
+  it('never defers against a +Infinity threshold (no finite buffered amount is strictly greater than +Infinity)', () => {
+    expect(shouldDeferClientSend(Number.MAX_VALUE, Number.POSITIVE_INFINITY)).toBe(false)
+    expect(shouldDeferClientSend(Number.MAX_SAFE_INTEGER, Number.POSITIVE_INFINITY)).toBe(false)
+  })
+
+  it('does not defer when buffered amount and threshold are both +Infinity (strict > is false)', () => {
+    expect(shouldDeferClientSend(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY)).toBe(false)
+  })
+
   it('treats negative buffered amount like zero (never above a non-negative threshold)', () => {
     expect(shouldDeferClientSend(-1, 0)).toBe(false)
     expect(shouldDeferClientSend(-100, 1024)).toBe(false)
