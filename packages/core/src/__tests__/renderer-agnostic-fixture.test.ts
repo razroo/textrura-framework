@@ -12,12 +12,25 @@ type Fixture = {
   layout: ComputedLayout
   expectedSemanticIncludes: string[]
   expectedA11yRoles: string[]
+  /** Optional: assert {@link AccessibilityNode.state} at paths (indices under the fixture root). */
+  expectedA11yStateAtPaths?: Array<{
+    path: number[]
+    state: NonNullable<AccessibilityNode['state']>
+  }>
 }
 
 function flattenRoles(node: AccessibilityNode, out: string[] = []): string[] {
   out.push(node.role)
   for (const child of node.children ?? []) flattenRoles(child, out)
   return out
+}
+
+function nodeAtPath(root: AccessibilityNode, path: number[]): AccessibilityNode {
+  let cur = root
+  for (const i of path) {
+    cur = cur.children[i]!
+  }
+  return cur
 }
 
 const fixtureDir = fileURLToPath(new URL('../../../../fixtures/renderer-agnostic/', import.meta.url))
@@ -37,6 +50,12 @@ describe('renderer-agnostic fixtures', () => {
 
       const a11y = toAccessibilityTree(fixture.tree, fixture.layout)
       expect(flattenRoles(a11y)).toEqual(fixture.expectedA11yRoles)
+
+      if (fixture.expectedA11yStateAtPaths) {
+        for (const { path, state } of fixture.expectedA11yStateAtPaths) {
+          expect(nodeAtPath(a11y, path).state).toMatchObject(state)
+        }
+      }
     })
   }
 })
