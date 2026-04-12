@@ -14,9 +14,30 @@ import type { UIElement } from './types.js'
  * but are omitted here so the Textura snapshot stays a pure flex/measure input. Scroll offsets and parent-bounds
  * containment come from the live tree in hit-testing/selection; renderers apply `overflow` clip modes when painting
  * instead of threading these props through Yoga/WASM for layout.
+ *
+ * {@link import('./types.js').EventHandlers} keys and a mistaken `handlers` bag on `props` are stripped so bad casts,
+ * manual trees, or corrupt snapshots cannot thread functions into the layout pipeline.
  */
+/** Keys aligned with {@link import('./types.js').EventHandlers}; must not reach Textura/Yoga. */
+const EVENT_HANDLER_PROP_KEYS = [
+  'onClick',
+  'onPointerDown',
+  'onPointerUp',
+  'onPointerMove',
+  'onWheel',
+  'onKeyDown',
+  'onKeyUp',
+  'onCompositionStart',
+  'onCompositionUpdate',
+  'onCompositionEnd',
+] as const
+
 function stripStyleProps(props: Record<string, unknown>): Record<string, unknown> {
   const layoutProps = { ...props }
+  for (const k of EVENT_HANDLER_PROP_KEYS) {
+    delete layoutProps[k]
+  }
+  delete layoutProps.handlers
   delete layoutProps.backgroundColor
   delete layoutProps.color
   delete layoutProps.borderColor
@@ -56,6 +77,7 @@ function stripStyleProps(props: Record<string, unknown>): Record<string, unknown
  *
  * Strips everything that is not consumed by Textura layout: colors, borders, opacity, cursor,
  * `pointerEvents`, `zIndex`, `overflow` / `scrollX` / `scrollY`, `boxShadow`, `gradient`,
+ * event handler props (same names as {@link import('./types.js').EventHandlers}) and mistaken `handlers` on `props`,
  * `selectable`, `key` / `semantic` (runtime metadata; constructors normally lift these off `props`),
  * `dir` on the layout root only, image `src` / `alt` / `objectFit`, and scene3d host fields (`background`,
  * `objects`, `fov`, `near`, `far`, `cameraPosition`, `cameraTarget`, `orbitControls`, `maxPixelRatio`).

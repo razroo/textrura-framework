@@ -653,6 +653,67 @@ describe('toLayoutTree', () => {
     expect(textLayout).not.toHaveProperty('semantic')
   })
 
+  it('strips event handler props and mistaken handlers bag from props (must not reach Textura/Yoga)', () => {
+    const noop = () => {}
+    const badBox = {
+      kind: 'box' as const,
+      props: {
+        width: 10,
+        height: 10,
+        onClick: noop,
+        onPointerDown: noop,
+        onPointerUp: noop,
+        onPointerMove: noop,
+        onWheel: noop,
+        onKeyDown: noop,
+        onKeyUp: noop,
+        onCompositionStart: noop,
+        onCompositionUpdate: noop,
+        onCompositionEnd: noop,
+        handlers: { onClick: noop },
+      },
+      children: [] as UIElement[],
+    } as unknown as UIElement
+    const boxLayout = toLayoutTree(badBox) as BoxLayoutNode
+    expect(boxLayout).toMatchObject({ width: 10, height: 10, children: [] })
+    for (const k of [
+      'onClick',
+      'onPointerDown',
+      'onPointerUp',
+      'onPointerMove',
+      'onWheel',
+      'onKeyDown',
+      'onKeyUp',
+      'onCompositionStart',
+      'onCompositionUpdate',
+      'onCompositionEnd',
+      'handlers',
+    ] as const) {
+      expect(boxLayout).not.toHaveProperty(k)
+    }
+
+    const badText = {
+      kind: 'text' as const,
+      props: {
+        text: 'x',
+        font: '14px sans-serif',
+        lineHeight: 18,
+        width: 8,
+        height: 18,
+        onClick: noop,
+      },
+    } as unknown as UIElement
+    const textLayout = toLayoutTree(badText) as Record<string, unknown>
+    expect(textLayout).toMatchObject({
+      text: 'x',
+      font: '14px sans-serif',
+      lineHeight: 18,
+      width: 8,
+      height: 18,
+    })
+    expect(textLayout).not.toHaveProperty('onClick')
+  })
+
   it('forwards props not in the strip list to the layout snapshot (strip-list, not a whitelist)', () => {
     const hinted = box({
       width: 10,
