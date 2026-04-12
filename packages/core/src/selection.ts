@@ -243,6 +243,8 @@ function textNodeBoundsAreFinite(node: TextNodeInfo): boolean {
  *
  * `charOffset` matches **JavaScript string indices** (UTF-16 code units) when each line’s `charOffsets` /
  * `charWidths` entry corresponds to one code unit — the usual shape from canvas `measureText` and Pretext.
+ * Missing entries and non-finite values are coerced with the same `finiteNumberOrZero` helper as scroll props
+ * so corrupt metrics cannot yield `NaN` midpoint comparisons.
  * Supplementary characters then occupy two adjacent indices, aligned with `String` slicing and text-input caret math.
  *
  * Vertical line bands are half-open between stacked lines so a y exactly on an interior boundary belongs to the
@@ -281,23 +283,25 @@ export function hitTestText(
       if (inBand) {
         // Find the character within the line
         const localX = px - line.x
-        const lineVisualWidth = line.charOffsets.length > 0
-          ? (line.charOffsets[line.charOffsets.length - 1] ?? 0) + (line.charWidths[line.charWidths.length - 1] ?? 0)
-          : 0
+        const lineVisualWidth =
+          line.charOffsets.length > 0
+            ? finiteNumberOrZero(line.charOffsets[line.charOffsets.length - 1]) +
+              finiteNumberOrZero(line.charWidths[line.charWidths.length - 1])
+            : 0
         if (node.direction === 'rtl') {
           // In RTL mode, map visual x from the right edge back to logical indices.
           const visualFromRight = lineVisualWidth - localX
           for (let c = 0; c < line.charOffsets.length; c++) {
-            const charStart = line.charOffsets[c]!
-            const charEnd = charStart + line.charWidths[c]!
+            const charStart = finiteNumberOrZero(line.charOffsets[c])
+            const charEnd = charStart + finiteNumberOrZero(line.charWidths[c])
             if (visualFromRight < (charStart + charEnd) / 2) {
               return { nodeIndex: node.index, charOffset: globalCharOffset + c }
             }
           }
         } else {
           for (let c = 0; c < line.charOffsets.length; c++) {
-            const charStart = line.charOffsets[c]!
-            const charEnd = charStart + line.charWidths[c]!
+            const charStart = finiteNumberOrZero(line.charOffsets[c])
+            const charEnd = charStart + finiteNumberOrZero(line.charWidths[c])
             if (localX < (charStart + charEnd) / 2) {
               return { nodeIndex: node.index, charOffset: globalCharOffset + c }
             }

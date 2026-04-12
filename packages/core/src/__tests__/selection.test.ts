@@ -853,6 +853,49 @@ describe('hitTestText', () => {
     expect(hitTestText(textNodes, 100, 5)).toEqual({ nodeIndex: 0, charOffset: 3 })
   })
 
+  it('coerces missing or non-finite per-char metrics for midpoint tests (short charWidths; NaN width)', () => {
+    const shortWidths: TextNodeInfo[] = [
+      {
+        element: { kind: 'text' as const, props: { text: 'ab', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 18,
+        index: 0,
+        lines: [{ text: 'ab', x: 0, y: 0, charOffsets: [0, 8], charWidths: [8] }],
+      },
+    ]
+    expect(() => hitTestText(shortWidths, 4, 5)).not.toThrow()
+    // Missing second width → 0-wide cluster at x=8; midpoints 4 and 8 — localX=4 maps to second code unit.
+    expect(hitTestText(shortWidths, 4, 5)).toEqual({ nodeIndex: 0, charOffset: 1 })
+    expect(hitTestText(shortWidths, 2, 5)).toEqual({ nodeIndex: 0, charOffset: 0 })
+
+    const nanWidth: TextNodeInfo[] = [
+      {
+        element: { kind: 'text' as const, props: { text: 'ab', font: '14px sans-serif', lineHeight: 18 } },
+        direction: 'ltr' as const,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 18,
+        index: 0,
+        lines: [
+          {
+            text: 'ab',
+            x: 0,
+            y: 0,
+            charOffsets: [0, 8],
+            charWidths: [8, Number.NaN],
+          },
+        ],
+      },
+    ]
+    expect(() => hitTestText(nanWidth, 6, 5)).not.toThrow()
+    // NaN width coerced to 0 → second cluster midpoint 8; localX=6 hits logical offset 1.
+    expect(hitTestText(nanWidth, 6, 5)).toEqual({ nodeIndex: 0, charOffset: 1 })
+  })
+
   it('returns null for non-finite pointer coordinates', () => {
     const textNodes: TextNodeInfo[] = [
       {
@@ -1209,7 +1252,7 @@ describe('hitTestText direction mapping', () => {
     expect(rightHit).toEqual({ nodeIndex: 0, charOffset: 0 })
   })
 
-  it('does not throw when an RTL line has NaN charWidths (non-finite visual width); snaps to end of line', () => {
+  it('does not throw when an RTL line has NaN charWidths (non-finite width coerced; deterministic mapping)', () => {
     const textNodes: TextNodeInfo[] = [
       {
         element: { kind: 'text' as const, props: { text: 'ab', font: '14px sans-serif', lineHeight: 18 } },
@@ -1223,11 +1266,11 @@ describe('hitTestText direction mapping', () => {
       },
     ]
     expect(() => hitTestText(textNodes, 2, 5)).not.toThrow()
-    expect(hitTestText(textNodes, 2, 5)).toEqual({ nodeIndex: 0, charOffset: 2 })
-    expect(hitTestText(textNodes, 20, 5)).toEqual({ nodeIndex: 0, charOffset: 2 })
+    expect(hitTestText(textNodes, 2, 5)).toEqual({ nodeIndex: 0, charOffset: 1 })
+    expect(hitTestText(textNodes, 20, 5)).toEqual({ nodeIndex: 0, charOffset: 0 })
   })
 
-  it('does not throw when charWidths is shorter than charOffsets; trailing slots use NaN midpoints and snap to end of line', () => {
+  it('does not throw when charWidths is shorter than charOffsets; trailing slots use zero fallback widths', () => {
     const textNodes: TextNodeInfo[] = [
       {
         element: { kind: 'text' as const, props: { text: 'ab', font: '14px sans-serif', lineHeight: 18 } },
@@ -1241,7 +1284,7 @@ describe('hitTestText direction mapping', () => {
       },
     ]
     expect(() => hitTestText(textNodes, 2, 5)).not.toThrow()
-    // First glyph still has a paired width; later offsets have no width → NaN midpoints → no early hit.
+    // First glyph has width; trailing offsets use 0 width — midpoints still resolve without NaN poisoning.
     expect(hitTestText(textNodes, 2, 5)).toEqual({ nodeIndex: 0, charOffset: 0 })
     expect(hitTestText(textNodes, 12, 5)).toEqual({ nodeIndex: 0, charOffset: 2 })
   })
