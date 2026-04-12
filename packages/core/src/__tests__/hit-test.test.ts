@@ -1261,6 +1261,26 @@ describe('dispatchHit', () => {
     expect(hasInteractiveHitAtPoint(parent, layout, 70, 30)).toBe(false)
   })
 
+  it('IEEE −0 root offsets match +0 for hit routing (hosts may emit signed zero for transform origins)', () => {
+    const child = box({ width: 40, height: 40, onClick: () => {} })
+    const parent = box({ width: 100, height: 100 }, [child])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 10, y: 20, width: 40, height: 40, children: [] as const }],
+    }
+    expect(Object.is(-0, 0)).toBe(false)
+    expect(dispatchHit(parent, layout, 'onClick', 20, 30, undefined, -0, -0).handled).toBe(true)
+    expect(dispatchHit(parent, layout, 'onClick', 20, 30, undefined, 0, 0).handled).toBe(true)
+    expect(hitPathAtPoint(parent, layout, 20, 30, -0, -0)).toEqual(hitPathAtPoint(parent, layout, 20, 30, 0, 0))
+    expect(hasInteractiveHitAtPoint(parent, layout, 20, 30, -0, -0)).toBe(
+      hasInteractiveHitAtPoint(parent, layout, 20, 30, 0, 0),
+    )
+    expect(getCursorAtPoint(parent, layout, 20, 30, -0, -0)).toBe(getCursorAtPoint(parent, layout, 20, 30, 0, 0))
+  })
+
   it('non-finite or non-number root offsetX/offsetY are treated as zero (matches scroll offset rules)', () => {
     const child = box({
       width: 40,
