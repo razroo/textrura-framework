@@ -46,6 +46,19 @@ describe('safePerformanceNowMs', () => {
     vi.stubGlobal('performance', { now: () => Object(3.14) as unknown as number })
     expect(safePerformanceNowMs()).toBe(0)
   })
+
+  it('returns 0 when now() returns bigint or string (typeof must be number; no ToNumber coercion)', () => {
+    vi.stubGlobal('performance', { now: () => 1n as unknown as number })
+    expect(safePerformanceNowMs()).toBe(0)
+    vi.stubGlobal('performance', { now: () => '12.5' as unknown as number })
+    expect(safePerformanceNowMs()).toBe(0)
+  })
+
+  it('returns 0 when globalThis.performance is undefined', () => {
+    // @ts-expect-error — simulate host without Performance API
+    vi.stubGlobal('performance', undefined)
+    expect(safePerformanceNowMs()).toBe(0)
+  })
 })
 
 describe('readPerformanceNow', () => {
@@ -56,10 +69,28 @@ describe('readPerformanceNow', () => {
     expect(readPerformanceNow()).toBe(Number.POSITIVE_INFINITY)
   })
 
+  it('preserves IEEE −0 when now() returns primitive −0 (same as safe path; deltas may care about sign bit)', () => {
+    vi.stubGlobal('performance', { now: () => -0 })
+    const t = readPerformanceNow()
+    expect(Object.is(t, -0)).toBe(true)
+  })
+
   it('maps non-number now() results to 0 without coercion', () => {
     vi.stubGlobal('performance', { now: () => Object(7) as unknown as number })
     expect(readPerformanceNow()).toBe(0)
     vi.stubGlobal('performance', { now: () => 1n as unknown as number })
+    expect(readPerformanceNow()).toBe(0)
+  })
+
+  it('returns 0 when performance is missing, now is not a function, or globalThis.performance is undefined', () => {
+    // @ts-expect-error — partial global
+    vi.stubGlobal('performance', {})
+    expect(readPerformanceNow()).toBe(0)
+    // @ts-expect-error — hostile environment
+    vi.stubGlobal('performance', { now: 'nope' })
+    expect(readPerformanceNow()).toBe(0)
+    // @ts-expect-error — simulate host without Performance API
+    vi.stubGlobal('performance', undefined)
     expect(readPerformanceNow()).toBe(0)
   })
 

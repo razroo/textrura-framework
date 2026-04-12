@@ -28,6 +28,10 @@ export default defineConfig({
   },
   test: {
     pool: 'threads',
+    // Cap parallel workers so large `vitest run` batches (e.g. `npm run release:gate`) do not exhaust
+    // thread pool / memory on laptops and shared CI runners — avoids spurious per-test timeouts when
+    // workers fail to start ("Timeout waiting for worker to respond").
+    maxWorkers: 8,
     testTimeout: 30_000,
     hookTimeout: 60_000,
     setupFiles: [fromRoot('vitest.setup.ts')],
