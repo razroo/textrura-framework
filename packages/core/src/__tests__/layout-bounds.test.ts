@@ -729,6 +729,15 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(0, -max, 0, max)).toBeNull()
   })
 
+  it('returns null when scroll subtraction underflows on only one axis (finite other axis; -Infinity poisons the pair)', () => {
+    const max = Number.MAX_VALUE
+    expect(-max - max).toBe(-Infinity)
+    // ox underflows; oy stays finite.
+    expect(scrollSafeChildOffsets(-max, 10, max, 0)).toBeNull()
+    // oy underflows; ox stays finite.
+    expect(scrollSafeChildOffsets(10, -max, 0, max)).toBeNull()
+  })
+
   it('returns null when abs minus scroll overflows for 1e308-scale operands (finite inputs, infinite difference)', () => {
     const big = 1e308
     expect(big - -big).toBe(Infinity)
