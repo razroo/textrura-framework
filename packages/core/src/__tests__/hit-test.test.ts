@@ -365,6 +365,32 @@ describe('dispatchHit', () => {
     })
   })
 
+  describe('hasInteractiveHitAtPoint: pointer vs keyboard/composition slots', () => {
+    it('is false when the only handlers under the point are keyboard/composition (no pointer or wheel)', () => {
+      const el = box({
+        width: 100,
+        height: 50,
+        onKeyDown: () => {},
+        onCompositionStart: () => {},
+      })
+      const layout = { x: 0, y: 0, width: 100, height: 50, children: [] as const }
+      expect(hasInteractiveHitAtPoint(el, layout, 50, 25)).toBe(false)
+    })
+
+    it('is true when a deeper keyboard-only box sits under an ancestor with a pointer handler', () => {
+      const inner = box({ width: 40, height: 40, onKeyDown: () => {} })
+      const root = box({ width: 100, height: 100, onClick: () => {} }, [inner])
+      const layout = {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        children: [{ x: 0, y: 0, width: 40, height: 40, children: [] as const }],
+      }
+      expect(hasInteractiveHitAtPoint(root, layout, 20, 20)).toBe(true)
+    })
+  })
+
   it('merges extra metadata onto the HitEvent; pointer geometry comes from the hit', () => {
     let received: HitEvent | undefined
     const layout = { x: 10, y: 20, width: 100, height: 50, children: [] }
