@@ -70,6 +70,9 @@ export interface TexturaServerOptions {
    * Values other than the strings `ltr` and `rtl` are ignored at runtime (e.g. malformed config) so
    * `computeLayout` still receives a direction consistent with the root element, matching
    * `createApp`'s `layoutDirection` option in `@geometra/core`.
+   *
+   * Forwards to the Textura owner-direction field (`ComputeOptions.direction` on each {@link computeLayout} call;
+   * owner context for `dir: 'auto'` nodes).
    */
   layoutDirection?: 'ltr' | 'rtl'
 }

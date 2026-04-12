@@ -45,6 +45,9 @@ export interface AppOptions {
    *
    * Nested `dir` on descendants is forwarded into Textura for per-subtree flex layout; the layout-tree root
    * still omits `dir` so this option and the resolved root direction stay aligned.
+   *
+   * Forwards to {@link ComputeOptions.direction} on the Textura {@link computeLayout} call (owner context for
+   * `dir: 'auto'` nodes).
    */
   layoutDirection?: 'ltr' | 'rtl'
 }
