@@ -680,6 +680,15 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(0, 0, 1, 1)).toEqual({ ox: -1, oy: -1 })
   })
 
+  it('returns finite negative origins at MAX_VALUE scroll when abs is 0 (extreme overscroll; still representable)', () => {
+    const max = Number.MAX_VALUE
+    expect(Number.isFinite(-max)).toBe(true)
+    expect(scrollSafeChildOffsets(0, 0, max, 0)).toEqual({ ox: -max, oy: 0 })
+    expect(scrollSafeChildOffsets(0, 0, 0, max)).toEqual({ ox: 0, oy: -max })
+    // Large scroll with modest abs: difference stays finite (distinct from abs±scroll overflow → null cases above).
+    expect(scrollSafeChildOffsets(100, 200, max, max)).toEqual({ ox: 100 - max, oy: 200 - max })
+  })
+
   it('coerces non-finite scroll props via finiteNumberOrZero', () => {
     expect(scrollSafeChildOffsets(10, 20, Number.NaN, Number.POSITIVE_INFINITY)).toEqual({ ox: 10, oy: 20 })
   })
