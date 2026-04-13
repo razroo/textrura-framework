@@ -102,8 +102,8 @@ fi
 # Layout/Yoga geometry regression: use `packages/core/src/__tests__/geometry-snapshot-ci.test.ts` (gate-listed)
 # and `GEOMETRY_SNAPSHOT_TESTING.md`; avoid unrelated snapshot churn unless widening the gate on purpose.
 # Inclusive rects, scroll subtraction overflow guards, and `finiteNumberOrZero` / `finiteRootExtent`:
-# `packages/core/src/__tests__/layout-bounds.test.ts` (gate-listed) — pair with `hit-test.test.ts` when changing
-# pointer coordinate math or scroll offsets.
+# implementation `packages/core/src/layout-bounds.ts`; tests `packages/core/src/__tests__/layout-bounds.test.ts`
+# (gate-listed) — pair with `hit-test.test.ts` when changing pointer coordinate math or scroll offsets.
 # Demos and starter output: read `AGENTS.md` — Geometra should own the full viewport; no marketing DOM shells
 # or extra chrome around the canvas; diagnostics belong in-tree, not adjacent HTML panels.
 # Edits to scripts/create-geometra-app.mjs or templates it emits: run `npm run create:app:smoke` from repo root
@@ -230,7 +230,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
       Prefer one primary subsystem or package per iteration (e.g. core hit-test, fonts, server protocol); avoid wide drive-by refactors unless the task truly spans boundaries. For hit-test, text input, protocol, or layout/repaint work, align with FRAMEWORK_NORTH_STAR.md (merge checklist: tests where practical, no DOM leaks, no avoidable perf regressions).
       When adding tests without a specific bugfix, prefer extending files already run by root \`package.json\` \`release:gate\` (keeps new coverage in the vetted CI path; only widen the gate when the suite is release-critical). The gate is an explicit file allowlist — \`npm run test\` (vitest.fast) may run additional files that the gate does not; confirm in \`package.json\` rather than assuming. If you widen the gate, grep or read the existing \`vitest run ...\` list first so you do not add a duplicate path (vitest would execute that file twice). Paths are not grouped by package: e.g. \`layout-bounds.test.ts\` may already be the first argv path — search the whole line, not only near related tests. \`scripts/release/verify-release-gate.mjs\` also enforces that \`geometry-snapshot-ci.test.ts\`, \`layout-bounds.test.ts\`, and \`hit-test.test.ts\` remain in the allowlist (do not drop them when trimming \`release:gate\`).
       When roadmap and routing checklists are fully checked, re-read ROADMAP "Deferred / research" for themes, or target north-star hot paths (hit-test, text measurement, protocol encode/decode, layout/repaint).
-      Inclusive layout rects and scroll-safe child offsets (\`layout-bounds.ts\`) have dedicated coverage in \`packages/core/src/__tests__/layout-bounds.test.ts\` (release gate); extend that file when hardening coordinate math, not only \`hit-test.test.ts\`.
+      Inclusive layout rects and scroll-safe child offsets (\`packages/core/src/layout-bounds.ts\` — \`scrollSafeChildOffsets\`, \`pointInInclusiveLayoutRect\`, etc.) have dedicated coverage in \`packages/core/src/__tests__/layout-bounds.test.ts\` (release gate); extend that file when hardening coordinate math, not only \`hit-test.test.ts\`.
       Pick something concrete and high-value. Do NOT say there is nothing to do — there is always room to improve a codebase.
 
    c) Self-improve this loop: when scripts/cursor-agent-loop.sh — the prompt you are reading or the script's header comments — is stale, misleading, too vague, or omits heuristics that would help later runs pick better tasks and scope work smarter, prefer a minimal, accurate edit to that script if that is higher leverage right now than the next item in (a)/(b). Goal: successive iterations should get better at deciding what to work on and how.
