@@ -27,6 +27,25 @@ describe('history adapters', () => {
     expect(high.location.pathname).toBe('/b')
   })
 
+  it('memory history treats non-finite initialIndex like the default (last entry)', () => {
+    const nan = createMemoryHistory({ initialEntries: ['/a', '/b'], initialIndex: Number.NaN })
+    expect(nan.location.pathname).toBe('/b')
+
+    const posInf = createMemoryHistory({ initialEntries: ['/a', '/b'], initialIndex: Number.POSITIVE_INFINITY })
+    expect(posInf.location.pathname).toBe('/b')
+
+    const negInf = createMemoryHistory({ initialEntries: ['/a', '/b'], initialIndex: Number.NEGATIVE_INFINITY })
+    expect(negInf.location.pathname).toBe('/b')
+  })
+
+  it('memory history treats non-number initialIndex like the default (last entry)', () => {
+    const asStr = createMemoryHistory({ initialEntries: ['/a', '/b'], initialIndex: '1' as never })
+    expect(asStr.location.pathname).toBe('/b')
+
+    const asBigInt = createMemoryHistory({ initialEntries: ['/a', '/b'], initialIndex: 0n as never })
+    expect(asBigInt.location.pathname).toBe('/b')
+  })
+
   it('memory history treats empty initialEntries as a single "/" entry (documented default)', () => {
     const history = createMemoryHistory({ initialEntries: [] })
     expect(history.location.pathname).toBe('/')

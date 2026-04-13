@@ -54,14 +54,27 @@ function locationFromWindow(windowLike: Pick<Window, 'location'>): RouterLocatio
 
 type MemoryHistoryOptions = {
   initialEntries?: string[]
+  /**
+   * Starting stack index. Clamped to `[0, entries.length - 1]`.
+   *
+   * Omitted uses the last entry. Non-finite values (`NaN`, `±Infinity`) and non-numbers (e.g. corrupted
+   * JSON / loose host data) fall back to that same default — they must not produce a `NaN` index, which
+   * would make `entries[index]` undefined.
+   */
   initialIndex?: number
+}
+
+function resolveMemoryInitialIndex(requested: number | undefined, last: number): number {
+  if (requested === undefined) return last
+  return typeof requested === 'number' && Number.isFinite(requested) ? requested : last
 }
 
 /**
  * In-memory stack for tests, SSR previews, and non-browser environments.
  *
  * - Empty `initialEntries` becomes a single `"/"` entry.
- * - `initialIndex` is clamped to the stack; default is the last entry.
+ * - `initialIndex` is clamped to the stack; default is the last entry. Non-finite or non-number values
+ *   behave like the default (see {@link MemoryHistoryOptions.initialIndex}).
  * - `go(0)` does not notify listeners.
  * - Non-finite `delta` (`NaN`, `±Infinity`) is a no-op (does not move the index or notify).
  * - Values that are not primitive finite numbers (`bigint`, strings, objects, etc.) are also no-ops so
@@ -69,10 +82,8 @@ type MemoryHistoryOptions = {
  */
 export function createMemoryHistory(options: MemoryHistoryOptions = {}): HistoryAdapter {
   const entries = (options.initialEntries ?? ['/']).map(parseToLocation)
-  let index = Math.min(
-    Math.max(options.initialIndex ?? entries.length - 1, 0),
-    Math.max(entries.length - 1, 0),
-  )
+  const last = Math.max(entries.length - 1, 0)
+  let index = Math.min(Math.max(resolveMemoryInitialIndex(options.initialIndex, last), 0), last)
   if (entries.length === 0) {
     entries.push(parseToLocation('/'))
     index = 0
