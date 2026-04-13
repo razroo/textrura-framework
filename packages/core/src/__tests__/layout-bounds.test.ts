@@ -658,6 +658,9 @@ describe('finiteRootExtent', () => {
     expect(finiteRootExtent(Object(50) as unknown as number)).toBeUndefined()
     // Boxed numbers are typeof object; must not normalize IEEE −0 via primitive path.
     expect(finiteRootExtent(Object(-0) as unknown as number)).toBeUndefined()
+    // Corrupt JSON / mistaken host options (booleans are not roots).
+    expect(finiteRootExtent(true as unknown as number)).toBeUndefined()
+    expect(finiteRootExtent(false as unknown as number)).toBeUndefined()
   })
 
   it('returns undefined for Symbol, function, and array values without throwing (typeof guard; parity with layout bounds)', () => {
@@ -709,6 +712,13 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(10, 20, undefined, 4)).toEqual({ ox: 10, oy: 16 })
     expect(scrollSafeChildOffsets(10, 20, 3, undefined)).toEqual({ ox: 7, oy: 20 })
     expect(scrollSafeChildOffsets(10, 20, undefined, undefined)).toEqual({ ox: 10, oy: 20 })
+  })
+
+  it('treats boolean scroll props like 0 (finiteNumberOrZero; corrupt JSON cannot slip booleans into subtraction)', () => {
+    expect(scrollSafeChildOffsets(10, 20, true as unknown as number, false as unknown as number)).toEqual({
+      ox: 10,
+      oy: 20,
+    })
   })
 
   it('returns abs minus finite scroll offsets', () => {
