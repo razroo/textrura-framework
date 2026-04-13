@@ -1,0 +1,22 @@
+{
+  "name": "@geometra/demo-mcp-native-crud",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "server": "tsx --tsconfig ../../tsconfig.examples.json server.ts",
+    "client": "vite --config vite.config.ts",
+    "dev": "echo 'Run: npm run server  (terminal 1)  &&  npm run client  (terminal 2), then open http://localhost:5173/'",
+    "build": "vite build --config vite.config.ts"
+  },
+  "dependencies": {
+    "@geometra/client": "*",
+    "@geometra/core": "*",
+    "@geometra/renderer-canvas": "*",
+    "@geometra/server": "*",
+    "@geometra/ui": "*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "vite": "^8.0.3"
+  }
+}

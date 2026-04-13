@@ -555,3 +555,274 @@ If `minConfidence < 0.7` or `mismatches` are non-empty and the actual value is e
 - `verifyFills` only checks text and choice fields, not toggles or file uploads. Verify those separately with `geometra_query` if needed.
 - Autocomplete can replace your value after a brief delay. If you suspect this, add a `geometra_wait_for` with `value` set to your expected text before verifying.
 - Some sites format phone numbers, dates, or SSNs on blur. A mismatched `actual` is not always an error -- compare the semantic content, not the exact string.
+
+---
+
+## Native vs Proxy: When to Use Each
+
+Geometra MCP has two connection modes. Every recipe above uses the **proxy** path (Chromium + Playwright). Recipes 8-10 below use the **native** path (direct WebSocket to a Geometra server).
+
+| | Native | Proxy |
+|---|---|---|
+| **Connect with** | `url: "ws://localhost:3100"` | `pageUrl: "https://..."` |
+| **Browser needed** | No | Yes (Chromium auto-spawned) |
+| **Form-fill tools** | Click + type + key only | `fill_form`, `fill_fields`, `pick_listbox_option`, etc. |
+| **Best for** | Geometra-native apps, agent-first UX, multi-agent | Existing websites, ATS automation |
+| **Startup time** | Instant | 2-5s (browser launch) |
+
+**Choose native when** you're building a new Geometra app and want agents as first-class users. Choose proxy when automating an existing website.
+
+See `NATIVE_MCP_GUIDE.md` for the full tool compatibility matrix.
+
+---
+
+## 8. Drive a Native Geometra App
+
+Connect to a running Geometra server (no browser, no proxy) and interact through semantic tools.
+
+**Prerequisite:** Start the CRUD demo server:
+```bash
+cd demos/mcp-native-crud && npm run server
+```
+
+### Step 1 -- Connect
+
+```json
+geometra_connect({
+  "url": "ws://localhost:3100"
+})
+```
+
+**Check:** Connection confirms with session info. No browser is launched.
+
+### Step 2 -- Discover the UI
+
+```json
+geometra_page_model({})
+```
+
+Returns buttons ("Add Task", filter buttons), a task list, status text. The agent now understands the app structure.
+
+### Step 3 -- Add a task
+
+```json
+geometra_click({ "role": "button", "name": "Add Task" })
+```
+
+Opens the edit form with a title input and priority selector.
+
+### Step 4 -- Focus and type
+
+```json
+geometra_click({ "role": "textbox" })
+geometra_type({ "text": "Review pull request" })
+```
+
+The server receives each keystroke, updates its signal state, and broadcasts the new frame.
+
+### Step 5 -- Save
+
+```json
+geometra_click({ "role": "button", "name": "Save" })
+```
+
+### Step 6 -- Verify
+
+```json
+geometra_query({ "role": "status" })
+```
+
+**Check:** Response text should be "Task created: Review pull request".
+
+### Step 7 -- Snapshot the result
+
+```json
+geometra_snapshot({})
+```
+
+Shows the updated task list with the new task visible.
+
+### Pitfalls
+
+- Always call `geometra_click` on the textbox before `geometra_type` -- the server routes key events to the focused element.
+- If `geometra_type` has no effect, verify with `geometra_snapshot` that the input is focused.
+- Use `geometra_query({ role: "status" })` to verify actions rather than relying on the snapshot alone.
+
+---
+
+## 9. Full CRUD Cycle on a Native App
+
+A complete add / filter / edit / delete workflow with verification between each step.
+
+**Prerequisite:** The CRUD demo server is running on `ws://localhost:3100`.
+
+### Add a task
+
+```json
+geometra_connect({ "url": "ws://localhost:3100" })
+geometra_click({ "role": "button", "name": "Add Task" })
+geometra_click({ "role": "textbox" })
+geometra_type({ "text": "Deploy to staging" })
+geometra_click({ "role": "button", "name": "Save" })
+geometra_query({ "role": "status" })
+```
+
+**Check:** Status = "Task created: Deploy to staging"
+
+### Filter to active tasks
+
+```json
+geometra_click({ "role": "button", "name": "Filter Active" })
+geometra_snapshot({})
+```
+
+**Check:** Only uncompleted tasks appear.
+
+### Toggle a task as done
+
+```json
+geometra_click({ "role": "checkbox", "name": "Deploy to staging" })
+geometra_query({ "role": "status" })
+```
+
+**Check:** Status = "Task completed: Deploy to staging". The task disappears from the active filter.
+
+### Switch to done filter
+
+```json
+geometra_click({ "role": "button", "name": "Filter Done" })
+geometra_snapshot({})
+```
+
+**Check:** "Deploy to staging" now appears in the done list.
+
+### Edit a task
+
+```json
+geometra_click({ "role": "button", "name": "Filter All" })
+geometra_click({ "role": "button", "name": "Edit Deploy to staging" })
+```
+
+The edit form opens with the title pre-filled.
+
+```json
+geometra_click({ "role": "textbox" })
+geometra_key({ "key": "Meta+a" })
+geometra_type({ "text": "Deploy to production" })
+geometra_click({ "role": "button", "name": "Save" })
+geometra_query({ "role": "status" })
+```
+
+**Check:** Status = "Task updated: Deploy to production"
+
+### Delete a task
+
+```json
+geometra_click({ "role": "button", "name": "Delete Deploy to production" })
+geometra_query({ "role": "status" })
+```
+
+**Check:** Status = "Task deleted: Deploy to production"
+
+### Pitfalls
+
+- Edit and Delete buttons include the task title in their `ariaLabel` (e.g., "Edit Deploy to staging"). Use the full name to target the right task when multiple tasks exist.
+- After toggling a checkbox, the task may disappear if a filter is active. Switch to "All" first if you need to interact with it further.
+
+---
+
+## 10. Multi-Agent Shared Geometry
+
+Two agents connect to the same native server and see each other's changes in real time.
+
+### Agent A -- create tasks
+
+```json
+geometra_connect({ "url": "ws://localhost:3100" })
+geometra_click({ "role": "button", "name": "Add Task" })
+geometra_click({ "role": "textbox" })
+geometra_type({ "text": "Write unit tests" })
+geometra_click({ "role": "button", "name": "Save" })
+```
+
+### Agent B -- observe and act (separate MCP session)
+
+```json
+geometra_connect({ "url": "ws://localhost:3100" })
+geometra_snapshot({})
+```
+
+Agent B sees the task that Agent A just created. Now B marks it done:
+
+```json
+geometra_click({ "role": "checkbox", "name": "Write unit tests" })
+```
+
+### Agent A -- verify B's action
+
+```json
+geometra_snapshot({})
+```
+
+Agent A sees the task is now checked. No polling needed -- `snapshot` reads the latest frame, and the server broadcasts every `update()` to all clients.
+
+### How it works
+
+Each `geometra_connect` creates an independent MCP session, but they share the same app state on the server. When any client (human or agent) triggers an action, the server:
+1. Updates its signals
+2. Calls `server.update()`
+3. Recomputes layout via Yoga
+4. Broadcasts the new frame to all connected WebSocket clients
+
+MCP sessions receive the updated frame automatically. The next tool call from any agent reads the latest state.
+
+### Pitfalls
+
+- Concurrent writes to the same field are last-write-wins. There is no conflict resolution -- the last agent to trigger an action determines the state.
+- If two agents click the same button simultaneously, both actions fire. Design your state transitions to be idempotent where possible.
+
+---
+
+## Troubleshooting
+
+Common errors and how to resolve them.
+
+### "Connection refused" or timeout on connect
+
+The server isn't running, or you're using the wrong port/URL.
+
+- **Native:** Verify the server process is running and check the port. Default is `ws://localhost:3100`.
+- **Proxy:** Verify the URL is reachable from your machine. Try `curl -I <url>` first.
+
+### "Not connected" on any tool call
+
+You must call `geometra_connect` before using any other tool. Each MCP session starts disconnected.
+
+### "Client message type X is not supported on the native Textura server"
+
+You called a proxy-only tool (`fill_form`, `fill_fields`, `set_checked`, `select_option`, `pick_listbox_option`, `upload_files`, `wheel`) on a native Geometra server. Use `click` + `type` + `key` instead. See the tool compatibility matrix in `NATIVE_MCP_GUIDE.md`.
+
+### Element not found (no match for role/name)
+
+The element doesn't exist, isn't visible, or has a different name than expected.
+
+1. Run `geometra_snapshot({ "view": "full" })` to see the complete tree
+2. Check element roles with `geometra_query({ "role": "button" })` to list all buttons
+3. If using `name`, try a substring: `geometra_query({ "text": "Submit" })` instead of an exact name match
+
+### Stale state after action
+
+If `geometra_snapshot` shows old state after an action, the server may not have called `server.update()`. This is a server-side bug in the app being automated.
+
+For proxy connections, the page may still be loading. Use `geometra_wait_for` with a condition that indicates the update completed.
+
+### Type has no effect
+
+The target element isn't focused. Click the input/textbox first:
+
+```json
+geometra_click({ "role": "textbox", "name": "Title" })
+geometra_type({ "text": "hello" })
+```
+
+On native servers, the input component must have an `onKeyDown` handler wired up -- see `NATIVE_MCP_GUIDE.md` section 5.

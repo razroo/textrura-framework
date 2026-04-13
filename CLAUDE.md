@@ -10,6 +10,8 @@ See **`PLATFORM_AUTH.md`** for `@geometra/auth`, `@geometra/token-registry`, and
 See **`PROTOCOL_EVOLUTION.md`** for server/client protocol versioning beyond GEOM v1.
 See **`GEOMETRY_SNAPSHOT_TESTING.md`** for layout JSON / geometry regression patterns in CI.
 See **`DEPLOYMENT.md`** for production deployment: process management, reverse proxy, auth, scaling, monitoring.
+See **`NATIVE_MCP_GUIDE.md`** for building native Geometra apps that AI agents drive via MCP.
+See **`MCP_COOKBOOK.md`** for MCP tool call recipes (proxy and native workflows).
 
 ## Architecture
 

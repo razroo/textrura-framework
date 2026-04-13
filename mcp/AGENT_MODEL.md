@@ -77,12 +77,45 @@ The goal is to let the model answer:
 
 There are 2 ways to use Geometra MCP:
 
-- **Native Geometra**: a Geometra app streams its own tree + layout over GEOM v1.
-- **Geometra proxy**: Chromium + Playwright load a normal webpage, extract DOM geometry and semantics, and translate that into the same GEOM v1 protocol.
+- **Native Geometra**: a Geometra app streams its own tree + layout over GEOM v1. Connect with `geometra_connect({ url: "ws://localhost:3100" })`.
+- **Geometra proxy**: Chromium + Playwright load a normal webpage, extract DOM geometry and semantics, and translate that into the same GEOM v1 protocol. Connect with `geometra_connect({ pageUrl: "https://..." })`.
 
-In both cases, the MCP tool contract is the same.
+In both cases, the MCP tool contract is the same — with one important caveat: **high-level form-fill tools are proxy-only**.
+
+Tools that work on **both** native and proxy: `connect`, `disconnect`, `list_sessions`, `page_model`, `snapshot`, `layout`, `query`, `expand_section`, `find_action`, `click`, `type`, `key`, `scroll_to`, `wait_for`, `wait_for_navigation`, `list_items`, `run_actions` (click/type/key), `workflow_state`.
+
+Tools that are **proxy-only** (they require DOM access): `fill_form`, `fill_fields`, `fill_otp`, `pick_listbox_option`, `select_option`, `set_checked`, `upload_files`, `wheel`, `generate_pdf`, `prepare_browser`.
+
+On a native server, calling a proxy-only tool returns an error: `"Client message type X is not supported on the native Textura server"`.
 
 The low-token behavior comes from the **MCP layer and protocol shape**, not from a different browser engine.
+
+### Recommended agent loop for native Geometra apps
+
+When driving a native Geometra app, use this pattern:
+
+1. `geometra_connect({ url: "ws://..." })` — connect to the server
+2. `geometra_page_model({})` — learn the UI structure (buttons, lists, inputs)
+3. For each action: `geometra_click` to press buttons or focus inputs, then `geometra_type` for text entry, `geometra_key` for special keys (Enter, Tab, Escape)
+4. Verify after each step: `geometra_query({ role: "status" })` or `geometra_snapshot({})`
+5. Repeat 3-4 until the workflow is complete
+
+Key differences from proxy mode:
+- No `fill_form` — use `click` on the input + `type` for each field
+- No `pick_listbox_option` — use `click` to open + `click` to select
+- Always click the input before typing — the server routes key events to the focused element
+- Native servers are instant (no browser startup), so no need for `prepare_browser`
+
+### Making native apps agent-friendly
+
+If you're building a Geometra app that agents will drive:
+
+- Use `@geometra/ui` components (`button`, `input`, `checkbox`, `dialog`) — they set proper semantic annotations automatically
+- Add `semantic: { role, ariaLabel }` to custom interactive elements so MCP can discover them
+- Add a `role: 'status'` element that updates after each mutation — agents use it to verify actions
+- Call `server.update()` after every signal change — MCP only sees the latest frame
+
+See `NATIVE_MCP_GUIDE.md` for full details and `demos/mcp-native-crud/` for a working example.
 
 ## Why Token Usage Can Be Lower
 
