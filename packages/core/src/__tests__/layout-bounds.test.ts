@@ -1009,6 +1009,15 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(tiny, 0, 0, tiny)).toEqual({ ox: tiny, oy: -tiny })
     expect(scrollSafeChildOffsets(0, tiny, tiny, 0)).toEqual({ ox: -tiny, oy: tiny })
   })
+
+  it('negative subnormal scroll increases ox at MIN_VALUE-scale abs (finiteNumberOrZero keeps negSub; not coerced to 0 scroll)', () => {
+    const t = Number.MIN_VALUE
+    const negSub = -t
+    expect(finiteNumberOrZero(negSub)).toBe(negSub)
+    const r = scrollSafeChildOffsets(8 * t, 100, negSub, 0)!
+    expect(r.ox).toBe(9 * t)
+    expect(r.oy).toBe(100)
+  })
 })
 
 describe('finiteNumberOrZero', () => {
