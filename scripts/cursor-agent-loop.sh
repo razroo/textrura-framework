@@ -61,6 +61,9 @@ fi
 # keyboard.test.ts); inserting it again after keyboard duplicates the entry and fails verify-release-gate.mjs.
 # `verify-release-gate.mjs` also resolves paths canonically, so `packages/a/../b/x.test.ts` counts as the same
 # file as `packages/b/x.test.ts` for duplicate detection. Gate paths must use forward slashes only (backslashes rejected).
+# The same script enforces a **required** subset of the allowlist (do not drop these when editing `release:gate`):
+# `packages/core/src/__tests__/geometry-snapshot-ci.test.ts`, `layout-bounds.test.ts`, and `hit-test.test.ts`
+# (geometry CI, shared layout invariants, hit routing — see `requiredVitestAllowlistPaths` in verify-release-gate.mjs).
 # The verifier also requires exactly one `bun run test:terminal-input` in the gate string and that the first
 # `&&` segment runs `verify-release-gate.mjs` (fail-fast before vitest; no duplicate terminal suites).
 # `npm run release:gate` runs `scripts/release/verify-release-gate.mjs`
@@ -210,7 +213,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
       - Add small, useful features that fit the framework's philosophy
       - Improve the demo site or starter templates (follow AGENTS.md: Geometra owns the page; minimal host HTML)
       Prefer one primary subsystem or package per iteration (e.g. core hit-test, fonts, server protocol); avoid wide drive-by refactors unless the task truly spans boundaries. For hit-test, text input, protocol, or layout/repaint work, align with FRAMEWORK_NORTH_STAR.md (merge checklist: tests where practical, no DOM leaks, no avoidable perf regressions).
-      When adding tests without a specific bugfix, prefer extending files already run by root \`package.json\` \`release:gate\` (keeps new coverage in the vetted CI path; only widen the gate when the suite is release-critical). The gate is an explicit file allowlist — \`npm run test\` (vitest.fast) may run additional files that the gate does not; confirm in \`package.json\` rather than assuming. If you widen the gate, grep or read the existing \`vitest run ...\` list first so you do not add a duplicate path (vitest would execute that file twice). Paths are not grouped by package: e.g. \`layout-bounds.test.ts\` may already be the first argv path — search the whole line, not only near related tests.
+      When adding tests without a specific bugfix, prefer extending files already run by root \`package.json\` \`release:gate\` (keeps new coverage in the vetted CI path; only widen the gate when the suite is release-critical). The gate is an explicit file allowlist — \`npm run test\` (vitest.fast) may run additional files that the gate does not; confirm in \`package.json\` rather than assuming. If you widen the gate, grep or read the existing \`vitest run ...\` list first so you do not add a duplicate path (vitest would execute that file twice). Paths are not grouped by package: e.g. \`layout-bounds.test.ts\` may already be the first argv path — search the whole line, not only near related tests. \`scripts/release/verify-release-gate.mjs\` also enforces that \`geometry-snapshot-ci.test.ts\`, \`layout-bounds.test.ts\`, and \`hit-test.test.ts\` remain in the allowlist (do not drop them when trimming \`release:gate\`).
       When roadmap and routing checklists are fully checked, re-read ROADMAP "Deferred / research" for themes, or target north-star hot paths (hit-test, text measurement, protocol encode/decode, layout/repaint).
       Pick something concrete and high-value. Do NOT say there is nothing to do — there is always room to improve a codebase.
 
