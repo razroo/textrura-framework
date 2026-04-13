@@ -133,6 +133,11 @@ describe('safePerformanceNowMs', () => {
     expect(safePerformanceNowMs()).toBe(0)
   })
 
+  it('returns 0 when now() returns an array (typeof object; no numeric coercion)', () => {
+    vi.stubGlobal('performance', { now: () => [] as unknown as number })
+    expect(safePerformanceNowMs()).toBe(0)
+  })
+
   it('returns 0 when now() returns bigint or string (typeof must be number; no ToNumber coercion)', () => {
     vi.stubGlobal('performance', { now: () => 1n as unknown as number })
     expect(safePerformanceNowMs()).toBe(0)
@@ -211,6 +216,10 @@ describe('readPerformanceNow', () => {
     vi.stubGlobal('performance', { now: () => Object(7) as unknown as number })
     expect(readPerformanceNow()).toBe(0)
     vi.stubGlobal('performance', { now: () => 1n as unknown as number })
+    expect(readPerformanceNow()).toBe(0)
+    vi.stubGlobal('performance', { now: () => '12.5' as unknown as number })
+    expect(readPerformanceNow()).toBe(0)
+    vi.stubGlobal('performance', { now: () => [] as unknown as number })
     expect(readPerformanceNow()).toBe(0)
   })
 
