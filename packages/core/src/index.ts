@@ -104,7 +104,7 @@ export {
 export type { Viewport, BreakpointMap } from './responsive.js'
 
 // Virtual scroll helpers
-export { syncVirtualWindow } from './virtual-scroll.js'
+export { inclusiveEndIndex, syncVirtualWindow } from './virtual-scroll.js'
 export type { VirtualWindowState } from './virtual-scroll.js'
 
 // SEO

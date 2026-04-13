@@ -26,8 +26,10 @@ function nonNegativeOrZero(n: number): number {
 /**
  * Inclusive last row index for a window starting at `start`. When `start + safeWindow - 1` overflows or is
  * otherwise non-finite, returns `maxIndex` (same defensive rule as {@link import('./layout-bounds.js').pointInInclusiveLayoutRect}).
+ *
+ * Exported for parity tests and advanced virtual-list math; {@link syncVirtualWindow} is the primary API.
  */
-function inclusiveEndIndex(start: number, maxIndex: number, safeWindow: number): number {
+export function inclusiveEndIndex(start: number, maxIndex: number, safeWindow: number): number {
   const spanEnd = start + safeWindow - 1
   return Number.isFinite(spanEnd) ? Math.min(maxIndex, spanEnd) : maxIndex
 }

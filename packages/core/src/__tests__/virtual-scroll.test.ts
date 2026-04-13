@@ -1,5 +1,20 @@
 import { describe, it, expect } from 'vitest'
-import { syncVirtualWindow } from '../virtual-scroll.js'
+import { inclusiveEndIndex, syncVirtualWindow } from '../virtual-scroll.js'
+
+describe('inclusiveEndIndex', () => {
+  it('returns maxIndex when start + safeWindow - 1 overflows to non-finite (IEEE sum; mirrors inclusive rect edges)', () => {
+    const maxIndex = 7
+    const start = Number.MAX_VALUE
+    const safeWindow = Number.MAX_VALUE
+    expect(Number.isFinite(start + safeWindow - 1)).toBe(false)
+    expect(inclusiveEndIndex(start, maxIndex, safeWindow)).toBe(maxIndex)
+  })
+
+  it('returns Math.min(maxIndex, spanEnd) when the span sum stays finite', () => {
+    expect(inclusiveEndIndex(2, 99, 5)).toBe(6)
+    expect(inclusiveEndIndex(0, 4, 100)).toBe(4)
+  })
+})
 
 describe('syncVirtualWindow', () => {
   it('keeps selection visible while moving down rapidly', () => {
