@@ -148,6 +148,15 @@ describe('syncVirtualWindow', () => {
     expect(r.end).toBe(999)
   })
 
+  it('keeps start/end/selected aligned at Number.MAX_SAFE_INTEGER list scale (window 1; last row visible)', () => {
+    const last = Number.MAX_SAFE_INTEGER - 1
+    const r = syncVirtualWindow(Number.MAX_SAFE_INTEGER, 1, last, last)
+    expect(r.selected).toBe(last)
+    expect(r.start).toBe(last)
+    expect(r.end).toBe(last)
+    expect(r.end - r.start + 1).toBe(1)
+  })
+
   it('stays finite when totalRows and windowSize are both ~1e308 (IEEE-scale virtual lists)', () => {
     // Guards against NaN/Inf window indices when host state uses scientific-magnitude counts (still finite doubles).
     const r = syncVirtualWindow(1e308, 1e308, 5e307, 5e307)
