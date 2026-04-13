@@ -675,6 +675,11 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(0, 0, 0, 0)).toEqual({ ox: 0, oy: 0 })
   })
 
+  it('returns negative finite child origins when scroll exceeds abs (over-scroll; hit-test / selection space)', () => {
+    expect(scrollSafeChildOffsets(100, 50, 120, 60)).toEqual({ ox: -20, oy: -10 })
+    expect(scrollSafeChildOffsets(0, 0, 1, 1)).toEqual({ ox: -1, oy: -1 })
+  })
+
   it('coerces non-finite scroll props via finiteNumberOrZero', () => {
     expect(scrollSafeChildOffsets(10, 20, Number.NaN, Number.POSITIVE_INFINITY)).toEqual({ ox: 10, oy: 20 })
   })

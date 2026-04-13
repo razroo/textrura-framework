@@ -26,9 +26,14 @@ export function finiteNumberOrZero(value: unknown): number {
  * offsets that would become `0` inside downstream math using {@link finiteNumberOrZero} (which would
  * misplace children).
  *
- * `absX` / `absY` must be **primitive** finite `number` values: `typeof` rejects `BigInt` before subtraction
- * (mixing `bigint` with `number` throws in JS) and rejects boxed numbers / strings so corrupt host input
- * cannot coerce via `-` the way it could with loose `number`-typed parameters alone.
+ * @param absX — Absolute X of the current node in parent space; must be a **primitive** finite `number`.
+ *   `typeof` rejects `BigInt` before subtraction (mixing `bigint` with `number` throws in JS) and rejects
+ *   boxed numbers / strings so corrupt host input cannot coerce via `-`.
+ * @param absY — Same rules as `absX`, for the Y axis.
+ * @param scrollX — Horizontal scroll offset; coerced with {@link finiteNumberOrZero} (same rule as element `scrollX` props).
+ * @param scrollY — Vertical scroll offset; coerced with {@link finiteNumberOrZero}.
+ * @returns `{ ox, oy }` when both differences are finite (may be **negative** when scroll exceeds `abs`),
+ *   or `null` when `absX`/`absY` are not primitive finite numbers or when either axis overflows to non-finite.
  */
 export function scrollSafeChildOffsets(
   absX: number,
