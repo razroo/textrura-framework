@@ -695,6 +695,8 @@ describe('finiteRootExtent', () => {
   it('returns undefined for negative sizes', () => {
     expect(finiteRootExtent(-1)).toBeUndefined()
     expect(finiteRootExtent(-Number.MIN_VALUE)).toBeUndefined()
+    expect(finiteRootExtent(-Number.EPSILON)).toBeUndefined()
+    expect(finiteRootExtent(Number.MIN_SAFE_INTEGER)).toBeUndefined()
   })
 
   it('maps IEEE −0 to +0 and returns 0 (valid non-negative root)', () => {
@@ -705,6 +707,7 @@ describe('finiteRootExtent', () => {
   it('returns finite non-negative extents including zero and large magnitudes', () => {
     expect(finiteRootExtent(0)).toBe(0)
     expect(finiteRootExtent(Number.MIN_VALUE)).toBe(Number.MIN_VALUE)
+    expect(finiteRootExtent(Number.EPSILON)).toBe(Number.EPSILON)
     expect(finiteRootExtent(Number.MAX_VALUE)).toBe(Number.MAX_VALUE)
   })
 
