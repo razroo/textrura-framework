@@ -960,6 +960,14 @@ describe('scrollSafeChildOffsets', () => {
     expect(3 * t - t).toBe(2 * t)
     expect(scrollSafeChildOffsets(2 * t, 3 * t, t, t)).toEqual({ ox: t, oy: 2 * t })
   })
+
+  it('subtracts subnormal scroll from near-zero abs without overflow (tiny overscroll yields finite negative subnormal oy)', () => {
+    const tiny = Number.MIN_VALUE
+    expect(tiny - 0).toBe(tiny)
+    expect(0 - tiny).toBe(-tiny)
+    expect(scrollSafeChildOffsets(tiny, 0, 0, tiny)).toEqual({ ox: tiny, oy: -tiny })
+    expect(scrollSafeChildOffsets(0, tiny, tiny, 0)).toEqual({ ox: -tiny, oy: tiny })
+  })
 })
 
 describe('finiteNumberOrZero', () => {
