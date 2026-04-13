@@ -40,7 +40,10 @@ fi
 # Textura, animation beyond helpers, extra render targets). In-repo anchors: Textura `direction` / per-node `dir`
 # and tests in packages/textura/src/__tests__/compute-layout.test.ts; `RTL_PARITY_MATRIX.md` (repo root) for RTL
 # parity across paths; core animation helpers under packages/core;
-# WebGPU geometry consumer under packages/renderer-webgpu. Otherwise prefer one scoped change under
+# WebGPU geometry consumer under packages/renderer-webgpu. Optional GEOM v1 binary envelopes: decode/encode
+# behavior is duplicated with intentional parity in packages/server/src/binary-frame.ts and
+# packages/client/src/binary-frame.ts — touch both (and their binary-frame tests) when changing frame guards.
+# Otherwise prefer one scoped change under
 # packages/ (tests, perf in hit-test/text/layout paths, types, public JSDoc, or
 # `rg 'TODO|FIXME|HACK' packages`; a clean TODO grep is normal — pick a north-star bucket anyway).
 # `vitest.fast.config.ts` (used by `npm run test` / quality.yml "Fast tests") includes only
