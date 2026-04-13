@@ -271,6 +271,20 @@ describe('diffLayout', () => {
     // Index 0: prev has a node, next has a hole — skip. Index 1: next has a node, prev has none — skip.
     expect(diffLayout(prev, next)).toEqual([])
   })
+
+  it('recurses past aligned holes in sparse children arrays (same index missing on both sides)', () => {
+    const prevChildren: TestLayout[] = []
+    prevChildren[0] = { x: 0, y: 0, width: 10, height: 10, children: [] }
+    prevChildren[2] = { x: 0, y: 0, width: 5, height: 5, children: [] }
+    const nextChildren: TestLayout[] = []
+    nextChildren[0] = { x: 0, y: 0, width: 10, height: 10, children: [] }
+    nextChildren[2] = { x: 1, y: 0, width: 5, height: 5, children: [] }
+    const prev: TestLayout = { x: 0, y: 0, width: 100, height: 100, children: prevChildren }
+    const next: TestLayout = { x: 0, y: 0, width: 100, height: 100, children: nextChildren }
+    expect(1 in prev.children).toBe(false)
+    expect(1 in next.children).toBe(false)
+    expect(diffLayout(prev, next)).toEqual([{ path: [2], x: 1 }])
+  })
 })
 
 describe('isProtocolCompatible', () => {
