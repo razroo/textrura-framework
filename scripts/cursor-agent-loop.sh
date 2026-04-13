@@ -106,6 +106,10 @@ fi
 # Inclusive rects, scroll subtraction overflow guards, and `finiteNumberOrZero` / `finiteRootExtent`:
 # implementation `packages/core/src/layout-bounds.ts`; tests `packages/core/src/__tests__/layout-bounds.test.ts`
 # (gate-listed) — pair with `hit-test.test.ts` when changing pointer coordinate math or scroll offsets.
+# Virtualized list windowing (`syncVirtualWindow`, large-scroll / overscroll UX): `packages/core/src/virtual-scroll.ts`;
+# tests `packages/core/src/__tests__/virtual-scroll.test.ts` (gate-listed). Prefer extending that file for window-index
+# invariants and corrupt numeric props — `virtual-scroll.test.ts` already grids small integers; add targeted cases when
+# hardening IEEE / NaN edges, not only `virtual-scroll.ts` in isolation.
 # Demos and starter output: read `AGENTS.md` — Geometra should own the full viewport; no marketing DOM shells
 # or extra chrome around the canvas; diagnostics belong in-tree, not adjacent HTML panels.
 # Edits to scripts/create-geometra-app.mjs or templates it emits: run `npm run create:app:smoke` from repo root
@@ -233,6 +237,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
       When adding tests without a specific bugfix, prefer extending files already run by root \`package.json\` \`release:gate\` (keeps new coverage in the vetted CI path; only widen the gate when the suite is release-critical). The gate is an explicit file allowlist — \`npm run test\` (vitest.fast) may run additional files that the gate does not; confirm in \`package.json\` rather than assuming. If you widen the gate, grep or read the existing \`vitest run ...\` list first so you do not add a duplicate path (vitest would execute that file twice). Paths are not grouped by package: e.g. \`layout-bounds.test.ts\` may already be the first argv path — search the whole line, not only near related tests. \`scripts/release/verify-release-gate.mjs\` also enforces that \`geometry-snapshot-ci.test.ts\`, \`layout-bounds.test.ts\`, and \`hit-test.test.ts\` remain in the allowlist (do not drop them when trimming \`release:gate\`).
       When roadmap and routing checklists are fully checked, re-read ROADMAP "Deferred / research" for themes, or target north-star hot paths (hit-test, text measurement, protocol encode/decode, layout/repaint).
       Inclusive layout rects and scroll-safe child offsets (\`packages/core/src/layout-bounds.ts\` — \`scrollSafeChildOffsets\`, \`pointInInclusiveLayoutRect\`, etc.) have dedicated coverage in \`packages/core/src/__tests__/layout-bounds.test.ts\` (release gate); extend that file when hardening coordinate math, not only \`hit-test.test.ts\`.
+      Large-list window indices: \`syncVirtualWindow\` in \`packages/core/src/virtual-scroll.ts\` with tests in \`packages/core/src/__tests__/virtual-scroll.test.ts\` (release gate) — extend when tightening overflow/NaN invariants or corrupt host props for virtual scroll state.
       Pick something concrete and high-value. Do NOT say there is nothing to do — there is always room to improve a codebase.
 
    c) Self-improve this loop: when scripts/cursor-agent-loop.sh — the prompt you are reading or the script's header comments — is stale, misleading, too vague, or omits heuristics that would help later runs pick better tasks and scope work smarter, prefer a minimal, accurate edit to that script if that is higher leverage right now than the next item in (a)/(b). Goal: successive iterations should get better at deciding what to work on and how.
