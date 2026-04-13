@@ -1,3 +1,9 @@
+/**
+ * Shared layout coordinate helpers for hit-testing, text selection, focus routing, a11y bounds, text-input
+ * caret math, root extent options, and animation timelines. All entry points assume plain deserialized
+ * geometry; `typeof` / `Number.isFinite` guards avoid `BigInt` mixing and accidental coercion from boxed
+ * or string values.
+ */
 import type { ComputedLayout } from 'textura'
 
 /** True only for finite primitive numbers: `typeof` rejects `BigInt`, boxed numbers, and objects before `Number.isFinite`. */

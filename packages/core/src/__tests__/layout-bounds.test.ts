@@ -734,6 +734,13 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(10, 20, 3, false as unknown as number)).toEqual({ ox: 7, oy: 20 })
   })
 
+  it('coerces string scroll props to 0 without throwing (JSON number-as-string; same rule as finiteNumberOrZero)', () => {
+    expect(() => scrollSafeChildOffsets(22, 30, '12' as unknown as number, 4)).not.toThrow()
+    expect(scrollSafeChildOffsets(22, 30, '12' as unknown as number, 4)).toEqual({ ox: 22, oy: 26 })
+    expect(() => scrollSafeChildOffsets(10, 20, 3, '4' as unknown as number)).not.toThrow()
+    expect(scrollSafeChildOffsets(10, 20, 3, '4' as unknown as number)).toEqual({ ox: 7, oy: 20 })
+  })
+
   it('coerces array and binary buffer scroll props to 0 without throwing (typeof object; corrupt JSON / host bugs)', () => {
     expect(() => scrollSafeChildOffsets(10, 20, [] as unknown as number, 4)).not.toThrow()
     expect(scrollSafeChildOffsets(10, 20, [] as unknown as number, 4)).toEqual({ ox: 10, oy: 16 })
