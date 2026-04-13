@@ -660,6 +660,15 @@ describe('finiteRootExtent', () => {
     expect(finiteRootExtent(Object(-0) as unknown as number)).toBeUndefined()
   })
 
+  it('returns undefined for Symbol, function, and array values without throwing (typeof guard; parity with layout bounds)', () => {
+    expect(() => finiteRootExtent(Symbol('root') as unknown as number)).not.toThrow()
+    expect(finiteRootExtent(Symbol('root') as unknown as number)).toBeUndefined()
+    expect(() => finiteRootExtent((() => 100) as unknown as number)).not.toThrow()
+    expect(finiteRootExtent((() => 100) as unknown as number)).toBeUndefined()
+    expect(() => finiteRootExtent([] as unknown as number)).not.toThrow()
+    expect(finiteRootExtent([] as unknown as number)).toBeUndefined()
+  })
+
   it('returns undefined for negative sizes', () => {
     expect(finiteRootExtent(-1)).toBeUndefined()
     expect(finiteRootExtent(-Number.MIN_VALUE)).toBeUndefined()
