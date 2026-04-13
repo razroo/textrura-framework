@@ -184,13 +184,13 @@ describe('readPerformanceNow', () => {
   })
 
   it('returns 0 when globalThis.performance is null or other falsy non-objects (same guard as safe path)', () => {
-    // @ts-expect-error
+    // @ts-expect-error — stub null to exercise guard
     vi.stubGlobal('performance', null)
     expect(readPerformanceNow()).toBe(0)
-    // @ts-expect-error
+    // @ts-expect-error — stub false as falsy non-object
     vi.stubGlobal('performance', false as unknown as Performance)
     expect(readPerformanceNow()).toBe(0)
-    // @ts-expect-error
+    // @ts-expect-error — stub 0 as falsy non-object
     vi.stubGlobal('performance', 0 as unknown as Performance)
     expect(readPerformanceNow()).toBe(0)
   })
