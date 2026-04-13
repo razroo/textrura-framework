@@ -823,6 +823,19 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(min, 0, -1, 0)).toEqual({ ox: min + 1, oy: 0 })
   })
 
+  it('loses unit-level precision at ~1e16 scale when scroll is one less than abs (IEEE: abs−1 rounds to abs; ox becomes 0)', () => {
+    const absX = 1e16
+    const scrollOneLess = absX - 1
+    expect(scrollOneLess).toBe(absX)
+    expect(scrollSafeChildOffsets(absX, 7, scrollOneLess, 0)).toEqual({ ox: 0, oy: 7 })
+  })
+
+  it('still resolves ox=1 at MAX_SAFE_INTEGER when scroll is one less (ULP allows distinct neighbors)', () => {
+    const y = Number.MAX_SAFE_INTEGER
+    expect(y === y - 1).toBe(false)
+    expect(scrollSafeChildOffsets(y, 4, y - 1, 0)).toEqual({ ox: 1, oy: 4 })
+  })
+
   it('returns negative finite child origins when scroll exceeds abs (over-scroll; hit-test / selection space)', () => {
     expect(scrollSafeChildOffsets(100, 50, 120, 60)).toEqual({ ox: -20, oy: -10 })
     expect(scrollSafeChildOffsets(0, 0, 1, 1)).toEqual({ ox: -1, oy: -1 })
