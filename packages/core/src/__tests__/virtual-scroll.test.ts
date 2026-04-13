@@ -85,6 +85,20 @@ describe('syncVirtualWindow', () => {
     expect(syncVirtualWindow(-3, 5, 0, 0)).toEqual({ start: 0, end: 0, selected: 0 })
   })
 
+  it('treats IEEE negative zero totalRows like zero rows (finite signed zero; same empty list as +0)', () => {
+    expect(syncVirtualWindow(-0, 5, 0, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+    expect(syncVirtualWindow(-0, 5, 0, 0)).toEqual(syncVirtualWindow(0, 5, 0, 0))
+  })
+
+  it('clamps IEEE negative zero windowSize below 1 to a single visible row (matches +0)', () => {
+    expect(syncVirtualWindow(5, -0, 2, 0)).toEqual(syncVirtualWindow(5, 0, 2, 0))
+    expect(syncVirtualWindow(5, -0, 2, 0)).toEqual({ start: 2, end: 2, selected: 2 })
+  })
+
+  it('floors IEEE negative zero selected and currentStart like +0 (whole row indices)', () => {
+    expect(syncVirtualWindow(10, 3, -0, -0)).toEqual(syncVirtualWindow(10, 3, 0, 0))
+  })
+
   it('clamps windowSize below 1 to a single visible row', () => {
     expect(syncVirtualWindow(5, 0, 2, 0)).toEqual({ start: 2, end: 2, selected: 2 })
     expect(syncVirtualWindow(5, -2, 4, 0)).toEqual({ start: 4, end: 4, selected: 4 })
