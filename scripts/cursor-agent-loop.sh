@@ -130,6 +130,10 @@ fi
 # Interaction / protocol / renderer changes: skim `FRAMEWORK_NORTH_STAR.md` merge checklist (DOM-free invariants,
 # input tests, perf hot paths, docs accuracy) before shipping.
 # In `build_prompt`'s `cat <<EOF` body, escape Markdown backticks as \\`…\\` — unescaped \`path\` runs shell command substitution and drops file names from the agent prompt (stderr: "command not found").
+# Cursor rules (`.cursor/rules/*`), CI-injected prompts, and ad-hoc copies of this loop may duplicate the
+# task-selection / release-gate guidance above. When those drift, prefer updating **this file** as the
+# canonical in-repo checklist — then mirror wording into external prompts so agents do not ship stale
+# checkbox `grep`/`rg` patterns or obsolete `release:gate` / `verify-release-gate.mjs` expectations.
 # A few `packages/*/src/__tests__/**/*.test.ts` files stay outside `release:gate` on purpose (browser/visual
 # canvas suites, long server stress/integration): e.g. renderer-canvas `browser-client`, `input-forwarding`,
 # `visual-regression`; server `server-rapid-update-integration`, `server-transport-stress`. Compare `find
