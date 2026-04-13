@@ -34,6 +34,8 @@ fi
 # External agent prompts sometimes say to grep raw `[ ]` anywhere in ROADMAP — that is still the same footgun:
 # without a leading `-` anchor, `[ ]` is often parsed as a one-space character class, not a Markdown checkbox.
 # Always interpret "unchecked roadmap items" as line-anchored list checkboxes (`- [ ]` / `^- \[ \]`), never prose.
+# Maintainer-only release playbooks (`RELEASE_CHECKLIST.md`, `v1-release-checklist.md`) use the same checkbox
+# shape for ship steps — do not treat matches there as framework/engineering backlog when searching for work.
 # Both trackers may already be all `[x]` — that only means unchecked checkbox backlog is exhausted there,
 # not that the repo is "done". ROADMAP "Deferred / research" uses plain bullets (no `- [ ]`), so an empty
 # roadmap grep does not mean no roadmap-backed themes — read that subsection when casting next work (RTL through
@@ -107,8 +109,6 @@ fi
 # Interaction / protocol / renderer changes: skim `FRAMEWORK_NORTH_STAR.md` merge checklist (DOM-free invariants,
 # input tests, perf hot paths, docs accuracy) before shipping.
 # In `build_prompt`'s `cat <<EOF` body, escape Markdown backticks as \\`…\\` — unescaped \`path\` runs shell command substitution and drops file names from the agent prompt (stderr: "command not found").
-# Ignore `[ ]` in RELEASE_CHECKLIST.md / v1-release-checklist.md
-# (maintainer release steps, not framework backlog).
 # A few `packages/*/src/__tests__/**/*.test.ts` files stay outside `release:gate` on purpose (browser/visual
 # canvas suites, long server stress/integration): e.g. renderer-canvas `browser-client`, `input-forwarding`,
 # `visual-regression`; server `server-rapid-update-integration`, `server-transport-stress`. Compare `find
