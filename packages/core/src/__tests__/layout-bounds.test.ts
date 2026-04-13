@@ -468,6 +468,26 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(-10, -19, -10, -20, 0, 0)).toBe(false)
   })
 
+  it('zero width with positive height is a vertical segment (inclusive x = absX only; y spans absY..absY+height)', () => {
+    expect(pointInInclusiveLayoutRect(5, 7, 5, 0, 0, 20)).toBe(true)
+    expect(pointInInclusiveLayoutRect(5, 0, 5, 0, 0, 20)).toBe(true)
+    expect(pointInInclusiveLayoutRect(5, 20, 5, 0, 0, 20)).toBe(true)
+    expect(pointInInclusiveLayoutRect(5.001, 7, 5, 0, 0, 20)).toBe(false)
+    expect(pointInInclusiveLayoutRect(4.999, 7, 5, 0, 0, 20)).toBe(false)
+    expect(pointInInclusiveLayoutRect(5, 21, 5, 0, 0, 20)).toBe(false)
+    expect(pointInInclusiveLayoutRect(5, -0.001, 5, 0, 0, 20)).toBe(false)
+  })
+
+  it('zero height with positive width is a horizontal segment (inclusive y = absY only; x spans absX..absX+width)', () => {
+    expect(pointInInclusiveLayoutRect(7, 3, 0, 3, 20, 0)).toBe(true)
+    expect(pointInInclusiveLayoutRect(0, 3, 0, 3, 20, 0)).toBe(true)
+    expect(pointInInclusiveLayoutRect(20, 3, 0, 3, 20, 0)).toBe(true)
+    expect(pointInInclusiveLayoutRect(7, 3.001, 0, 3, 20, 0)).toBe(false)
+    expect(pointInInclusiveLayoutRect(7, 2.999, 0, 3, 20, 0)).toBe(false)
+    expect(pointInInclusiveLayoutRect(21, 3, 0, 3, 20, 0)).toBe(false)
+    expect(pointInInclusiveLayoutRect(-0.001, 3, 0, 3, 20, 0)).toBe(false)
+  })
+
   it('treats subnormal width at extreme absX as a collapsed rect: absX+width rounds to absX; inclusive min corner still hits', () => {
     const absX = Number.MAX_VALUE
     const w = Number.MIN_VALUE
