@@ -97,6 +97,8 @@ fi
 # After hand-editing `scripts.release:gate` in package.json, run `node scripts/release/verify-release-gate.mjs` from the
 # repo root to validate the vitest argv (duplicate paths, `..` escapes, forward slashes) without waiting for the full
 # vitest batch — same verifier as the first `&&` segment of `npm run release:gate`.
+# A full `npm run release:gate` already invokes that verifier first; do not assume you must run the verifier again
+# after a green gate unless you changed `package.json` again before committing.
 # CI order (`.github/workflows/quality.yml` `quality` job, sequential — first failing step stops the job):
 #   lint → fast tests (`bun run test` / vitest.fast.config.ts) → build → `benchmark:mcp-flow:all -- --assert`
 #   → `examples:smoke` → `e2e:demo` → `release:gate` (last). A green local `release:gate` does **not** prove
@@ -261,7 +263,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
    npm run release:gate
    (\`bun run release:gate\` is equivalent — same script; CI uses Bun.)
    The gate ends with \`bun run test:terminal-input\` (see root package.json) — \`bun\` must be on PATH. If that fails, fix issues and re-run until it passes (or stop with a clear explanation if blocked by environment).
-   If you edited \`scripts.release:gate\` in package.json, run \`node scripts/release/verify-release-gate.mjs\` first to catch duplicate/malformed vitest paths before the long vitest batch (same check as the first \`&&\` segment of the gate).
+   The first \`&&\` segment of \`release:gate\` is already \`node scripts/release/verify-release-gate.mjs\` — a full gate run validates the vitest allowlist before vitest starts. Run \`verify-release-gate.mjs\` **alone** only when iterating on \`scripts.release:gate\` in package.json and you want fast feedback without the full vitest batch; after a green \`npm run release:gate\`, you do not need a second verify pass unless you edit \`package.json\` again.
    CI (\`.github/workflows/quality.yml\`) runs lint → fast tests → build → \`benchmark:mcp-flow:all -- --assert\` → examples:smoke → e2e:demo → \`release:gate\` in order (first failure stops the job). A green local \`release:gate\` does not prove lint, fast tests, build, benchmarks, examples, or E2E passed. When your change touches demos, \`create:app\`, examples scripts, demo E2E surfaces, or MCP benchmark scripts / harness expectations, run the matching subset locally (not only the gate).
 
 5. If you made real changes: git add only what belongs to this task, then git commit with a conventional message (feat:/fix:/chore:/docs:/test:/perf:/refactor: as appropriate).
