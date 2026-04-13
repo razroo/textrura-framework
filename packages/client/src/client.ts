@@ -1,5 +1,10 @@
 import type { ComputedLayout } from 'textura'
-import { layoutBoundsAreFinite, type Renderer, type UIElement } from '@geometra/core'
+import {
+  isFinitePlainNumber,
+  layoutBoundsAreFinite,
+  type Renderer,
+  type UIElement,
+} from '@geometra/core'
 import { decodeBinaryFrameJson, type BinaryFrameBytes } from './binary-frame.js'
 
 function asBinaryFrameBytes(data: unknown): BinaryFrameBytes {
@@ -101,17 +106,20 @@ function isPlainLayoutTreeValue(v: unknown): v is Record<string, unknown> {
   return Object.getPrototypeOf(v) === Object.prototype
 }
 
+/**
+ * Wire-safe optional `x`/`y`: finite primitive numbers only (same `isFinitePlainNumber` rule as server
+ * `coalescePatches` / `diffLayout` in `packages/server/src/protocol.ts`).
+ */
 function isOptionalFiniteNumberField(record: Record<string, unknown>, key: string): boolean {
   if (!Object.prototype.hasOwnProperty.call(record, key)) return true
-  const v = record[key]
-  return typeof v === 'number' && Number.isFinite(v)
+  return isFinitePlainNumber(record[key])
 }
 
 /** Like {@link isOptionalFiniteNumberField} but requires `>= 0` when present (layout width/height). */
 function isOptionalNonNegativeFiniteDimensionField(record: Record<string, unknown>, key: string): boolean {
   if (!Object.prototype.hasOwnProperty.call(record, key)) return true
   const v = record[key]
-  return typeof v === 'number' && Number.isFinite(v) && v >= 0
+  return isFinitePlainNumber(v) && v >= 0
 }
 
 /** Each patch must be a plain object with an array `path` of non-negative integer indices. */
