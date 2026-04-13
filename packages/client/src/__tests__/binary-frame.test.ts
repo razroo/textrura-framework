@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { decodeBinaryFrameJson, isBinaryFrameArrayBuffer, MAX_V1_PAYLOAD_BYTES } from '../binary-frame.js'
+import {
+  decodeBinaryFrameJson,
+  isBinaryFrameArrayBuffer,
+  isBinaryFrameBuffer,
+  MAX_V1_PAYLOAD_BYTES,
+} from '../binary-frame.js'
 
 /** Mirrors server v1 envelope layout (see `packages/server/src/binary-frame.ts`). */
 function encodeBinaryFrameJsonV1(jsonUtf8: string): ArrayBuffer {
@@ -21,6 +26,10 @@ function encodeBinaryFrameRawV1(payload: Uint8Array): ArrayBuffer {
 }
 
 describe('isBinaryFrameArrayBuffer', () => {
+  it('isBinaryFrameBuffer is the same function (parity with @geometra/server export name)', () => {
+    expect(isBinaryFrameBuffer).toBe(isBinaryFrameArrayBuffer)
+  })
+
   it('returns false when buffer is shorter than the v1 header', () => {
     expect(isBinaryFrameArrayBuffer(new ArrayBuffer(0))).toBe(false)
     expect(isBinaryFrameArrayBuffer(new ArrayBuffer(8))).toBe(false)

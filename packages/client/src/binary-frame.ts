@@ -97,6 +97,12 @@ export function isBinaryFrameArrayBuffer(data: BinaryFrameBytes): boolean {
 }
 
 /**
+ * Same predicate as {@link isBinaryFrameArrayBuffer}. Use this name when aligning helpers with
+ * `@geometra/server` `isBinaryFrameBuffer` (identical guards; browser bundle keeps both exports).
+ */
+export const isBinaryFrameBuffer = isBinaryFrameArrayBuffer
+
+/**
  * Decode JSON string from a v1 binary envelope (browser).
  * Bytes after `header + payloadLength` are ignored so callers may pass a longer backing buffer.
  * Accepts a root `ArrayBuffer` / `SharedArrayBuffer` or any `ArrayBufferView` with the same semantics as
