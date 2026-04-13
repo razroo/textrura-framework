@@ -89,9 +89,9 @@ function getChildrenByZAsc(boxEl: BoxElement): number[] {
   }
 
   const cached = zIndexOrderCache.get(boxEl)
-  if (cached && cached.zValues.length === kids.length) {
+  if (cached && cached.zValues.length === n) {
     let unchanged = true
-    for (let i = 0; i < kids.length; i++) {
+    for (let i = 0; i < n; i++) {
       if (cached.zValues[i] !== zIndexOf(kids[i]!)) {
         unchanged = false
         break
@@ -100,18 +100,24 @@ function getChildrenByZAsc(boxEl: BoxElement): number[] {
     if (unchanged) return cached.asc
   }
 
-  const zValues = kids.map(child => zIndexOf(child))
-  const asc = kids
-    .map((_, i) => i)
-    .sort((a, b) => {
-      const za = zValues[a]!
-      const zb = zValues[b]!
-      if (za < zb) return -1
-      if (za > zb) return 1
-      // Same z-index: keep source order (ascending index). Hit-test walks this list in reverse so the
-      // last sibling wins, matching canvas/terminal paint order for stacked ties.
-      return a - b
-    })
+  // Single pass: stale or missing cache must not re-call zIndexOf after validation (was map + prior loop).
+  const zValues = new Array<number>(n)
+  for (let i = 0; i < n; i++) {
+    zValues[i] = zIndexOf(kids[i]!)
+  }
+  const asc = new Array<number>(n)
+  for (let i = 0; i < n; i++) {
+    asc[i] = i
+  }
+  asc.sort((a, b) => {
+    const za = zValues[a]!
+    const zb = zValues[b]!
+    if (za < zb) return -1
+    if (za > zb) return 1
+    // Same z-index: keep source order (ascending index). Hit-test walks this list in reverse so the
+    // last sibling wins, matching canvas/terminal paint order for stacked ties.
+    return a - b
+  })
   zIndexOrderCache.set(boxEl, { zValues, asc })
   return asc
 }
