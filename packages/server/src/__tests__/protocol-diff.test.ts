@@ -470,6 +470,27 @@ describe('coalescePatches', () => {
     ).toEqual([{ path: [1], x: 2 }])
   })
 
+  it('ignores string and boolean geometry fields (typeof guard; corrupt JSON must not coerce)', () => {
+    expect(
+      coalescePatches([
+        { path: [0], x: 10, y: 2, width: 40, height: 30 },
+        {
+          path: [0],
+          x: '20' as unknown as number,
+          y: true as unknown as number,
+          width: '50' as unknown as number,
+          height: false as unknown as number,
+        },
+      ]),
+    ).toEqual([{ path: [0], x: 10, y: 2, width: 40, height: 30 }])
+    expect(
+      coalescePatches([
+        { path: [1], x: 1 },
+        { path: [1], x: '99' as unknown as number },
+      ]),
+    ).toEqual([{ path: [1], x: 1 }])
+  })
+
   it('coalesces burst updates to the root path (empty path segment)', () => {
     const merged = coalescePatches([
       { path: [], x: 1 },
