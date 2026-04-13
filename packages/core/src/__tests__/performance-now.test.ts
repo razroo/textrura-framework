@@ -65,6 +65,13 @@ describe('safePerformanceNowMs', () => {
     expect(safePerformanceNowMs()).toBe(0)
   })
 
+  it('returns 0 when now() returns null or undefined (typeof null is object; no loose equality to number)', () => {
+    vi.stubGlobal('performance', { now: () => null as unknown as number })
+    expect(safePerformanceNowMs()).toBe(0)
+    vi.stubGlobal('performance', { now: () => undefined as unknown as number })
+    expect(safePerformanceNowMs()).toBe(0)
+  })
+
   it('returns 0 when globalThis.performance is undefined', () => {
     // @ts-expect-error — simulate host without Performance API
     vi.stubGlobal('performance', undefined)
@@ -92,6 +99,13 @@ describe('readPerformanceNow', () => {
     vi.stubGlobal('performance', { now: () => Object(7) as unknown as number })
     expect(readPerformanceNow()).toBe(0)
     vi.stubGlobal('performance', { now: () => 1n as unknown as number })
+    expect(readPerformanceNow()).toBe(0)
+  })
+
+  it('maps null and undefined now() results to 0 (typeof null is object; typeof undefined is undefined)', () => {
+    vi.stubGlobal('performance', { now: () => null as unknown as number })
+    expect(readPerformanceNow()).toBe(0)
+    vi.stubGlobal('performance', { now: () => undefined as unknown as number })
     expect(readPerformanceNow()).toBe(0)
   })
 
