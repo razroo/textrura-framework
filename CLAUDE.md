@@ -9,6 +9,7 @@ See **`INTEGRATION_COOKBOOK.md`** for canvas, server/client, and DOM-free migrat
 See **`PLATFORM_AUTH.md`** for `@geometra/auth`, `@geometra/token-registry`, and the WebSocket auth contract.
 See **`PROTOCOL_EVOLUTION.md`** for server/client protocol versioning beyond GEOM v1.
 See **`GEOMETRY_SNAPSHOT_TESTING.md`** for layout JSON / geometry regression patterns in CI.
+See **`DEPLOYMENT.md`** for production deployment: process management, reverse proxy, auth, scaling, monitoring.
 
 ## Architecture
 
