@@ -602,6 +602,18 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(0, 0n as unknown as number, 0, 0, 10, 10)).toBe(false)
   })
 
+  it('returns false for symbol or boolean pointer coords without throwing (Number.isFinite requires a primitive number)', () => {
+    const sym = Symbol('p') as unknown as number
+    expect(() => pointInInclusiveLayoutRect(sym, 0, 0, 0, 10, 10)).not.toThrow()
+    expect(pointInInclusiveLayoutRect(sym, 0, 0, 0, 10, 10)).toBe(false)
+    expect(() => pointInInclusiveLayoutRect(0, sym, 0, 0, 10, 10)).not.toThrow()
+    expect(pointInInclusiveLayoutRect(0, sym, 0, 0, 10, 10)).toBe(false)
+    expect(() => pointInInclusiveLayoutRect(true as unknown as number, 0, 0, 0, 10, 10)).not.toThrow()
+    expect(pointInInclusiveLayoutRect(true as unknown as number, 0, 0, 0, 10, 10)).toBe(false)
+    expect(() => pointInInclusiveLayoutRect(0, false as unknown as number, 0, 0, 10, 10)).not.toThrow()
+    expect(pointInInclusiveLayoutRect(0, false as unknown as number, 0, 0, 10, 10)).toBe(false)
+  })
+
   it('returns false for bigint rect origin or size without throwing (corrupt abs layout / bad coercion)', () => {
     const b = 3n as unknown as number
     expect(() => pointInInclusiveLayoutRect(0, 0, b, 0, 10, 10)).not.toThrow()
