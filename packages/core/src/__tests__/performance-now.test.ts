@@ -60,6 +60,20 @@ describe('safePerformanceNowMs', () => {
     expect(readPerformanceNow()).toBe(22.25)
   })
 
+  it('returns 0 when inherited prototype now is not callable (typeof perf.now must be function)', () => {
+    const badProto = Object.create({ now: 404 })
+    vi.stubGlobal('performance', badProto)
+    expect(safePerformanceNowMs()).toBe(0)
+    expect(readPerformanceNow()).toBe(0)
+  })
+
+  it('returns 0 when own-property now is explicitly undefined (partial polyfill / corrupt embedder)', () => {
+    // @ts-expect-error — exercise Object.prototype-style own field without a callable implementation
+    vi.stubGlobal('performance', { now: undefined })
+    expect(safePerformanceNowMs()).toBe(0)
+    expect(readPerformanceNow()).toBe(0)
+  })
+
   it('maps NaN and non-finite now() results to 0', () => {
     vi.stubGlobal('performance', { now: () => Number.NaN })
     expect(safePerformanceNowMs()).toBe(0)
