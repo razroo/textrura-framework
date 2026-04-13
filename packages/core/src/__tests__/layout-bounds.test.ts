@@ -1242,4 +1242,29 @@ describe('composed scroll + inclusive rect (hit-test coordinate space)', () => {
     const inner = scrollSafeChildOffsets(innerAbsX, innerAbsY, 5, 0)!
     expect(inner).toEqual({ ox: 45, oy: 80 })
   })
+
+  it('nested scroll containers: four levels chain abs + scroll the same way as collectHits (mixed axes per level)', () => {
+    // L1 root (0,0): horizontal scroll 10.
+    const l1 = scrollSafeChildOffsets(0, 0, 10, 0)!
+    expect(l1).toEqual({ ox: -10, oy: 0 })
+    // L2: content at (100, 0) relative to L1; vertical scroll 5.
+    const l2AbsX = l1.ox + 100
+    const l2AbsY = l1.oy + 0
+    expect(l2AbsX).toBe(90)
+    const l2 = scrollSafeChildOffsets(l2AbsX, l2AbsY, 0, 5)!
+    expect(l2).toEqual({ ox: 90, oy: -5 })
+    // L3: content at (0, 50); horizontal scroll 8.
+    const l3AbsX = l2.ox + 0
+    const l3AbsY = l2.oy + 50
+    expect(l3AbsY).toBe(45)
+    const l3 = scrollSafeChildOffsets(l3AbsX, l3AbsY, 8, 0)!
+    expect(l3).toEqual({ ox: 82, oy: 45 })
+    // L4: content at (20, 10); vertical scroll 3.
+    const l4AbsX = l3.ox + 20
+    const l4AbsY = l3.oy + 10
+    expect(l4AbsX).toBe(102)
+    expect(l4AbsY).toBe(55)
+    const l4 = scrollSafeChildOffsets(l4AbsX, l4AbsY, 0, 3)!
+    expect(l4).toEqual({ ox: 102, oy: 52 })
+  })
 })
