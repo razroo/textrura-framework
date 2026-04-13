@@ -116,7 +116,8 @@ export function layoutBoundsAreFinite(layout: ComputedLayout): boolean {
  * two large finite operands can still produce `±Infinity`, and naive `x <= absX + width` would then accept
  * every finite `x`. Shared by hit-testing and overflow clipping so behavior stays consistent.
  *
- * @param x — Pointer X (must be a finite primitive `number`; non-numbers yield `false` via `Number.isFinite`).
+ * @param x — Pointer X; must pass the same primitive finite-number guard as {@link layoutBoundsAreFinite}
+ *   (`typeof` + `Number.isFinite`; boxed numbers and non-numbers yield `false`).
  * @param y — Pointer Y (same rules as `x`).
  * @param absX — Rectangle minimum X in the same coordinate space as `x`.
  * @param absY — Rectangle minimum Y in the same coordinate space as `y`.
@@ -133,12 +134,12 @@ export function pointInInclusiveLayoutRect(
   height: number,
 ): boolean {
   if (
-    !Number.isFinite(x) ||
-    !Number.isFinite(y) ||
-    !Number.isFinite(absX) ||
-    !Number.isFinite(absY) ||
-    !Number.isFinite(width) ||
-    !Number.isFinite(height) ||
+    !isFiniteLayoutNumber(x) ||
+    !isFiniteLayoutNumber(y) ||
+    !isFiniteLayoutNumber(absX) ||
+    !isFiniteLayoutNumber(absY) ||
+    !isFiniteLayoutNumber(width) ||
+    !isFiniteLayoutNumber(height) ||
     width < 0 ||
     height < 0
   ) {
