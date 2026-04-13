@@ -1660,6 +1660,28 @@ describe('dispatchHit', () => {
     expect(log).toEqual(['high'])
   })
 
+  it('overlapping siblings: three distinct z-index values prefer the highest when DOM order is not z-sorted (multi-child sort path)', () => {
+    const log: string[] = []
+    const low = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('low') } })
+    const mid = box({ width: 50, height: 50, zIndex: 5, onClick: () => { log.push('mid') } })
+    const high = box({ width: 50, height: 50, zIndex: 10, onClick: () => { log.push('high') } })
+    const root = box({ width: 100, height: 100 }, [mid, low, high])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['high'])
+  })
+
   it('overlapping siblings: four distinct z-index values prefer the highest (map+sort path; non-two-child fast paths)', () => {
     const log: string[] = []
     const a = box({ width: 50, height: 50, zIndex: 2, onClick: () => { log.push('a') } })
