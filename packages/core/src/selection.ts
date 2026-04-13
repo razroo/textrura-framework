@@ -65,6 +65,9 @@ export interface SelectionRange {
  * When `abs - scroll` overflows to non-finite values, child subtrees are skipped (same
  * {@link import('./layout-bounds.js').scrollSafeChildOffsets} rule as hit-testing) so corrupt extremes
  * cannot emit text nodes with non-finite coordinates.
+ * When `offsetX + layout.x` or `offsetY + layout.y` overflows IEEE double range, the walk returns without
+ * emitting nodes for that subtree (same non-finite absolute-origin rule as
+ * {@link import('./layout-bounds.js').pointInInclusiveLayoutRect} in hit-testing).
  *
  * Sibling order is **element child index** (tree source order), not {@link import('./types.js').StyleProps.zIndex}
  * paint order — pointer routing uses z-index for topmost hits; selection indexing stays stable for a11y and ranges.
@@ -99,6 +102,8 @@ function collectTextNodesWalk(
 
   const x = offsetX + layout.x
   const y = offsetY + layout.y
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return
+
   const direction = resolveElementDirection(element, parentDirection)
 
   if (element.kind === 'text') {

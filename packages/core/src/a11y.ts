@@ -85,6 +85,19 @@ function roleFor(element: UIElement): string {
   return inferBoxRole(element)
 }
 
+/** Degenerate node when geometry is unusable — matches corrupt-layout handling. */
+function degenerateAccessibilityNode(element: UIElement, path: number[]): AccessibilityNode {
+  return {
+    role: roleFor(element),
+    ...(inferName(element) !== undefined ? { name: inferName(element) } : {}),
+    ...(stateFor(element) !== undefined ? { state: stateFor(element) } : {}),
+    bounds: { x: 0, y: 0, width: 0, height: 0 },
+    path,
+    children: [],
+    focusable: false,
+  }
+}
+
 function walk(
   element: UIElement,
   layout: ComputedLayout,
@@ -93,19 +106,15 @@ function walk(
   path: number[],
 ): AccessibilityNode {
   if (!layoutBoundsAreFinite(layout)) {
-    return {
-      role: roleFor(element),
-      ...(inferName(element) !== undefined ? { name: inferName(element) } : {}),
-      ...(stateFor(element) !== undefined ? { state: stateFor(element) } : {}),
-      bounds: { x: 0, y: 0, width: 0, height: 0 },
-      path,
-      children: [],
-      focusable: false,
-    }
+    return degenerateAccessibilityNode(element, path)
   }
 
   const x = offsetX + layout.x
   const y = offsetY + layout.y
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    return degenerateAccessibilityNode(element, path)
+  }
+
   const children: AccessibilityNode[] = []
 
   if (element.kind === 'box') {
@@ -137,6 +146,8 @@ function walk(
  * leaf with zero bounds, no children, and `focusable: false` (even if it has pointer/keyboard handlers).
  * Subtrees under corrupt geometry are not walked — same rule as {@link import('./focus.js').collectFocusOrder}
  * and hit-testing so bad Yoga output cannot surface misleading bounds or hidden descendants.
+ * When composed absolute `offsetX + layout.x` / `offsetY + layout.y` overflows to non-finite values, the
+ * same degenerate node is emitted (no infinite bounds from IEEE double sums).
  */
 export function toAccessibilityTree(tree: UIElement, layout: ComputedLayout): AccessibilityNode {
   return walk(tree, layout, 0, 0, [])

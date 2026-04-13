@@ -48,6 +48,47 @@ describe('collectTextNodes', () => {
     expect(results[0].direction).toBe('ltr')
   })
 
+  it('skips text collection when offset plus layout origin overflows to non-finite abs (IEEE double sum)', () => {
+    const max = Number.MAX_VALUE
+    expect(max + max).toBe(Infinity)
+    const el = text({ text: 'Lost', font: '14px sans-serif', lineHeight: 18, width: 10, height: 18 })
+    const layout: ComputedLayout = {
+      x: max,
+      y: 0,
+      width: 10,
+      height: 18,
+      children: [],
+    }
+    const results: TextNodeInfo[] = []
+    collectTextNodes(el, layout, max, 0, results)
+    expect(results).toHaveLength(0)
+  })
+
+  it('skips nested text when an ancestor box abs overflows before the text leaf (subtree not walked)', () => {
+    const max = Number.MAX_VALUE
+    const innerText = text({ text: 'Inside', font: '14px sans-serif', lineHeight: 18, width: 10, height: 18 })
+    const inner = box({ width: 50, height: 50 }, [innerText])
+    const el = box({ width: 100, height: 100 }, [inner])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        {
+          x: max,
+          y: 0,
+          width: 50,
+          height: 50,
+          children: [{ x: 0, y: 0, width: 10, height: 18, children: [] }],
+        },
+      ],
+    }
+    const results: TextNodeInfo[] = []
+    collectTextNodes(el, layout, max, 0, results)
+    expect(results).toHaveLength(0)
+  })
+
   it('skips image and scene3d leaves but still collects sibling text (non-box branches are terminal)', () => {
     const el = box({ width: 300, height: 100 }, [
       text({ text: 'A', font: '14px sans-serif', lineHeight: 18, width: 40, height: 18 }),

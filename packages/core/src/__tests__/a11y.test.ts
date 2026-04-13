@@ -271,6 +271,38 @@ describe('toAccessibilityTree', () => {
     expect(a11y.focusable).toBe(false)
   })
 
+  it('emits zero bounds for a text node when offset plus layout overflows (nested MAX_VALUE + MAX_VALUE)', () => {
+    const max = Number.MAX_VALUE
+    const innerText = text({ text: 'Hi', font: '14px Inter', lineHeight: 18, width: 10, height: 18 })
+    const inner = box({ width: 50, height: 50 }, [innerText])
+    const tree = box({ width: 100, height: 100 }, [inner])
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        {
+          x: max,
+          y: 0,
+          width: 50,
+          height: 50,
+          children: [{ x: max, y: 0, width: 10, height: 18, children: [] }],
+        },
+      ],
+    }
+    const a11y = toAccessibilityTree(tree, layout)
+    expect(a11y.children).toHaveLength(1)
+    const mid = a11y.children[0]!
+    expect(mid.bounds.x).toBe(max)
+    expect(mid.children).toHaveLength(1)
+    const leaf = mid.children[0]!
+    expect(leaf.role).toBe('text')
+    expect(leaf.bounds).toEqual({ x: 0, y: 0, width: 0, height: 0 })
+    expect(leaf.children).toEqual([])
+    expect(leaf.focusable).toBe(false)
+  })
+
   it('maps common semantic tags for nav/list/form patterns', () => {
     const tree = box({ semantic: { tag: 'main' } }, [
       box({ semantic: { tag: 'nav' } }, [
