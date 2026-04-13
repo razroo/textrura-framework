@@ -1409,6 +1409,19 @@ describe('findInTextNodes', () => {
     ])
   })
 
+  it('matches lone unpaired surrogate code units (invalid UTF-16; still one index per code unit like canvas)', () => {
+    const high = '\uD800'
+    const low = '\uDC00'
+    expect(high.length).toBe(1)
+    expect(low.length).toBe(1)
+    expect(findInTextNodes([stubTextNode(0, high)], high)).toEqual([
+      { anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 1 },
+    ])
+    expect(findInTextNodes([stubTextNode(0, low)], low)).toEqual([
+      { anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 1 },
+    ])
+  })
+
   it('does not match in lowercased space when case-folding changes UTF-16 length (İ vs i+combining)', () => {
     const ch = '\u0130' // Turkish capital I with dot; default-locale toLowerCase() expands to two UTF-16 code units
     expect(ch.length).toBe(1)
