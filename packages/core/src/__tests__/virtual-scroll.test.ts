@@ -37,6 +37,12 @@ describe('inclusiveEndIndex', () => {
     expect(Number.isFinite(inclusiveEndIndex(0, Number.NaN, 5))).toBe(true)
   })
 
+  it('returns finite spanEnd when maxIndex is +Infinity (corrupt cap; same non-finite maxIndex branch as NaN)', () => {
+    expect(inclusiveEndIndex(0, Number.POSITIVE_INFINITY, 5)).toBe(4)
+    expect(inclusiveEndIndex(3, Number.POSITIVE_INFINITY, 4)).toBe(6)
+    expect(Number.isFinite(inclusiveEndIndex(0, Number.POSITIVE_INFINITY, 5))).toBe(true)
+  })
+
   it('allows a negative inclusive end when safeWindow is 0 and spanEnd stays finite (callers should pass window ≥ 1)', () => {
     // start 0, window 0 → spanEnd = -1; Math.min(maxIndex, -1) is negative — distinct from syncVirtualWindow (always floors window to ≥ 1).
     expect(inclusiveEndIndex(0, 100, 0)).toBe(-1)
