@@ -62,6 +62,13 @@ describe('safePerformanceNowMs', () => {
     expect(Object.is(t, -0)).toBe(true)
   })
 
+  it('preserves small positive finite now() values including subnormals (only NaN/±Infinity map to 0)', () => {
+    vi.stubGlobal('performance', { now: () => Number.MIN_VALUE })
+    expect(safePerformanceNowMs()).toBe(Number.MIN_VALUE)
+    vi.stubGlobal('performance', { now: () => Number.EPSILON })
+    expect(safePerformanceNowMs()).toBe(Number.EPSILON)
+  })
+
   it('returns 0 when performance or now is missing', () => {
     // @ts-expect-error — exercise partial global
     vi.stubGlobal('performance', {})
@@ -159,6 +166,13 @@ describe('readPerformanceNow', () => {
     vi.stubGlobal('performance', { now: () => -0 })
     const t = readPerformanceNow()
     expect(Object.is(t, -0)).toBe(true)
+  })
+
+  it('passes through small positive finite now() values including subnormals (read path does not clamp)', () => {
+    vi.stubGlobal('performance', { now: () => Number.MIN_VALUE })
+    expect(readPerformanceNow()).toBe(Number.MIN_VALUE)
+    vi.stubGlobal('performance', { now: () => Number.EPSILON })
+    expect(readPerformanceNow()).toBe(Number.EPSILON)
   })
 
   it('maps non-number now() results to 0 without coercion', () => {
