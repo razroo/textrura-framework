@@ -1005,3 +1005,24 @@ describe('finiteNumberOrZero', () => {
     expect(finiteNumberOrZero(exotic)).toBe(0)
   })
 })
+
+describe('composed scroll + inclusive rect (hit-test coordinate space)', () => {
+  it('interior point hits child rect built from scroll-adjusted origin plus relative layout', () => {
+    const o = scrollSafeChildOffsets(50, 80, 10, 20)!
+    expect(o).toEqual({ ox: 40, oy: 60 })
+    const childX = 5
+    const childY = 7
+    const w = 32
+    const h = 18
+    const midX = o.ox + childX + w / 2
+    const midY = o.oy + childY + h / 2
+    expect(pointInInclusiveLayoutRect(midX, midY, o.ox + childX, o.oy + childY, w, h)).toBe(true)
+  })
+
+  it('negative scroll-adjusted origin: inclusive point test stays stable when scroll exceeds abs (overscroll)', () => {
+    const o = scrollSafeChildOffsets(20, 20, 100, 100)!
+    expect(o).toEqual({ ox: -80, oy: -80 })
+    expect(pointInInclusiveLayoutRect(o.ox + 50, o.oy + 50, o.ox, o.oy, 200, 200)).toBe(true)
+    expect(pointInInclusiveLayoutRect(o.ox - 0.001, o.oy, o.ox, o.oy, 200, 200)).toBe(false)
+  })
+})
