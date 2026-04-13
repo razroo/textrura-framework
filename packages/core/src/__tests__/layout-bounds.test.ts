@@ -1085,4 +1085,17 @@ describe('composed scroll + inclusive rect (hit-test coordinate space)', () => {
     expect(absX + w).toBe(Infinity)
     expect(pointInInclusiveLayoutRect(absX, absY, absX, absY, w, h)).toBe(false)
   })
+
+  it('nested scroll containers: sequential scrollSafeChildOffsets matches hit-test offset chaining', () => {
+    // Outer box: abs origin (0,0) with horizontal scroll — same as collectHits(abs, scroll) before walking children.
+    const outer = scrollSafeChildOffsets(0, 0, 50, 0)!
+    expect(outer).toEqual({ ox: -50, oy: 0 })
+    // Inner box laid out at (100, 0) relative to outer content; abs = parent child origin + layout.x/y.
+    const innerAbsX = outer.ox + 100
+    const innerAbsY = outer.oy + 0
+    expect(innerAbsX).toBe(50)
+    const inner = scrollSafeChildOffsets(innerAbsX, innerAbsY, 20, 0)!
+    // Inner abs 50 in root space, minus inner scroll 20 → child origin 30 (matches collectHits recursion).
+    expect(inner).toEqual({ ox: 30, oy: 0 })
+  })
 })
