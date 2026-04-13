@@ -2,23 +2,6 @@ import type { LayoutNode } from 'textura'
 import type { UIElement } from './types.js'
 
 /**
- * Removes paint, hit-target, scroll-container, and non-Yoga metadata from element props.
- * Keep this list aligned with {@link StyleProps}, text/image-only fields, `selectable`, and runtime
- * metadata (`key`, `semantic`) that belong on {@link UIElement} but must never reach Yoga when mistakenly
- * present on `props` (bad casts / corrupt snapshots).
- * (see tests in `tree.test.ts`). Per-node `dir` is forwarded to Textura for non-root nodes only
- * (see {@link toLayoutTree}).
- *
- * `overflow`, `scrollX`, and `scrollY` stay on the **live** {@link UIElement} tree for
- * {@link import('./hit-test.js').dispatchHit}, canvas/terminal paint, and {@link import('./selection.js').collectTextNodes},
- * but are omitted here so the Textura snapshot stays a pure flex/measure input. Scroll offsets and parent-bounds
- * containment come from the live tree in hit-testing/selection; renderers apply `overflow` clip modes when painting
- * instead of threading these props through Yoga/WASM for layout.
- *
- * {@link import('./types.js').EventHandlers} keys (any `on` + uppercase prefix), and a mistaken `handlers` bag on
- * `props`, are stripped so bad casts, manual trees, or corrupt snapshots cannot thread functions into the layout pipeline.
- */
-/**
  * Strip `onFoo`-style handler keys (leading `on` + uppercase) so stray callbacks from bad casts or
  * DOM-era names never reach Textura/Yoga. Matches every {@link import('./types.js').EventHandlers} name
  * and unknown `on*` props such as `onUnknown`, without touching keys like `online` or `onlyChild`.
@@ -29,6 +12,24 @@ function stripOnHandlerProps(layoutProps: Record<string, unknown>): void {
   }
 }
 
+/**
+ * Shallow-copy `props` and remove paint, hit-target, scroll-container, and non-Yoga metadata before Yoga.
+ *
+ * Keep the delete list aligned with {@link StyleProps}, text/image-only fields, `selectable`, and runtime
+ * metadata (`key`, `semantic`) that belong on {@link UIElement} but must never reach Yoga when mistakenly
+ * present on `props` (bad casts / corrupt snapshots). See `tree.test.ts`. Per-node `dir` is forwarded to Textura
+ * for non-root nodes only (see {@link toLayoutTree}).
+ *
+ * `overflow`, `scrollX`, and `scrollY` stay on the **live** {@link UIElement} tree for
+ * {@link import('./hit-test.js').dispatchHit}, canvas/terminal paint, and {@link import('./selection.js').collectTextNodes},
+ * but are omitted here so the Textura snapshot stays a pure flex/measure input. Scroll offsets and parent-bounds
+ * containment come from the live tree in hit-testing/selection; renderers apply `overflow` clip modes when painting
+ * instead of threading these props through Yoga/WASM for layout.
+ *
+ * {@link import('./types.js').EventHandlers} keys (any `on` + uppercase prefix), mistaken `handlers` on `props`,
+ * and keys removed above are stripped so bad casts, manual trees, or corrupt snapshots cannot thread functions or
+ * paint-only fields into the layout pipeline. Runs {@link stripOnHandlerProps} first.
+ */
 function stripStyleProps(props: Record<string, unknown>): Record<string, unknown> {
   const layoutProps = { ...props }
   stripOnHandlerProps(layoutProps)
