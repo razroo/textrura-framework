@@ -14,6 +14,22 @@ import {
 
 const V1_FIXTURES = ['frame.json', 'patch.json', 'error.json'] as const
 
+/**
+ * Browser-shaped v1 GEOM binary envelope (`TextEncoder` UTF-8 + uint32 LE length). `@geometra/client`
+ * intentionally exposes only decode — this mirrors the wire layout embedders use without `Buffer`.
+ */
+function encodeBinaryFrameJsonBrowserStyle(jsonUtf8: string): Uint8Array {
+  const payload = new TextEncoder().encode(jsonUtf8)
+  if (payload.length > MAX_V1_PAYLOAD_BYTES) {
+    throw new RangeError(`payload length ${payload.length} exceeds v1 cap`)
+  }
+  const out = new Uint8Array(9 + payload.length)
+  out.set([0x47, 0x45, 0x4f, 0x4d, 1], 0)
+  new DataView(out.buffer).setUint32(5, payload.length, true)
+  out.set(payload, 9)
+  return out
+}
+
 describe('protocol binary conformance', () => {
   it('server and client share the v1 uint32 payload cap (binary-frame.ts comments)', () => {
     expect(MAX_V1_PAYLOAD_BYTES).toBe(MAX_V1_PAYLOAD_BYTES_CLIENT)
@@ -29,6 +45,25 @@ describe('protocol binary conformance', () => {
     views.push(badMagic, badVersion)
     for (const u8 of views) {
       expect(isBinaryFrameBuffer(u8)).toBe(isBinaryFrameArrayBufferClient(u8))
+    }
+  })
+
+  it('server encodeBinaryFrameJson matches browser TextEncoder wire layout (byte-for-byte v1 envelope)', () => {
+    const literals = ['{}', JSON.stringify({ surf: '🌊', mark: '\u202e' })]
+    for (const asText of literals) {
+      const server = encodeBinaryFrameJson(asText)
+      const browser = encodeBinaryFrameJsonBrowserStyle(asText)
+      expect(Buffer.from(browser).equals(server)).toBe(true)
+      expect(decodeBinaryFrameJsonClient(browser.buffer)).toBe(asText)
+    }
+    for (const name of V1_FIXTURES) {
+      const frame = JSON.parse(
+        readFileSync(new URL(`../../../../fixtures/protocol/v1/${name}`, import.meta.url), 'utf8'),
+      )
+      const asText = JSON.stringify(frame)
+      const server = encodeBinaryFrameJson(asText)
+      const browser = encodeBinaryFrameJsonBrowserStyle(asText)
+      expect(Buffer.from(browser).equals(server)).toBe(true)
     }
   })
 
