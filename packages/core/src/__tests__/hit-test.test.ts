@@ -4077,6 +4077,49 @@ describe('scroll and overflow clipping', () => {
     expect(hitPathAtPoint(parent, layout, max, 50)).toEqual([])
   })
 
+  it('overflow scroll: parent onClick still runs when child offset overflows (descendants skipped; parent stays targetable)', () => {
+    let parentFired = false
+    let localX = 0
+    let localY = 0
+    let childFired = false
+    const child = box({
+      width: 50,
+      height: 50,
+      onClick: () => {
+        childFired = true
+      },
+    })
+    const max = Number.MAX_VALUE
+    const parent = box(
+      {
+        width: 100,
+        height: 100,
+        overflow: 'scroll',
+        scrollX: -max,
+        onClick: e => {
+          parentFired = true
+          localX = e.localX
+          localY = e.localY
+        },
+      },
+      [child],
+    )
+    const layout = {
+      x: max,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [{ x: 10, y: 10, width: 50, height: 50, children: [] }],
+    }
+    expect(max - -max).toBe(Infinity)
+    const r = dispatchHit(parent, layout, 'onClick', max, 50)
+    expect(r.handled).toBe(true)
+    expect(parentFired).toBe(true)
+    expect(childFired).toBe(false)
+    expect(localX).toBe(0)
+    expect(localY).toBe(50)
+  })
+
   it('hitPathAtPoint resolves path under scrollX', () => {
     const child = box({ width: 50, height: 50 })
     const parent = box({ width: 100, height: 100, overflow: 'scroll', scrollX: 40 }, [child])
