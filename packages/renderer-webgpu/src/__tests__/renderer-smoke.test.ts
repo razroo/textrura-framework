@@ -175,24 +175,47 @@ describe('webgpu renderer smoke', () => {
     )
   })
 
-  it('notifies onFallbackNeeded for text leaves after init (MVP collects solid boxes only)', async () => {
+  it('renders text leaves without fallback after init', async () => {
+    const fakeDevice = {
+      createShaderModule: () => ({}),
+      createRenderPipeline: () => ({}),
+      createPipelineLayout: () => ({}),
+      createBindGroupLayout: () => ({}),
+      createBindGroup: () => ({}),
+      createSampler: () => ({}),
+      createTexture: () => ({ createView: () => ({}), destroy: () => {} }),
+      createCommandEncoder: () => ({
+        beginRenderPass: () => ({ setPipeline: () => {}, setVertexBuffer: () => {}, setBindGroup: () => {}, draw: () => {}, end: () => {} }),
+        finish: () => ({}),
+      }),
+      queue: { writeBuffer: () => {}, submit: () => {}, copyExternalImageToTexture: () => {} },
+      createBuffer: () => ({ destroy: () => {} }),
+    }
     vi.stubGlobal('navigator', {
       gpu: {
         getPreferredCanvasFormat: () => 'bgra8unorm',
         requestAdapter: async () => ({
-          requestDevice: async () => ({
-            createShaderModule: () => ({}),
-            createRenderPipeline: () => ({}),
-            createCommandEncoder: () => ({
-              beginRenderPass: () => ({ setPipeline: () => {}, setVertexBuffer: () => {}, draw: () => {}, end: () => {} }),
-              finish: () => ({}),
-            }),
-            queue: { writeBuffer: () => {}, submit: () => {} },
-            createBuffer: () => ({ destroy: () => {} }),
-          }),
+          requestDevice: async () => fakeDevice,
         }),
       },
     } as unknown as Navigator)
+
+    // Stub OffscreenCanvas for text atlas
+    vi.stubGlobal('OffscreenCanvas', class {
+      width: number
+      height: number
+      constructor(w: number, h: number) { this.width = w; this.height = h }
+      getContext() {
+        return {
+          font: '',
+          textBaseline: '',
+          fillStyle: '',
+          clearRect: () => {},
+          fillText: () => {},
+          measureText: (t: string) => ({ width: t.length * 8 }),
+        }
+      }
+    })
 
     const currentTexture = { createView: () => ({}) }
     const context = {
@@ -221,7 +244,8 @@ describe('webgpu renderer smoke', () => {
     }
     renderer.render(layout, tree)
 
-    expect(onFallbackNeeded).toHaveBeenCalledWith(1)
+    // Text is now rendered natively — no fallback needed
+    expect(onFallbackNeeded).not.toHaveBeenCalled()
   })
 
   it('after init, clamps canvas backing store to 1×1 when root layout width is NaN', async () => {
@@ -232,6 +256,9 @@ describe('webgpu renderer smoke', () => {
           requestDevice: async () => ({
             createShaderModule: () => ({}),
             createRenderPipeline: () => ({}),
+            createPipelineLayout: () => ({}),
+            createBindGroupLayout: () => ({}),
+            createSampler: () => ({}),
             createCommandEncoder: () => ({
               beginRenderPass: () => ({ setPipeline: () => {}, setVertexBuffer: () => {}, draw: () => {}, end: () => {} }),
               finish: () => ({}),
@@ -242,6 +269,15 @@ describe('webgpu renderer smoke', () => {
         }),
       },
     } as unknown as Navigator)
+
+    vi.stubGlobal('OffscreenCanvas', class {
+      width: number
+      height: number
+      constructor(w: number, h: number) { this.width = w; this.height = h }
+      getContext() {
+        return { font: '', textBaseline: '', fillStyle: '', clearRect: () => {}, fillText: () => {}, measureText: () => ({ width: 0 }) }
+      }
+    })
 
     const currentTexture = { createView: () => ({}) }
     const context = {

@@ -27,9 +27,9 @@ Routing competitiveness work is tracked in `ROUTING_COMPETITIVENESS_CHECKLIST.md
 
 ## Deferred / research
 
-- Full RTL/document direction pass through Textura props.
-- Animation primitives beyond current `animation.ts` helpers.
-- Non-canvas render targets (WebGPU, PDF) consuming the same geometry.
+- [x] Full RTL/document direction pass through Textura props — logical-axis layout props (`marginInlineStart/End`, `paddingInlineStart/End`, `borderInlineStart/End`, `insetInlineStart/End`, block-axis equivalents) via Yoga `Edge.Start`/`Edge.End`.
+- Animation primitives beyond current `animation.ts` helpers (choreography, gestures, keyframe scrubbing).
+- [x] Non-canvas render targets (WebGPU, PDF) consuming the same geometry — WebGPU text rendering via canvas atlas; `@geometra/renderer-pdf` raw PDF 1.4 generation.
 
 ## Post-1.0 execution plan (1.x)
 

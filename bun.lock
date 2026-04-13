@@ -118,6 +118,20 @@
         "vite": "^8.0.3",
       },
     },
+    "demos/mcp-native-crud": {
+      "name": "@geometra/demo-mcp-native-crud",
+      "dependencies": {
+        "@geometra/client": "*",
+        "@geometra/core": "*",
+        "@geometra/renderer-canvas": "*",
+        "@geometra/server": "*",
+        "@geometra/ui": "*",
+      },
+      "devDependencies": {
+        "tsx": "^4.19.0",
+        "vite": "^8.0.3",
+      },
+    },
     "demos/mcp-radix-fixture": {
       "name": "@geometra/demo-mcp-radix-fixture",
       "dependencies": {
@@ -188,7 +202,7 @@
     },
     "packages/agent": {
       "name": "@geometra/agent",
-      "version": "1.37.0",
+      "version": "1.49.0",
       "dependencies": {
         "@geometra/core": "^1.6.0",
         "@geometra/server": "^1.6.0",
@@ -197,7 +211,7 @@
     },
     "packages/cli": {
       "name": "@geometra/cli",
-      "version": "1.37.0",
+      "version": "1.49.0",
       "bin": {
         "geometra": "./dist/bin.js",
       },
@@ -214,14 +228,14 @@
     },
     "packages/client": {
       "name": "@geometra/client",
-      "version": "1.37.0",
+      "version": "1.49.0",
       "dependencies": {
         "@geometra/core": "^1.6.0",
       },
     },
     "packages/core": {
       "name": "@geometra/core",
-      "version": "1.37.0",
+      "version": "1.49.0",
       "dependencies": {
         "textura": "^1.6.0",
       },
@@ -231,7 +245,7 @@
     },
     "packages/proxy": {
       "name": "@geometra/proxy",
-      "version": "1.37.0",
+      "version": "1.49.0",
       "bin": {
         "geometra-proxy": "./dist/index.js",
       },
@@ -247,15 +261,22 @@
     },
     "packages/renderer-canvas": {
       "name": "@geometra/renderer-canvas",
-      "version": "1.37.0",
+      "version": "1.49.0",
       "dependencies": {
         "@geometra/client": "^1.6.0",
         "@geometra/core": "^1.6.0",
       },
     },
+    "packages/renderer-pdf": {
+      "name": "@geometra/renderer-pdf",
+      "version": "1.49.0",
+      "dependencies": {
+        "@geometra/core": "^1.6.0",
+      },
+    },
     "packages/renderer-terminal": {
       "name": "@geometra/renderer-terminal",
-      "version": "1.37.0",
+      "version": "1.49.0",
       "dependencies": {
         "@geometra/core": "^1.6.0",
       },
@@ -265,7 +286,7 @@
     },
     "packages/renderer-three": {
       "name": "@geometra/renderer-three",
-      "version": "1.37.0",
+      "version": "1.49.0",
       "dependencies": {
         "@geometra/client": "^1.6.0",
         "@geometra/core": "^1.6.0",
@@ -281,21 +302,21 @@
     },
     "packages/renderer-webgpu": {
       "name": "@geometra/renderer-webgpu",
-      "version": "1.37.0",
+      "version": "1.49.0",
       "dependencies": {
         "@geometra/core": "^1.2.1",
       },
     },
     "packages/router": {
       "name": "@geometra/router",
-      "version": "1.37.0",
+      "version": "1.49.0",
       "dependencies": {
         "@geometra/core": "^1.2.1",
       },
     },
     "packages/server": {
       "name": "@geometra/server",
-      "version": "1.37.0",
+      "version": "1.49.0",
       "dependencies": {
         "@geometra/core": "^1.6.0",
         "ws": "^8.18.0",
@@ -306,7 +327,7 @@
     },
     "packages/textura": {
       "name": "textura",
-      "version": "1.37.0",
+      "version": "1.49.0",
       "dependencies": {
         "@chenglou/pretext": "^0.0.3",
         "yoga-layout": "^3.2.1",
@@ -314,7 +335,7 @@
     },
     "packages/tw": {
       "name": "@geometra/tw",
-      "version": "1.37.0",
+      "version": "1.49.0",
       "dependencies": {
         "@geometra/core": "^1.6.0",
         "textura": "^1.6.0",
@@ -322,7 +343,7 @@
     },
     "packages/ui": {
       "name": "@geometra/ui",
-      "version": "1.37.0",
+      "version": "1.49.0",
       "dependencies": {
         "@geometra/core": "^1.6.0",
       },
@@ -447,6 +468,8 @@
 
     "@geometra/demo-mcp-greenhouse-fixture": ["@geometra/demo-mcp-greenhouse-fixture@workspace:demos/mcp-greenhouse-fixture"],
 
+    "@geometra/demo-mcp-native-crud": ["@geometra/demo-mcp-native-crud@workspace:demos/mcp-native-crud"],
+
     "@geometra/demo-mcp-radix-fixture": ["@geometra/demo-mcp-radix-fixture@workspace:demos/mcp-radix-fixture"],
 
     "@geometra/demo-security": ["@geometra/demo-security@workspace:demos/security-demo"],
@@ -462,6 +485,8 @@
     "@geometra/proxy": ["@geometra/proxy@workspace:packages/proxy"],
 
     "@geometra/renderer-canvas": ["@geometra/renderer-canvas@workspace:packages/renderer-canvas"],
+
+    "@geometra/renderer-pdf": ["@geometra/renderer-pdf@workspace:packages/renderer-pdf"],
 
     "@geometra/renderer-terminal": ["@geometra/renderer-terminal@workspace:packages/renderer-terminal"],
 

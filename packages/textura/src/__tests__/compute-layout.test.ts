@@ -2326,6 +2326,130 @@ describe('display none (Yoga Display.None)', () => {
   })
 })
 
+describe('logical-axis props', () => {
+  it('paddingInlineStart applies to left in LTR', () => {
+    const tree: BoxNode = {
+      width: 100,
+      height: 40,
+      paddingInlineStart: 10,
+      children: [{ width: 20, height: 20 }],
+    }
+    const result = computeLayout(tree, { width: 100, direction: 'ltr' })
+    expect(result.children[0]!.x).toBe(10)
+  })
+
+  it('paddingInlineStart applies to right in RTL (child pushed to right)', () => {
+    const tree: BoxNode = {
+      width: 100,
+      height: 40,
+      dir: 'rtl',
+      paddingInlineStart: 10,
+      children: [{ width: 20, height: 20 }],
+    }
+    const result = computeLayout(tree, { width: 100, direction: 'rtl' })
+    // In RTL, inline-start = right side, so child is pushed away from right edge
+    expect(result.children[0]!.x).toBe(100 - 10 - 20)
+  })
+
+  it('paddingInlineEnd applies to right in LTR', () => {
+    const tree: BoxNode = {
+      width: 100,
+      height: 40,
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      paddingInlineEnd: 15,
+      children: [{ width: 20, height: 20 }],
+    }
+    const result = computeLayout(tree, { width: 100, direction: 'ltr' })
+    expect(result.children[0]!.x).toBe(100 - 15 - 20)
+  })
+
+  it('marginInlineStart offsets child in LTR', () => {
+    const tree: BoxNode = {
+      width: 100,
+      height: 40,
+      children: [{ width: 20, height: 20, marginInlineStart: 12 }],
+    }
+    const result = computeLayout(tree, { width: 100, direction: 'ltr' })
+    expect(result.children[0]!.x).toBe(12)
+  })
+
+  it('marginInlineStart offsets child from right in RTL', () => {
+    const tree: BoxNode = {
+      width: 100,
+      height: 40,
+      dir: 'rtl',
+      children: [{ width: 20, height: 20, marginInlineStart: 12 }],
+    }
+    const result = computeLayout(tree, { width: 100, direction: 'rtl' })
+    expect(result.children[0]!.x).toBe(100 - 12 - 20)
+  })
+
+  it('borderInlineStart reserves space in LTR', () => {
+    const tree: BoxNode = {
+      width: 100,
+      height: 40,
+      borderInlineStart: 5,
+      children: [{ width: 20, height: 20 }],
+    }
+    const result = computeLayout(tree, { width: 100, direction: 'ltr' })
+    expect(result.children[0]!.x).toBe(5)
+  })
+
+  it('insetInlineStart positions absolutely in LTR', () => {
+    const tree: BoxNode = {
+      width: 100,
+      height: 100,
+      children: [{ width: 20, height: 20, position: 'absolute', insetInlineStart: 30 }],
+    }
+    const result = computeLayout(tree, { width: 100, direction: 'ltr' })
+    expect(result.children[0]!.x).toBe(30)
+  })
+
+  it('insetInlineStart positions absolutely from right in RTL', () => {
+    const tree: BoxNode = {
+      width: 100,
+      height: 100,
+      dir: 'rtl',
+      children: [{ width: 20, height: 20, position: 'absolute', insetInlineStart: 30 }],
+    }
+    const result = computeLayout(tree, { width: 100, direction: 'rtl' })
+    expect(result.children[0]!.x).toBe(100 - 30 - 20)
+  })
+
+  it('paddingBlockStart and paddingBlockEnd apply to top and bottom', () => {
+    const tree: BoxNode = {
+      width: 100,
+      height: 100,
+      paddingBlockStart: 8,
+      paddingBlockEnd: 12,
+      children: [{ width: 20, height: 20 }],
+    }
+    const result = computeLayout(tree, { width: 100 })
+    expect(result.children[0]!.y).toBe(8)
+  })
+
+  it('marginBlockStart applies to top', () => {
+    const tree: BoxNode = {
+      width: 100,
+      height: 100,
+      children: [{ width: 20, height: 20, marginBlockStart: 7 }],
+    }
+    const result = computeLayout(tree, { width: 100 })
+    expect(result.children[0]!.y).toBe(7)
+  })
+
+  it('insetBlockStart positions absolutely from top', () => {
+    const tree: BoxNode = {
+      width: 100,
+      height: 100,
+      children: [{ width: 20, height: 20, position: 'absolute', insetBlockStart: 25 }],
+    }
+    const result = computeLayout(tree, { width: 100 })
+    expect(result.children[0]!.y).toBe(25)
+  })
+})
+
 describe('engine init contract', () => {
   it('computeLayout throws a clear error when Yoga config is missing (caller must init after destroy)', async () => {
     destroy()

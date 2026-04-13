@@ -20,6 +20,7 @@ See **`MCP_COOKBOOK.md`** for MCP tool call recipes (proxy and native workflows)
 - **`packages/renderer-canvas`** — Canvas2D paint backend with text selection highlight rendering, optional layout debug overlay and focus ring
 - **`packages/renderer-terminal`** — ANSI terminal renderer
 - **`packages/renderer-three`** — Three.js render hosts (`createThreeGeometraSplitHost`, `createThreeGeometraStackedHost`), `Scene3dManager` for reconciling `scene3d` element descriptors into a live Three.js scene graph, WebGL sizing utilities, layout sync
+- **`packages/renderer-pdf`** — PDF 1.4 renderer; `PDFRenderer.generate()` returns `Uint8Array` from computed geometry (base-14 fonts, solid boxes, text)
 - **`packages/server`** — WebSocket server, layout computation, geometry diffing
 - **`packages/client`** — Thin WebSocket client (~2KB), receives pre-computed geometry
 - **`demo/`** — Main marketing/demo website (Vite, served via GitHub Pages)

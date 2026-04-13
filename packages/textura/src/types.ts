@@ -52,6 +52,14 @@ export interface FlexProps {
   paddingLeft?: number
   paddingHorizontal?: number
   paddingVertical?: number
+  /** Logical inline-start padding: resolves to left in LTR, right in RTL. */
+  paddingInlineStart?: number
+  /** Logical inline-end padding: resolves to right in LTR, left in RTL. */
+  paddingInlineEnd?: number
+  /** Logical block-start padding (alias for paddingTop in horizontal writing modes). */
+  paddingBlockStart?: number
+  /** Logical block-end padding (alias for paddingBottom in horizontal writing modes). */
+  paddingBlockEnd?: number
 
   margin?: number | 'auto'
   marginTop?: number | 'auto'
@@ -60,12 +68,28 @@ export interface FlexProps {
   marginLeft?: number | 'auto'
   marginHorizontal?: number | 'auto'
   marginVertical?: number | 'auto'
+  /** Logical inline-start margin: resolves to left in LTR, right in RTL. */
+  marginInlineStart?: number | 'auto'
+  /** Logical inline-end margin: resolves to right in LTR, left in RTL. */
+  marginInlineEnd?: number | 'auto'
+  /** Logical block-start margin (alias for marginTop in horizontal writing modes). */
+  marginBlockStart?: number | 'auto'
+  /** Logical block-end margin (alias for marginBottom in horizontal writing modes). */
+  marginBlockEnd?: number | 'auto'
 
   border?: number
   borderTop?: number
   borderRight?: number
   borderBottom?: number
   borderLeft?: number
+  /** Logical inline-start border: resolves to left in LTR, right in RTL. */
+  borderInlineStart?: number
+  /** Logical inline-end border: resolves to right in LTR, left in RTL. */
+  borderInlineEnd?: number
+  /** Logical block-start border (alias for borderTop in horizontal writing modes). */
+  borderBlockStart?: number
+  /** Logical block-end border (alias for borderBottom in horizontal writing modes). */
+  borderBlockEnd?: number
 
   gap?: number
   rowGap?: number
@@ -76,6 +100,14 @@ export interface FlexProps {
   right?: number
   bottom?: number
   left?: number
+  /** Logical inline-start position: resolves to left in LTR, right in RTL. */
+  insetInlineStart?: number
+  /** Logical inline-end position: resolves to right in LTR, left in RTL. */
+  insetInlineEnd?: number
+  /** Logical block-start position (alias for top in horizontal writing modes). */
+  insetBlockStart?: number
+  /** Logical block-end position (alias for bottom in horizontal writing modes). */
+  insetBlockEnd?: number
 
   aspectRatio?: number
   overflow?: 'visible' | 'hidden' | 'scroll'

@@ -1,0 +1,38 @@
+{
+  "name": "@geometra/renderer-pdf",
+  "version": "1.49.0",
+  "description": "PDF renderer for Geometra — consumes computed geometry and produces PDF output",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/razroo/geometra",
+    "directory": "packages/renderer-pdf"
+  },
+  "homepage": "https://razroo.github.io/geometra",
+  "keywords": [
+    "geometra",
+    "renderer",
+    "pdf",
+    "dom-free",
+    "layout"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@geometra/core": "^1.6.0"
+  }
+}

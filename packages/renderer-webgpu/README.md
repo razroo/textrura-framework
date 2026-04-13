@@ -10,8 +10,9 @@ This package provides:
 
 Current status:
 
-- API scaffold is implemented
-- Full paint parity with `@geometra/renderer-canvas` is not implemented yet
+- Solid-color box rendering via vertex-colored triangle pipeline
+- Text rendering via canvas-rasterized texture atlas with GPU sampling
+- Full paint parity with `@geometra/renderer-canvas` is not yet complete
 
 ## Install
 
@@ -22,16 +23,19 @@ npm install @geometra/renderer-webgpu
 ## Current support
 
 - WebGPU capability detection and async device/context initialization
-- Geometry render integration for solid box backgrounds
+- Solid-color box rendering (vertex-colored triangles)
+- Text rendering via offscreen canvas atlas → GPU texture sampling
+- Word wrapping for `whiteSpace: 'normal' | 'pre-wrap'`
+- Alpha blending for text and box overlays
 - 2D clear-pass fallback before `init()` completes
-- Optional `onFallbackNeeded(count)` callback when a tree includes unsupported paint features
+- Optional `onFallbackNeeded(count)` callback for unsupported paint features
 
 Current gaps:
 
-- text paint
 - selection highlight
 - focus/debug overlays
 - gradients, shadows, and border-radius parity
+- image rendering
 - full canvas feature parity
 
 ## Usage
