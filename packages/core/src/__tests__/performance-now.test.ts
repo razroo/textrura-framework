@@ -90,6 +90,13 @@ describe('safePerformanceNowMs', () => {
     expect(safePerformanceNowMs()).toBe(0)
   })
 
+  it('returns 0 when now() returns boolean or symbol (typeof not number)', () => {
+    vi.stubGlobal('performance', { now: () => true as unknown as number })
+    expect(safePerformanceNowMs()).toBe(0)
+    vi.stubGlobal('performance', { now: () => Symbol('t') as unknown as number })
+    expect(safePerformanceNowMs()).toBe(0)
+  })
+
   it('returns 0 when now() returns null or undefined (typeof null is object; no loose equality to number)', () => {
     vi.stubGlobal('performance', { now: () => null as unknown as number })
     expect(safePerformanceNowMs()).toBe(0)
@@ -142,6 +149,13 @@ describe('readPerformanceNow', () => {
     vi.stubGlobal('performance', { now: () => null as unknown as number })
     expect(readPerformanceNow()).toBe(0)
     vi.stubGlobal('performance', { now: () => undefined as unknown as number })
+    expect(readPerformanceNow()).toBe(0)
+  })
+
+  it('maps boolean and symbol now() results to 0 (typeof not number)', () => {
+    vi.stubGlobal('performance', { now: () => false as unknown as number })
+    expect(readPerformanceNow()).toBe(0)
+    vi.stubGlobal('performance', { now: () => Symbol('t') as unknown as number })
     expect(readPerformanceNow()).toBe(0)
   })
 
