@@ -1,7 +1,7 @@
 import type { ComputedLayout } from 'textura'
 import type { UIElement, BoxElement, TextElement, ImageElement } from './types.js'
 import { hasFocusCandidateHandlers } from './focus-candidates.js'
-import { finiteNumberOrZero, layoutBoundsAreFinite } from './layout-bounds.js'
+import { layoutBoundsAreFinite, scrollSafeChildOffsets } from './layout-bounds.js'
 
 export interface AccessibilityBounds {
   x: number
@@ -118,12 +118,15 @@ function walk(
   const children: AccessibilityNode[] = []
 
   if (element.kind === 'box') {
-    const childOffsetX = x - finiteNumberOrZero(element.props.scrollX)
-    const childOffsetY = y - finiteNumberOrZero(element.props.scrollY)
-    for (let i = 0; i < element.children.length; i++) {
-      const childLayout = layout.children[i]
-      if (childLayout) {
-        children.push(walk(element.children[i]!, childLayout, childOffsetX, childOffsetY, [...path, i]))
+    const childOrigin = scrollSafeChildOffsets(x, y, element.props.scrollX, element.props.scrollY)
+    if (childOrigin) {
+      for (let i = 0; i < element.children.length; i++) {
+        const childLayout = layout.children[i]
+        if (childLayout) {
+          children.push(
+            walk(element.children[i]!, childLayout, childOrigin.ox, childOrigin.oy, [...path, i]),
+          )
+        }
       }
     }
   }
@@ -148,6 +151,9 @@ function walk(
  * and hit-testing so bad Yoga output cannot surface misleading bounds or hidden descendants.
  * When composed absolute `offsetX + layout.x` / `offsetY + layout.y` overflows to non-finite values, the
  * same degenerate node is emitted (no infinite bounds from IEEE double sums).
+ * Box children use {@link import('./layout-bounds.js').scrollSafeChildOffsets} for `scrollX` / `scrollY` (same rule as hit-testing and
+ * text selection): when the scroll-adjusted origin overflows to non-finite values, descendants are not
+ * walked so corrupt extremes cannot surface misleading child bounds.
  */
 export function toAccessibilityTree(tree: UIElement, layout: ComputedLayout): AccessibilityNode {
   return walk(tree, layout, 0, 0, [])

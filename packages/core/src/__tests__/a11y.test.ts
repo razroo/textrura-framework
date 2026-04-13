@@ -196,6 +196,25 @@ describe('toAccessibilityTree', () => {
     expect(a11y.children[0]?.bounds.y).toBe(68)
   })
 
+  it('skips descendant walks when scroll-adjusted child origins overflow (parity with hit-test / selection)', () => {
+    const max = Number.MAX_VALUE
+    const tree = box(
+      { width: 300, height: 100, overflow: 'scroll', scrollX: -max },
+      [text({ text: 'Not surfaced', font: '14px Inter', lineHeight: 18 })],
+    )
+    const layout = {
+      x: max,
+      y: 0,
+      width: 300,
+      height: 100,
+      children: [{ x: max, y: 0, width: 40, height: 18, children: [] }],
+    }
+
+    const a11y = toAccessibilityTree(tree, layout)
+    expect(a11y.bounds.x).toBe(max)
+    expect(a11y.children).toEqual([])
+  })
+
   it('skips subtrees when layout bounds fail layoutBoundsAreFinite (parity with focus order and hit-test)', () => {
     const inner = text({ text: 'Hidden', font: '14px Inter', lineHeight: 18 })
     const tree = box({ semantic: { tag: 'main' } }, [
