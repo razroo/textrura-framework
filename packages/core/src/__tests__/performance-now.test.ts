@@ -1,6 +1,26 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readPerformanceNow, safePerformanceNowMs } from '../performance-now.js'
 
+/** Temporarily replace `globalThis.performance` with a getter that throws (outer try/catch in SUT). */
+function withHostilePerformanceGetter(run: () => void): void {
+  const prev = Object.getOwnPropertyDescriptor(globalThis, 'performance')
+  try {
+    Object.defineProperty(globalThis, 'performance', {
+      configurable: true,
+      get() {
+        throw new Error('hostile performance')
+      },
+    })
+    run()
+  } finally {
+    if (prev) {
+      Object.defineProperty(globalThis, 'performance', prev)
+    } else {
+      Reflect.deleteProperty(globalThis, 'performance')
+    }
+  }
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
 })
@@ -77,6 +97,12 @@ describe('safePerformanceNowMs', () => {
     vi.stubGlobal('performance', undefined)
     expect(safePerformanceNowMs()).toBe(0)
   })
+
+  it('returns 0 when accessing globalThis.performance throws (hostile accessor)', () => {
+    withHostilePerformanceGetter(() => {
+      expect(safePerformanceNowMs()).toBe(0)
+    })
+  })
 })
 
 describe('readPerformanceNow', () => {
@@ -137,5 +163,11 @@ describe('readPerformanceNow', () => {
       },
     })
     expect(readPerformanceNow()).toBe(0)
+  })
+
+  it('returns 0 when accessing globalThis.performance throws (hostile accessor)', () => {
+    withHostilePerformanceGetter(() => {
+      expect(readPerformanceNow()).toBe(0)
+    })
   })
 })
