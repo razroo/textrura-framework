@@ -131,6 +131,8 @@ describe('diffLayout', () => {
 
     const negSub = -Number.MIN_VALUE
     expect(negSub).toBeLessThan(0)
+    const negWsub: TestLayout = { x: 0, y: 0, width: negSub, height: 10, children: [] }
+    expect(diffLayout(ok, negWsub)).toEqual([])
     const negH: TestLayout = { x: 0, y: 0, width: 10, height: negSub, children: [] }
     expect(diffLayout(ok, negH)).toEqual([])
 
@@ -465,6 +467,12 @@ describe('coalescePatches', () => {
         { path: [2], width: negSub },
       ]),
     ).toEqual([{ path: [2], width: 8 }])
+    expect(
+      coalescePatches([
+        { path: [3], height: 8 },
+        { path: [3], height: negSub },
+      ]),
+    ).toEqual([{ path: [3], height: 8 }])
   })
 
   it('still merges IEEE negative zero width and height (non-negative in JS; degenerate rects stay expressible)', () => {
