@@ -110,6 +110,18 @@ describe('safePerformanceNowMs', () => {
     expect(safePerformanceNowMs()).toBe(0)
   })
 
+  it('returns 0 when globalThis.performance is null or other falsy non-objects (embedder / partial globals)', () => {
+    // @ts-expect-error — rare but valid: property exists and is null
+    vi.stubGlobal('performance', null)
+    expect(safePerformanceNowMs()).toBe(0)
+    // @ts-expect-error — pathological; must not throw when probing .now
+    vi.stubGlobal('performance', false as unknown as Performance)
+    expect(safePerformanceNowMs()).toBe(0)
+    // @ts-expect-error — numeric zero is falsy; not a Performance object
+    vi.stubGlobal('performance', 0 as unknown as Performance)
+    expect(safePerformanceNowMs()).toBe(0)
+  })
+
   it('returns 0 when accessing globalThis.performance throws (hostile accessor)', () => {
     withHostilePerformanceGetter(() => {
       expect(safePerformanceNowMs()).toBe(0)
@@ -168,6 +180,18 @@ describe('readPerformanceNow', () => {
     expect(readPerformanceNow()).toBe(0)
     // @ts-expect-error — simulate host without Performance API
     vi.stubGlobal('performance', undefined)
+    expect(readPerformanceNow()).toBe(0)
+  })
+
+  it('returns 0 when globalThis.performance is null or other falsy non-objects (same guard as safe path)', () => {
+    // @ts-expect-error
+    vi.stubGlobal('performance', null)
+    expect(readPerformanceNow()).toBe(0)
+    // @ts-expect-error
+    vi.stubGlobal('performance', false as unknown as Performance)
+    expect(readPerformanceNow()).toBe(0)
+    // @ts-expect-error
+    vi.stubGlobal('performance', 0 as unknown as Performance)
     expect(readPerformanceNow()).toBe(0)
   })
 
