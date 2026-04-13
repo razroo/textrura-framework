@@ -2,11 +2,13 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import {
   decodeBinaryFrameJson as decodeBinaryFrameJsonClient,
+  isBinaryFrameArrayBuffer as isBinaryFrameArrayBufferClient,
   MAX_V1_PAYLOAD_BYTES as MAX_V1_PAYLOAD_BYTES_CLIENT,
 } from '../../../client/src/binary-frame.js'
 import {
   encodeBinaryFrameJson,
   decodeBinaryFrameJson,
+  isBinaryFrameBuffer,
   MAX_V1_PAYLOAD_BYTES,
 } from '../binary-frame.js'
 
@@ -16,6 +18,18 @@ describe('protocol binary conformance', () => {
   it('server and client share the v1 uint32 payload cap (binary-frame.ts comments)', () => {
     expect(MAX_V1_PAYLOAD_BYTES).toBe(MAX_V1_PAYLOAD_BYTES_CLIENT)
     expect(MAX_V1_PAYLOAD_BYTES).toBe(0xffff_ffff)
+  })
+
+  it('server isBinaryFrameBuffer and client isBinaryFrameArrayBuffer agree on the same views (header probe parity)', () => {
+    const headerOnly = new Uint8Array([0x47, 0x45, 0x4f, 0x4d, 1, 0, 0, 0, 0])
+    const encoded = encodeBinaryFrameJson('{}')
+    const views: Uint8Array[] = [headerOnly, new Uint8Array(encoded)]
+    const badMagic = new Uint8Array([0x00, 0x45, 0x4f, 0x4d, 1, 0, 0, 0, 0])
+    const badVersion = new Uint8Array([0x47, 0x45, 0x4f, 0x4d, 2, 0, 0, 0, 0])
+    views.push(badMagic, badVersion)
+    for (const u8 of views) {
+      expect(isBinaryFrameBuffer(u8)).toBe(isBinaryFrameArrayBufferClient(u8))
+    }
   })
 
   it.each(V1_FIXTURES)('binary envelope roundtrips v1/%s like text frames', name => {
