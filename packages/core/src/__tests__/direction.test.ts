@@ -229,6 +229,9 @@ describe('resolveComputeLayoutDirection', () => {
     expect(resolveComputeLayoutDirection('auto' as never, rtlRoot)).toBe('rtl')
     expect(resolveComputeLayoutDirection('sideways-lr' as never, rtlRoot)).toBe('rtl')
     expect(resolveComputeLayoutDirection(0 as never, rtlRoot)).toBe('rtl')
+    // Strict equality with 'ltr' | 'rtl' only; IEEE −0 is still a number (distinct sign bit from +0).
+    expect(Object.is(-0, 0)).toBe(false)
+    expect(resolveComputeLayoutDirection(-0 as never, rtlRoot)).toBe('rtl')
     expect(resolveComputeLayoutDirection(null as never, rtlRoot)).toBe('rtl')
     expect(resolveComputeLayoutDirection('' as never, rtlRoot)).toBe('rtl')
   })
