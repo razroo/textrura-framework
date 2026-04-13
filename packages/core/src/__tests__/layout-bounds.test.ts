@@ -1064,4 +1064,17 @@ describe('composed scroll + inclusive rect (hit-test coordinate space)', () => {
     // Same absolute origin the hit-test layer uses before scroll subtraction; inclusive test stays well-defined.
     expect(pointInInclusiveLayoutRect(max, 0, max, 0, 50, 50)).toBe(true)
   })
+
+  it('scroll-adjusted origin plus child abs rect: rejects hit when absX+width overflows (mirrors hit-test child bounds)', () => {
+    const o = scrollSafeChildOffsets(10, 10, 0, 0)!
+    expect(o).toEqual({ ox: 10, oy: 10 })
+    const relX = 1e300
+    const relY = 0
+    const w = Number.MAX_VALUE
+    const h = 10
+    const absX = o.ox + relX
+    const absY = o.oy + relY
+    expect(absX + w).toBe(Infinity)
+    expect(pointInInclusiveLayoutRect(absX, absY, absX, absY, w, h)).toBe(false)
+  })
 })
