@@ -50,6 +50,18 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 10, height: 10, children: sealed })).toBe(true)
   })
 
+  it('accepts Proxy-wrapped and subclassed arrays as children (Array.isArray true; exotic snapshots)', () => {
+    const proxied = new Proxy([] as ComputedLayout[], {}) as ComputedLayout['children']
+    expect(Array.isArray(proxied)).toBe(true)
+    expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 1, height: 1, children: proxied })).toBe(true)
+
+    class LayoutChildArray extends Array<ComputedLayout> {}
+    const subclassed = new LayoutChildArray() as unknown as ComputedLayout['children']
+    expect(subclassed instanceof Array).toBe(true)
+    expect(Array.isArray(subclassed)).toBe(true)
+    expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 1, height: 1, children: subclassed })).toBe(true)
+  })
+
   it('rejects children that inherit Array.prototype but are not Arrays (Array.isArray guard)', () => {
     const children = Object.create(Array.prototype) as unknown as ComputedLayout['children']
     expect(Array.isArray(children)).toBe(false)
