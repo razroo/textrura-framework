@@ -14,6 +14,22 @@ describe('inclusiveEndIndex', () => {
     expect(inclusiveEndIndex(2, 99, 5)).toBe(6)
     expect(inclusiveEndIndex(0, 4, 100)).toBe(4)
   })
+
+  it('returns maxIndex when spanEnd is -Infinity (e.g. -Infinity start; same non-finite guard as +Infinity overflow)', () => {
+    const maxIndex = 12
+    expect(Number.isFinite(-Infinity + 5 - 1)).toBe(false)
+    expect(inclusiveEndIndex(-Infinity, maxIndex, 5)).toBe(maxIndex)
+  })
+
+  it('returns maxIndex when any argument makes spanEnd NaN (NaN start/window poison the sum)', () => {
+    expect(inclusiveEndIndex(Number.NaN, 9, 4)).toBe(9)
+    expect(inclusiveEndIndex(2, 9, Number.NaN)).toBe(9)
+  })
+
+  it('allows a negative inclusive end when safeWindow is 0 and spanEnd stays finite (callers should pass window ≥ 1)', () => {
+    // start 0, window 0 → spanEnd = -1; Math.min(maxIndex, -1) is negative — distinct from syncVirtualWindow (always floors window to ≥ 1).
+    expect(inclusiveEndIndex(0, 100, 0)).toBe(-1)
+  })
 })
 
 describe('syncVirtualWindow', () => {
