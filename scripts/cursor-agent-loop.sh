@@ -28,6 +28,9 @@ fi
 # the checkbox search. Likewise `rg '\[ \]'` without `^-\s*` is still easy to misread — anchor on `- [ ]`.
 # Zero matching lines from those greps is normal when everything is checked — not a broken search; continue to
 # deferred themes / north-star buckets (step 2b) instead of retrying or assuming the repo has "no roadmap".
+# When the host injects a **Today's date** (or similar) into the agent context, treat that calendar year as
+# authoritative for web search, release notes, and "current" dependency/docs lookups — do not assume the model
+# training cutoff year.
 # External agent prompts sometimes say to grep raw `[ ]` anywhere in ROADMAP — that is still the same footgun:
 # without a leading `-` anchor, `[ ]` is often parsed as a one-space character class, not a Markdown checkbox.
 # Always interpret "unchecked roadmap items" as line-anchored list checkboxes (`- [ ]` / `^- \[ \]`), never prose.
@@ -205,7 +208,7 @@ You are working on Geometra, a DOM-free UI framework. Respect CLAUDE.md, FRAMEWO
 
 Single iteration — do exactly one cohesive, meaningful slice of work:
 
-1. Explore the codebase. Read ROADMAP.md, CLAUDE.md, and browse the source in packages/. Understand the architecture and what already exists. If the task touches demo sites, \`create:app\` templates, or starter examples, read AGENTS.md (full-viewport canvas; no extra DOM chrome around Geometra).
+1. Explore the codebase. Read ROADMAP.md, CLAUDE.md, and browse the source in packages/. Understand the architecture and what already exists. If the task touches demo sites, \`create:app\` templates, or starter examples, read AGENTS.md (full-viewport canvas; no extra DOM chrome around Geometra). When the host or tool context includes a **Today's date** field, use that calendar year for time-sensitive web search and dated references (do not assume the model's training cutoff year).
 
 2. Decide what to work on. Use this priority order:
    a) Unchecked items in ROADMAP.md (if any remain). Find Markdown **task** checkboxes with a line-anchored pattern, e.g. \`rg '^- \\[ \\]' ROADMAP.md\` or \`grep -E '^- \\[ \\]' ROADMAP.md\` — not only Phase A–C; post-1.0, release polish, and next-frontier blocks use the same \`- [ ] / - [x]\` shape. Indented nested items (e.g. under a parent bullet in ROUTING_COMPETITIVENESS_CHECKLIST.md) need optional leading whitespace: \`rg '^[[:space:]]*- \\[ \\]' FILE.md\`. (**Do not** use a bare \`[ ]\` regex: in common engines that is a one-space character class and matches almost every line, not an unchecked box.) **Do not** use plain \`grep\` without \`-E\` for this pattern: default BRE treats \`[\` as starting a bracket expression; use \`grep -E\`, \`rg\`, or \`grep -F '- [ ]'\` if you truly need fixed-string matching. If \`rg\` is not installed (shell exit 127), use \`grep -E\` / \`grep -F\` with the same patterns — a missing binary is not "no unchecked items". When ROADMAP is all \`[x]\`, run the same search on \`ROUTING_COMPETITIVENESS_CHECKLIST.md\` at the **repository root** (same directory as ROADMAP; not \`packages/router\`) — include the nested pattern if you expect sub-list checkboxes. When both return no unchecked lines, that means backlog checkboxes there are exhausted (expected), not a broken search — proceed to ROADMAP "Deferred / research" or routing sections as thematic hints (fonts/metrics, hit-test and input, protocol, renderers, demos), or to 2b. The ROADMAP "Deferred / research" subsection has no checkboxes — read it explicitly when everything else is \`[x]\` and you want roadmap-aligned themes. Skip maintainer-only release files for backlog: ignore unchecked lines in RELEASE_CHECKLIST.md and v1-release-checklist.md.
