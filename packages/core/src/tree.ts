@@ -15,28 +15,23 @@ import type { UIElement } from './types.js'
  * containment come from the live tree in hit-testing/selection; renderers apply `overflow` clip modes when painting
  * instead of threading these props through Yoga/WASM for layout.
  *
- * {@link import('./types.js').EventHandlers} keys and a mistaken `handlers` bag on `props` are stripped so bad casts,
- * manual trees, or corrupt snapshots cannot thread functions into the layout pipeline.
+ * {@link import('./types.js').EventHandlers} keys (any `on` + uppercase prefix), and a mistaken `handlers` bag on
+ * `props`, are stripped so bad casts, manual trees, or corrupt snapshots cannot thread functions into the layout pipeline.
  */
-/** Keys aligned with {@link import('./types.js').EventHandlers}; must not reach Textura/Yoga. */
-const EVENT_HANDLER_PROP_KEYS = [
-  'onClick',
-  'onPointerDown',
-  'onPointerUp',
-  'onPointerMove',
-  'onWheel',
-  'onKeyDown',
-  'onKeyUp',
-  'onCompositionStart',
-  'onCompositionUpdate',
-  'onCompositionEnd',
-] as const
+/**
+ * Strip `onFoo`-style handler keys (leading `on` + uppercase) so stray callbacks from bad casts or
+ * DOM-era names never reach Textura/Yoga. Matches every {@link import('./types.js').EventHandlers} name
+ * and unknown `on*` props such as `onUnknown`, without touching keys like `online` or `onlyChild`.
+ */
+function stripOnHandlerProps(layoutProps: Record<string, unknown>): void {
+  for (const k of Object.keys(layoutProps)) {
+    if (/^on[A-Z]/.test(k)) delete layoutProps[k]
+  }
+}
 
 function stripStyleProps(props: Record<string, unknown>): Record<string, unknown> {
   const layoutProps = { ...props }
-  for (const k of EVENT_HANDLER_PROP_KEYS) {
-    delete layoutProps[k]
-  }
+  stripOnHandlerProps(layoutProps)
   delete layoutProps.handlers
   delete layoutProps.backgroundColor
   delete layoutProps.color
@@ -77,7 +72,8 @@ function stripStyleProps(props: Record<string, unknown>): Record<string, unknown
  *
  * Strips everything that is not consumed by Textura layout: colors, borders, opacity, cursor,
  * `pointerEvents`, `zIndex`, `overflow` / `scrollX` / `scrollY`, `boxShadow`, `gradient`,
- * event handler props (same names as {@link import('./types.js').EventHandlers}) and mistaken `handlers` on `props`,
+ * event-handler-style props (`on` + uppercase; same shape as {@link import('./types.js').EventHandlers}) and mistaken
+ * `handlers` on `props`,
  * `selectable`, `key` / `semantic` (runtime metadata; constructors normally lift these off `props`),
  * `dir` on the layout root only, image `src` / `alt` / `objectFit`, and scene3d host fields (`background`,
  * `objects`, `fov`, `near`, `far`, `cameraPosition`, `cameraTarget`, `orbitControls`, `maxPixelRatio`).

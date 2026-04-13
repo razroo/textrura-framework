@@ -714,6 +714,17 @@ describe('toLayoutTree', () => {
     expect(textLayout).not.toHaveProperty('onClick')
   })
 
+  it('strips unknown onFoo-style handler props (on + uppercase) from layout snapshots', () => {
+    const noop = () => {}
+    const el = box({ width: 2, height: 2, onUnknown: noop, onCustomThing: noop } as never)
+    expect((el.props as Record<string, unknown>).onUnknown).toBe(noop)
+    expect((el.props as Record<string, unknown>).onCustomThing).toBe(noop)
+    const layout = toLayoutTree(el) as Record<string, unknown>
+    expect(layout).toMatchObject({ width: 2, height: 2, children: [] })
+    expect(layout).not.toHaveProperty('onUnknown')
+    expect(layout).not.toHaveProperty('onCustomThing')
+  })
+
   it('forwards props not in the strip list to the layout snapshot (strip-list, not a whitelist)', () => {
     const hinted = box({
       width: 10,
