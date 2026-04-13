@@ -769,6 +769,10 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(0, 0, 0, 0)).toEqual({ ox: 0, oy: 0 })
   })
 
+  it('preserves fractional scroll offsets (sub-pixel smooth scroll / trackpad deltas stay in child space)', () => {
+    expect(scrollSafeChildOffsets(100.25, 200.5, 10.125, 40.375)).toEqual({ ox: 90.125, oy: 160.125 })
+  })
+
   it('preserves exact integer differences at safe-integer magnitude (large layouts; doubles stay exact)', () => {
     const max = Number.MAX_SAFE_INTEGER
     const min = Number.MIN_SAFE_INTEGER
