@@ -9,6 +9,10 @@ fi
 # session that explores the codebase, picks the next best improvement, implements
 # it, runs the release gate, commits when there are real changes, and pushes only
 # if that iteration created a new commit (HEAD advanced). Default: composer-2 (falls back to auto if unavailable), 100 iterations.
+#
+# Router work (`packages/router`, `@geometra/router`): even when ROUTING_COMPETITIVENESS_CHECKLIST.md is all [x],
+# read its prose sections for ranking/history/link/response semantics before changing behavior — unchecked boxes
+# being exhausted does not make that file obsolete.
 # `npm run release:gate` and `bun run release:gate` invoke the same package.json script; CI runs `bun run release:gate` (see .github/workflows/quality.yml).
 #
 # Task selection (humans/agents): find unchecked Markdown boxes in ROADMAP.md (Phase A–C, post-1.0 plans,
@@ -145,6 +149,7 @@ fi
 #
 # Usage:
 #   ./scripts/cursor-agent-loop.sh
+#   npm run cursor-agent:loop   # from repo root; same script
 #   CURSOR_AGENT_ITERATIONS=3 ./scripts/cursor-agent-loop.sh
 #   CURSOR_AGENT_PUSH=0 ./scripts/cursor-agent-loop.sh   # commit only, no push
 #   CURSOR_AGENT_FORCE_SHELL=0 ./scripts/cursor-agent-loop.sh   # prompt before each agent shell command
@@ -242,6 +247,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
       Prefer one primary subsystem or package per iteration (e.g. core hit-test, fonts, server protocol); avoid wide drive-by refactors unless the task truly spans boundaries. For hit-test, text input, protocol, or layout/repaint work, align with FRAMEWORK_NORTH_STAR.md (merge checklist: tests where practical, no DOM leaks, no avoidable perf regressions).
       When adding tests without a specific bugfix, prefer extending files already run by root \`package.json\` \`release:gate\` (keeps new coverage in the vetted CI path; only widen the gate when the suite is release-critical). The gate is an explicit file allowlist — \`npm run test\` (vitest.fast) may run additional files that the gate does not; confirm in \`package.json\` rather than assuming. Root \`npm run test:all\` / \`bun run test:all\` runs vitest.fast then explicitly adds fonts, virtual-scroll, and perf-smoke suites — broader than \`npm run test\`, but still not equivalent to \`release:gate\` (different argv + terminal input). If you widen the gate, grep or read the existing \`vitest run ...\` list first so you do not add a duplicate path (vitest would execute that file twice). Paths are not grouped by package: e.g. \`layout-bounds.test.ts\` may already be the first argv path — search the whole line, not only near related tests. \`scripts/release/verify-release-gate.mjs\` also enforces that \`geometry-snapshot-ci.test.ts\`, \`layout-bounds.test.ts\`, and \`hit-test.test.ts\` remain in the allowlist (do not drop them when trimming \`release:gate\`).
       When roadmap and routing checklists are fully checked, re-read ROADMAP "Deferred / research" for themes, or target north-star hot paths (hit-test, text measurement, protocol encode/decode, layout/repaint).
+      Router package (\`packages/router\`): even when \`ROUTING_COMPETITIVENESS_CHECKLIST.md\` has no unchecked boxes, read its prose for ranking/history/link/response semantics before changing behavior.
       Inclusive layout rects and scroll-safe child offsets (\`packages/core/src/layout-bounds.ts\` — \`scrollSafeChildOffsets\`, \`pointInInclusiveLayoutRect\`, etc.) have dedicated coverage in \`packages/core/src/__tests__/layout-bounds.test.ts\` (release gate); extend that file when hardening coordinate math, not only \`hit-test.test.ts\`.
       Geometry snapshot CI (\`packages/core/src/__tests__/geometry-snapshot-ci.test.ts\`, \`__snapshots__/\`): for a fast local loop while editing snapshots, \`npm run test:geometry\` runs that file only — still finish with full \`npm run release:gate\` before commit.
       Large-list window indices: \`syncVirtualWindow\` in \`packages/core/src/virtual-scroll.ts\` with tests in \`packages/core/src/__tests__/virtual-scroll.test.ts\` (release gate) — extend when tightening overflow/NaN invariants or corrupt host props for virtual scroll state.
