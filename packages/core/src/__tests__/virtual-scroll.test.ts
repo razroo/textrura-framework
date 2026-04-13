@@ -48,6 +48,13 @@ describe('inclusiveEndIndex', () => {
     expect(inclusiveEndIndex(0, 100, 0)).toBe(-1)
   })
 
+  it('allows a negative inclusive end when safeWindow is negative but spanEnd stays finite (direct callers; syncVirtualWindow never passes window < 1)', () => {
+    // 0 + (-5) - 1 = -6; Math.min(100, -6) stays negative — documents behavior for corrupt / mistaken window args.
+    expect(inclusiveEndIndex(0, 100, -5)).toBe(-6)
+    // 1 + (-1) - 1 = -1; Math.min(20, -1) = -1 (distinct from safeWindow 0, which yields spanEnd -1 only when start is 0).
+    expect(inclusiveEndIndex(1, 20, -1)).toBe(-1)
+  })
+
   it('clamps a finite negative maxIndex to 0 before min(spanEnd) so corrupt caps cannot yield a negative end when spanEnd is positive', () => {
     // spanEnd 4 and 5 stay positive; without clamping, Math.min(-3, 4) / Math.min(-1, 5) would be negative.
     expect(inclusiveEndIndex(0, -3, 5)).toBe(0)
