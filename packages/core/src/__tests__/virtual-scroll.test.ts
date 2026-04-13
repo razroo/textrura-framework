@@ -148,6 +148,17 @@ describe('syncVirtualWindow', () => {
     expect(r.end).toBe(999)
   })
 
+  it('stays finite when totalRows and windowSize are both ~1e308 (IEEE-scale virtual lists)', () => {
+    // Guards against NaN/Inf window indices when host state uses scientific-magnitude counts (still finite doubles).
+    const r = syncVirtualWindow(1e308, 1e308, 5e307, 5e307)
+    expect(Number.isFinite(r.start)).toBe(true)
+    expect(Number.isFinite(r.end)).toBe(true)
+    expect(Number.isFinite(r.selected)).toBe(true)
+    expect(r.selected).toBe(5e307)
+    expect(r.start).toBe(0)
+    expect(r.end).toBe(1e308)
+  })
+
   it('returns only finite start/end/selected for a grid of representative magnitudes (overflow / sanitizer invariant)', () => {
     const vals = [0, -2, 0.9, 4.9, 99.2, 8000.1]
     for (const totalRows of vals) {
