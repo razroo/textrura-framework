@@ -21,6 +21,19 @@ function withHostilePerformanceGetter(run: () => void): void {
   }
 }
 
+/** `performance` object whose `now` getter throws — exercises try/catch around `typeof perf.now` probes. */
+function hostilePerformanceProxyThrowsOnNow(): object {
+  return new Proxy(
+    {},
+    {
+      get(_target, prop) {
+        if (prop === 'now') throw new Error('proxy now')
+        return undefined
+      },
+    },
+  )
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
 })
@@ -150,6 +163,11 @@ describe('safePerformanceNowMs', () => {
       expect(safePerformanceNowMs()).toBe(0)
     })
   })
+
+  it('returns 0 when accessing performance.now throws during the typeof probe (hostile Proxy)', () => {
+    vi.stubGlobal('performance', hostilePerformanceProxyThrowsOnNow())
+    expect(safePerformanceNowMs()).toBe(0)
+  })
 })
 
 describe('readPerformanceNow', () => {
@@ -247,5 +265,10 @@ describe('readPerformanceNow', () => {
     withHostilePerformanceGetter(() => {
       expect(readPerformanceNow()).toBe(0)
     })
+  })
+
+  it('returns 0 when accessing performance.now throws during the typeof probe (hostile Proxy)', () => {
+    vi.stubGlobal('performance', hostilePerformanceProxyThrowsOnNow())
+    expect(readPerformanceNow()).toBe(0)
   })
 })
