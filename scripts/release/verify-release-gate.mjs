@@ -135,7 +135,8 @@ async function main() {
     if (list.length > 1) {
       const sorted = [...list].sort()
       throw new Error(
-        `release:gate: duplicate vitest entry after path resolution "${canonical}" (listed as: ${sorted.join(' | ')}; vitest would run the file ${list.length} times)`,
+        `release:gate: duplicate vitest entry after path resolution "${canonical}" (listed as: ${sorted.join(' | ')}; vitest would run the file ${list.length} times). ` +
+          `Search the full scripts.release:gate line in package.json — allowlist paths are not grouped by package, so the same file can appear twice far apart (e.g. near the start and again later).`,
       )
     }
   }

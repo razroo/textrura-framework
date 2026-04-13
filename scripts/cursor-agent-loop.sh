@@ -83,6 +83,8 @@ fi
 # (`bun run test` / vitest.fast.config.ts), `bun run build`, `bun run benchmark:mcp-flow:all -- --assert`,
 # `bun run examples:smoke`, and `bun run e2e:demo`. When editing MCP benchmark scripts or harness expectations,
 # run that benchmark locally (or the relevant `benchmark:mcp-*` variant), not only `release:gate`.
+# Root `bun run build` also runs `cd mcp && npm run build` (see root package.json). Changes under `mcp/` need that
+# build step — `release:gate` alone does not compile the MCP package.
 # A green `release:gate` alone does not imply those steps passed — re-run the relevant ones when touching demos,
 # create:app templates, examples tooling, or Playwright-covered demo flows.
 # Extend an allowlisted file when adding release-critical tests unless you intentionally widen the gate.
