@@ -41,6 +41,12 @@ describe('inclusiveEndIndex', () => {
     // start 0, window 0 → spanEnd = -1; Math.min(maxIndex, -1) is negative — distinct from syncVirtualWindow (always floors window to ≥ 1).
     expect(inclusiveEndIndex(0, 100, 0)).toBe(-1)
   })
+
+  it('clamps a finite negative maxIndex to 0 before min(spanEnd) so corrupt caps cannot yield a negative end when spanEnd is positive', () => {
+    // spanEnd 4 and 5 stay positive; without clamping, Math.min(-3, 4) / Math.min(-1, 5) would be negative.
+    expect(inclusiveEndIndex(0, -3, 5)).toBe(0)
+    expect(inclusiveEndIndex(2, -1, 4)).toBe(0)
+  })
 })
 
 describe('syncVirtualWindow', () => {

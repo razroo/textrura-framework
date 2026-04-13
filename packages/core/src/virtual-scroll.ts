@@ -29,7 +29,9 @@ function nonNegativeOrZero(n: number): number {
  * {@link import('./layout-bounds.js').pointInInclusiveLayoutRect}).
  *
  * When `spanEnd` is finite but `maxIndex` is not, returns `spanEnd` so corrupt caps cannot yield `NaN` from
- * `Math.min`. {@link syncVirtualWindow} always passes a non-negative integer `maxIndex`.
+ * `Math.min`. {@link syncVirtualWindow} always passes a non-negative integer `maxIndex`. When both are
+ * finite, `maxIndex` is clamped to `≥ 0` before `Math.min` so a negative cap cannot produce a negative end
+ * while `spanEnd` is still positive.
  *
  * Exported for parity tests and advanced virtual-list math; {@link syncVirtualWindow} is the primary API.
  */
@@ -41,7 +43,9 @@ export function inclusiveEndIndex(start: number, maxIndex: number, safeWindow: n
   if (!Number.isFinite(maxIndex)) {
     return spanEnd
   }
-  return Math.min(maxIndex, spanEnd)
+  // maxIndex is always non-negative from syncVirtualWindow; clamp so direct callers with corrupt
+  // negative caps cannot produce a negative end when spanEnd is still positive.
+  return Math.min(Math.max(0, maxIndex), spanEnd)
 }
 
 /**
