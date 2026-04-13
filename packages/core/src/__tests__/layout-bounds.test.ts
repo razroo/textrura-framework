@@ -226,6 +226,14 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ ...base, width: Object(10) as unknown as number })).toBe(false)
   })
 
+  it('rejects boxed Number(-0) on width/height (typeof object; distinct from primitive IEEE −0 which is valid)', () => {
+    const base = { x: 0, y: 0, width: 10, height: 10, children: [] as [] }
+    expect(layoutBoundsAreFinite({ ...base, width: Object(-0) as unknown as number })).toBe(false)
+    expect(layoutBoundsAreFinite({ ...base, height: Object(-0) as unknown as number })).toBe(false)
+    expect(layoutBoundsAreFinite({ x: 0, y: 0, width: -0, height: 10, children: [] })).toBe(true)
+    expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 10, height: -0, children: [] })).toBe(true)
+  })
+
   it('rejects array and ordinary object values on bounds (corrupt deserialization)', () => {
     const base = { x: 0, y: 0, width: 10, height: 10, children: [] as [] }
     expect(layoutBoundsAreFinite({ ...base, x: [0] as unknown as number })).toBe(false)
