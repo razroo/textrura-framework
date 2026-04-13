@@ -146,7 +146,17 @@ export async function launchProxyRuntime(options: LaunchProxyRuntimeOptions): Pr
       height: options.height ?? 720,
     }
     const browserLaunchStartedAt = performance.now()
-    const launchOpts: Parameters<typeof chromium.launch>[0] = { headless: options.headed !== true }
+    const launchOpts: Parameters<typeof chromium.launch>[0] = { 
+      headless: options.headed !== true,
+      args: [
+        '--disable-blink-features=AutomationControlled',
+        '--disable-dev-shm-usage',
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-web-security',
+        '--disable-features=IsolateOrigins,site-per-process',
+      ]
+    }
     if (options.slowMo && options.slowMo > 0) launchOpts.slowMo = options.slowMo
     browser = await chromium.launch(launchOpts)
     trace.browserLaunchMs = performance.now() - browserLaunchStartedAt
