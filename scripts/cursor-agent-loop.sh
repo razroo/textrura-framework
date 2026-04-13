@@ -88,7 +88,8 @@ fi
 # first to fail fast on duplicates/missing paths and to ensure `test:terminal-input` is the final `&&` segment
 # in package.json (nothing may run after the demo-terminal input suite), then the vitest allowlist, then
 # `bun run test:terminal-input`
-# (@geometra/demo-terminal). The gate fails if `bun` is missing from PATH even when Node/npm work — install Bun or run
+# (@geometra/demo-terminal). Run from the git repo root (root package.json); invoking from `packages/*` usually fails.
+# The gate fails if `bun` is missing from PATH even when Node/npm work — install Bun or run
 # only the vitest segment locally when debugging. The allowlist evolves; read package.json instead of copying examples
 # from older prompts or transcripts.
 # Commit hygiene for autonomous runs: `git add -A` from a dirty workspace can sweep unrelated files into the
@@ -262,6 +263,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
 4. Run the repo release gate from the repo root:
    npm run release:gate
    (\`bun run release:gate\` is equivalent — same script; CI uses Bun.)
+   The gate script lives in the **root** \`package.json\`; run it with cwd at the git top-level (where that file is). Running \`npm run release:gate\` from \`packages/*\` or other subdirs typically fails or does not execute the workspace gate.
    The gate ends with \`bun run test:terminal-input\` (see root package.json) — \`bun\` must be on PATH. If that fails, fix issues and re-run until it passes (or stop with a clear explanation if blocked by environment).
    The first \`&&\` segment of \`release:gate\` is already \`node scripts/release/verify-release-gate.mjs\` — a full gate run validates the vitest allowlist before vitest starts. Run \`verify-release-gate.mjs\` **alone** only when iterating on \`scripts.release:gate\` in package.json and you want fast feedback without the full vitest batch; after a green \`npm run release:gate\`, you do not need a second verify pass unless you edit \`package.json\` again.
    CI (\`.github/workflows/quality.yml\`) runs lint → fast tests → build → \`benchmark:mcp-flow:all -- --assert\` → examples:smoke → e2e:demo → \`release:gate\` in order (first failure stops the job). A green local \`release:gate\` does not prove lint, fast tests, build, benchmarks, examples, or E2E passed. When your change touches demos, \`create:app\`, examples scripts, demo E2E surfaces, or MCP benchmark scripts / harness expectations, run the matching subset locally (not only the gate).
