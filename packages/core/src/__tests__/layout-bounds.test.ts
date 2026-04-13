@@ -982,6 +982,12 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(10, doubled, 0, tiny)).toEqual({ ox: 10, oy: tiny })
   })
 
+  it('keeps machine-epsilon scroll deltas finite on ox/oy (distinct from MIN_VALUE subnormals)', () => {
+    const e = Number.EPSILON
+    expect(scrollSafeChildOffsets(e, 5, 2 * e, 0)).toEqual({ ox: -e, oy: 5 })
+    expect(scrollSafeChildOffsets(7, e, 0, 2 * e)).toEqual({ ox: 7, oy: -e })
+  })
+
   it('returns +0 child origin when abs and scroll are the same subnormal (tiny - tiny is +0, not −0)', () => {
     const tiny = Number.MIN_VALUE
     expect(tiny - tiny).toBe(0)
