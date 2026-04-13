@@ -794,6 +794,14 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(10, 20, Number.NaN, Number.POSITIVE_INFINITY)).toEqual({ ox: 10, oy: 20 })
   })
 
+  it('coerces scroll double-overflow (MAX_VALUE * 2 → Infinity) via finiteNumberOrZero (axis treated as 0 scroll)', () => {
+    expect(Number.MAX_VALUE * 2).toBe(Infinity)
+    // Infinity scroll coerces to 0 on that axis only; the other axis still subtracts.
+    expect(scrollSafeChildOffsets(10, 20, Number.MAX_VALUE * 2, 3)).toEqual({ ox: 10, oy: 17 })
+    expect(scrollSafeChildOffsets(10, 20, 3, Number.MAX_VALUE * 2)).toEqual({ ox: 7, oy: 20 })
+    expect(scrollSafeChildOffsets(10, 20, Number.MAX_VALUE * 2, Number.MAX_VALUE * 2)).toEqual({ ox: 10, oy: 20 })
+  })
+
   it('coerces boxed Number scroll props to 0 (typeof object; same rule as hit-test / selection walks)', () => {
     const boxed = Object(3) as unknown as number
     expect(finiteNumberOrZero(boxed)).toBe(0)
