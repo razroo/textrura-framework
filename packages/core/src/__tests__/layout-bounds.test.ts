@@ -953,6 +953,13 @@ describe('scrollSafeChildOffsets', () => {
     expect(Object.is(tiny - tiny, -0)).toBe(false)
     expect(scrollSafeChildOffsets(tiny, tiny, tiny, tiny)).toEqual({ ox: 0, oy: 0 })
   })
+
+  it('returns distinct subnormal child origins when abs is a multiple of the scroll on each axis (2t − t)', () => {
+    const t = Number.MIN_VALUE
+    expect(2 * t - t).toBe(t)
+    expect(3 * t - t).toBe(2 * t)
+    expect(scrollSafeChildOffsets(2 * t, 3 * t, t, t)).toEqual({ ox: t, oy: 2 * t })
+  })
 })
 
 describe('finiteNumberOrZero', () => {
