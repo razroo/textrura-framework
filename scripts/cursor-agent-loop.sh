@@ -103,6 +103,8 @@ fi
 # Extend an allowlisted file when adding release-critical tests unless you intentionally widen the gate.
 # Layout/Yoga geometry regression: use `packages/core/src/__tests__/geometry-snapshot-ci.test.ts` (gate-listed)
 # and `GEOMETRY_SNAPSHOT_TESTING.md`; avoid unrelated snapshot churn unless widening the gate on purpose.
+# Faster local feedback when only that file or its `__snapshots__/` change: `npm run test:geometry` (single vitest
+# file; still run full `npm run release:gate` before commit — the gate is authoritative).
 # Inclusive rects, scroll subtraction overflow guards, and `finiteNumberOrZero` / `finiteRootExtent`:
 # implementation `packages/core/src/layout-bounds.ts`; tests `packages/core/src/__tests__/layout-bounds.test.ts`
 # (gate-listed) — pair with `hit-test.test.ts` when changing pointer coordinate math or scroll offsets.
@@ -238,6 +240,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
       When adding tests without a specific bugfix, prefer extending files already run by root \`package.json\` \`release:gate\` (keeps new coverage in the vetted CI path; only widen the gate when the suite is release-critical). The gate is an explicit file allowlist — \`npm run test\` (vitest.fast) may run additional files that the gate does not; confirm in \`package.json\` rather than assuming. If you widen the gate, grep or read the existing \`vitest run ...\` list first so you do not add a duplicate path (vitest would execute that file twice). Paths are not grouped by package: e.g. \`layout-bounds.test.ts\` may already be the first argv path — search the whole line, not only near related tests. \`scripts/release/verify-release-gate.mjs\` also enforces that \`geometry-snapshot-ci.test.ts\`, \`layout-bounds.test.ts\`, and \`hit-test.test.ts\` remain in the allowlist (do not drop them when trimming \`release:gate\`).
       When roadmap and routing checklists are fully checked, re-read ROADMAP "Deferred / research" for themes, or target north-star hot paths (hit-test, text measurement, protocol encode/decode, layout/repaint).
       Inclusive layout rects and scroll-safe child offsets (\`packages/core/src/layout-bounds.ts\` — \`scrollSafeChildOffsets\`, \`pointInInclusiveLayoutRect\`, etc.) have dedicated coverage in \`packages/core/src/__tests__/layout-bounds.test.ts\` (release gate); extend that file when hardening coordinate math, not only \`hit-test.test.ts\`.
+      Geometry snapshot CI (\`packages/core/src/__tests__/geometry-snapshot-ci.test.ts\`, \`__snapshots__/\`): for a fast local loop while editing snapshots, \`npm run test:geometry\` runs that file only — still finish with full \`npm run release:gate\` before commit.
       Large-list window indices: \`syncVirtualWindow\` in \`packages/core/src/virtual-scroll.ts\` with tests in \`packages/core/src/__tests__/virtual-scroll.test.ts\` (release gate) — extend when tightening overflow/NaN invariants or corrupt host props for virtual scroll state.
       Pick something concrete and high-value. Do NOT say there is nothing to do — there is always room to improve a codebase.
 
