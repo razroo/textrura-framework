@@ -78,6 +78,11 @@ describe('safePerformanceNowMs', () => {
     expect(safePerformanceNowMs()).toBe(0)
   })
 
+  it('returns 0 when now() returns a plain object with valueOf (typeof object; no ToPrimitive coercion)', () => {
+    vi.stubGlobal('performance', { now: () => ({ valueOf: () => 12 }) as unknown as number })
+    expect(safePerformanceNowMs()).toBe(0)
+  })
+
   it('returns 0 when now() returns bigint or string (typeof must be number; no ToNumber coercion)', () => {
     vi.stubGlobal('performance', { now: () => 1n as unknown as number })
     expect(safePerformanceNowMs()).toBe(0)
@@ -125,6 +130,11 @@ describe('readPerformanceNow', () => {
     vi.stubGlobal('performance', { now: () => Object(7) as unknown as number })
     expect(readPerformanceNow()).toBe(0)
     vi.stubGlobal('performance', { now: () => 1n as unknown as number })
+    expect(readPerformanceNow()).toBe(0)
+  })
+
+  it('maps plain objects with valueOf to 0 (typeof object; no ToPrimitive / numeric coercion)', () => {
+    vi.stubGlobal('performance', { now: () => ({ valueOf: () => 12 }) as unknown as number })
     expect(readPerformanceNow()).toBe(0)
   })
 
