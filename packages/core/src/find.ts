@@ -19,11 +19,12 @@ import type { TextNodeInfo, SelectionRange } from './selection.js'
  * @param nodes — Text nodes in document order (typically from {@link import('./selection.js').collectTextNodes}).
  *   Entries whose `element.props.text` is not a string are skipped so mistyped or partially deserialized trees
  *   cannot throw in `slice` / `length` paths. An empty `nodes` array yields `[]`.
- * @param query — Candidate substring. Only a **non-empty primitive string** can produce matches: `''`, `null`,
- *   `undefined`, boxed strings, and other non-strings return `[]` without throwing. Whitespace-only queries are
- *   valid when the same UTF-16 run exists in the original text (same sliding-window rules as other queries).
+ * @param query — Candidate substring (`unknown` at the type level so deserialized or host data can be passed
+ *   safely). Only a **non-empty primitive string** can produce matches: `''`, `null`, `undefined`, boxed
+ *   strings, and other non-strings return `[]` without throwing. Whitespace-only queries are valid when the
+ *   same UTF-16 run exists in the original text (same sliding-window rules as other queries).
  */
-export function findInTextNodes(nodes: TextNodeInfo[], query: string): SelectionRange[] {
+export function findInTextNodes(nodes: TextNodeInfo[], query: unknown): SelectionRange[] {
   if (typeof query !== 'string' || !query || nodes.length === 0) return []
   const lowerQuery = query.toLowerCase()
   const qLen = query.length
