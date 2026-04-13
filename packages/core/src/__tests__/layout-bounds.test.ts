@@ -1056,4 +1056,12 @@ describe('composed scroll + inclusive rect (hit-test coordinate space)', () => {
     expect(pointInInclusiveLayoutRect(o.ox + 50, o.oy + 50, o.ox, o.oy, 200, 200)).toBe(true)
     expect(pointInInclusiveLayoutRect(o.ox - 0.001, o.oy, o.ox, o.oy, 200, 200)).toBe(false)
   })
+
+  it('null scroll offsets (abs − scroll overflow): parent inclusive rect may still hold; callers must not walk children with fake origins', () => {
+    const max = Number.MAX_VALUE
+    expect(max - -max).toBe(Infinity)
+    expect(scrollSafeChildOffsets(max, 0, -max, 0)).toBeNull()
+    // Same absolute origin the hit-test layer uses before scroll subtraction; inclusive test stays well-defined.
+    expect(pointInInclusiveLayoutRect(max, 0, max, 0, 50, 50)).toBe(true)
+  })
 })
