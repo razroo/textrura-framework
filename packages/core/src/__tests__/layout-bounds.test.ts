@@ -453,6 +453,16 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(101, 0, 0, 0, 100, 50)).toBe(false)
   })
 
+  it('rejects the next IEEE float past an inclusive max edge (ULP outside [0,1] on a unit rect)', () => {
+    const w = 1
+    const h = 1
+    const pastOne = 1 + 2 ** -52
+    expect(pastOne).toBeGreaterThan(1)
+    expect(pointInInclusiveLayoutRect(pastOne, 0.5, 0, 0, w, h)).toBe(false)
+    expect(pointInInclusiveLayoutRect(0.5, pastOne, 0, 0, w, h)).toBe(false)
+    expect(pointInInclusiveLayoutRect(1, 1, 0, 0, w, h)).toBe(true)
+  })
+
   it('treats IEEE -0 pointer coordinates like +0 on inclusive min edges (subtle float sign)', () => {
     expect(Object.is(-0, 0)).toBe(false)
     expect(pointInInclusiveLayoutRect(-0, 0, 0, 0, 100, 50)).toBe(true)
