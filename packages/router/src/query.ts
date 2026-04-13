@@ -63,7 +63,9 @@ export function parseQuery(search: string): ParsedQuery {
 }
 
 /**
- * Serialize a shallow query object to `?a=1&b=2`. Keys are sorted lexicographically for stable output.
+ * Serialize a shallow query object to `?a=1&b=2`. Keys are sorted with {@link String.prototype.localeCompare}
+ * under the Unicode **root** locale (`'und'`) so output order does not depend on the host default locale
+ * (CI vs local shells) while staying aligned with common collation semantics for non-ASCII keys.
  * Skips `null` and `undefined`; array values become repeated keys. Booleans become `"true"` / `"false"`.
  * Skips non-finite numbers (`NaN`, `±Infinity`) and `bigint` values so accidental numeric garbage does not produce query pairs
  * (parity with {@link import('./path.js').buildPath} optional param omission).
@@ -75,7 +77,7 @@ export function parseQuery(search: string): ParsedQuery {
  * Returns `""` when there are no pairs to emit.
  */
 export function stringifyQuery(query: QueryInput): string {
-  const keys = Object.keys(query).sort((a, b) => a.localeCompare(b))
+  const keys = Object.keys(query).sort((a, b) => a.localeCompare(b, 'und'))
   const pairs: string[] = []
 
   for (const key of keys) {

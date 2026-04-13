@@ -168,6 +168,10 @@ describe('query helpers', () => {
     expect(stringifyQuery({ z: 1, a: 'first', m: true })).toBe('?a=first&m=true&z=1')
   })
 
+  it('sorts keys with Unicode root collation (und) so non-ASCII keys do not depend on host default locale', () => {
+    expect(stringifyQuery({ z: '1', 'ä': '2', a: '3' })).toBe('?a=3&%C3%A4=2&z=1')
+  })
+
   it('stringifies arrays as repeated keys and skips nullish values', () => {
     expect(stringifyQuery({ tag: ['ui', 'router'], empty: null, missing: undefined })).toBe(
       '?tag=ui&tag=router',
