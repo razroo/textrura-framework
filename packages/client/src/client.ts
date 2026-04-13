@@ -283,9 +283,9 @@ function applyPatches(layout: ComputedLayout, patches: ServerPatch['patches']): 
  * A well-formed `patch` with an empty `patches` array still calls {@link Renderer.render} (no geometry
  * mutation, but a repaint hook for hosts that rely on render side effects).
  *
- * For `patch` messages, each entry walks `path` into `layout.children`; if an index is missing, the
- * walk stops and any `x` / `y` / `width` / `height` fields apply to that last resolved node (often the
- * root). This is intentional lenient behavior and does not call `onError`.
+ * For `patch` messages, each entry walks `path` into `layout.children` (an empty `path` targets the
+ * root). If a child is missing at any segment, the **entire** patch entry is skipped — no `x` / `y` /
+ * `width` / `height` fields apply — and `onError` is not called.
  *
  * When the payload is not a plain JSON object (including JSON array roots, which are `typeof` `"object"`,
  * and objects with a null or exotic prototype, which `JSON.parse` never produces),
