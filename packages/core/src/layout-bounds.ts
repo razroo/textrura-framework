@@ -6,8 +6,12 @@
  */
 import type { ComputedLayout } from 'textura'
 
-/** True only for finite primitive numbers: `typeof` rejects `BigInt`, boxed numbers, and objects before `Number.isFinite`. */
-function isFiniteLayoutNumber(value: unknown): value is number {
+/**
+ * True only for finite **primitive** numbers: `typeof` rejects `BigInt`, boxed numbers, and objects before
+ * `Number.isFinite`. Shared with protocol patch validation (`@geometra/server` `coalescePatches`) so corrupt
+ * serialized scalars are rejected under the same rules as layout bounds and hit-testing.
+ */
+export function isFinitePlainNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
 }
 
@@ -99,10 +103,10 @@ export function layoutBoundsAreFinite(layout: ComputedLayout): boolean {
   const { x, y, width, height, children } = layout
   if (!Array.isArray(children)) return false
   return (
-    isFiniteLayoutNumber(x) &&
-    isFiniteLayoutNumber(y) &&
-    isFiniteLayoutNumber(width) &&
-    isFiniteLayoutNumber(height) &&
+    isFinitePlainNumber(x) &&
+    isFinitePlainNumber(y) &&
+    isFinitePlainNumber(width) &&
+    isFinitePlainNumber(height) &&
     width >= 0 &&
     height >= 0
   )
@@ -134,12 +138,12 @@ export function pointInInclusiveLayoutRect(
   height: number,
 ): boolean {
   if (
-    !isFiniteLayoutNumber(x) ||
-    !isFiniteLayoutNumber(y) ||
-    !isFiniteLayoutNumber(absX) ||
-    !isFiniteLayoutNumber(absY) ||
-    !isFiniteLayoutNumber(width) ||
-    !isFiniteLayoutNumber(height) ||
+    !isFinitePlainNumber(x) ||
+    !isFinitePlainNumber(y) ||
+    !isFinitePlainNumber(absX) ||
+    !isFinitePlainNumber(absY) ||
+    !isFinitePlainNumber(width) ||
+    !isFinitePlainNumber(height) ||
     width < 0 ||
     height < 0
   ) {

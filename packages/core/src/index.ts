@@ -42,6 +42,7 @@ export type { HitDispatchResult } from './hit-test.js'
 export {
   finiteNumberOrZero,
   finiteRootExtent,
+  isFinitePlainNumber,
   layoutBoundsAreFinite,
   pointInInclusiveLayoutRect,
   scrollSafeChildOffsets,

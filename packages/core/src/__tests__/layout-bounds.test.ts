@@ -3,12 +3,37 @@ import { describe, it, expect } from 'vitest'
 import {
   finiteNumberOrZero,
   finiteRootExtent,
+  isFinitePlainNumber,
   layoutBoundsAreFinite,
   pointInInclusiveLayoutRect,
   scrollSafeChildOffsets,
 } from '../layout-bounds.js'
 
 const emptyChildren = [] as const
+
+describe('isFinitePlainNumber', () => {
+  it('accepts finite primitive numbers (including IEEE −0)', () => {
+    expect(isFinitePlainNumber(0)).toBe(true)
+    const neg0: unknown = -0
+    expect(isFinitePlainNumber(neg0)).toBe(true)
+    if (isFinitePlainNumber(neg0)) {
+      expect(Object.is(neg0, -0)).toBe(true)
+    }
+    expect(isFinitePlainNumber(Number.MAX_VALUE)).toBe(true)
+    expect(isFinitePlainNumber(Number.MIN_VALUE)).toBe(true)
+  })
+
+  it('rejects NaN, ±Infinity, and non-numbers (typeof + Number.isFinite parity with layout bounds)', () => {
+    expect(isFinitePlainNumber(Number.NaN)).toBe(false)
+    expect(isFinitePlainNumber(Number.POSITIVE_INFINITY)).toBe(false)
+    expect(isFinitePlainNumber(Number.NEGATIVE_INFINITY)).toBe(false)
+    expect(isFinitePlainNumber(undefined)).toBe(false)
+    expect(isFinitePlainNumber(null)).toBe(false)
+    expect(isFinitePlainNumber('1' as unknown as number)).toBe(false)
+    expect(isFinitePlainNumber(1n as unknown as number)).toBe(false)
+    expect(isFinitePlainNumber(Object(3) as unknown as number)).toBe(false)
+  })
+})
 
 describe('layoutBoundsAreFinite', () => {
   it('accepts a normal finite rect with non-negative size', () => {

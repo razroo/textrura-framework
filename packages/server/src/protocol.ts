@@ -1,5 +1,5 @@
 import type { ComputedLayout } from 'textura'
-import type { UIElement } from '@geometra/core'
+import { isFinitePlainNumber, type UIElement } from '@geometra/core'
 
 /** Increment when the wire message shape changes in a non-backward-compatible way. */
 export const PROTOCOL_VERSION = 1
@@ -211,14 +211,9 @@ function sameLayoutScalar(a: number, b: number): boolean {
   return a === b
 }
 
-/** Only finite primitive numbers merge; `null`, `NaN`, `±Infinity`, and non-numbers are ignored per field. */
-function isFinitePatchNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value)
-}
-
 /** Finite primitive `number` with `>= 0` for layout width/height (matches GEOM v1 client patch validation). */
 function isNonNegativePatchDimension(value: unknown): value is number {
-  return isFinitePatchNumber(value) && value >= 0
+  return isFinitePlainNumber(value) && value >= 0
 }
 
 /**
@@ -248,8 +243,8 @@ export function coalescePatches(patches: LayoutPatch[]): LayoutPatch[] {
       order.push(key)
     }
     const next = byPath.get(key)!
-    if (isFinitePatchNumber(patch.x)) next.x = patch.x
-    if (isFinitePatchNumber(patch.y)) next.y = patch.y
+    if (isFinitePlainNumber(patch.x)) next.x = patch.x
+    if (isFinitePlainNumber(patch.y)) next.y = patch.y
     if (isNonNegativePatchDimension(patch.width)) next.width = patch.width
     if (isNonNegativePatchDimension(patch.height)) next.height = patch.height
   }
@@ -293,13 +288,13 @@ export function diffLayout(
   let changed = false
 
   if (!sameLayoutScalar(prev.x, next.x)) {
-    if (isFinitePatchNumber(next.x)) {
+    if (isFinitePlainNumber(next.x)) {
       patch.x = next.x
       changed = true
     }
   }
   if (!sameLayoutScalar(prev.y, next.y)) {
-    if (isFinitePatchNumber(next.y)) {
+    if (isFinitePlainNumber(next.y)) {
       patch.y = next.y
       changed = true
     }
