@@ -2,6 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { matchRouteTree, renderMatchedOutlet, type RouteNode } from '../tree.js'
 
 describe('route tree matching', () => {
+  it('returns null when the route table is empty', () => {
+    expect(matchRouteTree([], '/')).toBeNull()
+    expect(matchRouteTree([], '/any/path')).toBeNull()
+  })
+
+  it('returns null when no registered pattern matches the pathname', () => {
+    const routes: RouteNode<string>[] = [{ id: 'about', path: '/about' }]
+    expect(matchRouteTree(routes, '/missing')).toBeNull()
+    expect(matchRouteTree(routes, '/about/extra')).toBeNull()
+  })
+
   it('matches nested routes and accumulates params', () => {
     const routes: RouteNode<string>[] = [
       {
