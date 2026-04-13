@@ -61,10 +61,31 @@ describe('CanvasRenderer.setFrameTimings', () => {
     expect(renderer.lastLayoutWallMs).toBe(0)
     renderer.setFrameTimings({ layoutMs: Number.POSITIVE_INFINITY })
     expect(renderer.lastLayoutWallMs).toBe(0)
+    renderer.setFrameTimings({ layoutMs: Number.NEGATIVE_INFINITY })
+    expect(renderer.lastLayoutWallMs).toBe(0)
     renderer.setFrameTimings({ layoutMs: -3 })
     expect(renderer.lastLayoutWallMs).toBe(0)
     renderer.setFrameTimings({ layoutMs: 4.25 })
     expect(renderer.lastLayoutWallMs).toBe(4.25)
+  })
+
+  it('preserves large finite layoutMs (telemetry is not capped below Number.isFinite truthy values)', () => {
+    Object.defineProperty(globalThis, 'window', {
+      value: { devicePixelRatio: 1 },
+      configurable: true,
+      writable: true,
+    })
+    const ctx = new FakeCtx()
+    const canvas = {
+      style: {} as Record<string, string>,
+      getContext: () => ctx,
+    } as unknown as HTMLCanvasElement
+
+    const renderer = new CanvasRenderer({ canvas })
+    renderer.setFrameTimings({ layoutMs: Number.MAX_SAFE_INTEGER })
+    expect(renderer.lastLayoutWallMs).toBe(Number.MAX_SAFE_INTEGER)
+    renderer.setFrameTimings({ layoutMs: Number.MAX_VALUE })
+    expect(renderer.lastLayoutWallMs).toBe(Number.MAX_VALUE)
   })
 
   it('normalizes layoutMs IEEE -0 to +0 (Math.max collapses -0; HUD uses toFixed on lastLayoutWallMs)', () => {
