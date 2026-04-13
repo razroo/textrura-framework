@@ -715,6 +715,14 @@ describe('pointInInclusiveLayoutRect', () => {
       expect(pointInInclusiveLayoutRect(5, 5, 0, 0, 10, bad)).toBe(false)
     }
   })
+
+  it('returns false for boxed width or height (typeof object; parity with GEOM patch dimension guards)', () => {
+    const w = Object(10) as unknown as number
+    const h = Object(8) as unknown as number
+    expect(Number.isFinite(w)).toBe(false)
+    expect(pointInInclusiveLayoutRect(5, 5, 0, 0, w, 10)).toBe(false)
+    expect(pointInInclusiveLayoutRect(5, 5, 0, 0, 10, h)).toBe(false)
+  })
 })
 
 describe('finiteRootExtent', () => {
