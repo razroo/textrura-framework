@@ -54,6 +54,15 @@ describe('normalizeSpringConfig', () => {
     expect(normalizeSpringConfig({ mass: '1' as never })).toMatchObject({ mass: 1 })
   })
 
+  it('treats IEEE −0 like non-positive mass/stiffness (<= 0), but −0 damping passes the < 0 guard (still non-negative)', () => {
+    // mass / stiffness use `<= 0`; −0 <= 0 is true → defaults (same as +0).
+    expect(normalizeSpringConfig({ mass: -0 })).toMatchObject({ mass: 1 })
+    expect(normalizeSpringConfig({ stiffness: -0 })).toMatchObject({ stiffness: 170 })
+    // damping uses `< 0` only; −0 < 0 is false → value kept (IEEE −0; same physics as +0 for −damping * velocity).
+    const d = normalizeSpringConfig({ damping: -0 })
+    expect(Object.is(d.damping, -0)).toBe(true)
+  })
+
   it('uses default stiffness when missing, non-finite, zero, or negative', () => {
     expect(normalizeSpringConfig({ stiffness: Number.NaN })).toMatchObject({ stiffness: 170 })
     expect(normalizeSpringConfig({ stiffness: Number.NEGATIVE_INFINITY })).toMatchObject({
