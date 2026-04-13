@@ -801,4 +801,37 @@ describe('geometry snapshot CI', () => {
     const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 100 })
     expect(roundLayout(layout)).toMatchSnapshot()
   })
+
+  it('stable row with columnGap only and two fixed-width text children (rounded)', async () => {
+    await init()
+    const item = { font: '16px sans-serif', lineHeight: 20, width: 32, height: 20 } as const
+    const tree = box(
+      { width: 200, height: 50, padding: 8, flexDirection: 'row', columnGap: 14 },
+      [text({ text: 'A', ...item }), text({ text: 'B', ...item })],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 200, height: 50 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
+
+  it('stable wrapped row with distinct rowGap and columnGap (rounded)', async () => {
+    await init()
+    const item = { font: '16px sans-serif', lineHeight: 20, width: 44, height: 20 } as const
+    const tree = box(
+      {
+        width: 100,
+        height: 100,
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        rowGap: 12,
+        columnGap: 5,
+      },
+      [
+        text({ text: '1', ...item }),
+        text({ text: '2', ...item }),
+        text({ text: '3', ...item }),
+      ],
+    )
+    const layout = computeLayout(toLayoutTree(tree), { width: 100, height: 100 })
+    expect(roundLayout(layout)).toMatchSnapshot()
+  })
 })
