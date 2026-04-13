@@ -177,6 +177,14 @@ describe('safePerformanceNowMs', () => {
     expect(safePerformanceNowMs()).toBe(0)
   })
 
+  it('returns 0 when globalThis.performance is a truthy non-object (string/number mistaken host; no callable now)', () => {
+    // Truthy primitives are not Performance objects; `typeof perf.now` must not assume an object receiver.
+    vi.stubGlobal('performance', 'clock' as unknown as Performance)
+    expect(safePerformanceNowMs()).toBe(0)
+    vi.stubGlobal('performance', 1 as unknown as Performance)
+    expect(safePerformanceNowMs()).toBe(0)
+  })
+
   it('returns 0 when accessing globalThis.performance throws (hostile accessor)', () => {
     withHostilePerformanceGetter(() => {
       expect(safePerformanceNowMs()).toBe(0)
@@ -263,6 +271,13 @@ describe('readPerformanceNow', () => {
     expect(readPerformanceNow()).toBe(0)
     // @ts-expect-error — stub 0 as falsy non-object
     vi.stubGlobal('performance', 0 as unknown as Performance)
+    expect(readPerformanceNow()).toBe(0)
+  })
+
+  it('returns 0 when globalThis.performance is a truthy non-object (string/number mistaken host; same guard as safe path)', () => {
+    vi.stubGlobal('performance', 'clock' as unknown as Performance)
+    expect(readPerformanceNow()).toBe(0)
+    vi.stubGlobal('performance', 1 as unknown as Performance)
     expect(readPerformanceNow()).toBe(0)
   })
 
