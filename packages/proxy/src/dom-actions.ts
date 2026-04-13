@@ -4916,20 +4916,10 @@ export async function setCheckedControl(page: Page, label: string, opts?: SetChe
 
         let after = readChecked(target)
         if (after !== payload.checked && target instanceof HTMLInputElement) {
-          // dispatchEvent bypasses React 17+ event delegation — use keyboard
-          // Space to toggle which properly fires keyboard events React catches
           target.checked = payload.checked
-          await page.keyboard.press(' ')
-          await page.waitForTimeout(50)
+          target.dispatchEvent(new Event('input', { bubbles: true }))
+          target.dispatchEvent(new Event('change', { bubbles: true }))
           after = target.checked
-
-          // If keyboard still didn't sync, try directly focusing and pressing Space
-          if (after !== payload.checked) {
-            await target.evaluate((el) => (el as HTMLInputElement).focus())
-            await page.keyboard.press(' ')
-            await page.waitForTimeout(50)
-            after = target.checked
-          }
         }
 
         return {
