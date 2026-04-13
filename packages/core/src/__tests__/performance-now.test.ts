@@ -31,6 +31,22 @@ describe('safePerformanceNowMs', () => {
     expect(safePerformanceNowMs()).toBe(12.5)
   })
 
+  it('uses inherited or prototype-chain now() implementations (polyfills may not assign own properties)', () => {
+    const viaProto = Object.create({ now: () => 11.5 })
+    vi.stubGlobal('performance', viaProto)
+    expect(safePerformanceNowMs()).toBe(11.5)
+    expect(readPerformanceNow()).toBe(11.5)
+
+    class PerfPolyfill {
+      now() {
+        return 22.25
+      }
+    }
+    vi.stubGlobal('performance', new PerfPolyfill())
+    expect(safePerformanceNowMs()).toBe(22.25)
+    expect(readPerformanceNow()).toBe(22.25)
+  })
+
   it('maps NaN and non-finite now() results to 0', () => {
     vi.stubGlobal('performance', { now: () => Number.NaN })
     expect(safePerformanceNowMs()).toBe(0)
