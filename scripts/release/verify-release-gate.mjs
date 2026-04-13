@@ -75,8 +75,9 @@ async function main() {
   }
 
   if (segments.length !== 3) {
+    const preview = segments.map((s, i) => `${i + 1}:${s.length > 72 ? `${s.slice(0, 72)}…` : s}`).join(' | ')
     throw new Error(
-      `release:gate: expected exactly three && segments (verify-release-gate.mjs, single vitest run batch, bun run test:terminal-input); got ${segments.length}`,
+      `release:gate: expected exactly three && segments (verify-release-gate.mjs, single vitest run batch, bun run test:terminal-input); got ${segments.length} (${preview})`,
     )
   }
   const vitestSegment = segments[1] ?? ''
