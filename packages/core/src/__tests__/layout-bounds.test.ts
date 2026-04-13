@@ -1159,4 +1159,25 @@ describe('composed scroll + inclusive rect (hit-test coordinate space)', () => {
     const inner = scrollSafeChildOffsets(innerAbsX, innerAbsY, 5, 10)!
     expect(inner).toEqual({ ox: 15, oy: 10 })
   })
+
+  it('nested scroll containers: three levels with mixed per-axis scroll (outer X, middle Y, inner X)', () => {
+    // Root (0,0): horizontal scroll only — same pattern as collectHits before walking content children.
+    const outer = scrollSafeChildOffsets(0, 0, 50, 0)!
+    expect(outer).toEqual({ ox: -50, oy: 0 })
+    // Middle laid out at (100, 0) relative to outer content.
+    const middleAbsX = outer.ox + 100
+    const middleAbsY = outer.oy + 0
+    expect(middleAbsX).toBe(50)
+    // Middle box: vertical scroll only.
+    const middle = scrollSafeChildOffsets(middleAbsX, middleAbsY, 0, 20)!
+    expect(middle).toEqual({ ox: 50, oy: -20 })
+    // Inner laid out at (0, 100) relative to middle content.
+    const innerAbsX = middle.ox + 0
+    const innerAbsY = middle.oy + 100
+    expect(innerAbsX).toBe(50)
+    expect(innerAbsY).toBe(80)
+    // Innermost: horizontal scroll only (distinct axis from each ancestor).
+    const inner = scrollSafeChildOffsets(innerAbsX, innerAbsY, 5, 0)!
+    expect(inner).toEqual({ ox: 45, oy: 80 })
+  })
 })
