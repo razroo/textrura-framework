@@ -1,5 +1,10 @@
 import { box, bodyText, text } from '@geometra/core'
 import type { UIElement, EventHandlers } from '@geometra/core'
+import { theme, font, lineHeight } from './theme.js'
+
+// Re-export theme API
+export { theme, setTheme, peekTheme, mergeTheme, darkTheme, font, lineHeight } from './theme.js'
+export type { Theme, ThemeColors, ThemeTypography, ThemeSpacing, ThemeRadii, DeepPartial } from './theme.js'
 
 let inputMeasureCtx: CanvasRenderingContext2D | null = null
 
@@ -19,7 +24,7 @@ function getCaretOffsetFromLocalX(textValue: string, localX: number): number {
     const approxCharWidth = 8
     return Math.max(0, Math.min(textValue.length, Math.round(clampedX / approxCharWidth)))
   }
-  ctx.font = '13px Inter'
+  ctx.font = font('', 'base')
   let running = 0
   for (let i = 0; i < textValue.length; i++) {
     const ch = textValue[i]!
@@ -31,18 +36,19 @@ function getCaretOffsetFromLocalX(textValue: string, localX: number): number {
 }
 
 export function button(label: string, onClick?: EventHandlers['onClick']): UIElement {
+  const t = theme()
   return box(
     {
       paddingLeft: 12,
       paddingRight: 12,
       paddingTop: 8,
       paddingBottom: 8,
-      borderRadius: 8,
-      backgroundColor: '#2563eb',
+      borderRadius: t.radii.md,
+      backgroundColor: t.colors.accent,
       cursor: 'pointer',
       onClick,
     },
-    [text({ text: label, font: '13px Inter', lineHeight: 18, color: '#ffffff' })],
+    [text({ text: label, font: font('', 'base'), lineHeight: lineHeight('base'), color: t.colors.accentText })],
   )
 }
 
@@ -51,11 +57,11 @@ export function button(label: string, onClick?: EventHandlers['onClick']): UIEle
 // ---------------------------------------------------------------------------
 
 export interface LinkOptions {
-  /** Font CSS shorthand (default: '12px Inter'). */
+  /** Font CSS shorthand (default: theme small font). */
   font?: string
-  /** Text color (default: '#38bdf8' — cyan). */
+  /** Text color (default: theme link color). */
   color?: string
-  /** Line height in pixels (default: 16). */
+  /** Line height in pixels (default: theme small line height). */
   lineHeight?: number
   /** Open in new tab (default: true). */
   newTab?: boolean
@@ -68,10 +74,11 @@ export interface LinkOptions {
  * href via `window.open`.
  */
 export function link(label: string, href: string, options: LinkOptions = {}): UIElement {
+  const t = theme()
   const {
-    font = '12px Inter',
-    color = '#38bdf8',
-    lineHeight = 16,
+    font: fontOverride = font('', 'small'),
+    color = t.colors.link,
+    lineHeight: lhOverride = lineHeight('small'),
     newTab = true,
   } = options
   return box(
@@ -84,7 +91,7 @@ export function link(label: string, href: string, options: LinkOptions = {}): UI
       },
       semantic: { tag: 'a', role: 'link', ariaLabel: label },
     },
-    [bodyText({ text: label, font, lineHeight, color })],
+    [bodyText({ text: label, font: fontOverride, lineHeight: lhOverride, color })],
   )
 }
 
@@ -110,11 +117,12 @@ export interface InputOptions {
 }
 
 export function input(value: string, placeholder = '', options: InputOptions = {}): UIElement {
+  const t = theme()
   const disabled = options.disabled === true
   const readOnly = !disabled && options.readOnly === true
   const focused = !disabled && options.focused === true
-  const valueColor = disabled ? '#64748b' : '#e2e8f0'
-  const placeholderColor = disabled ? '#475569' : '#64748b'
+  const valueColor = disabled ? t.colors.textDisabled : t.colors.text
+  const placeholderColor = disabled ? t.colors.borderMuted : t.colors.textDisabled
   const maxOffset = value.length
   const requestedCaret = options.caretOffset
   const caretBase =
@@ -131,27 +139,30 @@ export function input(value: string, placeholder = '', options: InputOptions = {
   const selEnd = Math.max(0, Math.min(Math.max(s0, s1), maxOffset))
   const hasSelection = focused && selStart !== selEnd
 
+  const f = font('', 'base')
+  const lh = lineHeight('base')
+
   const children: UIElement[] = []
   if (showPlaceholder) {
     if (focused) {
-      children.push(box({ width: 1.5, minHeight: 14, backgroundColor: '#38bdf8' }, []))
+      children.push(box({ width: 1.5, minHeight: 14, backgroundColor: t.colors.focus }, []))
     }
-    children.push(text({ text: placeholder, font: '13px Inter', lineHeight: 18, color: placeholderColor }))
+    children.push(text({ text: placeholder, font: f, lineHeight: lh, color: placeholderColor }))
   } else if (hasSelection) {
     const beforeSel = value.slice(0, selStart).replace(/ /g, '\u00A0')
     const selectedText = value.slice(selStart, selEnd).replace(/ /g, '\u00A0')
     const afterSel = value.slice(selEnd).replace(/ /g, '\u00A0')
     if (beforeSel.length > 0) {
-      children.push(text({ text: beforeSel, font: '13px Inter', lineHeight: 18, color: valueColor }))
+      children.push(text({ text: beforeSel, font: f, lineHeight: lh, color: valueColor }))
     }
     children.push(
       box(
-        { backgroundColor: 'rgba(56, 189, 248, 0.3)', borderRadius: 2 },
-        [text({ text: selectedText, font: '13px Inter', lineHeight: 18, color: valueColor })],
+        { backgroundColor: t.colors.selectionBg, borderRadius: 2 },
+        [text({ text: selectedText, font: f, lineHeight: lh, color: valueColor })],
       ),
     )
     if (afterSel.length > 0) {
-      children.push(text({ text: afterSel, font: '13px Inter', lineHeight: 18, color: valueColor }))
+      children.push(text({ text: afterSel, font: f, lineHeight: lh, color: valueColor }))
     }
   } else {
     const leftText = value.slice(0, caretOffset)
@@ -159,13 +170,13 @@ export function input(value: string, placeholder = '', options: InputOptions = {
     const displayLeft = leftText.replace(/ /g, '\u00A0')
     const displayRight = rightText.replace(/ /g, '\u00A0')
     if (displayLeft.length > 0) {
-      children.push(text({ text: displayLeft, font: '13px Inter', lineHeight: 18, color: valueColor }))
+      children.push(text({ text: displayLeft, font: f, lineHeight: lh, color: valueColor }))
     }
     if (focused) {
-      children.push(box({ width: 1.5, minHeight: 14, backgroundColor: '#38bdf8' }, []))
+      children.push(box({ width: 1.5, minHeight: 14, backgroundColor: t.colors.focus }, []))
     }
     if (displayRight.length > 0) {
-      children.push(text({ text: displayRight, font: '13px Inter', lineHeight: 18, color: valueColor }))
+      children.push(text({ text: displayRight, font: f, lineHeight: lh, color: valueColor }))
     }
   }
 
@@ -200,16 +211,16 @@ export function input(value: string, placeholder = '', options: InputOptions = {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 0,
-      paddingLeft: 10,
-      paddingRight: 10,
+      paddingLeft: t.spacing.md,
+      paddingRight: t.spacing.md,
       paddingTop: 8,
       paddingBottom: 8,
-      borderColor: disabled ? '#475569' : focused ? '#38bdf8' : '#334155',
+      borderColor: disabled ? t.colors.borderMuted : focused ? t.colors.focus : t.colors.border,
       borderWidth: 1,
-      borderRadius: 8,
+      borderRadius: t.radii.md,
       cursor: disabled ? 'not-allowed' : 'text',
       pointerEvents: disabled ? 'none' : undefined,
-      backgroundColor: disabled ? '#0f172a' : focused ? '#111827' : undefined,
+      backgroundColor: disabled ? t.colors.bg : focused ? t.colors.bgSubtle : undefined,
       semantic: disabled
         ? { tag: 'input', ariaDisabled: true }
         : readOnly
@@ -226,31 +237,33 @@ export function input(value: string, placeholder = '', options: InputOptions = {
 }
 
 export function list(items: string[]): UIElement {
+  const t = theme()
   return box(
-    { flexDirection: 'column', gap: 4, semantic: { tag: 'ul' } },
+    { flexDirection: 'column', gap: t.spacing.xs, semantic: { tag: 'ul' } },
     items.map((item) =>
-      box({ paddingLeft: 8, paddingTop: 4, paddingBottom: 4, semantic: { tag: 'li' } }, [
-        bodyText({ text: item, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }),
+      box({ paddingLeft: 8, paddingTop: t.spacing.xs, paddingBottom: t.spacing.xs, semantic: { tag: 'li' } }, [
+        bodyText({ text: item, font: font('', 'base'), lineHeight: lineHeight('base'), color: t.colors.text }),
       ]),
     ),
   )
 }
 
 export function dialog(title: string, body: string, actions: UIElement[] = []): UIElement {
+  const t = theme()
   return box(
     {
       flexDirection: 'column',
-      gap: 10,
-      padding: 14,
-      borderRadius: 10,
-      borderColor: '#334155',
+      gap: t.spacing.md,
+      padding: t.spacing.lg,
+      borderRadius: t.radii.lg,
+      borderColor: t.colors.border,
       borderWidth: 1,
-      backgroundColor: '#0f172a',
+      backgroundColor: t.colors.bg,
       semantic: { role: 'dialog', ariaLabel: title },
     },
     [
-      bodyText({ text: title, font: 'bold 16px Inter', lineHeight: 20, color: '#f8fafc' }),
-      bodyText({ text: body, font: '13px Inter', lineHeight: 18, color: '#cbd5e1' }),
+      bodyText({ text: title, font: font('bold', 'heading'), lineHeight: lineHeight('heading'), color: t.colors.textHeading }),
+      bodyText({ text: body, font: font('', 'base'), lineHeight: lineHeight('base'), color: t.colors.textSubtle }),
       box({ flexDirection: 'row', gap: 8 }, actions),
     ],
   )
@@ -263,10 +276,11 @@ export interface CheckboxOptions {
 }
 
 export function checkbox(label: string, options: CheckboxOptions = {}): UIElement {
+  const t = theme()
   const checked = options.checked === true
   const disabled = options.disabled === true
-  const borderColor = disabled ? '#475569' : checked ? '#22c55e' : '#64748b'
-  const bg = disabled ? '#0f172a' : checked ? '#14532d' : '#111827'
+  const borderColor = disabled ? t.colors.borderMuted : checked ? t.colors.success : t.colors.textDisabled
+  const bg = disabled ? t.colors.bg : checked ? t.colors.successBg : t.colors.bgSubtle
 
   const toggle = () => {
     if (disabled) return
@@ -276,7 +290,7 @@ export function checkbox(label: string, options: CheckboxOptions = {}): UIElemen
   return box(
     {
       flexDirection: 'row',
-      gap: 10,
+      gap: t.spacing.md,
       alignItems: 'center',
       cursor: disabled ? 'not-allowed' : 'pointer',
       semantic: { role: 'checkbox', ariaLabel: label, ariaSelected: checked, ariaDisabled: disabled },
@@ -290,7 +304,7 @@ export function checkbox(label: string, options: CheckboxOptions = {}): UIElemen
         {
           width: 16,
           height: 16,
-          borderRadius: 4,
+          borderRadius: t.radii.sm,
           borderColor,
           borderWidth: 1,
           backgroundColor: bg,
@@ -298,15 +312,15 @@ export function checkbox(label: string, options: CheckboxOptions = {}): UIElemen
           justifyContent: 'center',
         },
         checked
-          ? [text({ text: '✓', font: 'bold 11px Inter', lineHeight: 12, color: disabled ? '#94a3b8' : '#86efac' })]
+          ? [text({ text: '✓', font: `bold 11px ${t.typography.fontFamily}`, lineHeight: 12, color: disabled ? t.colors.textMuted : t.colors.successTextLight })]
           : [],
       ),
       box({ flexGrow: 1, minWidth: 0 }, [
         bodyText({
           text: label,
-          font: '13px Inter',
-          lineHeight: 18,
-          color: disabled ? '#64748b' : '#e2e8f0',
+          font: font('', 'base'),
+          lineHeight: lineHeight('base'),
+          color: disabled ? t.colors.textDisabled : t.colors.text,
         }),
       ]),
     ],
@@ -320,9 +334,10 @@ export interface RadioOptions {
 }
 
 export function radio(label: string, options: RadioOptions = {}): UIElement {
+  const t = theme()
   const checked = options.checked === true
   const disabled = options.disabled === true
-  const borderColor = disabled ? '#475569' : checked ? '#38bdf8' : '#64748b'
+  const borderColor = disabled ? t.colors.borderMuted : checked ? t.colors.focus : t.colors.textDisabled
 
   const select = () => {
     if (disabled || checked) return
@@ -332,7 +347,7 @@ export function radio(label: string, options: RadioOptions = {}): UIElement {
   return box(
     {
       flexDirection: 'row',
-      gap: 10,
+      gap: t.spacing.md,
       alignItems: 'center',
       cursor: disabled ? 'not-allowed' : 'pointer',
       semantic: { role: 'radio', ariaLabel: label, ariaSelected: checked, ariaDisabled: disabled },
@@ -346,23 +361,23 @@ export function radio(label: string, options: RadioOptions = {}): UIElement {
         {
           width: 16,
           height: 16,
-          borderRadius: 8,
+          borderRadius: t.radii.md,
           borderColor,
           borderWidth: 1,
-          backgroundColor: '#111827',
+          backgroundColor: t.colors.bgSubtle,
           alignItems: 'center',
           justifyContent: 'center',
         },
         checked
-          ? [box({ width: 8, height: 8, borderRadius: 4, backgroundColor: disabled ? '#64748b' : '#38bdf8' }, [])]
+          ? [box({ width: 8, height: 8, borderRadius: t.radii.sm, backgroundColor: disabled ? t.colors.textDisabled : t.colors.focus }, [])]
           : [],
       ),
       box({ flexGrow: 1, minWidth: 0 }, [
         bodyText({
           text: label,
-          font: '13px Inter',
-          lineHeight: 18,
-          color: disabled ? '#64748b' : '#e2e8f0',
+          font: font('', 'base'),
+          lineHeight: lineHeight('base'),
+          color: disabled ? t.colors.textDisabled : t.colors.text,
         }),
       ]),
     ],
@@ -380,45 +395,46 @@ export interface TabsOptions {
 }
 
 export function tabs(items: TabItem[], options: TabsOptions = {}): UIElement {
+  const t = theme()
   const activeIndex = Math.max(0, Math.min(options.activeIndex ?? 0, Math.max(0, items.length - 1)))
   const active = items[activeIndex]
   return box(
     {
       flexDirection: 'column',
-      gap: 10,
+      gap: t.spacing.md,
       semantic: { role: 'tablist' },
     },
     [
       box(
         {
           flexDirection: 'row',
-          gap: 6,
+          gap: t.spacing.sm,
           flexWrap: 'wrap',
         },
         items.map((item, idx) =>
           box(
             {
-              paddingLeft: 10,
-              paddingRight: 10,
-              paddingTop: 6,
-              paddingBottom: 6,
-              borderRadius: 8,
-              borderColor: idx === activeIndex ? '#38bdf8' : '#334155',
+              paddingLeft: t.spacing.md,
+              paddingRight: t.spacing.md,
+              paddingTop: t.spacing.sm,
+              paddingBottom: t.spacing.sm,
+              borderRadius: t.radii.md,
+              borderColor: idx === activeIndex ? t.colors.focus : t.colors.border,
               borderWidth: 1,
-              backgroundColor: idx === activeIndex ? '#082f49' : '#111827',
+              backgroundColor: idx === activeIndex ? t.colors.accentSoft : t.colors.bgSubtle,
               cursor: 'pointer',
               semantic: { role: 'tab', ariaLabel: item.label, ariaSelected: idx === activeIndex },
               onClick: () => options.onTabChange?.(idx),
             },
-            [bodyText({ text: item.label, font: '13px Inter', lineHeight: 18, color: idx === activeIndex ? '#bae6fd' : '#cbd5e1' })],
+            [bodyText({ text: item.label, font: font('', 'base'), lineHeight: lineHeight('base'), color: idx === activeIndex ? t.colors.accentSoftText : t.colors.textSubtle })],
           ),
         ),
       ),
       box(
         {
-          borderColor: '#334155',
+          borderColor: t.colors.border,
           borderWidth: 1,
-          borderRadius: 10,
+          borderRadius: t.radii.lg,
           padding: 12,
           semantic: { role: 'tabpanel' },
         },
@@ -428,19 +444,9 @@ export function tabs(items: TabItem[], options: TabsOptions = {}): UIElement {
   )
 }
 
-const toastVariantStyle: Record<
-  'info' | 'success' | 'warning' | 'error',
-  { border: string; background: string; color: string }
-> = {
-  info: { border: '#334155', background: '#0f172a', color: '#e2e8f0' },
-  success: { border: '#166534', background: '#052e16', color: '#bbf7d0' },
-  warning: { border: '#a16207', background: '#422006', color: '#fef08a' },
-  error: { border: '#991b1b', background: '#450a0a', color: '#fecaca' },
-}
-
 export interface ToastOptions {
   /** Visual tone. Default `info`. */
-  variant?: keyof typeof toastVariantStyle
+  variant?: 'info' | 'success' | 'warning' | 'error'
   /** Optional title above the message. */
   title?: string
   onDismiss?: () => void
@@ -451,29 +457,30 @@ export interface ToastOptions {
  * Uses `role="status"` for assistive tech.
  */
 export function toast(message: string, options: ToastOptions = {}): UIElement {
+  const t = theme()
   const variant = options.variant ?? 'info'
-  const s = toastVariantStyle[variant]
+  const s = t.colors.variants[variant]
   const children: UIElement[] = []
   if (options.title) {
     children.push(
       bodyText({
         text: options.title,
-        font: 'bold 13px Inter',
-        lineHeight: 18,
-        color: s.color,
+        font: font('bold', 'base'),
+        lineHeight: lineHeight('base'),
+        color: s.text,
       }),
     )
   }
   children.push(
     bodyText({
       text: message,
-      font: '13px Inter',
-      lineHeight: 18,
-      color: s.color,
+      font: font('', 'base'),
+      lineHeight: lineHeight('base'),
+      color: s.text,
     }),
   )
   const row: UIElement[] = [
-    box({ flexDirection: 'column', gap: 4, flexGrow: 1 }, children),
+    box({ flexDirection: 'column', gap: t.spacing.xs, flexGrow: 1 }, children),
   ]
   if (options.onDismiss) {
     row.push(
@@ -483,12 +490,12 @@ export function toast(message: string, options: ToastOptions = {}): UIElement {
           paddingRight: 8,
           paddingTop: 4,
           paddingBottom: 4,
-          borderRadius: 6,
+          borderRadius: t.spacing.sm,
           cursor: 'pointer',
           semantic: { role: 'button', ariaLabel: 'Dismiss' },
           onClick: options.onDismiss,
         },
-        [text({ text: '✕', font: '12px Inter', lineHeight: 14, color: s.color })],
+        [text({ text: '✕', font: font('', 'small'), lineHeight: 14, color: s.text })],
       ),
     )
   }
@@ -498,10 +505,10 @@ export function toast(message: string, options: ToastOptions = {}): UIElement {
       alignItems: 'flex-start',
       gap: 8,
       padding: 12,
-      borderRadius: 10,
+      borderRadius: t.radii.lg,
       borderWidth: 1,
       borderColor: s.border,
-      backgroundColor: s.background,
+      backgroundColor: s.bg,
       maxWidth: 360,
       semantic: { role: 'status', ariaLabel: options.title ? `${options.title}: ${message}` : message },
     },
@@ -524,16 +531,16 @@ export interface CommandPaletteOptions {
  * (filtering, keyboard) — this renders rows with optional shortcuts.
  */
 export function commandPalette(commands: CommandItem[], options: CommandPaletteOptions = {}): UIElement {
-  const muted = '#64748b'
+  const t = theme()
   return box(
     {
       flexDirection: 'column',
       gap: 2,
-      padding: 6,
-      borderRadius: 10,
+      padding: t.spacing.sm,
+      borderRadius: t.radii.lg,
       borderWidth: 1,
-      borderColor: '#334155',
-      backgroundColor: '#020617',
+      borderColor: t.colors.border,
+      backgroundColor: t.colors.bgAlt,
       semantic: { role: 'listbox', ariaLabel: 'Commands' },
     },
     commands.map((cmd) =>
@@ -544,21 +551,21 @@ export function commandPalette(commands: CommandItem[], options: CommandPaletteO
           alignItems: 'center',
           gap: 12,
           minWidth: 0,
-          paddingLeft: 10,
-          paddingRight: 10,
+          paddingLeft: t.spacing.md,
+          paddingRight: t.spacing.md,
           paddingTop: 8,
           paddingBottom: 8,
-          borderRadius: 8,
+          borderRadius: t.radii.md,
           cursor: 'pointer',
           semantic: { role: 'option', ariaLabel: cmd.label },
           onClick: () => options.onSelect?.(cmd.id),
         },
         [
           box({ flexGrow: 1, minWidth: 0 }, [
-            bodyText({ text: cmd.label, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }),
+            bodyText({ text: cmd.label, font: font('', 'base'), lineHeight: lineHeight('base'), color: t.colors.text }),
           ]),
           cmd.shortcut
-            ? text({ text: cmd.shortcut, font: '12px Inter', lineHeight: 16, color: muted })
+            ? text({ text: cmd.shortcut, font: font('', 'small'), lineHeight: lineHeight('small'), color: t.colors.textDisabled })
             : box({ width: 1, height: 1 }, []),
         ],
       ),
@@ -584,26 +591,27 @@ export interface MenuOptions {
  * Vertical menu (`role="menu"`). App owns open/close and positioning.
  */
 export function menu(items: MenuItem[], options: MenuOptions = {}): UIElement {
+  const t = theme()
   return box(
     {
       flexDirection: 'column',
       gap: 2,
-      padding: 6,
-      borderRadius: 10,
+      padding: t.spacing.sm,
+      borderRadius: t.radii.lg,
       borderWidth: 1,
-      borderColor: '#334155',
-      backgroundColor: '#020617',
+      borderColor: t.colors.border,
+      backgroundColor: t.colors.bgAlt,
       semantic: { role: 'menu', ariaLabel: options.ariaLabel ?? 'Menu' },
     },
     items.map((item) => {
-      const color = item.disabled ? '#475569' : item.danger ? '#fca5a5' : '#e2e8f0'
+      const color = item.disabled ? t.colors.borderMuted : item.danger ? t.colors.danger : t.colors.text
       return box(
         {
-          paddingLeft: 10,
-          paddingRight: 10,
+          paddingLeft: t.spacing.md,
+          paddingRight: t.spacing.md,
           paddingTop: 8,
           paddingBottom: 8,
-          borderRadius: 8,
+          borderRadius: t.radii.md,
           cursor: item.disabled ? 'not-allowed' : 'pointer',
           semantic: {
             role: 'menuitem',
@@ -612,7 +620,7 @@ export function menu(items: MenuItem[], options: MenuOptions = {}): UIElement {
           },
           onClick: item.disabled ? undefined : () => options.onSelect?.(item.id),
         },
-        [bodyText({ text: item.label, font: '13px Inter', lineHeight: 18, color })],
+        [bodyText({ text: item.label, font: font('', 'base'), lineHeight: lineHeight('base'), color })],
       )
     }),
   )
@@ -640,6 +648,7 @@ export interface SelectControlOptions {
  * after `onChange` if the panel should close.
  */
 export function selectControl(opts: SelectControlOptions): UIElement {
+  const t = theme()
   const selected = opts.options.find(o => o.value === opts.value)
   const label = selected?.label ?? opts.placeholder ?? 'Select…'
   const trigger = box(
@@ -649,32 +658,32 @@ export function selectControl(opts: SelectControlOptions): UIElement {
       alignItems: 'center',
       gap: 8,
       minWidth: 0,
-      paddingLeft: 10,
-      paddingRight: 10,
+      paddingLeft: t.spacing.md,
+      paddingRight: t.spacing.md,
       paddingTop: 8,
       paddingBottom: 8,
-      borderRadius: 8,
+      borderRadius: t.radii.md,
       borderWidth: 1,
-      borderColor: '#334155',
-      backgroundColor: '#0f172a',
+      borderColor: t.colors.border,
+      backgroundColor: t.colors.bg,
       cursor: 'pointer',
       semantic: { role: 'button', ariaLabel: 'Select', ariaExpanded: opts.open },
       onClick: () => opts.onToggle?.(),
     },
     [
       box({ flexGrow: 1, minWidth: 0 }, [
-        bodyText({ text: label, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }),
+        bodyText({ text: label, font: font('', 'base'), lineHeight: lineHeight('base'), color: t.colors.text }),
       ]),
       text({
         text: opts.open ? '▲' : '▼',
-        font: '10px Inter',
-        lineHeight: 18,
-        color: '#94a3b8',
+        font: `10px ${t.typography.fontFamily}`,
+        lineHeight: lineHeight('base'),
+        color: t.colors.textMuted,
       }),
     ],
   )
   if (!opts.open) {
-    return box({ flexDirection: 'column', gap: 4 }, [trigger])
+    return box({ flexDirection: 'column', gap: t.spacing.xs }, [trigger])
   }
   const panel = menu(
     opts.options.map(o => ({
@@ -687,7 +696,7 @@ export function selectControl(opts: SelectControlOptions): UIElement {
       onSelect: (id) => opts.onChange(id),
     },
   )
-  return box({ flexDirection: 'column', gap: 4 }, [trigger, panel])
+  return box({ flexDirection: 'column', gap: t.spacing.xs }, [trigger, panel])
 }
 
 export interface DataTableColumn {
@@ -709,6 +718,7 @@ export function dataTable(
   rows: Array<Record<string, string>>,
   options: DataTableOptions = {},
 ): UIElement {
+  const t = theme()
   const headerRow = box(
     {
       flexDirection: 'row',
@@ -719,25 +729,25 @@ export function dataTable(
     columns.map(col =>
       box(
         { flexGrow: 1, minWidth: 0, semantic: { role: 'columnheader', ariaLabel: col.header } },
-        [bodyText({ text: col.header, font: 'bold 12px Inter', lineHeight: 16, color: '#94a3b8' })],
+        [bodyText({ text: col.header, font: font('bold', 'small'), lineHeight: lineHeight('small'), color: t.colors.textMuted })],
       ),
     ),
   )
-  const divider = box({ height: 1, backgroundColor: '#334155' }, [])
+  const divider = box({ height: 1, backgroundColor: t.colors.border }, [])
   const bodyRows = rows.map((row, ri) =>
     box(
       {
         flexDirection: 'row',
         gap: 8,
-        paddingTop: 6,
-        paddingBottom: 6,
+        paddingTop: t.spacing.sm,
+        paddingBottom: t.spacing.sm,
         cursor: options.onRowClick ? 'pointer' : 'default',
         semantic: { role: 'row' },
         onClick: options.onRowClick ? () => options.onRowClick?.(ri) : undefined,
       },
       columns.map(col =>
         box({ flexGrow: 1, minWidth: 0, semantic: { role: 'cell' } }, [
-          bodyText({ text: row[col.key] ?? '', font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }),
+          bodyText({ text: row[col.key] ?? '', font: font('', 'base'), lineHeight: lineHeight('base'), color: t.colors.text }),
         ]),
       ),
     ),
@@ -768,6 +778,7 @@ export interface TreeViewOptions {
 }
 
 function treeNodeElement(node: TreeNode, depth: number, options: TreeViewOptions): UIElement {
+  const t = theme()
   const hasChildren = !!(node.children && node.children.length > 0)
   const expanded = options.expandedIds.has(node.id)
   const selected = options.selectedId === node.id
@@ -775,13 +786,13 @@ function treeNodeElement(node: TreeNode, depth: number, options: TreeViewOptions
     {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
+      gap: t.spacing.sm,
       minWidth: 0,
-      paddingLeft: 8 + depth * 14,
-      paddingTop: 4,
-      paddingBottom: 4,
-      borderRadius: 6,
-      backgroundColor: selected ? '#1e3a5f' : undefined,
+      paddingLeft: 8 + depth * t.spacing.lg,
+      paddingTop: t.spacing.xs,
+      paddingBottom: t.spacing.xs,
+      borderRadius: t.spacing.sm,
+      backgroundColor: selected ? t.colors.selected : undefined,
       cursor: 'pointer',
       semantic: {
         role: 'treeitem',
@@ -797,13 +808,13 @@ function treeNodeElement(node: TreeNode, depth: number, options: TreeViewOptions
       hasChildren
         ? text({
             text: expanded ? '▼' : '▶',
-            font: '10px Inter',
+            font: `10px ${t.typography.fontFamily}`,
             lineHeight: 14,
-            color: '#94a3b8',
+            color: t.colors.textMuted,
           })
         : box({ width: 14 }, []),
       box({ flexGrow: 1, minWidth: 0 }, [
-        bodyText({ text: node.label, font: '13px Inter', lineHeight: 18, color: '#e2e8f0' }),
+        bodyText({ text: node.label, font: font('', 'base'), lineHeight: lineHeight('base'), color: t.colors.text }),
       ]),
     ],
   )
@@ -869,27 +880,30 @@ export interface CardOptions {
 }
 
 export function card(options: CardOptions = {}): UIElement {
+  const t = theme()
+  const border = options.borderColor ?? t.colors.border
+  const bg = options.backgroundColor ?? t.colors.bg
   const sections: UIElement[] = []
   if (options.header) {
     sections.push(
-      box({ paddingLeft: 16, paddingRight: 16, paddingTop: 14, paddingBottom: 14, borderBottom: 1, borderColor: options.borderColor ?? '#334155', minWidth: 0 }, [options.header]),
+      box({ paddingLeft: t.spacing.xl, paddingRight: t.spacing.xl, paddingTop: t.spacing.lg, paddingBottom: t.spacing.lg, borderBottom: 1, borderColor: border, minWidth: 0 }, [options.header]),
     )
   }
   if (options.children && options.children.length > 0) {
-    sections.push(box({ flexDirection: 'column', padding: 16, gap: options.gap ?? 14, minWidth: 0 }, options.children))
+    sections.push(box({ flexDirection: 'column', padding: t.spacing.xl, gap: options.gap ?? t.spacing.lg, minWidth: 0 }, options.children))
   }
   if (options.footer) {
     sections.push(
-      box({ paddingLeft: 16, paddingRight: 16, paddingTop: 14, paddingBottom: 14, borderTop: 1, borderColor: options.borderColor ?? '#334155', minWidth: 0 }, [options.footer]),
+      box({ paddingLeft: t.spacing.xl, paddingRight: t.spacing.xl, paddingTop: t.spacing.lg, paddingBottom: t.spacing.lg, borderTop: 1, borderColor: border, minWidth: 0 }, [options.footer]),
     )
   }
   return box(
     {
       flexDirection: 'column',
       minWidth: 0,
-      borderRadius: 10, borderWidth: 1,
-      borderColor: options.borderColor ?? '#334155',
-      backgroundColor: options.backgroundColor ?? '#0f172a',
+      borderRadius: t.radii.lg, borderWidth: 1,
+      borderColor: border,
+      backgroundColor: bg,
       overflow: 'hidden',
     },
     sections,
@@ -900,26 +914,19 @@ export function card(options: CardOptions = {}): UIElement {
 // Badge
 // ---------------------------------------------------------------------------
 
-const badgeVariantStyle = {
-  default: { bg: '#334155', color: '#e2e8f0' },
-  success: { bg: '#14532d', color: '#bbf7d0' },
-  warning: { bg: '#422006', color: '#fef08a' },
-  error: { bg: '#450a0a', color: '#fecaca' },
-  info: { bg: '#082f49', color: '#bae6fd' },
-} as const
-
 export interface BadgeOptions {
-  variant?: keyof typeof badgeVariantStyle
+  variant?: 'default' | 'success' | 'warning' | 'error' | 'info'
 }
 
 export function badge(label: string, options: BadgeOptions = {}): UIElement {
-  const s = badgeVariantStyle[options.variant ?? 'default']
+  const t = theme()
+  const s = t.colors.badgeVariants[options.variant ?? 'default']
   return box(
     {
       paddingLeft: 8, paddingRight: 8, paddingTop: 2, paddingBottom: 2,
-      borderRadius: 9999, backgroundColor: s.bg,
+      borderRadius: t.radii.full, backgroundColor: s.bg,
     },
-    [bodyText({ text: label, font: 'bold 11px Inter', lineHeight: 14, color: s.color })],
+    [bodyText({ text: label, font: `bold 11px ${t.typography.fontFamily}`, lineHeight: 14, color: s.text })],
   )
 }
 
@@ -933,8 +940,9 @@ export interface SeparatorOptions {
 }
 
 export function separator(options: SeparatorOptions = {}): UIElement {
+  const t = theme()
   const vertical = options.direction === 'vertical'
-  const color = options.color ?? '#334155'
+  const color = options.color ?? t.colors.border
   return box(
     vertical
       ? { width: 1, alignSelf: 'stretch', backgroundColor: color, semantic: { role: 'separator' } }
@@ -953,8 +961,9 @@ export interface AvatarOptions {
 }
 
 export function avatar(name: string, options: AvatarOptions = {}): UIElement {
+  const t = theme()
   const size = options.size ?? 32
-  const bg = options.backgroundColor ?? '#2563eb'
+  const bg = options.backgroundColor ?? t.colors.accent
   const initials = name
     .split(/\s+/)
     .filter(Boolean)
@@ -968,7 +977,7 @@ export function avatar(name: string, options: AvatarOptions = {}): UIElement {
       backgroundColor: bg, alignItems: 'center', justifyContent: 'center',
       semantic: { ariaLabel: name },
     },
-    [text({ text: initials, font: `bold ${fontSize}px Inter`, lineHeight: Math.round(fontSize * 1.2), color: '#ffffff' })],
+    [text({ text: initials, font: `bold ${fontSize}px ${t.typography.fontFamily}`, lineHeight: Math.round(fontSize * 1.2), color: t.colors.accentText })],
   )
 }
 
@@ -976,49 +985,51 @@ export function avatar(name: string, options: AvatarOptions = {}): UIElement {
 // Alert
 // ---------------------------------------------------------------------------
 
-const alertVariantStyle = {
-  info: { border: '#334155', bg: '#0f172a', color: '#e2e8f0', icon: 'ℹ' },
-  success: { border: '#166534', bg: '#052e16', color: '#bbf7d0', icon: '✓' },
-  warning: { border: '#a16207', bg: '#422006', color: '#fef08a', icon: '⚠' },
-  error: { border: '#991b1b', bg: '#450a0a', color: '#fecaca', icon: '✕' },
-} as const
-
 export interface AlertOptions {
-  variant?: keyof typeof alertVariantStyle
+  variant?: 'info' | 'success' | 'warning' | 'error'
   title?: string
   onDismiss?: () => void
 }
 
+const alertIcons: Record<string, string> = {
+  info: 'ℹ',
+  success: '✓',
+  warning: '⚠',
+  error: '✕',
+}
+
 export function alert(message: string, options: AlertOptions = {}): UIElement {
+  const t = theme()
   const variant = options.variant ?? 'info'
-  const s = alertVariantStyle[variant]
+  const s = t.colors.variants[variant]
+  const icon = alertIcons[variant] ?? 'ℹ'
   const content: UIElement[] = []
   if (options.title) {
-    content.push(bodyText({ text: options.title, font: 'bold 13px Inter', lineHeight: 18, color: s.color }))
+    content.push(bodyText({ text: options.title, font: font('bold', 'base'), lineHeight: lineHeight('base'), color: s.text }))
   }
-  content.push(bodyText({ text: message, font: '13px Inter', lineHeight: 18, color: s.color }))
+  content.push(bodyText({ text: message, font: font('', 'base'), lineHeight: lineHeight('base'), color: s.text }))
 
   const body: UIElement[] = [
-    text({ text: s.icon, font: '13px Inter', lineHeight: 18, color: s.color }),
-    box({ flexDirection: 'column', gap: 4, flexGrow: 1, flexShrink: 1, minWidth: 0 }, content),
+    text({ text: icon, font: font('', 'base'), lineHeight: lineHeight('base'), color: s.text }),
+    box({ flexDirection: 'column', gap: t.spacing.xs, flexGrow: 1, flexShrink: 1, minWidth: 0 }, content),
   ]
   if (options.onDismiss) {
     body.push(
       box(
         {
           paddingLeft: 8, paddingRight: 8, paddingTop: 4, paddingBottom: 4,
-          borderRadius: 6, cursor: 'pointer',
+          borderRadius: t.spacing.sm, cursor: 'pointer',
           semantic: { role: 'button', ariaLabel: 'Dismiss' },
           onClick: options.onDismiss,
         },
-        [text({ text: '✕', font: '12px Inter', lineHeight: 14, color: s.color })],
+        [text({ text: '✕', font: font('', 'small'), lineHeight: 14, color: s.text })],
       ),
     )
   }
   return box(
     {
-      flexDirection: 'row', alignItems: 'flex-start', gap: 10,
-      padding: 12, borderRadius: 10, borderWidth: 1, minWidth: 0,
+      flexDirection: 'row', alignItems: 'flex-start', gap: t.spacing.md,
+      padding: 12, borderRadius: t.radii.lg, borderWidth: 1, minWidth: 0,
       borderColor: s.border, backgroundColor: s.bg,
       semantic: { role: 'alert', ariaLabel: options.title ? `${options.title}: ${message}` : message },
     },
@@ -1035,30 +1046,31 @@ export interface ProgressOptions {
 }
 
 export function progress(value: number, options: ProgressOptions = {}): UIElement {
+  const t = theme()
   const clamped = Math.max(0, Math.min(100, value))
   const children: UIElement[] = []
   if (options.label) {
     children.push(
       box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, minWidth: 0 }, [
         box({ flexGrow: 1, minWidth: 0 }, [
-          bodyText({ text: options.label, font: '12px Inter', lineHeight: 16, color: '#94a3b8' }),
+          bodyText({ text: options.label, font: font('', 'small'), lineHeight: lineHeight('small'), color: t.colors.textMuted }),
         ]),
-        text({ text: `${Math.round(clamped)}%`, font: '12px Inter', lineHeight: 16, color: '#94a3b8' }),
+        text({ text: `${Math.round(clamped)}%`, font: font('', 'small'), lineHeight: lineHeight('small'), color: t.colors.textMuted }),
       ]),
     )
   }
   children.push(
     box(
-      { flexDirection: 'row', height: 6, borderRadius: 3, backgroundColor: '#334155', overflow: 'hidden' },
+      { flexDirection: 'row', height: 6, borderRadius: 3, backgroundColor: t.colors.border, overflow: 'hidden' },
       [
-        box({ flexGrow: Math.max(clamped, 0.001), minWidth: 0, height: 6, borderRadius: 3, backgroundColor: '#2563eb' }),
+        box({ flexGrow: Math.max(clamped, 0.001), minWidth: 0, height: 6, borderRadius: 3, backgroundColor: t.colors.accent }),
         box({ flexGrow: Math.max(100 - clamped, 0.001), minWidth: 0, height: 6 }),
       ],
     ),
   )
   return box(
     {
-      flexDirection: 'column', gap: 6,
+      flexDirection: 'column', gap: t.spacing.sm,
       semantic: { role: 'progressbar', ariaLabel: options.label ?? 'Progress' },
     },
     children,
@@ -1076,12 +1088,13 @@ export interface SkeletonOptions {
 }
 
 export function skeleton(options: SkeletonOptions = {}): UIElement {
+  const t = theme()
   return box(
     {
       width: options.width ?? 100,
       height: options.height ?? 16,
-      borderRadius: options.borderRadius ?? 4,
-      backgroundColor: '#1e293b',
+      borderRadius: options.borderRadius ?? t.radii.sm,
+      backgroundColor: t.colors.skeleton,
     },
     [],
   )
@@ -1101,6 +1114,7 @@ export interface BreadcrumbOptions {
 }
 
 export function breadcrumb(items: BreadcrumbItem[], options: BreadcrumbOptions = {}): UIElement {
+  const t = theme()
   const sep = options.separator ?? '/'
   const children: UIElement[] = []
   for (let i = 0; i < items.length; i++) {
@@ -1110,16 +1124,16 @@ export function breadcrumb(items: BreadcrumbItem[], options: BreadcrumbOptions =
       children.push(
         box(
           { cursor: 'pointer', onClick: item.onClick },
-          [bodyText({ text: item.label, font: '13px Inter', lineHeight: 18, color: '#38bdf8' })],
+          [bodyText({ text: item.label, font: font('', 'base'), lineHeight: lineHeight('base'), color: t.colors.link })],
         ),
       )
     } else {
       children.push(
-        bodyText({ text: item.label, font: '13px Inter', lineHeight: 18, color: isLast ? '#e2e8f0' : '#94a3b8' }),
+        bodyText({ text: item.label, font: font('', 'base'), lineHeight: lineHeight('base'), color: isLast ? t.colors.text : t.colors.textMuted }),
       )
     }
     if (!isLast) {
-      children.push(text({ text: ` ${sep} `, font: '13px Inter', lineHeight: 18, color: '#475569' }))
+      children.push(text({ text: ` ${sep} `, font: font('', 'base'), lineHeight: lineHeight('base'), color: t.colors.borderMuted }))
     }
   }
   return box(
@@ -1142,6 +1156,7 @@ export interface PaginationOptions {
 }
 
 export function pagination(options: PaginationOptions): UIElement {
+  const t = theme()
   const { page, totalPages, onPageChange } = options
   const current = Math.max(1, Math.min(page, totalPages))
 
@@ -1149,15 +1164,15 @@ export function pagination(options: PaginationOptions): UIElement {
     box(
       {
         paddingLeft: 8, paddingRight: 8, paddingTop: 4, paddingBottom: 4,
-        borderRadius: 6,
+        borderRadius: t.spacing.sm,
         borderWidth: active ? 1 : 0,
-        borderColor: active ? '#38bdf8' : undefined,
-        backgroundColor: active ? '#082f49' : undefined,
+        borderColor: active ? t.colors.focus : undefined,
+        backgroundColor: active ? t.colors.accentSoft : undefined,
         cursor: disabled ? 'not-allowed' : 'pointer',
         onClick: disabled ? undefined : () => onPageChange(target),
         semantic: { role: 'button', ariaLabel: label, ariaDisabled: disabled },
       },
-      [text({ text: label, font: '13px Inter', lineHeight: 18, color: disabled ? '#475569' : active ? '#bae6fd' : '#e2e8f0' })],
+      [text({ text: label, font: font('', 'base'), lineHeight: lineHeight('base'), color: disabled ? t.colors.borderMuted : active ? t.colors.accentSoftText : t.colors.text })],
     )
 
   const children: UIElement[] = [
@@ -1174,7 +1189,7 @@ export function pagination(options: PaginationOptions): UIElement {
 
   return box(
     {
-      flexDirection: 'row', gap: 4, alignItems: 'center',
+      flexDirection: 'row', gap: t.spacing.xs, alignItems: 'center',
       semantic: { tag: 'nav', ariaLabel: 'Pagination' },
     },
     children,
@@ -1193,6 +1208,7 @@ export interface SwitchOptions {
 }
 
 export function switchControl(options: SwitchOptions): UIElement {
+  const t = theme()
   const { checked, disabled } = options
   const isDisabled = disabled === true
 
@@ -1201,32 +1217,32 @@ export function switchControl(options: SwitchOptions): UIElement {
     options.onChange(!checked)
   }
 
-  const trackBg = isDisabled ? '#1e293b' : checked ? '#166534' : '#334155'
-  const thumbBg = isDisabled ? '#475569' : checked ? '#22c55e' : '#94a3b8'
+  const trackBg = isDisabled ? t.colors.switchTrackDisabled : checked ? t.colors.switchTrackOn : t.colors.border
+  const thumbBg = isDisabled ? t.colors.switchThumbDisabled : checked ? t.colors.switchThumbOn : t.colors.switchThumbOff
 
   const track = box(
     {
-      width: 36, height: 20, borderRadius: 10,
+      width: 36, height: 20, borderRadius: t.radii.lg,
       backgroundColor: trackBg,
       flexDirection: 'row', alignItems: 'center',
       paddingLeft: checked ? 18 : 2,
       paddingRight: checked ? 2 : 18,
     },
-    [box({ width: 16, height: 16, borderRadius: 8, backgroundColor: thumbBg }, [])],
+    [box({ width: 16, height: 16, borderRadius: t.radii.md, backgroundColor: thumbBg }, [])],
   )
 
   const children: UIElement[] = [track]
   if (options.label) {
     children.push(
       box({ flexGrow: 1, minWidth: 0 }, [
-        bodyText({ text: options.label, font: '13px Inter', lineHeight: 18, color: isDisabled ? '#64748b' : '#e2e8f0' }),
+        bodyText({ text: options.label, font: font('', 'base'), lineHeight: lineHeight('base'), color: isDisabled ? t.colors.textDisabled : t.colors.text }),
       ]),
     )
   }
 
   return box(
     {
-      flexDirection: 'row', gap: 10, alignItems: 'center', minWidth: 0,
+      flexDirection: 'row', gap: t.spacing.md, alignItems: 'center', minWidth: 0,
       cursor: isDisabled ? 'not-allowed' : 'pointer',
       semantic: { role: 'switch', ariaLabel: options.label ?? 'Toggle', ariaSelected: checked, ariaDisabled: isDisabled },
       onClick: toggle,
@@ -1249,21 +1265,22 @@ export interface TextareaOptions {
 }
 
 export function textarea(value: string, placeholder = '', options: TextareaOptions = {}): UIElement {
+  const t = theme()
   const disabled = options.disabled === true
   const focused = !disabled && options.focused === true
   const rows = options.rows ?? 4
-  const minH = rows * 18 + 16
-  const valueColor = disabled ? '#64748b' : '#e2e8f0'
-  const placeholderColor = disabled ? '#475569' : '#64748b'
+  const minH = rows * lineHeight('base') + t.spacing.xl
+  const valueColor = disabled ? t.colors.textDisabled : t.colors.text
+  const placeholderColor = disabled ? t.colors.borderMuted : t.colors.textDisabled
   const showPlaceholder = value.length === 0
 
   return box(
     {
       flexDirection: 'column',
-      paddingLeft: 10, paddingRight: 10, paddingTop: 8, paddingBottom: 8,
-      borderColor: disabled ? '#475569' : focused ? '#38bdf8' : '#334155',
-      borderWidth: 1, borderRadius: 8,
-      backgroundColor: disabled ? '#0f172a' : focused ? '#111827' : undefined,
+      paddingLeft: t.spacing.md, paddingRight: t.spacing.md, paddingTop: 8, paddingBottom: 8,
+      borderColor: disabled ? t.colors.borderMuted : focused ? t.colors.focus : t.colors.border,
+      borderWidth: 1, borderRadius: t.radii.md,
+      backgroundColor: disabled ? t.colors.bg : focused ? t.colors.bgSubtle : undefined,
       cursor: disabled ? 'not-allowed' : 'text',
       pointerEvents: disabled ? 'none' : undefined,
       minHeight: minH,
@@ -1274,7 +1291,7 @@ export function textarea(value: string, placeholder = '', options: TextareaOptio
     [
       text({
         text: showPlaceholder ? placeholder : value,
-        font: '13px Inter', lineHeight: 18,
+        font: font('', 'base'), lineHeight: lineHeight('base'),
         color: showPlaceholder ? placeholderColor : valueColor,
         whiteSpace: 'pre-wrap',
       }),
@@ -1296,6 +1313,7 @@ export interface SliderOptions {
 }
 
 export function slider(options: SliderOptions): UIElement {
+  const t = theme()
   const { value, onChange, disabled } = options
   const isDisabled = disabled === true
   const min = options.min ?? 0
@@ -1305,10 +1323,10 @@ export function slider(options: SliderOptions): UIElement {
 
   const track = box(
     {
-      height: 6, borderRadius: 3, backgroundColor: '#334155',
+      height: 6, borderRadius: 3, backgroundColor: t.colors.border,
       flexDirection: 'row', overflow: 'hidden',
     },
-    [box({ width: pct, height: 6, backgroundColor: isDisabled ? '#475569' : '#2563eb' }, [])],
+    [box({ width: pct, height: 6, backgroundColor: isDisabled ? t.colors.borderMuted : t.colors.accent }, [])],
   )
 
   const topRow: UIElement[] = []
@@ -1316,9 +1334,9 @@ export function slider(options: SliderOptions): UIElement {
     topRow.push(
       box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, minWidth: 0 }, [
         box({ flexGrow: 1, minWidth: 0 }, [
-          bodyText({ text: options.label, font: '12px Inter', lineHeight: 16, color: '#94a3b8' }),
+          bodyText({ text: options.label, font: font('', 'small'), lineHeight: lineHeight('small'), color: t.colors.textMuted }),
         ]),
-        text({ text: String(Math.round(value)), font: '12px Inter', lineHeight: 16, color: '#94a3b8' }),
+        text({ text: String(Math.round(value)), font: font('', 'small'), lineHeight: lineHeight('small'), color: t.colors.textMuted }),
       ]),
     )
   }
@@ -1333,7 +1351,7 @@ export function slider(options: SliderOptions): UIElement {
 
   return box(
     {
-      flexDirection: 'column', gap: 6,
+      flexDirection: 'column', gap: t.spacing.sm,
       cursor: isDisabled ? 'not-allowed' : 'pointer',
       semantic: { role: 'slider', ariaLabel: options.label ?? 'Slider', ariaDisabled: isDisabled },
       onClick: handleClick,
@@ -1358,35 +1376,36 @@ export interface AccordionOptions {
 }
 
 export function accordion(items: AccordionItem[], options: AccordionOptions = {}): UIElement {
+  const t = theme()
   const expandedIds = options.expandedIds ?? new Set<string>()
   return box(
     {
       flexDirection: 'column',
-      borderWidth: 1, borderColor: '#334155', borderRadius: 10, overflow: 'hidden',
+      borderWidth: 1, borderColor: t.colors.border, borderRadius: t.radii.lg, overflow: 'hidden',
     },
     items.map((item, i) => {
       const expanded = expandedIds.has(item.id)
       const header = box(
         {
           flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, minWidth: 0,
-          paddingLeft: 14, paddingRight: 14, paddingTop: 10, paddingBottom: 10,
-          backgroundColor: '#0f172a', cursor: 'pointer',
-          borderTop: i > 0 ? 1 : 0, borderColor: '#334155',
+          paddingLeft: t.spacing.lg, paddingRight: t.spacing.lg, paddingTop: t.spacing.md, paddingBottom: t.spacing.md,
+          backgroundColor: t.colors.bg, cursor: 'pointer',
+          borderTop: i > 0 ? 1 : 0, borderColor: t.colors.border,
           semantic: { role: 'button', ariaLabel: item.title, ariaExpanded: expanded },
           onClick: () => options.onToggle?.(item.id),
         },
         [
           box({ flexGrow: 1, minWidth: 0 }, [
-            bodyText({ text: item.title, font: 'bold 13px Inter', lineHeight: 18, color: '#e2e8f0' }),
+            bodyText({ text: item.title, font: font('bold', 'base'), lineHeight: lineHeight('base'), color: t.colors.text }),
           ]),
-          text({ text: expanded ? '▲' : '▼', font: '10px Inter', lineHeight: 14, color: '#94a3b8' }),
+          text({ text: expanded ? '▲' : '▼', font: `10px ${t.typography.fontFamily}`, lineHeight: 14, color: t.colors.textMuted }),
         ],
       )
       if (!expanded) return header
       return box({ flexDirection: 'column' }, [
         header,
         box(
-          { padding: 14, backgroundColor: '#020617', borderTop: 1, borderColor: '#334155' },
+          { padding: t.spacing.lg, backgroundColor: t.colors.bgAlt, borderTop: 1, borderColor: t.colors.border },
           [item.content],
         ),
       ])
@@ -1413,6 +1432,7 @@ export interface SheetOptions {
 export function sheet(options: SheetOptions): UIElement {
   if (!options.open) return box({ display: 'none' }, [])
 
+  const t = theme()
   const side = options.side ?? 'right'
   const isVertical = side === 'left' || side === 'right'
   const panelWidth = isVertical ? (options.width ?? 320) : undefined
@@ -1424,7 +1444,7 @@ export function sheet(options: SheetOptions): UIElement {
     if (options.title) {
       headerChildren.push(
         box({ flexGrow: 1, minWidth: 0 }, [
-          bodyText({ text: options.title, font: 'bold 16px Inter', lineHeight: 20, color: '#f8fafc' }),
+          bodyText({ text: options.title, font: font('bold', 'heading'), lineHeight: lineHeight('heading'), color: t.colors.textHeading }),
         ]),
       )
     }
@@ -1433,11 +1453,11 @@ export function sheet(options: SheetOptions): UIElement {
         box(
           {
             paddingLeft: 8, paddingRight: 8, paddingTop: 4, paddingBottom: 4,
-            borderRadius: 6, cursor: 'pointer',
+            borderRadius: t.spacing.sm, cursor: 'pointer',
             semantic: { role: 'button', ariaLabel: 'Close' },
             onClick: options.onClose,
           },
-          [text({ text: '✕', font: '12px Inter', lineHeight: 14, color: '#94a3b8' })],
+          [text({ text: '✕', font: font('', 'small'), lineHeight: 14, color: t.colors.textMuted })],
         ),
       )
     }
@@ -1453,8 +1473,8 @@ export function sheet(options: SheetOptions): UIElement {
     {
       flexDirection: 'column',
       width: panelWidth, height: panelHeight,
-      padding: 16, backgroundColor: '#0f172a',
-      borderColor: '#334155',
+      padding: t.spacing.xl, backgroundColor: t.colors.bg,
+      borderColor: t.colors.border,
       ...(side === 'left' ? { borderRight: 1 } : {}),
       ...(side === 'right' ? { borderLeft: 1 } : {}),
       ...(side === 'top' ? { borderBottom: 1 } : {}),

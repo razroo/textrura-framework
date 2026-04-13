@@ -11,6 +11,7 @@ import {
   checkbox,
   comboboxField,
   commandPalette,
+  darkTheme,
   dataTable,
   menu,
   pagination,
@@ -256,7 +257,7 @@ describe('@geometra/ui primitives', () => {
     const el = badge('New', { variant: 'success' })
     expect(el.kind).toBe('box')
     if (el.kind !== 'box') return
-    expect(el.props.backgroundColor).toBe('#14532d')
+    expect(el.props.backgroundColor).toBe(darkTheme.colors.badgeVariants.success.bg)
     expect(el.children).toHaveLength(1)
     expect(el.children[0]?.kind).toBe('text')
   })
