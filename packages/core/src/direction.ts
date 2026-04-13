@@ -14,6 +14,8 @@ function normalizeResolvedDirection(value: unknown): ResolvedDirection {
  * Non-`ltr` / non-`rtl` {@link parentDirection} values (bad callers or deserialized state) fall back to `ltr`.
  *
  * @returns Resolved `ltr` or `rtl` for layout, text, and hit-testing.
+ *
+ * @see {@link resolveComputeLayoutDirection} — host `layoutDirection` plus root element for Yoga / Textura owner direction.
  */
 export function resolveDirectionValue(
   dir: Direction | undefined,
@@ -31,6 +33,8 @@ export function resolveDirectionValue(
  * @param element Any {@link UIElement}; `dir` is read from {@link UIElement.props} when present.
  * @param parentDirection Resolved direction of the visual parent (default `'ltr'`). Invalid values are normalized like {@link resolveDirectionValue}.
  * @returns Concrete `ltr` or `rtl` for layout, text, and hit-testing.
+ *
+ * @see {@link resolveComputeLayoutDirection} — when resolving the document / server `layoutDirection` together with the UI root.
  */
 export function resolveElementDirection(
   element: UIElement,
@@ -56,6 +60,8 @@ export function resolveElementDirection(
  *   {@link resolveElementDirection} on `root` with document default `'ltr'`.
  *
  * @see `RTL_PARITY_MATRIX.md` (repo root) for server/client RTL and text-metric parity expectations.
+ * @see {@link resolveDirectionValue} — per-node `dir` resolution rules used when the host override is absent or invalid.
+ * @see {@link resolveElementDirection} — same inheritance semantics applied to the live root element.
  */
 export function resolveComputeLayoutDirection(
   layoutDirection: unknown,
