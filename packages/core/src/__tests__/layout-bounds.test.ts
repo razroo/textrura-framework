@@ -797,6 +797,15 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(10, 20, new ArrayBuffer(0) as unknown as number, 0)).toEqual({ ox: 10, oy: 20 })
   })
 
+  it('coerces scroll props with valueOf or Symbol.toPrimitive to 0 (typeof object; finiteNumberOrZero parity; no ToNumber)', () => {
+    const coercible = { valueOf: () => 99 } as unknown as number
+    expect(() => scrollSafeChildOffsets(10, 20, coercible, 4)).not.toThrow()
+    expect(scrollSafeChildOffsets(10, 20, coercible, 4)).toEqual({ ox: 10, oy: 16 })
+    const exotic = { [Symbol.toPrimitive]: () => 7 } as unknown as number
+    expect(() => scrollSafeChildOffsets(10, 20, 3, exotic)).not.toThrow()
+    expect(scrollSafeChildOffsets(10, 20, 3, exotic)).toEqual({ ox: 7, oy: 20 })
+  })
+
   it('treats IEEE −0 scroll props like +0 for subtraction (signed-zero scroll from serializers; distinct from abs −0 preservation)', () => {
     expect(scrollSafeChildOffsets(10, 20, -0, -0)).toEqual({ ox: 10, oy: 20 })
     const r = scrollSafeChildOffsets(-0, 10, -0, 0)
