@@ -9,6 +9,7 @@ fi
 # session that explores the codebase, picks the next best improvement, implements
 # it, runs the release gate, commits when there are real changes, and pushes only
 # if that iteration created a new commit (HEAD advanced). Default: composer-2 (falls back to auto if unavailable), 100 iterations.
+# `npm run release:gate` and `bun run release:gate` invoke the same package.json script; CI runs `bun run release:gate` (see .github/workflows/quality.yml).
 #
 # Task selection (humans/agents): find unchecked Markdown boxes in ROADMAP.md (Phase A–C, post-1.0 plans,
 # release polish, next frontier) and in ROUTING_COMPETITIVENESS_CHECKLIST.md (repo root, next to ROADMAP —
@@ -230,6 +231,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
 
 4. Run the repo release gate from the repo root:
    npm run release:gate
+   (\`bun run release:gate\` is equivalent — same script; CI uses Bun.)
    The gate ends with \`bun run test:terminal-input\` (see root package.json) — \`bun\` must be on PATH. If that fails, fix issues and re-run until it passes (or stop with a clear explanation if blocked by environment).
    If you edited \`scripts.release:gate\` in package.json, run \`node scripts/release/verify-release-gate.mjs\` first to catch duplicate/malformed vitest paths before the long vitest batch (same check as the first \`&&\` segment of the gate).
    CI (\`.github/workflows/quality.yml\`) also runs lint, fast tests, build, \`benchmark:mcp-flow:all -- --assert\`, examples:smoke, and e2e:demo before this gate; when your change touches demos, \`create:app\`, examples scripts, demo E2E surfaces, or MCP benchmark scripts / harness expectations, run the matching subset locally (not only the gate).
