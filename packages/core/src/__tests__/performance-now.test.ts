@@ -16,6 +16,8 @@ describe('safePerformanceNowMs', () => {
     expect(safePerformanceNowMs()).toBe(0)
     vi.stubGlobal('performance', { now: () => Number.POSITIVE_INFINITY })
     expect(safePerformanceNowMs()).toBe(0)
+    vi.stubGlobal('performance', { now: () => Number.NEGATIVE_INFINITY })
+    expect(safePerformanceNowMs()).toBe(0)
   })
 
   it('preserves IEEE −0 when now() returns primitive −0', () => {
@@ -37,6 +39,15 @@ describe('safePerformanceNowMs', () => {
     vi.stubGlobal('performance', {
       now: () => {
         throw new Error('clock')
+      },
+    })
+    expect(safePerformanceNowMs()).toBe(0)
+  })
+
+  it('returns 0 when reading performance.now throws (hostile accessor before typeof/call)', () => {
+    vi.stubGlobal('performance', {
+      get now() {
+        throw new Error('hostile')
       },
     })
     expect(safePerformanceNowMs()).toBe(0)
@@ -67,6 +78,8 @@ describe('readPerformanceNow', () => {
     expect(Number.isNaN(readPerformanceNow())).toBe(true)
     vi.stubGlobal('performance', { now: () => Number.POSITIVE_INFINITY })
     expect(readPerformanceNow()).toBe(Number.POSITIVE_INFINITY)
+    vi.stubGlobal('performance', { now: () => Number.NEGATIVE_INFINITY })
+    expect(readPerformanceNow()).toBe(Number.NEGATIVE_INFINITY)
   })
 
   it('preserves IEEE −0 when now() returns primitive −0 (same as safe path; deltas may care about sign bit)', () => {
@@ -98,6 +111,15 @@ describe('readPerformanceNow', () => {
     vi.stubGlobal('performance', {
       now: () => {
         throw new Error('clock')
+      },
+    })
+    expect(readPerformanceNow()).toBe(0)
+  })
+
+  it('returns 0 when reading performance.now throws (hostile accessor before typeof/call)', () => {
+    vi.stubGlobal('performance', {
+      get now() {
+        throw new Error('hostile')
       },
     })
     expect(readPerformanceNow()).toBe(0)
