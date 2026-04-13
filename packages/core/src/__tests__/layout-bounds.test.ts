@@ -752,6 +752,18 @@ describe('scrollSafeChildOffsets', () => {
     expect(r!.oy).toBe(10)
   })
 
+  it('maps IEEE −0 abs and matching −0 scroll to +0 child ox (JS −0 − (−0) is +0; must not thread −0 into descendant offsets)', () => {
+    // Primitive −0 − (−0) is +0 in IEEE-754 / ECMAScript; pairing with preserved −0 oy below keeps the contract explicit.
+    expect(Object.is(-0 - -0, -0)).toBe(false)
+    expect(Object.is(-0 - -0, 0)).toBe(true)
+    const r = scrollSafeChildOffsets(-0, -0, -0, -0)
+    expect(r).not.toBeNull()
+    expect(Object.is(r!.ox, -0)).toBe(false)
+    expect(r!.ox).toBe(0)
+    expect(Object.is(r!.oy, -0)).toBe(false)
+    expect(r!.oy).toBe(0)
+  })
+
   it('returns null when abs minus scroll overflows to non-finite (hit-test / selection parity)', () => {
     const max = Number.MAX_VALUE
     expect(max - -max).toBe(Infinity)
