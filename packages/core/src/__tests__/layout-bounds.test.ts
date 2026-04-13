@@ -463,6 +463,16 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(1, 1, 0, 0, w, h)).toBe(true)
   })
 
+  it('binary float addition: absX+width need not equal the shortest decimal; inclusive max still accepts 0.3', () => {
+    const absX = 0.1
+    const width = 0.2
+    expect(absX + width).not.toBe(0.3)
+    const right = absX + width
+    // Representable 0.3 lies inside [absX, right] even though it is not exactly absX+width in real arithmetic.
+    expect(pointInInclusiveLayoutRect(0.3, 4, absX, 0, width, 10)).toBe(true)
+    expect(pointInInclusiveLayoutRect(right, 4, absX, 0, width, 10)).toBe(true)
+  })
+
   it('treats IEEE -0 pointer coordinates like +0 on inclusive min edges (subtle float sign)', () => {
     expect(Object.is(-0, 0)).toBe(false)
     expect(pointInInclusiveLayoutRect(-0, 0, 0, 0, 100, 50)).toBe(true)
