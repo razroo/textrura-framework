@@ -259,6 +259,18 @@ describe('diffLayout', () => {
     } as unknown as TestLayout
     expect(diffLayout(prev, next)).toEqual([{ path: [0], x: 2 }])
   })
+
+  it('does not recurse when only one side has a child at an index (holey next.children; no removal patches)', () => {
+    const leaf: TestLayout = { x: 0, y: 0, width: 10, height: 10, children: [] }
+    const prev: TestLayout = { x: 0, y: 0, width: 100, height: 100, children: [leaf] }
+    const nextChildren: TestLayout[] = []
+    nextChildren[1] = { x: 50, y: 0, width: 5, height: 5, children: [] }
+    const next: TestLayout = { x: 0, y: 0, width: 100, height: 100, children: nextChildren }
+    expect(next.children.length).toBe(2)
+    expect(next.children[0]).toBeUndefined()
+    // Index 0: prev has a node, next has a hole — skip. Index 1: next has a node, prev has none — skip.
+    expect(diffLayout(prev, next)).toEqual([])
+  })
 })
 
 describe('isProtocolCompatible', () => {
