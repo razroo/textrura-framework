@@ -90,9 +90,11 @@ fi
 # After hand-editing `scripts.release:gate` in package.json, run `node scripts/release/verify-release-gate.mjs` from the
 # repo root to validate the vitest argv (duplicate paths, `..` escapes, forward slashes) without waiting for the full
 # vitest batch — same verifier as the first `&&` segment of `npm run release:gate`.
-# CI runs the same gate: `.github/workflows/quality.yml` invokes `bun run release:gate` after lint, fast tests
-# (`bun run test` / vitest.fast.config.ts), `bun run build`, `bun run benchmark:mcp-flow:all -- --assert`,
-# `bun run examples:smoke`, and `bun run e2e:demo`. When editing MCP benchmark scripts or harness expectations,
+# CI order (`.github/workflows/quality.yml` `quality` job, sequential — first failing step stops the job):
+#   lint → fast tests (`bun run test` / vitest.fast.config.ts) → build → `benchmark:mcp-flow:all -- --assert`
+#   → `examples:smoke` → `e2e:demo` → `release:gate` (last). A green local `release:gate` does **not** prove
+#   lint, fast tests, build, benchmarks, examples, or Playwright E2E passed; run the matching earlier steps
+#   when your edits touch those surfaces. When editing MCP benchmark scripts or harness expectations,
 # run that benchmark locally (or the relevant `benchmark:mcp-*` variant), not only `release:gate`.
 # Root `bun run build` also runs `cd mcp && npm run build` (see root package.json). Changes under `mcp/` need that
 # build step — `release:gate` alone does not compile the MCP package.
@@ -242,7 +244,7 @@ Single iteration — do exactly one cohesive, meaningful slice of work:
    (\`bun run release:gate\` is equivalent — same script; CI uses Bun.)
    The gate ends with \`bun run test:terminal-input\` (see root package.json) — \`bun\` must be on PATH. If that fails, fix issues and re-run until it passes (or stop with a clear explanation if blocked by environment).
    If you edited \`scripts.release:gate\` in package.json, run \`node scripts/release/verify-release-gate.mjs\` first to catch duplicate/malformed vitest paths before the long vitest batch (same check as the first \`&&\` segment of the gate).
-   CI (\`.github/workflows/quality.yml\`) also runs lint, fast tests, build, \`benchmark:mcp-flow:all -- --assert\`, examples:smoke, and e2e:demo before this gate; when your change touches demos, \`create:app\`, examples scripts, demo E2E surfaces, or MCP benchmark scripts / harness expectations, run the matching subset locally (not only the gate).
+   CI (\`.github/workflows/quality.yml\`) runs lint → fast tests → build → \`benchmark:mcp-flow:all -- --assert\` → examples:smoke → e2e:demo → \`release:gate\` in order (first failure stops the job). A green local \`release:gate\` does not prove lint, fast tests, build, benchmarks, examples, or E2E passed. When your change touches demos, \`create:app\`, examples scripts, demo E2E surfaces, or MCP benchmark scripts / harness expectations, run the matching subset locally (not only the gate).
 
 5. If you made real changes: git add only what belongs to this task, then git commit with a conventional message (feat:/fix:/chore:/docs:/test:/perf:/refactor: as appropriate).
    Prefer \`git status\` first, then \`git add <file...>\` with explicit paths (avoid \`git add -A\` when the workspace has unrelated edits that must not ship in this commit).
