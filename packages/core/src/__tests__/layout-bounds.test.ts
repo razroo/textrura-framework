@@ -103,6 +103,16 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 10, height: 10, children })).toBe(false)
   })
 
+  it('rejects plain array-like objects as children (indexed entries + length; not Arrays)', () => {
+    const leaf = { x: 0, y: 0, width: 1, height: 1, children: [] as const }
+    const arrayLike = { 0: leaf, length: 1 } as unknown as ComputedLayout['children']
+    expect(Array.isArray(arrayLike)).toBe(false)
+    expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 10, height: 10, children: arrayLike })).toBe(false)
+    const emptyLike = { length: 0 } as unknown as ComputedLayout['children']
+    expect(Array.isArray(emptyLike)).toBe(false)
+    expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 10, height: 10, children: emptyLike })).toBe(false)
+  })
+
   it('accepts holey/sparse children arrays (Array.isArray only; parallel walks skip missing indices)', () => {
     const holey = new Array(2) as unknown as ComputedLayout['children']
     expect(holey.length).toBe(2)
