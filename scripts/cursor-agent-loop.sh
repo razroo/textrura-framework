@@ -66,6 +66,8 @@ fi
 # Before appending a path to the gate script, confirm it is not already listed (duplicate paths make
 # vitest run the same file twice). Scan the whole `scripts.release:gate` string — paths are not strictly
 # ordered, so a file can appear early in the vitest argv list while you only eyeball a later segment.
+# On duplicate resolved paths, `verify-release-gate.mjs` lists 1-based argv token positions (whitespace-split
+# gate string) so you can jump to both occurrences without searching the whole line by hand.
 # Example: `packages/core/src/__tests__/layout-bounds.test.ts` is often the *first* vitest path (before
 # keyboard.test.ts); inserting it again after keyboard duplicates the entry and fails verify-release-gate.mjs.
 # `verify-release-gate.mjs` also resolves paths canonically, so `packages/a/../b/x.test.ts` counts as the same

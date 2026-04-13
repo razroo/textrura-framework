@@ -134,9 +134,28 @@ async function main() {
   }
   for (const [canonical, list] of byCanonical) {
     if (list.length > 1) {
-      const sorted = [...list].sort()
+      const sorted = [...new Set(list)].sort()
+      // 1-based indices into the whitespace-split scripts.release:gate string (npm run argv order).
+      const argvPositions = []
+      for (let i = 0; i < tokens.length; i++) {
+        const t = tokens[i]
+        if (!t.startsWith('packages/') || !t.endsWith('.test.ts')) continue
+        if (t.includes('\\')) continue
+        if (!t.includes('/src/__tests__/')) continue
+        let can
+        try {
+          can = canonicalPackagesTestPath(t)
+        } catch {
+          continue
+        }
+        if (can === canonical) argvPositions.push(i + 1)
+      }
+      const posHint =
+        argvPositions.length > 0
+          ? ` Duplicate path tokens appear at argv positions ${argvPositions.join(', ')} (1-based words in scripts.release:gate).`
+          : ''
       throw new Error(
-        `release:gate: duplicate vitest entry after path resolution "${canonical}" (listed as: ${sorted.join(' | ')}; vitest would run the file ${list.length} times). ` +
+        `release:gate: duplicate vitest entry after path resolution "${canonical}" (listed as: ${sorted.join(' | ')}; vitest would run the file ${list.length} times).${posHint} ` +
           `Search the full scripts.release:gate line in package.json — allowlist paths are not grouped by package, so the same file can appear twice far apart (e.g. near the start and again later).`,
       )
     }
