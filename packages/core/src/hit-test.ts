@@ -103,7 +103,15 @@ function getChildrenByZAsc(boxEl: BoxElement): number[] {
   const zValues = kids.map(child => zIndexOf(child))
   const asc = kids
     .map((_, i) => i)
-    .sort((a, b) => zValues[a]! - zValues[b]!)
+    .sort((a, b) => {
+      const za = zValues[a]!
+      const zb = zValues[b]!
+      if (za < zb) return -1
+      if (za > zb) return 1
+      // Same z-index: keep source order (ascending index). Hit-test walks this list in reverse so the
+      // last sibling wins, matching canvas/terminal paint order for stacked ties.
+      return a - b
+    })
   zIndexOrderCache.set(boxEl, { zValues, asc })
   return asc
 }
