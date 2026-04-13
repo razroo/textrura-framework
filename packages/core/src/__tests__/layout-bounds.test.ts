@@ -716,6 +716,13 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(0, 0, 0, 0)).toEqual({ ox: 0, oy: 0 })
   })
 
+  it('preserves exact integer differences at safe-integer magnitude (large layouts; doubles stay exact)', () => {
+    const max = Number.MAX_SAFE_INTEGER
+    const min = Number.MIN_SAFE_INTEGER
+    expect(scrollSafeChildOffsets(max, max, 1, 1)).toEqual({ ox: max - 1, oy: max - 1 })
+    expect(scrollSafeChildOffsets(min, 0, -1, 0)).toEqual({ ox: min + 1, oy: 0 })
+  })
+
   it('returns negative finite child origins when scroll exceeds abs (over-scroll; hit-test / selection space)', () => {
     expect(scrollSafeChildOffsets(100, 50, 120, 60)).toEqual({ ox: -20, oy: -10 })
     expect(scrollSafeChildOffsets(0, 0, 1, 1)).toEqual({ ox: -1, oy: -1 })
