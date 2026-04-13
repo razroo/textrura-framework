@@ -725,6 +725,24 @@ describe('toLayoutTree', () => {
     expect(layout).not.toHaveProperty('onCustomThing')
   })
 
+  it('preserves keys that do not match the on+uppercase handler rule (online, onlyChild, bare on)', () => {
+    const el = box({
+      width: 10,
+      height: 10,
+      online: 1,
+      onlyChild: 2,
+      on: 3,
+    } as never)
+    const layout = toLayoutTree(el) as Record<string, unknown>
+    expect(layout).toMatchObject({
+      width: 10,
+      height: 10,
+      online: 1,
+      onlyChild: 2,
+      on: 3,
+    })
+  })
+
   it('forwards props not in the strip list to the layout snapshot (strip-list, not a whitelist)', () => {
     const hinted = box({
       width: 10,
