@@ -46,6 +46,7 @@ fi
 # Textura, animation beyond helpers, extra render targets). In-repo anchors: Textura `direction` / per-node `dir`
 # and tests in packages/textura/src/__tests__/compute-layout.test.ts; `RTL_PARITY_MATRIX.md` (repo root) for RTL
 # parity across paths; core animation helpers under packages/core;
+# Concrete open: `rg -n '^## Deferred / research' ROADMAP.md` (section starts ~line 28; thematic bullets only).
 # WebGPU geometry consumer under packages/renderer-webgpu. Optional GEOM v1 binary envelopes: decode/encode
 # behavior is duplicated with intentional parity in packages/server/src/binary-frame.ts and
 # packages/client/src/binary-frame.ts — touch both (and their binary-frame tests) when changing frame guards.
