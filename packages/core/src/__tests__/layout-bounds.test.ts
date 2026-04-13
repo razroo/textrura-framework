@@ -1116,4 +1116,14 @@ describe('composed scroll + inclusive rect (hit-test coordinate space)', () => {
     // Inner abs 50 in root space, minus inner scroll 20 → child origin 30 (matches collectHits recursion).
     expect(inner).toEqual({ ox: 30, oy: 0 })
   })
+
+  it('nested scroll containers: vertical outer scroll plus inner vertical scroll chains oy (same recursion pattern as horizontal)', () => {
+    const outer = scrollSafeChildOffsets(0, 0, 0, 40)!
+    expect(outer).toEqual({ ox: 0, oy: -40 })
+    const innerAbsX = outer.ox + 0
+    const innerAbsY = outer.oy + 100
+    expect(innerAbsY).toBe(60)
+    const inner = scrollSafeChildOffsets(innerAbsX, innerAbsY, 0, 10)!
+    expect(inner).toEqual({ ox: 0, oy: 50 })
+  })
 })
