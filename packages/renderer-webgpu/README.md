@@ -12,11 +12,13 @@ Current status:
 
 - Solid-color box rendering via vertex-colored triangle pipeline
 - **Border-radius** (uniform + per-corner) via rounded-rect SDF shape pipeline
-- **Linear gradients** — 2-stop via vertex color interpolation, N-stop via shared gradient atlas
+- **Linear and radial gradients** — 2-stop via vertex color interpolation, N-stop via shared gradient atlas
 - **Box shadow** via shadow pre-pass with blurred SDF
+- **Focus ring** (configurable color/padding) and **layout debug bounds** overlays via shape-pipeline stroke mode
+- **Selection highlights** via the color pipeline (shares `SelectionRange` with `@geometra/renderer-canvas`)
 - Text rendering via canvas-rasterized texture atlas with GPU sampling
 - **Image rendering** via per-image GPU textures with async loading cache
-- Near paint parity with `@geometra/renderer-canvas`; remaining gaps listed below
+- Near canvas parity; remaining gaps listed below
 
 ## Install
 
@@ -29,8 +31,11 @@ npm install @geometra/renderer-webgpu
 - WebGPU capability detection and async device/context initialization
 - Solid-color box rendering (vertex-colored triangles)
 - **Rounded corners** via SDF fragment shader, with uniform or per-corner radius (`topLeft`, `topRight`, `bottomLeft`, `bottomRight`)
-- **Linear gradients**: 2-stop via vertex color interpolation, N-stop baked into a shared 1D gradient atlas
+- **Linear and radial gradients**: 2-stop via vertex color interpolation, N-stop baked into a shared 1D gradient atlas
 - **Box shadow** emitted as a pre-pass draw with blurred SDF (`offsetX`, `offsetY`, `blur`, `color`)
+- **Focus ring** (`showFocusRing` / `focusRingColor` / `focusRingPadding`) via shape-pipeline stroke mode
+- **Layout debug bounds** (`debugLayoutBounds` / `debugStrokeColor`) via shape-pipeline stroke mode
+- **Text selection highlights** (`selection` field + `selectionColor`) using the shared core `SelectionRange` contract
 - Text rendering via offscreen canvas atlas → GPU texture sampling
 - Image rendering with per-image texture cache (async load, `img.decode()`)
 - Word wrapping for `whiteSpace: 'normal' | 'pre-wrap'`
@@ -41,10 +46,11 @@ npm install @geometra/renderer-webgpu
 
 Current gaps:
 
-- Selection highlights and focus rings (app-level overlays; render through `renderer-canvas` only)
-- Layout debug overlays (dev tooling; `renderer-canvas` only)
-- Radial or conic gradients (only linear)
+- Conic gradients (only linear + radial)
 - Gradient atlas capacity: 64 simultaneous multi-stop gradients per frame (flat/2-stop gradients are unlimited)
+- Text find-match highlights (renderer-canvas only via `enableFind`)
+- Accessibility mirror (app-level; can be enabled separately via `@geometra/core`)
+- Per-frame inspector HUD with frame timings (renderer-canvas only)
 
 ## Usage
 

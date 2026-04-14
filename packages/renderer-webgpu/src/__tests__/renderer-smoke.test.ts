@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect, vi } from 'vitest'
 import type { ComputedLayout } from 'textura'
-import { box, text } from '@geometra/core'
+import { box, text, setFocus, clearFocus } from '@geometra/core'
 import { WebGPURenderer } from '../index.js'
 
 class Fake2DContext {
@@ -500,5 +500,169 @@ describe('webgpu renderer smoke', () => {
     expect(() => renderer.render(layout, tree)).not.toThrow()
     expect(canvas.width).toBe(1)
     expect(canvas.height).toBe(1)
+  })
+
+  it('renders focus ring, debug bounds, radial gradient, and selection without fallback', async () => {
+    const fakeDevice = {
+      createShaderModule: () => ({}),
+      createRenderPipeline: () => ({}),
+      createPipelineLayout: () => ({}),
+      createBindGroupLayout: () => ({}),
+      createBindGroup: () => ({}),
+      createSampler: () => ({}),
+      createTexture: () => ({ createView: () => ({}), destroy: () => {} }),
+      createCommandEncoder: () => ({
+        beginRenderPass: () => ({ setPipeline: () => {}, setVertexBuffer: () => {}, setBindGroup: () => {}, draw: () => {}, end: () => {} }),
+        finish: () => ({}),
+      }),
+      queue: { writeBuffer: () => {}, submit: () => {}, copyExternalImageToTexture: () => {} },
+      createBuffer: () => ({ destroy: () => {} }),
+    }
+    vi.stubGlobal('navigator', {
+      gpu: {
+        getPreferredCanvasFormat: () => 'bgra8unorm',
+        requestAdapter: async () => ({
+          requestDevice: async () => fakeDevice,
+        }),
+      },
+    } as unknown as Navigator)
+    vi.stubGlobal('OffscreenCanvas', class {
+      width: number; height: number
+      constructor(w: number, h: number) { this.width = w; this.height = h }
+      getContext() {
+        return {
+          font: '',
+          textBaseline: '',
+          fillStyle: '',
+          clearRect: () => {},
+          fillText: () => {},
+          fillRect: () => {},
+          measureText: (s: string) => ({ width: s.length * 8 }),
+          createLinearGradient: () => ({ addColorStop: () => {} }),
+        }
+      }
+    })
+
+    const context = { configure: () => {}, getCurrentTexture: () => ({ createView: () => ({}) }) }
+    const canvas = {
+      width: 0, height: 0,
+      getContext: (kind: string) => (kind === 'webgpu' ? context : null),
+    } as unknown as HTMLCanvasElement
+
+    const onFallbackNeeded = vi.fn()
+    const renderer = new WebGPURenderer({
+      canvas,
+      onFallbackNeeded,
+      debugLayoutBounds: true,
+      showFocusRing: true,
+    })
+    await renderer.init()
+
+    const focusTarget = box({ width: 80, height: 30, onClick: () => undefined, backgroundColor: '#000000' }, [])
+    const tree = box({ width: 300, height: 200 }, [
+      box({
+        width: 100,
+        height: 100,
+        gradient: {
+          type: 'radial',
+          center: { x: 0.5, y: 0.5 },
+          radius: 0.8,
+          stops: [
+            { offset: 0, color: '#ff0000' },
+            { offset: 1, color: '#0000ff' },
+          ],
+        },
+      }, []),
+      focusTarget,
+      text({ text: 'selected', font: '12px sans-serif', lineHeight: 16, width: 60, height: 16 }),
+    ])
+    const layout: ComputedLayout = {
+      x: 0, y: 0, width: 300, height: 200,
+      children: [
+        { x: 10, y: 10, width: 100, height: 100, children: [] },
+        { x: 120, y: 10, width: 80, height: 30, children: [] },
+        { x: 10, y: 120, width: 60, height: 16, children: [] },
+      ],
+    }
+
+    setFocus(focusTarget, layout.children[1]!)
+    renderer.selection = { anchorNode: 0, anchorOffset: 0, focusNode: 0, focusOffset: 4 }
+
+    renderer.render(layout, tree)
+    clearFocus()
+    renderer.selection = null
+
+    expect(onFallbackNeeded).not.toHaveBeenCalled()
+  })
+
+  it('radial gradient with multi-stop colors uses the gradient atlas', async () => {
+    const addGradientMock = vi.fn()
+    const fakeDevice = {
+      createShaderModule: () => ({}),
+      createRenderPipeline: () => ({}),
+      createPipelineLayout: () => ({}),
+      createBindGroupLayout: () => ({}),
+      createBindGroup: () => ({}),
+      createSampler: () => ({}),
+      createTexture: () => ({ createView: () => ({}), destroy: () => {} }),
+      createCommandEncoder: () => ({
+        beginRenderPass: () => ({ setPipeline: () => {}, setVertexBuffer: () => {}, setBindGroup: () => {}, draw: () => {}, end: () => {} }),
+        finish: () => ({}),
+      }),
+      queue: { writeBuffer: () => {}, submit: () => {}, copyExternalImageToTexture: () => {} },
+      createBuffer: () => ({ destroy: () => {} }),
+    }
+    vi.stubGlobal('navigator', {
+      gpu: {
+        getPreferredCanvasFormat: () => 'bgra8unorm',
+        requestAdapter: async () => ({ requestDevice: async () => fakeDevice }),
+      },
+    } as unknown as Navigator)
+
+    let gradientFillCount = 0
+    vi.stubGlobal('OffscreenCanvas', class {
+      width: number; height: number
+      constructor(w: number, h: number) { this.width = w; this.height = h }
+      getContext() {
+        return {
+          font: '', textBaseline: '', fillStyle: '',
+          clearRect: () => {}, fillText: () => {},
+          fillRect: () => { gradientFillCount++ },
+          measureText: () => ({ width: 0 }),
+          createLinearGradient: () => {
+            addGradientMock()
+            return { addColorStop: () => {} }
+          },
+        }
+      }
+    })
+
+    const context = { configure: () => {}, getCurrentTexture: () => ({ createView: () => ({}) }) }
+    const canvas = {
+      width: 0, height: 0,
+      getContext: (kind: string) => (kind === 'webgpu' ? context : null),
+    } as unknown as HTMLCanvasElement
+
+    const renderer = new WebGPURenderer({ canvas })
+    await renderer.init()
+
+    const tree = box({
+      width: 200,
+      height: 200,
+      gradient: {
+        type: 'radial',
+        stops: [
+          { offset: 0, color: '#ff0000' },
+          { offset: 0.5, color: '#00ff00' },
+          { offset: 1, color: '#0000ff' },
+        ],
+      },
+    }, [])
+    const layout: ComputedLayout = { x: 0, y: 0, width: 200, height: 200, children: [] }
+    renderer.render(layout, tree)
+
+    // Multi-stop gradient → atlas.addGradient → createLinearGradient called
+    expect(addGradientMock).toHaveBeenCalled()
+    expect(gradientFillCount).toBeGreaterThan(0)
   })
 })

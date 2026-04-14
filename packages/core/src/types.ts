@@ -85,13 +85,29 @@ export interface StyleProps {
   scrollY?: number
   /** Box shadow. */
   boxShadow?: { offsetX: number; offsetY: number; blur: number; color: string }
-  /** Linear gradient background (overrides backgroundColor when set). */
-  gradient?: {
-    type: 'linear'
-    /** Angle in degrees. Default: 180 (top to bottom). */
-    angle?: number
-    stops: Array<{ offset: number; color: string }>
-  }
+  /**
+   * Gradient background (overrides backgroundColor when set). Linear gradients use an angle in
+   * degrees (0° = top→bottom, 90° = right→left, 180° = top→bottom, CSS semantics). Radial gradients
+   * draw from a center point outward to a radius; `center` is normalized to the box (0..1 on each
+   * axis; defaults to (0.5, 0.5)) and `radius` is normalized to the box's half-diagonal
+   * (defaults to 1 — reaches the farthest corner). Renderers that don't support the selected
+   * gradient type fall back to the first stop's color.
+   */
+  gradient?:
+    | {
+        type: 'linear'
+        /** Angle in degrees. Default: 180 (top to bottom). */
+        angle?: number
+        stops: Array<{ offset: number; color: string }>
+      }
+    | {
+        type: 'radial'
+        /** Center point in normalized box coordinates (0..1). Default: (0.5, 0.5) */
+        center?: { x: number; y: number }
+        /** Radius normalized to the box's half-diagonal. Default: 1 */
+        radius?: number
+        stops: Array<{ offset: number; color: string }>
+      }
 }
 
 /** Semantic properties for SEO and accessibility. */

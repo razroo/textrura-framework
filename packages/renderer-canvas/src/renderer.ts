@@ -468,6 +468,23 @@ export class CanvasRenderer implements Renderer {
       } else {
         ctx.fillRect(x, y, width, height)
       }
+    } else if (gradient && gradient.type === 'radial') {
+      const centerX = x + width * (gradient.center?.x ?? 0.5)
+      const centerY = y + height * (gradient.center?.y ?? 0.5)
+      // Reach the farthest corner when radius=1 (CSS farthest-corner semantics)
+      const halfDiagonal = Math.sqrt((width / 2) ** 2 + (height / 2) ** 2)
+      const r = halfDiagonal * (gradient.radius ?? 1)
+      const grad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, r)
+      for (const stop of gradient.stops) {
+        grad.addColorStop(stop.offset, stop.color)
+      }
+      ctx.fillStyle = grad
+      if (borderRadius) {
+        this.roundRect(x, y, width, height, borderRadius)
+        ctx.fill()
+      } else {
+        ctx.fillRect(x, y, width, height)
+      }
     } else if (backgroundColor && !boxShadow) {
       ctx.fillStyle = backgroundColor
       if (borderRadius) {
