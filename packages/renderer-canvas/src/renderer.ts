@@ -858,19 +858,37 @@ export class CanvasRenderer implements Renderer {
     return lines
   }
 
-  private roundRect(x: number, y: number, w: number, h: number, r: number): void {
-    r = Math.min(r, w / 2, h / 2)
+  private roundRect(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    r: number | { topLeft?: number; topRight?: number; bottomLeft?: number; bottomRight?: number },
+  ): void {
     const { ctx } = this
+    const maxR = Math.min(w / 2, h / 2)
+    let tl: number
+    let tr: number
+    let br: number
+    let bl: number
+    if (typeof r === 'number') {
+      tl = tr = br = bl = Math.min(Math.max(0, r), maxR)
+    } else {
+      tl = Math.min(Math.max(0, r.topLeft ?? 0), maxR)
+      tr = Math.min(Math.max(0, r.topRight ?? 0), maxR)
+      br = Math.min(Math.max(0, r.bottomRight ?? 0), maxR)
+      bl = Math.min(Math.max(0, r.bottomLeft ?? 0), maxR)
+    }
     ctx.beginPath()
-    ctx.moveTo(x + r, y)
-    ctx.lineTo(x + w - r, y)
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r)
-    ctx.lineTo(x + w, y + h - r)
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
-    ctx.lineTo(x + r, y + h)
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r)
-    ctx.lineTo(x, y + r)
-    ctx.quadraticCurveTo(x, y, x + r, y)
+    ctx.moveTo(x + tl, y)
+    ctx.lineTo(x + w - tr, y)
+    ctx.quadraticCurveTo(x + w, y, x + w, y + tr)
+    ctx.lineTo(x + w, y + h - br)
+    ctx.quadraticCurveTo(x + w, y + h, x + w - br, y + h)
+    ctx.lineTo(x + bl, y + h)
+    ctx.quadraticCurveTo(x, y + h, x, y + h - bl)
+    ctx.lineTo(x, y + tl)
+    ctx.quadraticCurveTo(x, y, x + tl, y)
     ctx.closePath()
   }
 

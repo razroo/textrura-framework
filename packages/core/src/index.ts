@@ -155,6 +155,7 @@ export type {
   Scene3dGroup,
   OrbitControlsConfig,
   StyleProps,
+  BorderRadiusCorners,
   CursorProp,
   Direction,
   DirectionProps,

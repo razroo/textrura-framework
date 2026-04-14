@@ -56,47 +56,33 @@ async function main() {
             marginTop: 24,
           },
           [
-            box({ width: 120, height: 80, backgroundColor: '#e94560', borderRadius: 12 }, [
-              text({
-                text: 'Rounded',
-                font: '600 14px Inter',
-                lineHeight: 20,
-                color: '#fff',
-                marginLeft: 12,
-                marginTop: 12,
-              }),
+            box({
+              width: 120,
+              height: 80,
+              backgroundColor: '#e94560',
+              borderRadius: 12,
+              boxShadow: { offsetX: 0, offsetY: 8, blur: 20, color: 'rgba(233,69,96,0.5)' },
+            }, [
+              text({ text: 'Shadow', font: '600 14px Inter', lineHeight: 20, color: '#fff', marginLeft: 12, marginTop: 12 }),
             ]),
             box({
               width: 120,
               height: 80,
-              borderRadius: 12,
+              borderRadius: { topLeft: 24, topRight: 4, bottomLeft: 4, bottomRight: 24 },
               gradient: {
                 type: 'linear',
                 angle: 135,
                 stops: [
-                  { offset: 0, color: '#0ea5e9' },
-                  { offset: 1, color: '#8b5cf6' },
+                  { offset: 0, color: '#ff0080' },
+                  { offset: 0.5, color: '#7928ca' },
+                  { offset: 1, color: '#0070f3' },
                 ],
               },
             }, [
-              text({
-                text: 'Gradient',
-                font: '600 14px Inter',
-                lineHeight: 20,
-                color: '#fff',
-                marginLeft: 12,
-                marginTop: 12,
-              }),
+              text({ text: '3-stop', font: '600 14px Inter', lineHeight: 20, color: '#fff', marginLeft: 12, marginTop: 12 }),
             ]),
             box({ width: 120, height: 80, backgroundColor: '#22c55e', borderRadius: 40 }, [
-              text({
-                text: 'Pill',
-                font: '600 14px Inter',
-                lineHeight: 20,
-                color: '#fff',
-                marginLeft: 12,
-                marginTop: 12,
-              }),
+              text({ text: 'Pill', font: '600 14px Inter', lineHeight: 20, color: '#fff', marginLeft: 12, marginTop: 12 }),
             ]),
             box({
               width: 120,
@@ -107,18 +93,13 @@ async function main() {
                 angle: 90,
                 stops: [
                   { offset: 0, color: '#f59e0b' },
-                  { offset: 1, color: '#e94560' },
+                  { offset: 0.3, color: '#f97316' },
+                  { offset: 0.7, color: '#ef4444' },
+                  { offset: 1, color: '#ec4899' },
                 ],
               },
             }, [
-              text({
-                text: 'Sunset',
-                font: '600 14px Inter',
-                lineHeight: 20,
-                color: '#fff',
-                marginLeft: 12,
-                marginTop: 12,
-              }),
+              text({ text: 'Sunset', font: '600 14px Inter', lineHeight: 20, color: '#fff', marginLeft: 12, marginTop: 12 }),
             ]),
           ],
         ),

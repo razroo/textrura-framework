@@ -33,12 +33,28 @@ export interface DirectionProps {
   dir?: Direction
 }
 
+/**
+ * Per-corner border radius. Any omitted corner defaults to `0`. Used when you need asymmetric rounded
+ * corners; for uniform rounding, pass a plain `number` to {@link StyleProps.borderRadius} instead.
+ */
+export interface BorderRadiusCorners {
+  topLeft?: number
+  topRight?: number
+  bottomLeft?: number
+  bottomRight?: number
+}
+
 /** Style properties for visual rendering (not layout). */
 export interface StyleProps {
   backgroundColor?: string
   color?: string
   borderColor?: string
-  borderRadius?: number
+  /**
+   * Border radius in pixels. Accepts a single `number` for uniform rounding or a {@link BorderRadiusCorners}
+   * object for per-corner control. Canvas and WebGPU renderers support both shapes; terminal renderer ignores
+   * border radius.
+   */
+  borderRadius?: number | BorderRadiusCorners
   borderWidth?: number
   opacity?: number
   /** Cursor to show when hovering this element. */

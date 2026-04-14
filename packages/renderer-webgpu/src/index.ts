@@ -20,9 +20,9 @@ export interface WebGPURendererOptions {
  *
  * Pipelines:
  * - color: vertex-colored triangles for flat boxes
- * - shape: rounded-rect / gradient boxes via SDF fragment shader
- * - text: offscreen-canvas atlas sampled as GPU texture
- * - image: per-image textures sampled as GPU texture
+ * - shape: unified SDF pipeline for rounded boxes, per-corner radius, linear gradients
+ *   (2-stop via vertex colors or N-stop via gradient atlas), and box shadow pre-pass
+ * - texture: offscreen-canvas atlas sampled as GPU texture (text + images)
  */
 
 function safeCanvasExtent(layout: ComputedLayout): { w: number; h: number } {
@@ -158,6 +158,57 @@ function wrapText(ctx: OffscreenCanvasRenderingContext2D, text: string, maxWidth
   return lines.length ? lines : ['']
 }
 
+// --- Gradient atlas: each row holds one N-stop linear gradient sampled along its main axis ---
+
+const GRADIENT_ATLAS_WIDTH = 256
+const GRADIENT_ATLAS_HEIGHT = 64
+
+class GradientAtlas {
+  private canvas: OffscreenCanvas
+  private ctx: OffscreenCanvasRenderingContext2D
+  private nextRow = 0
+  readonly width: number
+  readonly height: number
+
+  constructor() {
+    this.width = GRADIENT_ATLAS_WIDTH
+    this.height = GRADIENT_ATLAS_HEIGHT
+    this.canvas = new OffscreenCanvas(this.width, this.height)
+    const ctx = this.canvas.getContext('2d', { willReadFrequently: false })
+    if (!ctx) throw new Error('Could not create offscreen 2d context for gradient atlas')
+    this.ctx = ctx
+  }
+
+  clear(): void {
+    this.nextRow = 0
+    this.ctx.clearRect(0, 0, this.width, this.height)
+  }
+
+  /** Bake a gradient into a row. Returns the row index, or -1 if the atlas is full. */
+  addGradient(stops: Array<{ offset: number; color: string }>): number {
+    if (this.nextRow >= this.height) return -1
+    const row = this.nextRow++
+    const { ctx } = this
+    const grad = ctx.createLinearGradient(0, 0, this.width, 0)
+    for (const stop of stops) {
+      const clampedOffset = Math.max(0, Math.min(1, stop.offset))
+      grad.addColorStop(clampedOffset, stop.color)
+    }
+    ctx.fillStyle = grad
+    ctx.fillRect(0, row, this.width, 1)
+    return row
+  }
+
+  /** Returns the v-coordinate of a given row in [0, 1] for texture sampling. */
+  rowToV(row: number): number {
+    return (row + 0.5) / this.height
+  }
+
+  getCanvas(): OffscreenCanvas {
+    return this.canvas
+  }
+}
+
 // --- Image cache ---
 
 interface ImageTextureEntry {
@@ -192,7 +243,7 @@ class ImageCache {
       const texture = this.device.createTexture({
         size: [bitmap.width, bitmap.height],
         format: 'rgba8unorm',
-        usage: 0x04 | 0x10, // TEXTURE_BINDING | COPY_DST
+        usage: 0x04 | 0x10,
       })
       this.device.queue.copyExternalImageToTexture(
         { source: bitmap },
@@ -207,7 +258,6 @@ class ImageCache {
       })
       this.onReady()
     } catch {
-      // Mark as failed so we don't retry every frame
       this.cache.set(src, { texture: null as unknown as GPUTexture, width: 0, height: 0, loaded: false })
     } finally {
       this.loading.delete(src)
@@ -251,10 +301,24 @@ interface ShapeItem {
   y: number
   w: number
   h: number
-  radius: number
+  /** Per-corner radii: [topLeft, topRight, bottomRight, bottomLeft] */
+  radius: [number, number, number, number]
   color1: [number, number, number, number]
   color2: [number, number, number, number]
-  gradientDir: [number, number] // unit vector; (0,0) means solid
+  /** Gradient direction unit vector ((0,0) for solid or texture-sampled gradient) */
+  gradientDir: [number, number]
+  /** Blur radius in pixels for shadow pass; 0 means normal fill */
+  shadowBlur: number
+  /** -1 for no gradient texture; otherwise v-coordinate in [0, 1] into gradient atlas */
+  gradientV: number
+  /** Quad draw rect is expanded/offset for shadow; kept separate from shape origin */
+  drawX: number
+  drawY: number
+  drawW: number
+  drawH: number
+  /** Local origin of the SHAPE center within the draw quad (localPx offsets) */
+  shapeCenterLocalX: number
+  shapeCenterLocalY: number
 }
 
 export class WebGPURenderer implements Renderer {
@@ -271,6 +335,7 @@ export class WebGPURenderer implements Renderer {
   // Pipelines
   private colorPipeline: GPURenderPipeline | null = null
   private shapePipeline: GPURenderPipeline | null = null
+  private shapeBindGroupLayout: GPUBindGroupLayout | null = null
   private texturePipeline: GPURenderPipeline | null = null
   private textureBindGroupLayout: GPUBindGroupLayout | null = null
   private sampler: GPUSampler | null = null
@@ -286,6 +351,7 @@ export class WebGPURenderer implements Renderer {
   private imageVBCapacity = 0
 
   private textAtlas: TextAtlas | null = null
+  private gradientAtlas: GradientAtlas | null = null
   private imageCache: ImageCache | null = null
 
   constructor(options: WebGPURendererOptions) {
@@ -323,9 +389,8 @@ export class WebGPURenderer implements Renderer {
       minFilter: 'linear',
     })
     this.textAtlas = new TextAtlas(2048, 2048)
-    this.imageCache = new ImageCache(this.device, () => {
-      // Image loaded — could trigger a re-render; left to the host app
-    })
+    this.gradientAtlas = new GradientAtlas()
+    this.imageCache = new ImageCache(this.device, () => {})
     this._initialized = true
   }
 
@@ -352,12 +417,14 @@ export class WebGPURenderer implements Renderer {
     const imageItems: ImageItem[] = []
     const unsupported = { count: 0 }
 
+    // Reset per-frame atlases
+    this.textAtlas!.clear()
+    this.gradientAtlas!.clear()
+
     this.collect(tree, layout, 0, 0, colorRects, shapes, textItems, imageItems, unsupported)
     if (unsupported.count > 0) this.onFallbackNeeded?.(unsupported.count)
 
-    // Rasterize text to atlas
     const atlas = this.textAtlas!
-    atlas.clear()
     for (const item of textItems) {
       atlas.addText(item.text, item.font, item.color, item.lineHeight, item.x, item.y, item.w, item.h, item.whiteSpace)
     }
@@ -384,18 +451,42 @@ export class WebGPURenderer implements Renderer {
       pass.draw(colorRects.length / 6)
     }
 
-    // 2) Rounded-rect / gradient boxes
+    // 2) Shape pipeline (rounded boxes, gradients, shadows)
+    let gradientTexture: GPUTexture | null = null
     if (shapes.length > 0) {
+      // Always create a gradient texture (even if empty) so the shape bind group has something to bind
+      const gradientAtlas = this.gradientAtlas!
+      gradientTexture = device.createTexture({
+        size: [gradientAtlas.width, gradientAtlas.height],
+        format: 'rgba8unorm',
+        usage: 0x04 | 0x10,
+      })
+      device.queue.copyExternalImageToTexture(
+        { source: gradientAtlas.getCanvas() },
+        { texture: gradientTexture },
+        [gradientAtlas.width, gradientAtlas.height],
+      )
+
+      const bindGroup = device.createBindGroup({
+        layout: this.shapeBindGroupLayout!,
+        entries: [
+          { binding: 0, resource: this.sampler! },
+          { binding: 1, resource: gradientTexture.createView() },
+        ],
+      })
+
       const shapeVerts = this.buildShapeVertices(shapes, canvasW, canvasH)
       const vb = this.ensureBuffer('shape', shapeVerts.length * 4)
       device.queue.writeBuffer(vb, 0, new Float32Array(shapeVerts))
       pass.setPipeline(this.shapePipeline!)
       pass.setVertexBuffer(0, vb)
+      pass.setBindGroup(0, bindGroup)
       pass.draw(shapeVerts.length / SHAPE_VERTEX_STRIDE)
     }
 
     // 3) Text atlas draw
     const atlasEntries = atlas.getEntries()
+    let textAtlasTexture: GPUTexture | null = null
     if (atlasEntries.length > 0) {
       const textVerts = this.buildTextureVertices(
         atlasEntries.map((e) => ({
@@ -418,14 +509,14 @@ export class WebGPURenderer implements Renderer {
         const vb = this.ensureBuffer('text', textVerts.length * 4)
         device.queue.writeBuffer(vb, 0, new Float32Array(textVerts))
 
-        const atlasTexture = device.createTexture({
+        textAtlasTexture = device.createTexture({
           size: [atlas.width, atlas.height],
           format: 'rgba8unorm',
           usage: 0x04 | 0x10,
         })
         device.queue.copyExternalImageToTexture(
           { source: atlas.getCanvas() },
-          { texture: atlasTexture },
+          { texture: textAtlasTexture },
           [atlas.width, atlas.height],
         )
 
@@ -433,7 +524,7 @@ export class WebGPURenderer implements Renderer {
           layout: this.textureBindGroupLayout!,
           entries: [
             { binding: 0, resource: this.sampler! },
-            { binding: 1, resource: atlasTexture.createView() },
+            { binding: 1, resource: textAtlasTexture.createView() },
           ],
         })
 
@@ -441,12 +532,10 @@ export class WebGPURenderer implements Renderer {
         pass.setVertexBuffer(0, vb)
         pass.setBindGroup(0, bindGroup)
         pass.draw(textVerts.length / TEXTURE_VERTEX_STRIDE)
-
-        atlasTexture.destroy()
       }
     }
 
-    // 4) Images — each image has its own texture, so we batch per image
+    // 4) Images — each image has its own texture
     for (const img of imageItems) {
       const entry = this.imageCache!.get(img.src)
       if (!entry || !entry.loaded) continue
@@ -488,6 +577,10 @@ export class WebGPURenderer implements Renderer {
 
     pass.end()
     device.queue.submit([encoder.finish()])
+
+    // Transient per-frame textures
+    if (gradientTexture) gradientTexture.destroy()
+    if (textAtlasTexture) textAtlasTexture.destroy()
   }
 
   destroy(): void {
@@ -501,10 +594,12 @@ export class WebGPURenderer implements Renderer {
     }
     this.colorPipeline = null
     this.shapePipeline = null
+    this.shapeBindGroupLayout = null
     this.texturePipeline = null
     this.textureBindGroupLayout = null
     this.sampler = null
     this.textAtlas = null
+    this.gradientAtlas = null
     this.context = null
     this.device = null
     this.adapter = null
@@ -562,20 +657,8 @@ struct VSOut { @builtin(position) position: vec4f, @location(0) color: vec4f, }
   }
 
   /**
-   * Shape pipeline: per-vertex local position + shape params drive an SDF fragment shader
-   * for rounded rects, linear gradients, or both.
-   *
-   * Per-vertex layout (12 floats = 48 bytes):
-   *   pos (vec2)      — NDC position
-   *   localPx (vec2)  — position in pixels relative to rect center
-   *   halfSize (vec2) — rect half-size in pixels
-   *   radius (f32)    — border-radius in pixels
-   *   color1 (vec4)   — solid color (or gradient stop 1)
-   *   color2Lo (f32)  — packed xy of color2 (rg) [stride-fitting]
-   *
-   * For simplicity we store two colors + gradient direction as **instance-like** per-vertex
-   * data. Each of the 6 vertices of a box repeats the same color/gradient fields.
-   * Actual per-vertex layout is larger (see SHAPE_VERTEX_STRIDE).
+   * Shape pipeline: unified SDF path supporting rounded rects (per-corner), linear gradients
+   * (2-stop vertex-colored or N-stop atlas-sampled), and box shadow pre-pass.
    */
   private createShapePipeline(device: GPUDevice, format: GPUTextureFormat): GPURenderPipeline {
     const shader = device.createShaderModule({
@@ -584,20 +667,27 @@ struct VSOut {
   @builtin(position) position: vec4f,
   @location(0) localPx: vec2f,
   @location(1) halfSize: vec2f,
-  @location(2) radius: f32,
+  @location(2) radius: vec4f,
   @location(3) color1: vec4f,
   @location(4) color2: vec4f,
   @location(5) gradDir: vec2f,
+  @location(6) shadowBlur: f32,
+  @location(7) gradientV: f32,
 }
+
+@group(0) @binding(0) var gradSampler: sampler;
+@group(0) @binding(1) var gradTexture: texture_2d<f32>;
 
 @vertex fn vs_main(
   @location(0) pos: vec2f,
   @location(1) localPx: vec2f,
   @location(2) halfSize: vec2f,
-  @location(3) radius: f32,
+  @location(3) radius: vec4f,
   @location(4) color1: vec4f,
   @location(5) color2: vec4f,
   @location(6) gradDir: vec2f,
+  @location(7) shadowBlur: f32,
+  @location(8) gradientV: f32,
 ) -> VSOut {
   var out: VSOut;
   out.position = vec4f(pos.x, pos.y, 0.0, 1.0);
@@ -607,38 +697,70 @@ struct VSOut {
   out.color1 = color1;
   out.color2 = color2;
   out.gradDir = gradDir;
+  out.shadowBlur = shadowBlur;
+  out.gradientV = gradientV;
   return out;
 }
 
-fn sdRoundRect(p: vec2f, b: vec2f, r: f32) -> f32 {
-  let q = abs(p) - b + vec2f(r, r);
-  return min(max(q.x, q.y), 0.0) + length(max(q, vec2f(0.0, 0.0))) - r;
+// Per-corner rounded-rect SDF. radius = (topLeft, topRight, bottomRight, bottomLeft)
+fn sdRoundRect(p: vec2f, b: vec2f, r: vec4f) -> f32 {
+  // Pick corner radius based on quadrant of p
+  // Top-right if p.x > 0 && p.y < 0, top-left if p.x < 0 && p.y < 0, etc.
+  // Our Y axis grows downward (localPx.y < 0 is top)
+  var cornerR: f32;
+  if (p.x >= 0.0 && p.y < 0.0) { cornerR = r.y; }       // top-right
+  else if (p.x < 0.0 && p.y < 0.0) { cornerR = r.x; }   // top-left
+  else if (p.x >= 0.0 && p.y >= 0.0) { cornerR = r.z; } // bottom-right
+  else { cornerR = r.w; }                                // bottom-left
+
+  let q = abs(p) - b + vec2f(cornerR, cornerR);
+  return min(max(q.x, q.y), 0.0) + length(max(q, vec2f(0.0, 0.0))) - cornerR;
 }
 
 @fragment fn fs_main(in: VSOut) -> @location(0) vec4f {
-  // SDF for rounded rect
   let d = sdRoundRect(in.localPx, in.halfSize, in.radius);
-  // Antialias edge (1 pixel of smoothstep)
-  let alpha = 1.0 - smoothstep(-0.5, 0.5, d);
 
-  // Gradient interpolation: project localPx onto gradDir (in [-1, 1] range)
+  // Shadow path: alpha fades from color.a at edge to 0 at shadowBlur distance outside
+  if (in.shadowBlur > 0.0) {
+    let outside = max(d, 0.0);
+    let alpha = 1.0 - smoothstep(0.0, in.shadowBlur, outside);
+    return vec4f(in.color1.rgb, in.color1.a * alpha);
+  }
+
+  // Fill path: antialiased edge
+  let edgeAlpha = 1.0 - smoothstep(-0.5, 0.5, d);
+
+  // Color: gradient texture takes precedence if gradientV >= 0
   var col = in.color1;
-  let dirLen = length(in.gradDir);
-  if (dirLen > 0.001) {
-    let dir = in.gradDir / dirLen;
-    // Normalize localPx by half-size to get [-1,1] coords, then project
+  if (in.gradientV >= 0.0 && length(in.gradDir) > 0.001) {
+    let dir = normalize(in.gradDir);
+    let norm = in.localPx / max(in.halfSize, vec2f(0.001, 0.001));
+    let t = clamp(dot(norm, dir) * 0.5 + 0.5, 0.0, 1.0);
+    col = textureSample(gradTexture, gradSampler, vec2f(t, in.gradientV));
+    col = vec4f(col.rgb, col.a * in.color1.a);  // alpha propagation via color1.a
+  } else if (length(in.gradDir) > 0.001) {
+    // 2-stop gradient via vertex-interpolated colors
+    let dir = normalize(in.gradDir);
     let norm = in.localPx / max(in.halfSize, vec2f(0.001, 0.001));
     let t = clamp(dot(norm, dir) * 0.5 + 0.5, 0.0, 1.0);
     col = mix(in.color1, in.color2, t);
   }
 
-  return vec4f(col.rgb, col.a * alpha);
+  return vec4f(col.rgb, col.a * edgeAlpha);
 }
 `,
     })
 
+    const bindGroupLayout = device.createBindGroupLayout({
+      entries: [
+        { binding: 0, visibility: 0x2, sampler: {} },
+        { binding: 1, visibility: 0x2, texture: {} },
+      ],
+    })
+    this.shapeBindGroupLayout = bindGroupLayout
+
     return device.createRenderPipeline({
-      layout: 'auto',
+      layout: device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] }),
       vertex: {
         module: shader,
         entryPoint: 'vs_main',
@@ -649,10 +771,12 @@ fn sdRoundRect(p: vec2f, b: vec2f, r: f32) -> f32 {
               { shaderLocation: 0, offset: 0, format: 'float32x2' },        // pos
               { shaderLocation: 1, offset: 2 * 4, format: 'float32x2' },    // localPx
               { shaderLocation: 2, offset: 4 * 4, format: 'float32x2' },    // halfSize
-              { shaderLocation: 3, offset: 6 * 4, format: 'float32' },      // radius
-              { shaderLocation: 4, offset: 7 * 4, format: 'float32x4' },    // color1
-              { shaderLocation: 5, offset: 11 * 4, format: 'float32x4' },   // color2
-              { shaderLocation: 6, offset: 15 * 4, format: 'float32x2' },   // gradDir
+              { shaderLocation: 3, offset: 6 * 4, format: 'float32x4' },    // radius vec4
+              { shaderLocation: 4, offset: 10 * 4, format: 'float32x4' },   // color1
+              { shaderLocation: 5, offset: 14 * 4, format: 'float32x4' },   // color2
+              { shaderLocation: 6, offset: 18 * 4, format: 'float32x2' },   // gradDir
+              { shaderLocation: 7, offset: 20 * 4, format: 'float32' },     // shadowBlur
+              { shaderLocation: 8, offset: 21 * 4, format: 'float32' },     // gradientV
             ],
           },
         ],
@@ -718,9 +842,9 @@ struct VSOut {
           {
             arrayStride: TEXTURE_VERTEX_STRIDE * 4,
             attributes: [
-              { shaderLocation: 0, offset: 0, format: 'float32x2' },      // pos
-              { shaderLocation: 1, offset: 2 * 4, format: 'float32x2' },  // uv
-              { shaderLocation: 2, offset: 4 * 4, format: 'float32' },    // alpha
+              { shaderLocation: 0, offset: 0, format: 'float32x2' },
+              { shaderLocation: 1, offset: 2 * 4, format: 'float32x2' },
+              { shaderLocation: 2, offset: 4 * 4, format: 'float32' },
             ],
           },
         ],
@@ -747,26 +871,31 @@ struct VSOut {
   private buildShapeVertices(shapes: ShapeItem[], canvasW: number, canvasH: number): number[] {
     const verts: number[] = []
     for (const s of shapes) {
-      const x0 = (s.x / canvasW) * 2 - 1
-      const y0 = 1 - (s.y / canvasH) * 2
-      const x1 = ((s.x + s.w) / canvasW) * 2 - 1
-      const y1 = 1 - ((s.y + s.h) / canvasH) * 2
+      // Draw quad NDC coords
+      const x0 = (s.drawX / canvasW) * 2 - 1
+      const y0 = 1 - (s.drawY / canvasH) * 2
+      const x1 = ((s.drawX + s.drawW) / canvasW) * 2 - 1
+      const y1 = 1 - ((s.drawY + s.drawH) / canvasH) * 2
+
+      // Local pixel coordinates for each quad corner (relative to SHAPE center)
+      const lx0 = -s.shapeCenterLocalX
+      const ly0 = -s.shapeCenterLocalY
+      const lx1 = s.drawW - s.shapeCenterLocalX
+      const ly1 = s.drawH - s.shapeCenterLocalY
+
       const hw = s.w / 2
       const hh = s.h / 2
-      const r = Math.min(s.radius, hw, hh)
+      const [rTL, rTR, rBR, rBL] = s.radius
       const [c1r, c1g, c1b, c1a] = s.color1
       const [c2r, c2g, c2b, c2a] = s.color2
       const [gx, gy] = s.gradientDir
 
-      // Each vertex: pos(2), localPx(2), halfSize(2), radius(1), color1(4), color2(4), gradDir(2) = 17
-      // Triangle 1
-      pushShapeVert(verts, x0, y0, -hw, -hh, hw, hh, r, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, gx, gy)
-      pushShapeVert(verts, x1, y0, hw, -hh, hw, hh, r, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, gx, gy)
-      pushShapeVert(verts, x0, y1, -hw, hh, hw, hh, r, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, gx, gy)
-      // Triangle 2
-      pushShapeVert(verts, x1, y0, hw, -hh, hw, hh, r, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, gx, gy)
-      pushShapeVert(verts, x1, y1, hw, hh, hw, hh, r, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, gx, gy)
-      pushShapeVert(verts, x0, y1, -hw, hh, hw, hh, r, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, gx, gy)
+      pushShapeVert(verts, x0, y0, lx0, ly0, hw, hh, rTL, rTR, rBR, rBL, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, gx, gy, s.shadowBlur, s.gradientV)
+      pushShapeVert(verts, x1, y0, lx1, ly0, hw, hh, rTL, rTR, rBR, rBL, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, gx, gy, s.shadowBlur, s.gradientV)
+      pushShapeVert(verts, x0, y1, lx0, ly1, hw, hh, rTL, rTR, rBR, rBL, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, gx, gy, s.shadowBlur, s.gradientV)
+      pushShapeVert(verts, x1, y0, lx1, ly0, hw, hh, rTL, rTR, rBR, rBL, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, gx, gy, s.shadowBlur, s.gradientV)
+      pushShapeVert(verts, x1, y1, lx1, ly1, hw, hh, rTL, rTR, rBR, rBL, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, gx, gy, s.shadowBlur, s.gradientV)
+      pushShapeVert(verts, x0, y1, lx0, ly1, hw, hh, rTL, rTR, rBR, rBL, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, gx, gy, s.shadowBlur, s.gradientV)
     }
     return verts
   }
@@ -875,20 +1004,13 @@ struct VSOut {
     if (element.kind === 'image') {
       const { src, opacity } = element.props
       if (src) {
-        imageItems.push({
-          src,
-          x,
-          y,
-          w,
-          h,
-          opacity: opacity ?? 1,
-        })
+        imageItems.push({ src, x, y, w, h, opacity: opacity ?? 1 })
       }
       return
     }
 
     if (element.kind === 'box') {
-      this.categorizeBox(element, x, y, w, h, colorRects, shapes, unsupported)
+      this.categorizeBox(element, x, y, w, h, colorRects, shapes)
 
       const childOffsetX = x - finiteNumberOrZero(element.props.scrollX)
       const childOffsetY = y - finiteNumberOrZero(element.props.scrollY)
@@ -921,19 +1043,54 @@ struct VSOut {
     h: number,
     colorRects: number[],
     shapes: ShapeItem[],
-    unsupported: { count: number },
   ): void {
     const { backgroundColor, borderRadius, gradient, boxShadow, opacity } = element.props
 
-    if (boxShadow) unsupported.count++
-
-    const hasRadius = typeof borderRadius === 'number' && borderRadius > 0
+    const corners = normalizeBorderRadius(borderRadius, w, h)
+    const hasRadius = corners[0] > 0 || corners[1] > 0 || corners[2] > 0 || corners[3] > 0
     const hasGradient = !!gradient && gradient.type === 'linear' && gradient.stops.length >= 2
+
+    // Box shadow pre-pass (drawn first, behind the fill)
+    if (boxShadow && (backgroundColor || hasGradient || hasRadius)) {
+      const shadowColor = parseColor(boxShadow.color)
+      const shadowAlpha = opacity === undefined ? shadowColor[3] : shadowColor[3] * opacity
+      const blur = Math.max(0, boxShadow.blur)
+      const ox = boxShadow.offsetX
+      const oy = boxShadow.offsetY
+
+      // Shadow quad: centered at (x + ox + w/2, y + oy + h/2), expanded by blur in all directions
+      const drawX = x + ox - blur
+      const drawY = y + oy - blur
+      const drawW = w + 2 * blur
+      const drawH = h + 2 * blur
+      // Shape center within the draw quad = (drawW/2, drawH/2) = (w/2 + blur, h/2 + blur)
+      const shapeCenterLocalX = w / 2 + blur
+      const shapeCenterLocalY = h / 2 + blur
+
+      shapes.push({
+        x,
+        y,
+        w,
+        h,
+        radius: corners,
+        color1: [shadowColor[0], shadowColor[1], shadowColor[2], shadowAlpha],
+        color2: [shadowColor[0], shadowColor[1], shadowColor[2], shadowAlpha],
+        gradientDir: [0, 0],
+        shadowBlur: Math.max(blur, 0.001), // must be > 0 to trigger shadow path
+        gradientV: -1,
+        drawX,
+        drawY,
+        drawW,
+        drawH,
+        shapeCenterLocalX,
+        shapeCenterLocalY,
+      })
+    }
 
     if (!hasRadius && !hasGradient && !backgroundColor) return
 
+    // Flat path (no radius, no gradient, solid color)
     if (!hasRadius && !hasGradient && backgroundColor) {
-      // Flat path
       const [r, g, b, a] = parseColor(backgroundColor)
       const alpha = opacity === undefined ? a : a * opacity
       pushRectVertices(colorRects, x, y, w, h, this.canvas.width, this.canvas.height, r, g, b, alpha)
@@ -944,17 +1101,29 @@ struct VSOut {
     let color1: [number, number, number, number]
     let color2: [number, number, number, number]
     let gradDir: [number, number] = [0, 0]
+    let gradientV = -1
 
     if (hasGradient) {
       const stops = gradient.stops
-      const c1 = parseColor(stops[0]!.color)
-      const c2 = parseColor(stops[stops.length - 1]!.color)
-      color1 = c1
-      color2 = c2
-      // Angle: 0° = top-to-bottom (CSS), 90° = left-to-right
-      // Gradient direction vector in normalized coords
       const angleRad = ((gradient.angle ?? 180) * Math.PI) / 180
       gradDir = [Math.sin(angleRad), -Math.cos(angleRad)]
+
+      if (stops.length > 2) {
+        // N-stop gradient: bake to atlas
+        const row = this.gradientAtlas!.addGradient(stops)
+        if (row >= 0) {
+          gradientV = this.gradientAtlas!.rowToV(row)
+          color1 = [1, 1, 1, 1] // texture-sampled path multiplies by color1.a
+          color2 = [1, 1, 1, 1]
+        } else {
+          // Atlas full: fall back to first/last stops
+          color1 = parseColor(stops[0]!.color)
+          color2 = parseColor(stops[stops.length - 1]!.color)
+        }
+      } else {
+        color1 = parseColor(stops[0]!.color)
+        color2 = parseColor(stops[1]!.color)
+      }
     } else {
       const base = backgroundColor ? parseColor(backgroundColor) : ([0, 0, 0, 1] as [number, number, number, number])
       color1 = base
@@ -971,40 +1140,39 @@ struct VSOut {
       y,
       w,
       h,
-      radius: hasRadius ? borderRadius! : 0,
+      radius: corners,
       color1,
       color2,
       gradientDir: gradDir,
+      shadowBlur: 0,
+      gradientV,
+      drawX: x,
+      drawY: y,
+      drawW: w,
+      drawH: h,
+      shapeCenterLocalX: w / 2,
+      shapeCenterLocalY: h / 2,
     })
   }
 }
 
 // --- Constants ---
 
-const SHAPE_VERTEX_STRIDE = 17 // pos(2) localPx(2) halfSize(2) radius(1) color1(4) color2(4) gradDir(2)
+const SHAPE_VERTEX_STRIDE = 22 // pos(2) localPx(2) halfSize(2) radius(4) color1(4) color2(4) gradDir(2) shadowBlur(1) gradientV(1)
 const TEXTURE_VERTEX_STRIDE = 5 // pos(2) uv(2) alpha(1)
 
 function pushShapeVert(
   out: number[],
-  px: number,
-  py: number,
-  lx: number,
-  ly: number,
-  hw: number,
-  hh: number,
-  r: number,
-  c1r: number,
-  c1g: number,
-  c1b: number,
-  c1a: number,
-  c2r: number,
-  c2g: number,
-  c2b: number,
-  c2a: number,
-  gx: number,
-  gy: number,
+  px: number, py: number,
+  lx: number, ly: number,
+  hw: number, hh: number,
+  rTL: number, rTR: number, rBR: number, rBL: number,
+  c1r: number, c1g: number, c1b: number, c1a: number,
+  c2r: number, c2g: number, c2b: number, c2a: number,
+  gx: number, gy: number,
+  shadowBlur: number, gradientV: number,
 ): void {
-  out.push(px, py, lx, ly, hw, hh, r, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, gx, gy)
+  out.push(px, py, lx, ly, hw, hh, rTL, rTR, rBR, rBL, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, gx, gy, shadowBlur, gradientV)
 }
 
 function pushRectVertices(
@@ -1030,6 +1198,31 @@ function pushRectVertices(
   out.push(x1, y0, r, g, b, a)
   out.push(x1, y1, r, g, b, a)
   out.push(x0, y1, r, g, b, a)
+}
+
+/**
+ * Normalize `borderRadius` (number | object) into a 4-tuple [tl, tr, br, bl] in pixels, clamped
+ * to half of the smaller dimension.
+ */
+function normalizeBorderRadius(
+  r: number | { topLeft?: number; topRight?: number; bottomLeft?: number; bottomRight?: number } | undefined,
+  w: number,
+  h: number,
+): [number, number, number, number] {
+  const maxR = Math.min(w / 2, h / 2)
+  if (typeof r === 'number') {
+    const v = Math.min(Math.max(0, r), maxR)
+    return [v, v, v, v]
+  }
+  if (r && typeof r === 'object') {
+    return [
+      Math.min(Math.max(0, r.topLeft ?? 0), maxR),
+      Math.min(Math.max(0, r.topRight ?? 0), maxR),
+      Math.min(Math.max(0, r.bottomRight ?? 0), maxR),
+      Math.min(Math.max(0, r.bottomLeft ?? 0), maxR),
+    ]
+  }
+  return [0, 0, 0, 0]
 }
 
 function parseColor(color: string): [number, number, number, number] {
