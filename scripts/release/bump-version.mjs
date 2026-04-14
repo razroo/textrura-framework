@@ -36,6 +36,7 @@ const packages = [
   ['@geometra/renderer-canvas', 'packages/renderer-canvas/package.json'],
   ['@geometra/renderer-terminal', 'packages/renderer-terminal/package.json'],
   ['@geometra/renderer-webgpu', 'packages/renderer-webgpu/package.json'],
+  ['@geometra/renderer-pdf', 'packages/renderer-pdf/package.json'],
   ['@geometra/renderer-three', 'packages/renderer-three/package.json'],
   ['@geometra/server', 'packages/server/package.json'],
   ['@geometra/client', 'packages/client/package.json'],

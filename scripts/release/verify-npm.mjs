@@ -10,6 +10,7 @@ const packages = [
   '@geometra/renderer-canvas',
   '@geometra/renderer-terminal',
   '@geometra/renderer-webgpu',
+  '@geometra/renderer-pdf',
   '@geometra/server',
   '@geometra/client',
   '@geometra/ui',

@@ -15,6 +15,7 @@ jobs:
         packages/renderer-canvas
         packages/renderer-terminal
         packages/renderer-webgpu
+        packages/renderer-pdf
         packages/renderer-three
         packages/server
         packages/client
@@ -28,6 +29,7 @@ jobs:
         @geometra/renderer-canvas
         @geometra/renderer-terminal
         @geometra/renderer-webgpu
+        @geometra/renderer-pdf
         @geometra/renderer-three
         @geometra/server
         @geometra/client
