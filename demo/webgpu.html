@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Geometra — WebGPU Renderer Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #09090b;
+      color: #fafafa;
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      padding: 40px 24px;
+    }
+    .wrap {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .tagline {
+      color: #a1a1aa;
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    .status {
+      padding: 12px 16px;
+      background: #18181b;
+      border: 1px solid #3f3f46;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      font-size: 13px;
+    }
+    .status.ok { border-color: #22c55e; }
+    .status.err { border-color: #e94560; color: #fca5a5; }
+    canvas {
+      display: block;
+      border: 1px solid #3f3f46;
+      border-radius: 8px;
+      background: #000;
+    }
+    .back {
+      display: inline-block;
+      margin-top: 24px;
+      color: #e94560;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .back:hover { text-decoration: underline; }
+    .notes {
+      margin-top: 24px;
+      padding: 16px;
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #a1a1aa;
+      line-height: 1.6;
+    }
+    .notes strong { color: #fafafa; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>WebGPU Renderer</h1>
+    <div class="tagline">Geometra's WebGPU backend — solid boxes and text via a single GPU draw pipeline.</div>
+    <div id="status" class="status">Checking WebGPU support…</div>
+    <canvas id="app" width="800" height="400"></canvas>
+    <div class="notes">
+      <strong>What this demonstrates:</strong> The same declarative <code>box()</code> and <code>text()</code> tree you'd give
+      the canvas renderer, rendered instead via a WebGPU pipeline. Text is rasterized into an offscreen canvas atlas
+      and sampled as a GPU texture. Solid boxes are drawn as vertex-colored triangles.
+      <br /><br />
+      <strong>Current gaps:</strong> border-radius, gradients, shadows, images, selection highlights, and focus rings.
+      Text rendering works for any PDF-base-14 or web font present in the browser.
+    </div>
+    <a class="back" href="./">← Back to main demo</a>
+  </div>
+  <script type="module" src="./webgpu.ts"></script>
+</body>
+</html>

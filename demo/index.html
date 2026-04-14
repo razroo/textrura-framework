@@ -11,10 +11,42 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #09090b; }
     canvas { display: block; }
+    #geometra-toolbar {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 1000;
+      display: flex;
+      gap: 8px;
+      font-family: 'Inter', sans-serif;
+    }
+    #geometra-toolbar button,
+    #geometra-toolbar a {
+      background: rgba(24, 24, 27, 0.9);
+      color: #fafafa;
+      border: 1px solid #3f3f46;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      backdrop-filter: blur(8px);
+      transition: background 0.15s, border-color 0.15s;
+    }
+    #geometra-toolbar button:hover,
+    #geometra-toolbar a:hover {
+      background: rgba(39, 39, 42, 0.95);
+      border-color: #e94560;
+    }
   </style>
 </head>
 <body>
   <canvas id="app"></canvas>
+  <div id="geometra-toolbar">
+    <button id="export-pdf-btn" title="Download the current scene as a PDF (renderer-pdf)">Export PDF</button>
+    <a href="./webgpu.html" title="Standalone WebGPU renderer demo">Try WebGPU</a>
+  </div>
   <script type="module" src="./demo.ts"></script>
 </body>
 </html>

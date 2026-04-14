@@ -11,8 +11,10 @@ This package provides:
 Current status:
 
 - Solid-color box rendering via vertex-colored triangle pipeline
+- **Border-radius** and **linear gradients** via dedicated SDF shape pipeline
 - Text rendering via canvas-rasterized texture atlas with GPU sampling
-- Full paint parity with `@geometra/renderer-canvas` is not yet complete
+- **Image rendering** via per-image GPU textures with async loading cache
+- Full paint parity with `@geometra/renderer-canvas` is approaching — remaining gaps listed below
 
 ## Install
 
@@ -24,19 +26,24 @@ npm install @geometra/renderer-webgpu
 
 - WebGPU capability detection and async device/context initialization
 - Solid-color box rendering (vertex-colored triangles)
+- **Border-radius** via rounded-rect SDF fragment shader with antialiased edges
+- **Linear gradients** (angle + 2-stop stops) interpolated per-fragment
 - Text rendering via offscreen canvas atlas → GPU texture sampling
+- Image rendering with per-image texture cache (async load, `img.decode()`)
 - Word wrapping for `whiteSpace: 'normal' | 'pre-wrap'`
-- Alpha blending for text and box overlays
+- Alpha blending across color, shape, text, and image pipelines
+- Opacity propagation into paint colors and texture sampling
 - 2D clear-pass fallback before `init()` completes
 - Optional `onFallbackNeeded(count)` callback for unsupported paint features
 
 Current gaps:
 
-- selection highlight
-- focus/debug overlays
-- gradients, shadows, and border-radius parity
-- image rendering
-- full canvas feature parity
+- Multi-stop gradients (only first and last stops used)
+- Per-corner border radius (uniform radius only)
+- Box shadow
+- Selection highlights and focus rings
+- Layout debug overlays
+- Multiple gradient types (radial, conic)
 
 ## Usage
 

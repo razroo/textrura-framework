@@ -13,6 +13,7 @@ import {
 } from '@geometra/core'
 import type { App, UIElement } from '@geometra/core'
 import { CanvasRenderer, enableSelection, enableFind, enableAccessibilityMirror, enableInputForwarding } from '@geometra/renderer-canvas'
+import { PDFRenderer } from '@geometra/renderer-pdf'
 import {
   button as uiButton,
   checkbox as uiCheckbox,
@@ -2418,6 +2419,34 @@ canvas.addEventListener('mousemove', (e) => {
   mouseX.set(e.clientX)
   mouseY.set(e.clientY + window.scrollY)
 })
+
+// ─── PDF Export ──────────────────────────────────────────────────────────────
+const exportBtn = document.getElementById('export-pdf-btn') as HTMLButtonElement | null
+if (exportBtn) {
+  exportBtn.addEventListener('click', () => {
+    if (!app?.layout || !app.tree) {
+      alert('App not ready yet — please wait for the canvas to render.')
+      return
+    }
+    const pageWidth = Math.max(400, Math.min(1200, app.layout.width))
+    const pageHeight = Math.max(600, app.layout.height)
+    const pdfRenderer = new PDFRenderer({
+      pageWidth,
+      pageHeight,
+      background: BG,
+    })
+    const bytes = pdfRenderer.generate(app.layout, app.tree)
+    const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `geometra-demo-${new Date().toISOString().slice(0, 10)}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  })
+}
 
 // ─── Init ────────────────────────────────────────────────────────────────────
 router.start()

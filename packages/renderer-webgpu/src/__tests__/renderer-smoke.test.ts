@@ -248,6 +248,134 @@ describe('webgpu renderer smoke', () => {
     expect(onFallbackNeeded).not.toHaveBeenCalled()
   })
 
+  it('renders border-radius and gradient boxes without fallback after init', async () => {
+    const fakeDevice = {
+      createShaderModule: () => ({}),
+      createRenderPipeline: () => ({}),
+      createPipelineLayout: () => ({}),
+      createBindGroupLayout: () => ({}),
+      createBindGroup: () => ({}),
+      createSampler: () => ({}),
+      createTexture: () => ({ createView: () => ({}), destroy: () => {} }),
+      createCommandEncoder: () => ({
+        beginRenderPass: () => ({ setPipeline: () => {}, setVertexBuffer: () => {}, setBindGroup: () => {}, draw: () => {}, end: () => {} }),
+        finish: () => ({}),
+      }),
+      queue: { writeBuffer: () => {}, submit: () => {}, copyExternalImageToTexture: () => {} },
+      createBuffer: () => ({ destroy: () => {} }),
+    }
+    vi.stubGlobal('navigator', {
+      gpu: {
+        getPreferredCanvasFormat: () => 'bgra8unorm',
+        requestAdapter: async () => ({
+          requestDevice: async () => fakeDevice,
+        }),
+      },
+    } as unknown as Navigator)
+    vi.stubGlobal('OffscreenCanvas', class {
+      width: number
+      height: number
+      constructor(w: number, h: number) { this.width = w; this.height = h }
+      getContext() {
+        return {
+          font: '', textBaseline: '', fillStyle: '',
+          clearRect: () => {}, fillText: () => {}, measureText: () => ({ width: 0 }),
+        }
+      }
+    })
+
+    const context = { configure: () => {}, getCurrentTexture: () => ({ createView: () => ({}) }) }
+    const canvas = {
+      width: 0, height: 0,
+      getContext: (kind: string) => (kind === 'webgpu' ? context : null),
+    } as unknown as HTMLCanvasElement
+
+    const onFallbackNeeded = vi.fn()
+    const renderer = new WebGPURenderer({ canvas, onFallbackNeeded })
+    await renderer.init()
+
+    const tree = box({
+      width: 200,
+      height: 100,
+      backgroundColor: '#ff0000',
+      borderRadius: 12,
+    }, [
+      box({
+        width: 100,
+        height: 50,
+        gradient: {
+          type: 'linear',
+          angle: 90,
+          stops: [
+            { offset: 0, color: '#ff0000' },
+            { offset: 1, color: '#0000ff' },
+          ],
+        },
+      }, []),
+    ])
+    const layout: ComputedLayout = {
+      x: 0, y: 0, width: 200, height: 100,
+      children: [{ x: 10, y: 10, width: 100, height: 50, children: [] }],
+    }
+    renderer.render(layout, tree)
+
+    expect(onFallbackNeeded).not.toHaveBeenCalled()
+  })
+
+  it('reports box-shadow as unsupported (still a gap)', async () => {
+    const fakeDevice = {
+      createShaderModule: () => ({}),
+      createRenderPipeline: () => ({}),
+      createPipelineLayout: () => ({}),
+      createBindGroupLayout: () => ({}),
+      createBindGroup: () => ({}),
+      createSampler: () => ({}),
+      createTexture: () => ({ createView: () => ({}), destroy: () => {} }),
+      createCommandEncoder: () => ({
+        beginRenderPass: () => ({ setPipeline: () => {}, setVertexBuffer: () => {}, setBindGroup: () => {}, draw: () => {}, end: () => {} }),
+        finish: () => ({}),
+      }),
+      queue: { writeBuffer: () => {}, submit: () => {}, copyExternalImageToTexture: () => {} },
+      createBuffer: () => ({ destroy: () => {} }),
+    }
+    vi.stubGlobal('navigator', {
+      gpu: {
+        getPreferredCanvasFormat: () => 'bgra8unorm',
+        requestAdapter: async () => ({
+          requestDevice: async () => fakeDevice,
+        }),
+      },
+    } as unknown as Navigator)
+    vi.stubGlobal('OffscreenCanvas', class {
+      width: number; height: number
+      constructor(w: number, h: number) { this.width = w; this.height = h }
+      getContext() {
+        return { font: '', textBaseline: '', fillStyle: '', clearRect: () => {}, fillText: () => {}, measureText: () => ({ width: 0 }) }
+      }
+    })
+
+    const context = { configure: () => {}, getCurrentTexture: () => ({ createView: () => ({}) }) }
+    const canvas = {
+      width: 0, height: 0,
+      getContext: (kind: string) => (kind === 'webgpu' ? context : null),
+    } as unknown as HTMLCanvasElement
+
+    const onFallbackNeeded = vi.fn()
+    const renderer = new WebGPURenderer({ canvas, onFallbackNeeded })
+    await renderer.init()
+
+    const tree = box({
+      width: 100,
+      height: 100,
+      backgroundColor: '#ff0000',
+      boxShadow: { offsetX: 2, offsetY: 2, blur: 4, color: '#000000' },
+    }, [])
+    const layout: ComputedLayout = { x: 0, y: 0, width: 100, height: 100, children: [] }
+    renderer.render(layout, tree)
+
+    expect(onFallbackNeeded).toHaveBeenCalledWith(1)
+  })
+
   it('after init, clamps canvas backing store to 1×1 when root layout width is NaN', async () => {
     vi.stubGlobal('navigator', {
       gpu: {
