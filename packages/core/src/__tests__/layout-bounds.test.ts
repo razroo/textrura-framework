@@ -811,6 +811,14 @@ describe('finiteRootExtent', () => {
     expect(finiteRootExtent(Number.MAX_VALUE)).toBe(Number.MAX_VALUE)
   })
 
+  it('accepts positive subnormal root extents distinct from Number.MIN_VALUE (tiny finite doubles; layout-valid)', () => {
+    const tiny = 1e-320
+    expect(tiny).not.toBe(Number.MIN_VALUE)
+    expect(tiny).toBeGreaterThan(0)
+    expect(Number.isFinite(tiny)).toBe(true)
+    expect(finiteRootExtent(tiny)).toBe(tiny)
+  })
+
   it('accepts the next representable double beyond MAX_SAFE_INTEGER (unsafe integers are still finite roots)', () => {
     const step = Number.MAX_SAFE_INTEGER + 1
     expect(Number.isSafeInteger(step)).toBe(false)
