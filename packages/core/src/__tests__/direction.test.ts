@@ -247,6 +247,17 @@ describe('resolveComputeLayoutDirection', () => {
     expect(resolveComputeLayoutDirection([ 'rtl' ] as never, ltrRoot)).toBe('ltr')
   })
 
+  it('does not coerce host layoutDirection via valueOf or Symbol.toPrimitive (strict === only; derive from root)', () => {
+    const rtlRoot = box({ width: 1, height: 1, flexDirection: 'row', dir: 'rtl' }, [])
+    const ltrRoot = box({ width: 1, height: 1, flexDirection: 'row', dir: 'ltr' }, [])
+    const coercibleLtr = { valueOf: () => 'ltr' } as never
+    const coercibleRtl = { [Symbol.toPrimitive]: () => 'rtl' } as never
+    expect(resolveComputeLayoutDirection(coercibleLtr, rtlRoot)).toBe('rtl')
+    expect(resolveComputeLayoutDirection(coercibleRtl, ltrRoot)).toBe('ltr')
+    expect(() => resolveComputeLayoutDirection(coercibleLtr, rtlRoot)).not.toThrow()
+    expect(() => resolveComputeLayoutDirection(coercibleRtl, ltrRoot)).not.toThrow()
+  })
+
   it('ignores NaN and ±Infinity host layoutDirection (only primitive ltr|rtl strings win), deriving from the root', () => {
     const rtlRoot = box({ width: 1, height: 1, flexDirection: 'row', dir: 'rtl' }, [])
     expect(resolveComputeLayoutDirection(Number.NaN as never, rtlRoot)).toBe('rtl')
