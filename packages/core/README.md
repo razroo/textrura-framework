@@ -11,7 +11,7 @@ npm install @geometra/core
 ## Key Exports
 
 - `signal`, `computed`, `effect`, `batch` -- reactive primitives
-- `box`, `text`, `image` -- element constructors
+- `box`, `text`, `image`, `scene3d` -- element constructors
 - `createApp` -- application entry point
 - `toSemanticHTML` -- SEO-friendly HTML generation
 - `toAccessibilityTree` -- runtime accessibility tree from geometry
@@ -22,19 +22,29 @@ npm install @geometra/core
 
 ## Usage
 
+`createApp` returns a `Promise<App>` and takes a **renderer** (for example `@geometra/renderer-canvas` in the browser) plus optional root layout size in `AppOptions`. Wire pointer/keyboard to `app.dispatch` / `app.dispatchKey` from your host (see `demos/local-canvas`).
+
 ```ts
 import { box, text, createApp, signal } from '@geometra/core'
+import { CanvasRenderer } from '@geometra/renderer-canvas'
+
+const canvas = document.querySelector('canvas') as HTMLCanvasElement
+const renderer = new CanvasRenderer({ canvas })
 
 const count = signal(0)
 
-const app = createApp(() =>
-  box({ width: 300, height: 200, padding: 20, gap: 10 }, [
+function view() {
+  return box({ width: 300, height: 200, padding: 20, gap: 10 }, [
     text({ text: `Count: ${count.value}`, font: 'bold 24px sans-serif', lineHeight: 30 }),
     box({ width: 100, height: 40, backgroundColor: '#07f', onClick: () => count.set(count.peek() + 1) }, [
       text({ text: 'Click me', font: '16px sans-serif', lineHeight: 20, color: '#fff' }),
     ]),
   ])
-)
+}
+
+createApp(view, renderer, { width: 300, height: 200 }).then(() => {
+  // Mounted — forward pointer/keyboard from your host for interactivity (see demos/local-canvas).
+})
 ```
 
 ## Text input contract
