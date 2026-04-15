@@ -104,6 +104,13 @@ describe('safePerformanceNowMs', () => {
     expect(safePerformanceNowMs()).toBe(Number.EPSILON)
   })
 
+  it('preserves negative finite now() values (embedders may offset before the time origin)', () => {
+    vi.stubGlobal('performance', { now: () => -123.45 })
+    expect(safePerformanceNowMs()).toBe(-123.45)
+    vi.stubGlobal('performance', { now: () => -Number.MAX_VALUE })
+    expect(safePerformanceNowMs()).toBe(-Number.MAX_VALUE)
+  })
+
   it('returns 0 when performance or now is missing', () => {
     // @ts-expect-error — exercise partial global
     vi.stubGlobal('performance', {})
@@ -226,6 +233,13 @@ describe('readPerformanceNow', () => {
     expect(readPerformanceNow()).toBe(Number.MIN_VALUE)
     vi.stubGlobal('performance', { now: () => Number.EPSILON })
     expect(readPerformanceNow()).toBe(Number.EPSILON)
+  })
+
+  it('passes through negative finite now() values unchanged (callers clamp deltas if needed)', () => {
+    vi.stubGlobal('performance', { now: () => -42.25 })
+    expect(readPerformanceNow()).toBe(-42.25)
+    vi.stubGlobal('performance', { now: () => -Number.MIN_VALUE })
+    expect(readPerformanceNow()).toBe(-Number.MIN_VALUE)
   })
 
   it('maps non-number now() results to 0 without coercion', () => {

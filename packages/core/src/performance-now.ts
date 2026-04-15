@@ -4,7 +4,8 @@
  *
  * Returns a **finite** millisecond value: `NaN`, `±Infinity`, and any non-primitive-number return
  * from `now()` become `0`, so Yoga/layout wall-time deltas stay safe for
- * {@link import('./types.js').Renderer.setFrameTimings}.
+ * {@link import('./types.js').Renderer.setFrameTimings}. Negative finite values (offsets before the
+ * time origin) are preserved like positive magnitudes.
  *
  * Primitive IEEE **−0** is preserved (`Object.is` distinguishes −0 from +0).
  *
