@@ -1328,6 +1328,12 @@ describe('finiteNumberOrZero', () => {
     expect(() => finiteNumberOrZero(bare)).not.toThrow()
     expect(finiteNumberOrZero(bare)).toBe(0)
   })
+
+  it('maps WeakRef to 0 without throwing (typeof object; exotic host values cannot reach numeric scroll math)', () => {
+    const r = new WeakRef({}) as unknown as number
+    expect(() => finiteNumberOrZero(r)).not.toThrow()
+    expect(finiteNumberOrZero(r)).toBe(0)
+  })
 })
 
 describe('composed scroll + inclusive rect (hit-test coordinate space)', () => {
