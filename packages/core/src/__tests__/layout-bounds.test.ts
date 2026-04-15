@@ -755,6 +755,18 @@ describe('finiteRootExtent', () => {
     expect(finiteRootExtent([] as unknown as number)).toBeUndefined()
   })
 
+  it('returns undefined for Map, Set, Promise, Date, and RegExp without throwing (typeof object; corrupt AppOptions / JSON)', () => {
+    const m = new Map() as unknown as number
+    const s = new Set() as unknown as number
+    const p = Promise.resolve(1) as unknown as number
+    const d = new Date(0) as unknown as number
+    const r = /./ as unknown as number
+    for (const bad of [m, s, p, d, r] as const) {
+      expect(() => finiteRootExtent(bad)).not.toThrow()
+      expect(finiteRootExtent(bad)).toBeUndefined()
+    }
+  })
+
   it('returns undefined for negative sizes', () => {
     expect(finiteRootExtent(-1)).toBeUndefined()
     expect(finiteRootExtent(-Number.MIN_VALUE)).toBeUndefined()
