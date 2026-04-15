@@ -141,6 +141,8 @@ describe('safePerformanceNowMs', () => {
   it('returns 0 when now() returns a non-primitive number (boxed Number)', () => {
     vi.stubGlobal('performance', { now: () => Object(3.14) as unknown as number })
     expect(safePerformanceNowMs()).toBe(0)
+    vi.stubGlobal('performance', { now: () => Object(NaN) as unknown as number })
+    expect(safePerformanceNowMs()).toBe(0)
   })
 
   it('returns 0 when now() returns a plain object with valueOf (typeof object; no ToPrimitive coercion)', () => {
@@ -267,6 +269,8 @@ describe('readPerformanceNow', () => {
 
   it('maps non-number now() results to 0 without coercion', () => {
     vi.stubGlobal('performance', { now: () => Object(7) as unknown as number })
+    expect(readPerformanceNow()).toBe(0)
+    vi.stubGlobal('performance', { now: () => Object(NaN) as unknown as number })
     expect(readPerformanceNow()).toBe(0)
     vi.stubGlobal('performance', { now: () => 1n as unknown as number })
     expect(readPerformanceNow()).toBe(0)
