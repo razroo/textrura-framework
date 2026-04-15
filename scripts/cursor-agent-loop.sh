@@ -57,9 +57,10 @@ fi
 # Otherwise prefer one scoped change under
 # packages/ (tests, perf in hit-test/text/layout paths, types, public JSDoc, or
 # `rg 'TODO|FIXME|HACK' packages`; a clean TODO grep is normal — pick a north-star bucket anyway).
-# `vitest.fast.config.ts` (used by `npm run test` / quality.yml "Fast tests") includes only
-# `packages/*/src/__tests__/**/*.test.ts`. Tests colocated as `packages/<pkg>/src/*.test.ts` are skipped by
-# that glob until moved under `src/__tests__/` (or the include pattern is intentionally widened).
+# `vitest.fast.config.ts` (used by `npm run test` / quality.yml "Fast tests") includes
+# `packages/*/src/__tests__/**/*.test.ts` and `mcp/src/__tests__/**/*.test.ts`. Tests colocated as
+# `packages/<pkg>/src/*.test.ts` (outside `__tests__/`) are skipped by that glob until moved under
+# `src/__tests__/` (or the include pattern is intentionally widened).
 # The same config **excludes** several slow suites via `test.exclude` (e.g. core `fonts.test.ts`,
 # `virtual-scroll.test.ts`, `perf-smoke.test.ts`, server `protocol-perf-smoke.test.ts`) — `npm run test`
 # omits those even when `release:gate` runs them explicitly. Do not treat a green fast test run as a
@@ -70,9 +71,9 @@ fi
 # `vitest -t` on a lone test in files that combine `createApp` (awaits `textura.init()` / WASM) with
 # `vi.useFakeTimers()` can hang: fake clocks block timer-driven init. Run the whole file or `release:gate`
 # instead of assuming an isolated filtered test proves the case.
-# Root `npm run release:gate` allowlists specific vitest entry files (see package.json), not every
-# `packages/*/src/__tests__/**/*.test.ts` that `npm run test` / vitest.fast.config.ts includes — a file
-# passing `vitest.fast` does not imply it runs in CI gate; check package.json before assuming coverage ships.
+# Root `npm run release:gate` allowlists specific vitest entry files (see package.json), not every file
+# matched by vitest.fast (`packages/*/src/__tests__/**/*.test.ts` and `mcp/src/__tests__/**/*.test.ts`) —
+# a file passing `vitest.fast` does not imply it runs in CI gate; check package.json before assuming coverage ships.
 # `verify-release-gate.mjs` requires exactly one `vitest run` substring in `scripts.release:gate` (one batch);
 # do not split the allowlist across `vitest run ... && vitest run ...` — duplicate-path checks only apply per argv list.
 # Before appending a path to the gate script, confirm it is not already listed (duplicate paths make
