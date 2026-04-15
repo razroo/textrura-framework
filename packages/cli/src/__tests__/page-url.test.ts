@@ -10,6 +10,13 @@ describe('parseHttpPageUrl', () => {
   it('prepends https when the scheme is omitted', () => {
     expect(parseHttpPageUrl('example.com').href).toBe('https://example.com/')
     expect(parseHttpPageUrl('localhost:8080').href).toBe('https://localhost:8080/')
+    expect(parseHttpPageUrl('[::1]:5173').href).toBe('https://[::1]:5173/')
+    expect(parseHttpPageUrl('127.0.0.1:3000').href).toBe('https://127.0.0.1:3000/')
+  })
+
+  it('normalizes scheme-relative URLs after implicit https (WHATWG collapses extra slashes)', () => {
+    expect(parseHttpPageUrl('//example.com/path').href).toBe('https://example.com/path')
+    expect(parseHttpPageUrl('  //api.example.com/v1  ').href).toBe('https://api.example.com/v1')
   })
 
   it('preserves ws(s) URLs for direct WebSocket mode (caller branches on scheme)', () => {
