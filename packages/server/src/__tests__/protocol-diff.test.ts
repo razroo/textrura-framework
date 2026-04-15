@@ -457,6 +457,22 @@ describe('coalescePatches', () => {
     ).toEqual([{ path: [1], x: 7 }])
   })
 
+  it('interleaved corrupt-only bursts on the same path keep prior wire-safe fields and still accept later dimensions', () => {
+    expect(
+      coalescePatches([
+        { path: [0], x: 10, y: 20 },
+        {
+          path: [0],
+          x: Number.NaN,
+          y: Number.POSITIVE_INFINITY,
+          width: -1,
+          height: Number.NaN,
+        },
+        { path: [0], width: 30, height: 40 },
+      ]),
+    ).toEqual([{ path: [0], x: 10, y: 20, width: 30, height: 40 }])
+  })
+
   it('ignores negative width and height so coalescing stays aligned with client non-negative layout bounds', () => {
     expect(
       coalescePatches([
