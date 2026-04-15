@@ -273,6 +273,15 @@ describe('syncVirtualWindow', () => {
     expect(syncVirtualWindow(4, 20, 3, 0)).toEqual({ start: 0, end: 3, selected: 3 })
   })
 
+  it('keeps selection aligned at MAX_SAFE_INTEGER row counts with window 1 (large-list index math stays integer-safe)', () => {
+    const total = Number.MAX_SAFE_INTEGER
+    const last = total - 1
+    // Last row selected from window at 0: must scroll so the sole visible row is the last index.
+    expect(syncVirtualWindow(total, 1, last, 0)).toEqual({ start: last, end: last, selected: last })
+    // First row with viewport parked at the former last index: pull window back without NaN/Infinity indices.
+    expect(syncVirtualWindow(total, 1, 0, last)).toEqual({ start: 0, end: 0, selected: 0 })
+  })
+
   it('treats non-finite numeric inputs as safe defaults so state never propagates NaN', () => {
     expect(syncVirtualWindow(Number.NaN, 5, 2, 0)).toEqual({ start: 0, end: 0, selected: 0 })
     // windowSize NaN → visible height 1; window scrolls so selected row 2 is the sole visible row

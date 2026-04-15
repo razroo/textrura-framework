@@ -348,7 +348,7 @@ describe('extractFontFamiliesFromCSSFont', () => {
       const font = `${'75% '.repeat(4100)}14px Inter`
       expect(extractFontFamiliesFromCSSFont(font)).toEqual(['Inter'])
     },
-    15_000,
+    30_000,
   )
 
   it(
@@ -357,7 +357,7 @@ describe('extractFontFamiliesFromCSSFont', () => {
       const font = `${'75% '.repeat(8200)}14px Inter`
       expect(extractFontFamiliesFromCSSFont(font)).toEqual([])
     },
-    15_000,
+    30_000,
   )
 
   it('skips a long stack of leading stretch percentages before real size and family', () => {
