@@ -125,6 +125,12 @@ describe('safePerformanceNowMs', () => {
     expect(safePerformanceNowMs()).toBe(0)
   })
 
+  it('returns 0 when now is a callable that yields NaN with no args (mistaken host: parseFloat, not a clock)', () => {
+    vi.stubGlobal('performance', { now: parseFloat })
+    expect(Number.isNaN(parseFloat())).toBe(true)
+    expect(safePerformanceNowMs()).toBe(0)
+  })
+
   it('returns 0 when performance.now throws', () => {
     vi.stubGlobal('performance', {
       now: () => {
@@ -264,6 +270,11 @@ describe('readPerformanceNow', () => {
     expect(readPerformanceNow()).toBe(Number.POSITIVE_INFINITY)
     vi.stubGlobal('performance', { now: () => Number.NEGATIVE_INFINITY })
     expect(readPerformanceNow()).toBe(Number.NEGATIVE_INFINITY)
+  })
+
+  it('passes through NaN when now is parseFloat (callable typeof function; broken embedder)', () => {
+    vi.stubGlobal('performance', { now: parseFloat })
+    expect(Number.isNaN(readPerformanceNow())).toBe(true)
   })
 
   it('preserves IEEE −0 when now() returns primitive −0 (same as safe path; deltas may care about sign bit)', () => {
