@@ -189,6 +189,14 @@ describe('safePerformanceNowMs', () => {
     expect(safePerformanceNowMs()).toBe(0)
   })
 
+  it('returns 0 when now is a generator function (call yields an iterator; typeof result is object, not number)', () => {
+    function* genNow(): Generator<number, void, void> {
+      yield 12
+    }
+    vi.stubGlobal('performance', { now: genNow as unknown as Performance['now'] })
+    expect(safePerformanceNowMs()).toBe(0)
+  })
+
   it('returns 0 when now() returns bigint or string (typeof must be number; no ToNumber coercion)', () => {
     vi.stubGlobal('performance', { now: () => 1n as unknown as number })
     expect(safePerformanceNowMs()).toBe(0)
@@ -320,6 +328,14 @@ describe('readPerformanceNow', () => {
     vi.stubGlobal('performance', { now: () => new Date(0) as unknown as number })
     expect(readPerformanceNow()).toBe(0)
     vi.stubGlobal('performance', { now: () => /./ as unknown as number })
+    expect(readPerformanceNow()).toBe(0)
+  })
+
+  it('maps generator now() results to 0 (iterator object; typeof not number)', () => {
+    function* genNow(): Generator<number, void, void> {
+      yield 12
+    }
+    vi.stubGlobal('performance', { now: genNow as unknown as Performance['now'] })
     expect(readPerformanceNow()).toBe(0)
   })
 
