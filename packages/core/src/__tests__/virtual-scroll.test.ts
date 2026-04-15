@@ -323,6 +323,21 @@ describe('syncVirtualWindow', () => {
     expect(r.end - r.start + 1).toBe(1)
   })
 
+  it('at MAX_SAFE_INTEGER row count with a modest window, scrolls the window so the last row stays visible (nextSelected > end branch; no overflow in nextSelected − safeWindow + 1)', () => {
+    const totalRows = Number.MAX_SAFE_INTEGER
+    const windowSize = 100
+    const last = totalRows - 1
+    const r = syncVirtualWindow(totalRows, windowSize, last, 0)
+    expect(r.selected).toBe(last)
+    expect(Number.isFinite(r.start)).toBe(true)
+    expect(Number.isFinite(r.end)).toBe(true)
+    expect(r.start).toBe(last - windowSize + 1)
+    expect(r.end).toBe(last)
+    expect(r.selected).toBeGreaterThanOrEqual(r.start)
+    expect(r.selected).toBeLessThanOrEqual(r.end)
+    expect(r.end - r.start + 1).toBe(windowSize)
+  })
+
   it('stays finite when totalRows and windowSize are both ~1e308 (IEEE-scale virtual lists)', () => {
     // Guards against NaN/Inf window indices when host state uses scientific-magnitude counts (still finite doubles).
     const r = syncVirtualWindow(1e308, 1e308, 5e307, 5e307)
