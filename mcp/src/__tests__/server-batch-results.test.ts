@@ -62,6 +62,7 @@ const mockState = vi.hoisted(() => ({
   sendSetChecked: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 2000 })),
   sendWheel: vi.fn(async () => ({ status: 'updated' as const, timeoutMs: 2000 })),
   waitForUiCondition: vi.fn(async (_session: unknown, _check: () => boolean, _timeoutMs?: number) => true),
+  expandPageSection: vi.fn((_root: unknown, _id: string, _opts?: Record<string, unknown>) => null as unknown),
 }))
 
 function resetMockSessionCaches() {
@@ -114,7 +115,7 @@ vi.mock('../session.js', () => ({
   })),
   buildFormSchemas: vi.fn(() => mockState.formSchemas),
   buildFormRequiredSnapshot: vi.fn(() => []),
-  expandPageSection: vi.fn(() => null),
+  expandPageSection: mockState.expandPageSection,
   buildUiDelta: vi.fn(() => ({})),
   hasUiDelta: vi.fn(() => false),
   nodeIdForPath: vi.fn((path: number[]) => `n:${path.length > 0 ? path.join('.') : 'root'}`),
@@ -429,6 +430,154 @@ describe('batch MCP result shaping', () => {
     })
     expect(payload).not.toHaveProperty('steps')
     expect(payload).not.toHaveProperty('stepCount')
+  })
+
+  it('attaches verifyFills readback results to run_actions fill_fields step', async () => {
+    const handler = getToolHandler('geometra_run_actions')
+
+    mockState.currentA11yRoot = node('group', undefined, {
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 0 },
+      children: [
+        node('textbox', 'Full name', { value: 'Taylor Applicant', path: [0] }),
+        node('textbox', 'Phone', { value: '(929) 608-1737', path: [1] }),
+      ],
+    })
+
+    const result = await handler({
+      pageUrl: 'https://jobs.example.com/application',
+      headless: true,
+      actions: [
+        {
+          type: 'fill_fields',
+          verifyFills: true,
+          fields: [
+            { kind: 'text', fieldLabel: 'Full name', value: 'Taylor Applicant' },
+            { kind: 'text', fieldLabel: 'Phone', value: '+1-929-608-1737' },
+          ],
+        },
+      ],
+      stopOnError: true,
+      includeSteps: true,
+      detail: 'terse',
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    const steps = payload.steps as Array<Record<string, unknown>>
+    expect(steps).toHaveLength(1)
+    expect(steps[0]).toMatchObject({
+      type: 'fill_fields',
+      ok: true,
+      fieldCount: 2,
+      verification: { verified: 2, mismatches: [] },
+    })
+  })
+
+  it('runs expand_section inside run_actions and returns the section detail inline', async () => {
+    const handler = getToolHandler('geometra_run_actions')
+
+    const fakeDetail = {
+      id: 'fm:1.0',
+      kind: 'form',
+      name: 'Application',
+      fieldCount: 3,
+      fields: [{ id: 'f1', label: 'Full name', required: true }],
+    }
+    mockState.expandPageSection.mockReturnValueOnce(fakeDetail)
+
+    const result = await handler({
+      pageUrl: 'https://jobs.example.com/application',
+      headless: true,
+      actions: [
+        {
+          type: 'expand_section',
+          id: 'fm:1.0',
+          maxFields: 10,
+          onlyRequiredFields: true,
+        },
+      ],
+      includeSteps: true,
+      detail: 'terse',
+    })
+
+    expect(mockState.expandPageSection).toHaveBeenCalledWith(
+      mockState.currentA11yRoot,
+      'fm:1.0',
+      expect.objectContaining({ maxFields: 10, onlyRequiredFields: true }),
+    )
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    const steps = payload.steps as Array<Record<string, unknown>>
+    expect(steps).toHaveLength(1)
+    expect(steps[0]).toMatchObject({
+      type: 'expand_section',
+      ok: true,
+      id: 'fm:1.0',
+      detail: fakeDetail,
+    })
+  })
+
+  it('surfaces an error when expand_section id does not match a section', async () => {
+    const handler = getToolHandler('geometra_run_actions')
+
+    mockState.expandPageSection.mockReturnValueOnce(null)
+
+    const result = await handler({
+      pageUrl: 'https://jobs.example.com/application',
+      headless: true,
+      actions: [{ type: 'expand_section', id: 'fm:9.9' }],
+      includeSteps: true,
+      stopOnError: false,
+      detail: 'terse',
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    const steps = payload.steps as Array<Record<string, unknown>>
+    expect(steps[0]).toMatchObject({
+      type: 'expand_section',
+      ok: false,
+      error: expect.stringContaining('fm:9.9'),
+    })
+  })
+
+  it('flags mismatched fields in run_actions verifyFills output', async () => {
+    const handler = getToolHandler('geometra_run_actions')
+
+    mockState.currentA11yRoot = node('group', undefined, {
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 0 },
+      children: [
+        node('textbox', 'Full name', { value: 'Unexpected Name', path: [0] }),
+      ],
+    })
+
+    const result = await handler({
+      pageUrl: 'https://jobs.example.com/application',
+      headless: true,
+      actions: [
+        {
+          type: 'fill_fields',
+          verifyFills: true,
+          fields: [
+            { kind: 'text', fieldLabel: 'Full name', value: 'Taylor Applicant' },
+          ],
+        },
+      ],
+      includeSteps: true,
+      detail: 'terse',
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    const steps = payload.steps as Array<Record<string, unknown>>
+    const verification = steps[0]!.verification as {
+      verified: number
+      mismatches: Array<{ fieldLabel: string; expected: string; actual?: string }>
+    }
+    expect(verification.verified).toBe(0)
+    expect(verification.mismatches).toHaveLength(1)
+    expect(verification.mismatches[0]).toMatchObject({
+      fieldLabel: 'Full name',
+      expected: 'Taylor Applicant',
+      actual: 'Unexpected Name',
+    })
   })
 
   it('finds repeated actions by itemText in terse mode', async () => {

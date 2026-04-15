@@ -471,6 +471,27 @@ const batchActionSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('fill_fields'),
     fields: z.array(fillFieldSchema).min(1).max(80),
+    verifyFills: z
+      .boolean()
+      .optional()
+      .describe('After filling, read each text/choice field back and flag mismatches (e.g. autocomplete rejected input, format transformed). Adds a `verification` entry to the step.'),
+  }),
+  z.object({
+    type: z.literal('expand_section'),
+    id: z.string().describe('Stable section id from geometra_page_model (e.g. fm:1.0, ls:2.1).'),
+    maxHeadings: z.number().int().min(1).max(20).optional(),
+    maxFields: z.number().int().min(1).max(40).optional(),
+    fieldOffset: z.number().int().min(0).optional(),
+    onlyRequiredFields: z.boolean().optional(),
+    onlyInvalidFields: z.boolean().optional(),
+    maxActions: z.number().int().min(1).max(30).optional(),
+    actionOffset: z.number().int().min(0).optional(),
+    maxLists: z.number().int().min(0).max(20).optional(),
+    listOffset: z.number().int().min(0).optional(),
+    maxItems: z.number().int().min(0).max(50).optional(),
+    itemOffset: z.number().int().min(0).optional(),
+    maxTextPreview: z.number().int().min(0).max(20).optional(),
+    includeBounds: z.boolean().optional(),
   }),
 ])
 
@@ -1386,7 +1407,7 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
     'geometra_run_actions',
     `Execute several Geometra actions in one MCP round trip and return one consolidated result. This is the preferred path for long, multi-step form fills where one-tool-per-field would otherwise create too much chatter.
 
-Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_listbox_option\`, \`select_option\`, \`set_checked\`, \`wheel\`, \`wait_for\`, and \`fill_fields\`. \`click\` steps can also carry a nested \`waitFor\` condition. Pass \`pageUrl\` / \`url\` to auto-connect so an entire flow can run in one MCP call.`,
+Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_listbox_option\`, \`select_option\`, \`set_checked\`, \`wheel\`, \`wait_for\`, \`expand_section\`, and \`fill_fields\`. \`click\` steps can also carry a nested \`waitFor\` condition. \`fill_fields\` steps can carry \`verifyFills: true\` to batch fill + read-back verification in one step (same semantics as \`geometra_fill_form\`'s \`verifyFills\`). \`expand_section\` takes a stable section id from \`geometra_page_model\` and returns the same payload as \`geometra_expand_section\`, eliminating a round-trip when drilling into a form/dialog before acting on it. Pass \`pageUrl\` / \`url\` to auto-connect so an entire flow can run in one MCP call.`,
     {
       url: z.string().optional().describe('Optional target URL. Use a ws:// Geometra server URL or an http(s) page URL to auto-connect before running actions.'),
       pageUrl: z.string().optional().describe('Optional http(s) page URL to auto-connect before running actions. Prefer this over url for browser pages.'),
@@ -3882,6 +3903,7 @@ function batchFieldReadbackMatches(a11y: A11yNode, field: ResolvedFillFieldInput
 function actionNeedsUiTree(action: BatchAction): boolean {
   switch (action.type) {
     case 'wait_for':
+    case 'expand_section':
       return true
     case 'click':
       return action.x === undefined || action.y === undefined || Boolean(action.waitFor)
@@ -4147,12 +4169,45 @@ async function executeBatchAction(
         compact: waitConditionCompact(waited.value),
       }
     }
+    case 'expand_section': {
+      const a11y = sessionA11y(session)
+      if (!a11y) throw new Error('No UI tree available to expand section')
+      const sectionDetail = expandPageSection(a11y, action.id, {
+        maxHeadings: action.maxHeadings,
+        maxFields: action.maxFields,
+        fieldOffset: action.fieldOffset,
+        onlyRequiredFields: action.onlyRequiredFields,
+        onlyInvalidFields: action.onlyInvalidFields,
+        maxActions: action.maxActions,
+        actionOffset: action.actionOffset,
+        maxLists: action.maxLists,
+        listOffset: action.listOffset,
+        maxItems: action.maxItems,
+        itemOffset: action.itemOffset,
+        maxTextPreview: action.maxTextPreview,
+        includeBounds: action.includeBounds,
+      })
+      if (!sectionDetail) throw new Error(`No expandable section found for id ${action.id}`)
+      return {
+        summary: detail === 'verbose'
+          ? JSON.stringify(sectionDetail, null, 2)
+          : `Expanded section "${action.id}".`,
+        compact: { id: action.id, detail: sectionDetail },
+      }
+    }
     case 'fill_fields': {
       const resolvedFields = resolveFillFieldInputs(session, action.fields)
       if (!resolvedFields.ok) throw new Error(resolvedFields.error)
+      const verifyFillsFn = action.verifyFills
+        ? () => verifyFormFills(
+            session,
+            resolvedFields.fields.map(field => ({ field, confidence: 1.0, matchMethod: 'label-exact' as const })),
+          )
+        : undefined
       if (!includeSteps) {
         const batched = await tryBatchedResolvedFields(session, resolvedFields.fields, detail)
         if (batched.ok) {
+          const verification = verifyFillsFn?.()
           return {
             summary: `Filled ${resolvedFields.fields.length} field(s) in one proxy batch.`,
             compact: {
@@ -4160,6 +4215,7 @@ async function executeBatchAction(
               execution: 'batched',
               finalSource: batched.finalSource,
               final: batched.final,
+              ...(verification ? { verification } : {}),
             },
           }
         }
@@ -4185,11 +4241,13 @@ async function executeBatchAction(
           ? { index, kind: field.kind, ok, summary: result.summary }
           : { index, kind: field.kind, ok, ...result.compact })
       }
+      const verification = verifyFillsFn?.()
       return {
         summary: steps.map(step => String(step.summary ?? '')).filter(Boolean).join('\n'),
         compact: {
           fieldCount: resolvedFields.fields.length,
           ...(includeSteps ? { steps } : {}),
+          ...(verification ? { verification } : {}),
         },
       }
     }
