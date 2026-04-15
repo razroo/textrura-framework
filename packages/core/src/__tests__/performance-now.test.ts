@@ -197,10 +197,16 @@ describe('safePerformanceNowMs', () => {
     expect(safePerformanceNowMs()).toBe(0)
   })
 
-  it('returns 0 when now() returns Map, Set, Promise, Date, or RegExp (typeof object; parity with layout-bounds exotic guards)', () => {
+  it('returns 0 when now() returns Map, WeakMap, Set, WeakSet, WeakRef, Promise, Date, or RegExp (typeof object; parity with layout-bounds exotic guards)', () => {
     vi.stubGlobal('performance', { now: () => new Map() as unknown as number })
     expect(safePerformanceNowMs()).toBe(0)
+    vi.stubGlobal('performance', { now: () => new WeakMap() as unknown as number })
+    expect(safePerformanceNowMs()).toBe(0)
     vi.stubGlobal('performance', { now: () => new Set() as unknown as number })
+    expect(safePerformanceNowMs()).toBe(0)
+    vi.stubGlobal('performance', { now: () => new WeakSet() as unknown as number })
+    expect(safePerformanceNowMs()).toBe(0)
+    vi.stubGlobal('performance', { now: () => new WeakRef({}) as unknown as number })
     expect(safePerformanceNowMs()).toBe(0)
     vi.stubGlobal('performance', { now: () => Promise.resolve(0) as unknown as number })
     expect(safePerformanceNowMs()).toBe(0)
@@ -343,10 +349,16 @@ describe('readPerformanceNow', () => {
     expect(readPerformanceNow()).toBe(0)
   })
 
-  it('maps Map, Set, Promise, Date, and RegExp now() results to 0 (typeof object; no numeric coercion)', () => {
+  it('maps Map, WeakMap, Set, WeakSet, WeakRef, Promise, Date, and RegExp now() results to 0 (typeof object; no numeric coercion)', () => {
     vi.stubGlobal('performance', { now: () => new Map() as unknown as number })
     expect(readPerformanceNow()).toBe(0)
+    vi.stubGlobal('performance', { now: () => new WeakMap() as unknown as number })
+    expect(readPerformanceNow()).toBe(0)
     vi.stubGlobal('performance', { now: () => new Set() as unknown as number })
+    expect(readPerformanceNow()).toBe(0)
+    vi.stubGlobal('performance', { now: () => new WeakSet() as unknown as number })
+    expect(readPerformanceNow()).toBe(0)
+    vi.stubGlobal('performance', { now: () => new WeakRef({}) as unknown as number })
     expect(readPerformanceNow()).toBe(0)
     vi.stubGlobal('performance', { now: () => Promise.resolve(0) as unknown as number })
     expect(readPerformanceNow()).toBe(0)
