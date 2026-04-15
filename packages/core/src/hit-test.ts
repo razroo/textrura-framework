@@ -56,44 +56,43 @@ function getChildrenByZAsc(boxEl: BoxElement): number[] {
     return asc
   }
 
-  // Three+ children sharing one z-index: stable paint order matches source order; avoid map/sort allocations.
-  if (n >= 3) {
-    const z0 = zIndexOf(kids[0]!)
-    let allEqual = true
-    for (let i = 1; i < n; i++) {
-      if (zIndexOf(kids[i]!) !== z0) {
-        allEqual = false
-        break
-      }
-    }
-    if (allEqual) {
-      const cached = zIndexOrderCache.get(boxEl)
-      if (cached && cached.zValues.length === n) {
-        let match = true
-        for (let j = 0; j < n; j++) {
-          if (cached.zValues[j] !== z0) {
-            match = false
-            break
-          }
+  // Three+ children: one zIndexOf pass fills zValues, then either identity order (all equal z) or sort.
+  // Cache checks compare against that same zValues array — no second zIndexOf sweep before sort.
+  const zValues = new Array<number>(n)
+  zValues[0] = zIndexOf(kids[0]!)
+  let allEqual = true
+  for (let i = 1; i < n; i++) {
+    const zi = zIndexOf(kids[i]!)
+    zValues[i] = zi
+    if (zi !== zValues[0]) allEqual = false
+  }
+
+  if (allEqual) {
+    const z0 = zValues[0]!
+    const cached = zIndexOrderCache.get(boxEl)
+    if (cached && cached.zValues.length === n) {
+      let match = true
+      for (let j = 0; j < n; j++) {
+        if (cached.zValues[j] !== z0) {
+          match = false
+          break
         }
-        if (match) return cached.asc
       }
-      const zValues = new Array<number>(n)
-      const asc = new Array<number>(n)
-      for (let i = 0; i < n; i++) {
-        zValues[i] = z0
-        asc[i] = i
-      }
-      zIndexOrderCache.set(boxEl, { zValues, asc })
-      return asc
+      if (match) return cached.asc
     }
+    const asc = new Array<number>(n)
+    for (let i = 0; i < n; i++) {
+      asc[i] = i
+    }
+    zIndexOrderCache.set(boxEl, { zValues, asc })
+    return asc
   }
 
   const cached = zIndexOrderCache.get(boxEl)
   if (cached && cached.zValues.length === n) {
     let unchanged = true
     for (let i = 0; i < n; i++) {
-      if (cached.zValues[i] !== zIndexOf(kids[i]!)) {
+      if (cached.zValues[i] !== zValues[i]) {
         unchanged = false
         break
       }
@@ -101,11 +100,6 @@ function getChildrenByZAsc(boxEl: BoxElement): number[] {
     if (unchanged) return cached.asc
   }
 
-  // Single pass: stale or missing cache must not re-call zIndexOf after validation (was map + prior loop).
-  const zValues = new Array<number>(n)
-  for (let i = 0; i < n; i++) {
-    zValues[i] = zIndexOf(kids[i]!)
-  }
   const asc = new Array<number>(n)
   for (let i = 0; i < n; i++) {
     asc[i] = i
