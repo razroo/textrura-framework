@@ -378,6 +378,21 @@ describe('syncVirtualWindow', () => {
     expect(syncVirtualWindow(8, 3, 2, null as unknown as number)).toEqual({ start: 0, end: 2, selected: 2 })
   })
 
+  it('treats ArrayBuffer, Uint8Array, and plain functions as non-numbers on any axis (typeof not number; embedder mistakes)', () => {
+    const buf = new ArrayBuffer(0) as unknown as number
+    const u8 = new Uint8Array([3]) as unknown as number
+    const fn = (() => 5) as unknown as number
+    expect(syncVirtualWindow(buf, 3, 2, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+    expect(syncVirtualWindow(8, buf, 2, 0)).toEqual(syncVirtualWindow(8, 1, 2, 0))
+    expect(syncVirtualWindow(8, 3, 2, buf)).toEqual({ start: 0, end: 2, selected: 2 })
+    expect(syncVirtualWindow(8, u8, 2, 0)).toEqual(syncVirtualWindow(8, 1, 2, 0))
+    expect(syncVirtualWindow(8, 3, u8, 0)).toEqual({ start: 0, end: 2, selected: 0 })
+    expect(syncVirtualWindow(fn, 3, 2, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+    expect(syncVirtualWindow(8, fn, 2, 0)).toEqual(syncVirtualWindow(8, 1, 2, 0))
+    expect(syncVirtualWindow(8, 3, fn, 0)).toEqual({ start: 0, end: 2, selected: 0 })
+    expect(syncVirtualWindow(8, 3, 2, fn)).toEqual({ start: 0, end: 2, selected: 2 })
+  })
+
   it('treats explicit undefined on any axis like a non-number (optional-arg / loose calls)', () => {
     expect(syncVirtualWindow(undefined as unknown as number, 5, 2, 0)).toEqual({ start: 0, end: 0, selected: 0 })
     expect(syncVirtualWindow(8, undefined as unknown as number, 2, 0)).toEqual({ start: 2, end: 2, selected: 2 })
