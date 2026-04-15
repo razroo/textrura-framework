@@ -34,6 +34,11 @@ function nonNegativeOrZero(n: number): number {
  * while `spanEnd` is still positive.
  *
  * Exported for parity tests and advanced virtual-list math; {@link syncVirtualWindow} is the primary API.
+ *
+ * @param start — Window start row (inclusive). `syncVirtualWindow` passes floored non-negative indices; direct callers may pass corrupt values — NaN/±Inf on `start` or `safeWindow` yield non-finite `spanEnd` and fall through to the `maxIndex` / `0` branches (see tests).
+ * @param maxIndex — Inclusive last row index in the list. Negative values clamp to `0` before `Math.min` with `spanEnd` so a corrupt cap cannot produce a negative end when `spanEnd` is still positive.
+ * @param safeWindow — Visible row count for the span (`start + safeWindow - 1`). `syncVirtualWindow` always passes `≥ 1`; smaller or negative windows can yield negative `spanEnd` (documented for direct callers).
+ * @returns Inclusive last visible row index, or a safe fallback when `spanEnd` or `maxIndex` is non-finite (see implementation).
  */
 export function inclusiveEndIndex(start: number, maxIndex: number, safeWindow: number): number {
   const spanEnd = start + safeWindow - 1
