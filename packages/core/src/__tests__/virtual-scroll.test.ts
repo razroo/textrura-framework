@@ -49,6 +49,13 @@ describe('inclusiveEndIndex', () => {
     expect(inclusiveEndIndex(Number.POSITIVE_INFINITY, maxIndex, 5)).toBe(maxIndex)
   })
 
+  it('returns maxIndex when safeWindow is +Infinity (spanEnd overflows; syncVirtualWindow never passes infinite window)', () => {
+    expect(Number.isFinite(0 + Number.POSITIVE_INFINITY - 1)).toBe(false)
+    expect(inclusiveEndIndex(0, 12, Number.POSITIVE_INFINITY)).toBe(12)
+    expect(inclusiveEndIndex(4, 99, Number.POSITIVE_INFINITY)).toBe(99)
+    expect(inclusiveEndIndex(0, -3, Number.POSITIVE_INFINITY)).toBe(0)
+  })
+
   it('returns maxIndex when any argument makes spanEnd NaN (NaN start/window poison the sum)', () => {
     expect(inclusiveEndIndex(Number.NaN, 9, 4)).toBe(9)
     expect(inclusiveEndIndex(2, 9, Number.NaN)).toBe(9)
