@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { ComputedLayout } from 'textura'
+import { coalescePatches as coalesceProxyPatches } from '../../../proxy/src/diff-layout.js'
 import {
   diffLayout,
   isProtocolCompatible,
@@ -763,5 +764,84 @@ describe('coalescePatches', () => {
     ])
     expect(explicitFirst).toHaveLength(1)
     expect(explicitFirst[0]).toEqual({ path: [1, null, 3], x: 10, y: 20 })
+  })
+})
+
+describe('coalescePatches parity with @geometra/proxy diff-layout', () => {
+  it('matches proxy coalescePatches for representative GEOM batches', () => {
+    const cyclic: number[] = [0]
+    cyclic.push(cyclic as unknown as number)
+
+    const batches: LayoutPatch[][] = [
+      [],
+      [
+        null as unknown as LayoutPatch,
+        undefined as unknown as LayoutPatch,
+        { path: [0], x: 1 },
+      ],
+      [
+        { path: [1, 2], x: 10 },
+        { path: [1, 2], y: 20 },
+        { path: [1, 2], x: 30, width: 40 },
+        { path: [3], height: 9 },
+        { path: [3], y: 5 },
+      ],
+      [
+        { path: [0, 1], x: 10 },
+        { path: [0.1], y: 20 },
+      ],
+      [
+        { path: [Number.NaN], x: 1 },
+        { path: [null as unknown as number], y: 2 },
+      ],
+      [
+        { path: [0], x: 10, y: 1 },
+        { path: [0], x: Number.NaN, y: Number.POSITIVE_INFINITY, width: 3 },
+        { path: [0], x: null as unknown as number, y: null as unknown as number },
+      ],
+      [
+        { path: [0], width: 10, height: 20 },
+        { path: [0], width: -1, height: -0.5 },
+      ],
+      [{ path: [0], width: -0, height: -0 }],
+      [
+        { path: [0], x: 10, y: 2, width: 40, height: 30 },
+        {
+          path: [0],
+          x: '20' as unknown as number,
+          y: true as unknown as number,
+          width: '50' as unknown as number,
+          height: false as unknown as number,
+        },
+      ],
+      [
+        { path: [], x: 1 },
+        { path: [], y: 2 },
+        { path: [], height: 99 },
+      ],
+      [{ path: [0], x: 10 }, { path: [0], x: 0 }],
+      [{ path: [12, 3], x: 1 }, { path: [1, 23], y: 2 }],
+      [{ path: [0, 1] }, { path: [0, 1], x: 3, y: 4 }],
+      [
+        null as unknown as LayoutPatch,
+        { path: null as unknown as number[], x: 1 },
+        { path: [1], height: 3 },
+      ],
+      [{ path: cyclic, x: 1 }, { path: [1], y: 2 }],
+      [
+        { path: [0, 1n] as unknown as number[], x: 1 },
+        { path: [2], y: 3 },
+        { path: [0], width: 4 },
+      ],
+      [
+        { path: [0], x: 1, rotation: 45, meta: { id: 'a' } } as unknown as LayoutPatch,
+        { path: [0], y: 2, extra: 'noise' } as unknown as LayoutPatch,
+      ],
+    ]
+
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i]!
+      expect(coalescePatches(batch), `parity fixture ${i}`).toEqual(coalesceProxyPatches(batch))
+    }
   })
 })
