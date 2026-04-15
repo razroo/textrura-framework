@@ -59,6 +59,8 @@ function binaryFrameBytesFitBuffer(
  * frames embedded in a larger buffer without copying.
  * `null` / `undefined` yield `false` (mistyped JS callers) instead of throwing from buffer resolution.
  * Plain objects that are not real `ArrayBufferView` instances also yield `false` (no numeric coercion).
+ * Non-integer `byteOffset` / `byteLength` (e.g. mistyped fake views) yield `false` — same invariant as real
+ * `ArrayBufferView` fields and {@link binaryFrameBytesFitBuffer}.
  * Inconsistent `(buffer, byteOffset, byteLength)` tuples that would make `Uint8Array` throw `RangeError`
  * yield `false` instead of throwing. Hostile `Proxy` / exotic accessors that throw when reading
  * `byteLength` or `byteOffset` on the root buffer or view also yield `false` (same non-throwing contract).
@@ -79,9 +81,11 @@ export function isBinaryFrameArrayBuffer(data: BinaryFrameBytes): boolean {
     typeof byteOffset !== 'number' ||
     !Number.isFinite(byteOffset) ||
     byteOffset < 0 ||
+    !Number.isInteger(byteOffset) ||
     typeof byteLength !== 'number' ||
     !Number.isFinite(byteLength) ||
-    byteLength < HEADER_BYTES
+    byteLength < HEADER_BYTES ||
+    !Number.isInteger(byteLength)
   ) {
     return false
   }
