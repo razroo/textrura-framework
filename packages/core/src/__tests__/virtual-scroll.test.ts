@@ -309,6 +309,20 @@ describe('syncVirtualWindow', () => {
     expect(syncVirtualWindow(total, 1, 0, last)).toEqual({ start: 0, end: 0, selected: 0 })
   })
 
+  it('floors totalRows strictly between MAX_SAFE_INTEGER and MAX_SAFE_INTEGER+1 to MAX_SAFE_INTEGER rows (unsafe integer + fractional; intRowMetric)', () => {
+    const between = Number.MAX_SAFE_INTEGER + 0.5
+    expect(between).toBeGreaterThan(Number.MAX_SAFE_INTEGER)
+    expect(Number.isSafeInteger(between)).toBe(false)
+    const totalInt = Number.MAX_SAFE_INTEGER
+    const last = totalInt - 1
+    // Same row budget and selection as an integer total at MAX_SAFE_INTEGER; guards double-only magnitudes past the safe-integer line.
+    expect(syncVirtualWindow(between, 1, last, 0)).toEqual(syncVirtualWindow(totalInt, 1, last, 0))
+    const w2 = syncVirtualWindow(between, 2, last, 0)
+    expect(w2).toEqual(syncVirtualWindow(totalInt, 2, last, 0))
+    expect(w2.selected).toBe(last)
+    expect(w2.end).toBe(last)
+  })
+
   it('treats non-finite numeric inputs as safe defaults so state never propagates NaN', () => {
     expect(syncVirtualWindow(Number.NaN, 5, 2, 0)).toEqual({ start: 0, end: 0, selected: 0 })
     // windowSize NaN → visible height 1; window scrolls so selected row 2 is the sole visible row
