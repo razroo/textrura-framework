@@ -1156,6 +1156,28 @@ describe('createApp layout timing', () => {
     }
   })
 
+  it('clamps layoutMs to 0 when the layout delta overflows to Infinity (extreme performance.now span)', async () => {
+    const max = Number.MAX_VALUE
+    expect(max - -max).toBe(Infinity)
+    let step = 0
+    const spy = vi.spyOn(performance, 'now').mockImplementation(() => {
+      step++
+      return step === 1 ? -max : max
+    })
+    try {
+      const setFrameTimings = vi.fn()
+      const renderer: Renderer = {
+        setFrameTimings,
+        render: vi.fn(),
+        destroy: vi.fn(),
+      }
+      await createApp(() => box({ width: 40, height: 20 }, []), renderer, { width: 100, height: 50 })
+      expect(setFrameTimings).toHaveBeenCalledWith({ layoutMs: 0 })
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
   it('invokes setFrameTimings on each reactive re-layout when the view depends on a signal', async () => {
     const setFrameTimings = vi.fn()
     const render = vi.fn()
