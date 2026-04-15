@@ -170,6 +170,11 @@ describe('safePerformanceNowMs', () => {
     expect(safePerformanceNowMs()).toBe(0)
     vi.stubGlobal('performance', { now: () => Object(NaN) as unknown as number })
     expect(safePerformanceNowMs()).toBe(0)
+    // Boxed −0 is typeof object — must not preserve IEEE −0 (parity with primitive −0 path above and layout-bounds boxed guards).
+    vi.stubGlobal('performance', { now: () => Object(-0) as unknown as number })
+    const boxedNegZero = safePerformanceNowMs()
+    expect(Object.is(boxedNegZero, -0)).toBe(false)
+    expect(boxedNegZero).toBe(0)
   })
 
   it('returns 0 when now() returns a plain object with valueOf (typeof object; no ToPrimitive coercion)', () => {
@@ -326,6 +331,10 @@ describe('readPerformanceNow', () => {
     expect(readPerformanceNow()).toBe(0)
     vi.stubGlobal('performance', { now: () => Object(NaN) as unknown as number })
     expect(readPerformanceNow()).toBe(0)
+    vi.stubGlobal('performance', { now: () => Object(-0) as unknown as number })
+    const boxedNegZero = readPerformanceNow()
+    expect(Object.is(boxedNegZero, -0)).toBe(false)
+    expect(boxedNegZero).toBe(0)
     vi.stubGlobal('performance', { now: () => 1n as unknown as number })
     expect(readPerformanceNow()).toBe(0)
     vi.stubGlobal('performance', { now: () => '12.5' as unknown as number })
