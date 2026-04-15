@@ -275,6 +275,22 @@ describe('animation timeline', () => {
     setMotionPreference('full')
   })
 
+  it('stores property timelines in null-prototype bags so dynamic keys (e.g. __proto__) cannot pollute Object.prototype', () => {
+    const props = createPropertyTimeline({ ['__proto__']: 0, x: 1 })
+    expect(Object.getPrototypeOf(props.values)).toBeNull()
+    expect(props.values.x.peek()).toBe(1)
+    expect(props.values['__proto__'].peek()).toBe(0)
+    const stepped = props.step(0)
+    expect(Object.getPrototypeOf(stepped)).toBeNull()
+    expect(stepped.x).toBe(1)
+    expect(stepped['__proto__']).toBe(0)
+    props.to({ y: 2, z: 3 }, 100, easing.linear)
+    expect(Object.getPrototypeOf(props.values)).toBeNull()
+    props.step(100)
+    expect(props.values.y.peek()).toBe(2)
+    expect(props.values.z.peek()).toBe(3)
+  })
+
   it('clamps non-positive duration to 1ms so step() always has a defined progress scale', () => {
     const timeline = createTweenTimeline(0)
     timeline.to(100, 0, easing.linear)

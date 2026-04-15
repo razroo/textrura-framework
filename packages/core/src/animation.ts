@@ -214,7 +214,8 @@ export function createTweenTimeline(initialValue: number): TweenTimeline {
  */
 export function createPropertyTimeline(initialValues: Record<string, number>): PropertyTimeline {
   const timelines = new Map<string, TweenTimeline>()
-  const values: Record<string, Signal<number>> = {}
+  /** Null prototype so arbitrary string keys (including `__proto__`) stay own properties. */
+  const values = Object.create(null) as Record<string, Signal<number>>
 
   for (const key of Object.keys(initialValues)) {
     const timeline = createTweenTimeline(initialValues[key] ?? 0)
@@ -238,7 +239,7 @@ export function createPropertyTimeline(initialValues: Record<string, number>): P
   }
 
   function step(deltaMs: number): Record<string, number> {
-    const next: Record<string, number> = {}
+    const next = Object.create(null) as Record<string, number>
     for (const [key, timeline] of timelines) {
       next[key] = timeline.step(deltaMs)
     }
