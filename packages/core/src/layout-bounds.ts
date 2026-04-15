@@ -8,8 +8,10 @@ import type { ComputedLayout } from 'textura'
 
 /**
  * True only for finite **primitive** numbers: `typeof` rejects `BigInt`, boxed numbers, and objects before
- * `Number.isFinite`. Shared with protocol patch validation (`@geometra/server` `coalescePatches`) so corrupt
- * serialized scalars are rejected under the same rules as layout bounds and hit-testing.
+ * `Number.isFinite`. The same guard is imported by `@geometra/server` (`packages/server/src/protocol.ts`)
+ * for GEOM layout patches — non-negative dimension checks, per-field `x`/`y`/`width`/`height` updates, and
+ * `coalescePatches` merge rules — so corrupt wire scalars fail closed consistently with layout bounds and
+ * hit-testing.
  *
  * @param value — Any runtime value (deserialized layout fields, scroll offsets, protocol scalars).
  * @returns `true` when `value` is a primitive finite IEEE-754 number (including **−0**); `false` for `NaN`,
