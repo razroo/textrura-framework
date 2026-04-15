@@ -228,6 +228,13 @@ describe('safePerformanceNowMs', () => {
     expect(safePerformanceNowMs()).toBe(0)
   })
 
+  it('returns 0 when now is an async function (typeof is function but return is a Promise; not a primitive ms value)', () => {
+    vi.stubGlobal('performance', {
+      now: (async () => 12.5) as unknown as Performance['now'],
+    })
+    expect(safePerformanceNowMs()).toBe(0)
+  })
+
   it('returns 0 when now() returns bigint or string (typeof must be number; no ToNumber coercion)', () => {
     vi.stubGlobal('performance', { now: () => 1n as unknown as number })
     expect(safePerformanceNowMs()).toBe(0)
@@ -393,6 +400,13 @@ describe('readPerformanceNow', () => {
       yield 12
     }
     vi.stubGlobal('performance', { now: genNow as unknown as Performance['now'] })
+    expect(readPerformanceNow()).toBe(0)
+  })
+
+  it('maps async now() results to 0 (Promise; typeof not number)', () => {
+    vi.stubGlobal('performance', {
+      now: (async () => 12.5) as unknown as Performance['now'],
+    })
     expect(readPerformanceNow()).toBe(0)
   })
 
