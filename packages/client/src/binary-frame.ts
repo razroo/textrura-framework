@@ -103,6 +103,27 @@ export function isBinaryFrameArrayBuffer(data: BinaryFrameBytes): boolean {
 export const isBinaryFrameBuffer = isBinaryFrameArrayBuffer
 
 /**
+ * Wrap UTF-8 JSON in a v1 binary envelope for WebSocket binary frames.
+ * Same layout as `@geometra/server` `encodeBinaryFrameJson` (GEOM magic, version 1, uint32 LE length, UTF-8 payload);
+ * returns an `ArrayBuffer` instead of Node `Buffer`.
+ *
+ * @throws {RangeError} When the UTF-8 payload byte length exceeds {@link MAX_V1_PAYLOAD_BYTES}.
+ */
+export function encodeBinaryFrameJson(jsonUtf8: string): ArrayBuffer {
+  const payload = new TextEncoder().encode(jsonUtf8)
+  if (payload.length > MAX_V1_PAYLOAD_BYTES) {
+    throw new RangeError(
+      `GEOM v1 binary frame payload length ${payload.length} exceeds uint32 max (${MAX_V1_PAYLOAD_BYTES})`,
+    )
+  }
+  const out = new Uint8Array(HEADER_BYTES + payload.length)
+  out.set([0x47, 0x45, 0x4f, 0x4d, FRAME_VERSION], 0)
+  new DataView(out.buffer).setUint32(5, payload.length, true)
+  out.set(payload, HEADER_BYTES)
+  return out.buffer
+}
+
+/**
  * Decode JSON string from a v1 binary envelope (browser).
  * Bytes after `header + payloadLength` are ignored so callers may pass a longer backing buffer.
  * Accepts a root `ArrayBuffer` / `SharedArrayBuffer` or any `ArrayBufferView` with the same semantics as

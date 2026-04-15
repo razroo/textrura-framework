@@ -1,20 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   decodeBinaryFrameJson,
+  encodeBinaryFrameJson,
   isBinaryFrameArrayBuffer,
   isBinaryFrameBuffer,
   MAX_V1_PAYLOAD_BYTES,
 } from '../binary-frame.js'
-
-/** Mirrors server v1 envelope layout (see `packages/server/src/binary-frame.ts`). */
-function encodeBinaryFrameJsonV1(jsonUtf8: string): ArrayBuffer {
-  const payload = new TextEncoder().encode(jsonUtf8)
-  const out = new Uint8Array(9 + payload.length)
-  out.set([0x47, 0x45, 0x4f, 0x4d, 1], 0)
-  new DataView(out.buffer).setUint32(5, payload.length, true)
-  out.set(payload, 9)
-  return out.buffer
-}
 
 /** v1 envelope with arbitrary UTF-8 bytes (including invalid sequences for decode policy tests). */
 function encodeBinaryFrameRawV1(payload: Uint8Array): ArrayBuffer {
@@ -202,6 +193,40 @@ describe('isBinaryFrameArrayBuffer', () => {
   })
 })
 
+describe('encodeBinaryFrameJson', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('throws RangeError when UTF-8 payload byte length exceeds uint32 (no silent header truncation)', () => {
+    const fake = new Uint8Array(0)
+    Object.defineProperty(fake, 'length', { value: 0x1_0000_0000 })
+    vi.spyOn(TextEncoder.prototype, 'encode').mockReturnValue(fake)
+    expect(() => encodeBinaryFrameJson('x')).toThrow(RangeError)
+    expect(() => encodeBinaryFrameJson('x')).toThrow(/exceeds uint32 max/)
+  })
+
+  it('roundtrips JSON through GEOM v1 envelope (parity with server encode)', () => {
+    const json = JSON.stringify({
+      type: 'frame',
+      protocolVersion: 1,
+      layout: { x: 0, y: 0, width: 1, height: 1, children: [] },
+    })
+    const buf = encodeBinaryFrameJson(json)
+    expect(isBinaryFrameArrayBuffer(buf)).toBe(true)
+    expect(decodeBinaryFrameJson(buf)).toBe(json)
+  })
+
+  it('encode empty UTF-8 payload is header-only (9 bytes, length field zero) and roundtrips', () => {
+    const buf = encodeBinaryFrameJson('')
+    expect(buf.byteLength).toBe(9)
+    const u8 = new Uint8Array(buf)
+    expect([...u8.subarray(0, 5)]).toEqual([0x47, 0x45, 0x4f, 0x4d, 1])
+    expect(new DataView(buf).getUint32(5, true)).toBe(0)
+    expect(decodeBinaryFrameJson(buf)).toBe('')
+  })
+})
+
 describe('client binary frame decode', () => {
   it('exposes the v1 uint32 payload cap (aligned with server encode limits)', () => {
     expect(MAX_V1_PAYLOAD_BYTES).toBe(0xffff_ffff)
@@ -209,12 +234,12 @@ describe('client binary frame decode', () => {
 
   it('decodes v1 GEOM envelopes', () => {
     const json = '{"type":"patch","patches":[],"protocolVersion":1}'
-    expect(decodeBinaryFrameJson(encodeBinaryFrameJsonV1(json))).toBe(json)
+    expect(decodeBinaryFrameJson(encodeBinaryFrameJson(json))).toBe(json)
   })
 
   it('roundtrips JSON with astral-plane Unicode (UTF-8 outside the BMP)', () => {
     const json = JSON.stringify({ glyph: '🙂', mixed: 'a\uD83D\uDE42b', rtl: 'مرحبا' })
-    expect(decodeBinaryFrameJson(encodeBinaryFrameJsonV1(json))).toBe(json)
+    expect(decodeBinaryFrameJson(encodeBinaryFrameJson(json))).toBe(json)
   })
 
   it('throws when the buffer is not a GEOM binary frame', () => {
@@ -258,7 +283,7 @@ describe('client binary frame decode', () => {
 
   it('ignores trailing bytes after the declared payload', () => {
     const json = '{"type":"patch","patches":[]}'
-    const base = new Uint8Array(encodeBinaryFrameJsonV1(json))
+    const base = new Uint8Array(encodeBinaryFrameJson(json))
     const extended = new Uint8Array(base.length + 12)
     extended.set(base)
     for (let i = base.length; i < extended.length; i++) extended[i] = 0xff
@@ -267,7 +292,7 @@ describe('client binary frame decode', () => {
 
   it('detects a v1 header on a Uint8Array subarray (non-zero byteOffset)', () => {
     const json = '{"type":"patch","patches":[]}'
-    const frame = new Uint8Array(encodeBinaryFrameJsonV1(json))
+    const frame = new Uint8Array(encodeBinaryFrameJson(json))
     const prefix = 11
     const combined = new Uint8Array(prefix + frame.length + 5)
     combined.set(frame, prefix)
@@ -278,7 +303,7 @@ describe('client binary frame decode', () => {
 
   it('accepts a DataView over the whole frame (ArrayBufferView parity)', () => {
     const json = '{"type":"patch","patches":[]}'
-    const bytes = new Uint8Array(encodeBinaryFrameJsonV1(json))
+    const bytes = new Uint8Array(encodeBinaryFrameJson(json))
     const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
     expect(isBinaryFrameArrayBuffer(dv)).toBe(true)
     expect(decodeBinaryFrameJson(dv)).toBe(json)
@@ -286,7 +311,7 @@ describe('client binary frame decode', () => {
 
   it('decodes a DataView with non-zero byteOffset into a larger ArrayBuffer', () => {
     const json = '{"a":1}'
-    const frame = new Uint8Array(encodeBinaryFrameJsonV1(json))
+    const frame = new Uint8Array(encodeBinaryFrameJson(json))
     const prefix = 13
     const combined = new Uint8Array(prefix + frame.length + 4)
     combined.set(frame, prefix)
@@ -297,7 +322,7 @@ describe('client binary frame decode', () => {
 
   it('returns false when GEOM magic is only present before the view offset', () => {
     const json = '{"a":1}'
-    const frame = new Uint8Array(encodeBinaryFrameJsonV1(json))
+    const frame = new Uint8Array(encodeBinaryFrameJson(json))
     const combined = new Uint8Array(frame.length + 3)
     combined.set(frame, 3)
     const missesMagic = combined.subarray(0, frame.length)
@@ -317,7 +342,7 @@ describe('client binary frame decode', () => {
 
   it('accepts payload length exactly equal to bytes after header (buffer fits, no slack)', () => {
     const json = 'x'
-    const buf = encodeBinaryFrameJsonV1(json)
+    const buf = encodeBinaryFrameJson(json)
     expect(buf.byteLength).toBe(10)
     expect(decodeBinaryFrameJson(buf)).toBe(json)
   })
@@ -330,7 +355,7 @@ describe('client binary frame decode', () => {
   it('decodes a v1 frame when the backing store is a root SharedArrayBuffer', () => {
     if (typeof SharedArrayBuffer === 'undefined') return
     const json = '{"sab":true}'
-    const enc = new Uint8Array(encodeBinaryFrameJsonV1(json))
+    const enc = new Uint8Array(encodeBinaryFrameJson(json))
     const sab = new SharedArrayBuffer(enc.byteLength)
     new Uint8Array(sab).set(enc)
     expect(isBinaryFrameArrayBuffer(sab)).toBe(true)
@@ -340,7 +365,7 @@ describe('client binary frame decode', () => {
   it('decodes a v1 frame from a Uint8Array subview backed by SharedArrayBuffer (non-zero byteOffset)', () => {
     if (typeof SharedArrayBuffer === 'undefined') return
     const json = '{"sab":"slice"}'
-    const frame = new Uint8Array(encodeBinaryFrameJsonV1(json))
+    const frame = new Uint8Array(encodeBinaryFrameJson(json))
     const prefix = 7
     const sab = new SharedArrayBuffer(prefix + frame.byteLength + 6)
     const whole = new Uint8Array(sab)
@@ -352,7 +377,7 @@ describe('client binary frame decode', () => {
 
   it('decodes a v1 frame when the same bytes are exposed as Uint16Array or Uint32Array', () => {
     const json = '{"type":"patch","patches":[]}'
-    const frame = new Uint8Array(encodeBinaryFrameJsonV1(json))
+    const frame = new Uint8Array(encodeBinaryFrameJson(json))
 
     const len16 = Math.ceil(frame.byteLength / 2) * 2
     const buf16 = new ArrayBuffer(len16)
@@ -371,7 +396,7 @@ describe('client binary frame decode', () => {
 
   it('decodes a v1 frame when the same bytes are exposed as Int16Array, Int32Array, BigInt64Array, or BigUint64Array', () => {
     const json = '{"type":"patch","patches":[]}'
-    const frame = new Uint8Array(encodeBinaryFrameJsonV1(json))
+    const frame = new Uint8Array(encodeBinaryFrameJson(json))
 
     const len16 = Math.ceil(frame.byteLength / 2) * 2
     const buf16 = new ArrayBuffer(len16)
@@ -400,7 +425,7 @@ describe('client binary frame decode', () => {
 
   it('decodes a v1 frame when the same bytes are exposed as Float32Array, Float64Array, or Int8Array', () => {
     const json = '{"type":"patch","patches":[]}'
-    const frame = new Uint8Array(encodeBinaryFrameJsonV1(json))
+    const frame = new Uint8Array(encodeBinaryFrameJson(json))
 
     const len32f = Math.ceil(frame.byteLength / 4) * 4
     const buf32f = new ArrayBuffer(len32f)
@@ -424,7 +449,7 @@ describe('client binary frame decode', () => {
   it('decodes a v1 frame when the same bytes are exposed as Float16Array (ArrayBuffer.isView parity)', () => {
     if (typeof Float16Array === 'undefined') return
     const json = '{"type":"patch","patches":[]}'
-    const frame = new Uint8Array(encodeBinaryFrameJsonV1(json))
+    const frame = new Uint8Array(encodeBinaryFrameJson(json))
     const len16h = Math.ceil(frame.byteLength / 2) * 2
     const buf16h = new ArrayBuffer(len16h)
     new Uint8Array(buf16h).set(frame)

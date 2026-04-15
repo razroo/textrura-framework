@@ -2,18 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Renderer, UIElement } from '@geometra/core'
 import type { ComputedLayout } from 'textura'
 import { createClient, type ClientFrameMetrics } from '../client.js'
+import { encodeBinaryFrameJson } from '../binary-frame.js'
 
 const origWebSocket = globalThis.WebSocket
-
-/** Mirrors server v1 envelope layout (see `packages/server/src/binary-frame.ts`). */
-function encodeBinaryFrameJsonV1(jsonUtf8: string): ArrayBuffer {
-  const payload = new TextEncoder().encode(jsonUtf8)
-  const out = new Uint8Array(9 + payload.length)
-  out.set([0x47, 0x45, 0x4f, 0x4d, 1], 0)
-  new DataView(out.buffer).setUint32(5, payload.length, true)
-  out.set(payload, 9)
-  return out.buffer
-}
 
 describe('client reconnect integration', () => {
   beforeEach(() => {
@@ -256,7 +247,7 @@ describe('client reconnect integration', () => {
     await vi.runAllTimersAsync()
     expect(sockets).toHaveLength(1)
 
-    sockets[0]!.emit('message', { data: encodeBinaryFrameJsonV1(frameJson(40, 20)) })
+    sockets[0]!.emit('message', { data: encodeBinaryFrameJson(frameJson(40, 20)) })
     await vi.runAllTimersAsync()
     expect(renders).toHaveLength(1)
     expect(client.layout?.width).toBe(40)
@@ -268,7 +259,7 @@ describe('client reconnect integration', () => {
     await vi.runAllTimersAsync()
     expect(sockets).toHaveLength(2)
 
-    sockets[1]!.emit('message', { data: encodeBinaryFrameJsonV1(frameJson(88, 44)) })
+    sockets[1]!.emit('message', { data: encodeBinaryFrameJson(frameJson(88, 44)) })
     await vi.runAllTimersAsync()
     expect(client.layout?.width).toBe(88)
     expect(client.layout?.height).toBe(44)

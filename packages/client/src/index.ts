@@ -1,7 +1,8 @@
 /**
  * @packageDocumentation
  * Public entry for `@geometra/client`: WebSocket client, server message application, and optional
- * v1 GEOM binary JSON envelope helpers (same payload as text frames; see server `binary-frame`).
+ * v1 GEOM binary JSON envelope helpers — {@link encodeBinaryFrameJson} / {@link decodeBinaryFrameJson}
+ * (same payload as text frames; parity with `@geometra/server` `binary-frame`).
  */
 
 export { createClient, applyServerMessage } from './client.js'
@@ -17,6 +18,7 @@ export type { HeadlessClientOptions } from './headless.js'
 export { GEOM_DATA_CHANNEL_TRACKER_SNAPSHOT } from './data-channels.js'
 export {
   decodeBinaryFrameJson,
+  encodeBinaryFrameJson,
   isBinaryFrameArrayBuffer,
   isBinaryFrameBuffer,
   MAX_V1_PAYLOAD_BYTES,
