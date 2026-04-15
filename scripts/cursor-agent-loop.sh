@@ -32,6 +32,8 @@ fi
 # the checkbox search. Likewise `rg '\[ \]'` without `^-\s*` is still easy to misread — anchor on `- [ ]`.
 # Zero matching lines from those greps is normal when everything is checked — not a broken search; continue to
 # deferred themes / north-star buckets (step 2b) instead of retrying or assuming the repo has "no roadmap".
+# If you expected unchecked boxes but got zero matches, confirm cwd is the repo root (`test -f ROADMAP.md`); running
+# `rg`/`grep` on `ROADMAP.md` from `packages/*` or another subdir misses the path and looks like an empty backlog.
 # When the host injects a **Today's date** (or similar) into the agent context, treat that calendar year as
 # authoritative for web search, release notes, and "current" dependency/docs lookups — do not assume the model
 # training cutoff year.
