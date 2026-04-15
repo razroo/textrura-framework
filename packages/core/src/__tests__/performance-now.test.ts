@@ -197,7 +197,7 @@ describe('safePerformanceNowMs', () => {
     expect(safePerformanceNowMs()).toBe(0)
   })
 
-  it('returns 0 when now() returns Map, WeakMap, Set, WeakSet, WeakRef, Promise, Date, or RegExp (typeof object; parity with layout-bounds exotic guards)', () => {
+  it('returns 0 when now() returns Map, WeakMap, Set, WeakSet, WeakRef, Promise, Date, RegExp, ArrayBuffer, or DataView (typeof object; parity with layout-bounds exotic guards)', () => {
     vi.stubGlobal('performance', { now: () => new Map() as unknown as number })
     expect(safePerformanceNowMs()).toBe(0)
     vi.stubGlobal('performance', { now: () => new WeakMap() as unknown as number })
@@ -213,6 +213,10 @@ describe('safePerformanceNowMs', () => {
     vi.stubGlobal('performance', { now: () => new Date(0) as unknown as number })
     expect(safePerformanceNowMs()).toBe(0)
     vi.stubGlobal('performance', { now: () => /./ as unknown as number })
+    expect(safePerformanceNowMs()).toBe(0)
+    vi.stubGlobal('performance', { now: () => new ArrayBuffer(8) as unknown as number })
+    expect(safePerformanceNowMs()).toBe(0)
+    vi.stubGlobal('performance', { now: () => new DataView(new ArrayBuffer(4)) as unknown as number })
     expect(safePerformanceNowMs()).toBe(0)
   })
 
@@ -349,7 +353,7 @@ describe('readPerformanceNow', () => {
     expect(readPerformanceNow()).toBe(0)
   })
 
-  it('maps Map, WeakMap, Set, WeakSet, WeakRef, Promise, Date, and RegExp now() results to 0 (typeof object; no numeric coercion)', () => {
+  it('maps Map, WeakMap, Set, WeakSet, WeakRef, Promise, Date, RegExp, ArrayBuffer, and DataView now() results to 0 (typeof object; no numeric coercion)', () => {
     vi.stubGlobal('performance', { now: () => new Map() as unknown as number })
     expect(readPerformanceNow()).toBe(0)
     vi.stubGlobal('performance', { now: () => new WeakMap() as unknown as number })
@@ -365,6 +369,10 @@ describe('readPerformanceNow', () => {
     vi.stubGlobal('performance', { now: () => new Date(0) as unknown as number })
     expect(readPerformanceNow()).toBe(0)
     vi.stubGlobal('performance', { now: () => /./ as unknown as number })
+    expect(readPerformanceNow()).toBe(0)
+    vi.stubGlobal('performance', { now: () => new ArrayBuffer(8) as unknown as number })
+    expect(readPerformanceNow()).toBe(0)
+    vi.stubGlobal('performance', { now: () => new DataView(new ArrayBuffer(4)) as unknown as number })
     expect(readPerformanceNow()).toBe(0)
   })
 
