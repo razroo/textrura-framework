@@ -87,6 +87,22 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite(withExtra)).toBe(true)
   })
 
+  it('rejects invalid children before reading x/y/width/height (fewer [[Get]]s; throwing numeric accessors are not invoked)', () => {
+    let xReads = 0
+    const layout = {
+      get children() {
+        return null
+      },
+      get x() {
+        xReads++
+        throw new Error('layoutBoundsAreFinite must not read x when children is not an array')
+      },
+    } as unknown as ComputedLayout
+    expect(() => layoutBoundsAreFinite(layout)).not.toThrow()
+    expect(layoutBoundsAreFinite(layout)).toBe(false)
+    expect(xReads).toBe(0)
+  })
+
   it('rejects missing, null, or non-array children (corrupt geometry / bad deserialization)', () => {
     const base = { x: 0, y: 0, width: 10, height: 10 } as Record<string, unknown>
     expect(layoutBoundsAreFinite({ ...base } as unknown as ComputedLayout)).toBe(false)

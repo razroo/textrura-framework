@@ -92,16 +92,20 @@ export function finiteRootExtent(value: unknown): number | undefined {
  *   `children` is a real array (empty is fine). Missing or non-array `children` is rejected so parallel
  *   tree walks (hit-test, focus, a11y) never throw on `layout.children[i]` from bad snapshots or transport bugs.
  *
- * `x` / `y` / `width` / `height` are read with normal property access (destructuring uses `[[Get]]`), so
- * inherited values on the prototype chain are observed the same as own fields — including
- * non-enumerable prototype descriptors (enumerability affects `for...in`, not ordinary reads). Typical
+ * `children` is validated with `Array.isArray` before `x` / `y` / `width` / `height` are read, so corrupt
+ * snapshots without a real `children` array do not pay four numeric `[[Get]]`s (and avoid invoking
+ * accessors for bounds keys when the subtree cannot be walked). Numeric fields use normal property access
+ * (`[[Get]]`), so inherited values on the prototype chain match own fields — including non-enumerable
+ * prototype descriptors (enumerability affects `for...in`, not ordinary reads). Typical
  * {@link ComputedLayout} snapshots from Textura use plain objects with own fields only.
  * {@link ComputedLayout.children} is not validated recursively. Callers walking a tree should check
  * each visited layout when needed.
  */
 export function layoutBoundsAreFinite(layout: ComputedLayout): boolean {
-  const { x, y, width, height, children } = layout
-  if (!Array.isArray(children)) return false
+  // Children first: corrupt snapshots often omit or mistype `children`; avoid reading x/y/width/height
+  // (and any throwing accessors on those keys) until we know parallel tree walks are safe.
+  if (!Array.isArray(layout.children)) return false
+  const { x, y, width, height } = layout
   return (
     isFinitePlainNumber(x) &&
     isFinitePlainNumber(y) &&
