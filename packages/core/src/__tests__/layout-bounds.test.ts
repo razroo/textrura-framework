@@ -963,6 +963,10 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(0, 0, 1, 1)).toEqual({ ox: -1, oy: -1 })
   })
 
+  it('combines negative abs origins with scroll for deep negative child space (both axes stay finite)', () => {
+    expect(scrollSafeChildOffsets(-20, -30, 100, 100)).toEqual({ ox: -120, oy: -130 })
+  })
+
   it('returns finite negative origins at MAX_VALUE scroll when abs is 0 (extreme overscroll; still representable)', () => {
     const max = Number.MAX_VALUE
     expect(Number.isFinite(-max)).toBe(true)
