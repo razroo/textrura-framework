@@ -124,6 +124,18 @@ describe('inclusiveEndIndex', () => {
     expect(inclusiveEndIndex(2, negZero as number, 4)).toBe(0)
   })
 
+  it('direct callers: fractional positive maxIndex passes through Math.max(0, maxIdx) then Math.min with spanEnd (syncVirtualWindow uses integer caps only)', () => {
+    // spanEnd = 0 + 5 - 1 = 4; cap 2.7 is below spanEnd
+    expect(inclusiveEndIndex(0, 2.7, 5)).toBe(2.7)
+    // spanEnd = 2 + 4 - 1 = 5; cap 4.5 limits the inclusive end
+    expect(inclusiveEndIndex(2, 4.5, 4)).toBe(4.5)
+  })
+
+  it('direct callers: fractional negative maxIndex between -1 and 0 clamps to 0 before Math.min (corrupt non-integer cap)', () => {
+    expect(inclusiveEndIndex(0, -0.25, 5)).toBe(0)
+    expect(inclusiveEndIndex(2, -0.99, 4)).toBe(0)
+  })
+
   it('does not throw on BigInt or boxed operands; matches NaN / non-number paths (typeof guard before + and Number.isFinite)', () => {
     const z = 0n as unknown as number
     const one = 1n as unknown as number
