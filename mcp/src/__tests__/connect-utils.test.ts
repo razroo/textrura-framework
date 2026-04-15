@@ -60,6 +60,19 @@ describe('normalizeConnectTarget', () => {
     })
   })
 
+  it('accepts wss url input for already-running peers (TLS WebSocket)', () => {
+    const result = normalizeConnectTarget({ url: 'wss://example.com/socket' })
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        kind: 'ws',
+        wsUrl: 'wss://example.com/socket',
+        autoCoercedFromUrl: false,
+      },
+    })
+  })
+
   it('rejects ambiguous and empty connect inputs', () => {
     expect(normalizeConnectTarget({})).toEqual({
       ok: false,
@@ -118,6 +131,11 @@ describe('isHttpUrl', () => {
   it('accepts http and https URLs', () => {
     expect(isHttpUrl('https://example.com/path')).toBe(true)
     expect(isHttpUrl('http://localhost:8080/')).toBe(true)
+  })
+
+  it('accepts IPv6 literal hosts (URL parser canonical form)', () => {
+    expect(isHttpUrl('https://[::1]:8443/')).toBe(true)
+    expect(isHttpUrl('http://[2001:db8::1]/')).toBe(true)
   })
 
   it('rejects ws(s), file, and other schemes', () => {
