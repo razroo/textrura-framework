@@ -1,6 +1,7 @@
 import type { ComputedLayout } from 'textura'
 import type {
   App,
+  BorderRadiusCorners,
   FrameTimings,
   Renderer,
   UIElement,
@@ -1038,14 +1039,9 @@ export class CanvasRenderer implements Renderer {
 
     if (element.kind === 'box' && element === target) {
       const pad = this.focusRingPadding
-      const br = element.props.borderRadius ?? 0
-      this.strokeFocusRingOutline(
-        x - pad,
-        y - pad,
-        width + pad * 2,
-        height + pad * 2,
-        br > 0 ? br + pad * 0.5 : 0,
-      )
+      const br = element.props.borderRadius
+      const ringRadius = this.focusRingBorderRadius(br, pad)
+      this.strokeFocusRingOutline(x - pad, y - pad, width + pad * 2, height + pad * 2, ringRadius)
       return true
     }
 
@@ -1079,12 +1075,50 @@ export class CanvasRenderer implements Renderer {
     return false
   }
 
-  private strokeFocusRingOutline(x: number, y: number, w: number, h: number, borderRadius: number): void {
+  /** Effective corner radii for the focus ring outline (slightly larger than the box when padded). */
+  private focusRingBorderRadius(
+    br: number | BorderRadiusCorners | undefined,
+    pad: number,
+  ): number | BorderRadiusCorners {
+    const inset = pad * 0.5
+    if (br === undefined) return 0
+    if (typeof br === 'number') {
+      return br > 0 ? br + inset : 0
+    }
+    const tl = br.topLeft ?? 0
+    const tr = br.topRight ?? 0
+    const bl = br.bottomLeft ?? 0
+    const brc = br.bottomRight ?? 0
+    if (tl <= 0 && tr <= 0 && bl <= 0 && brc <= 0) return 0
+    return {
+      topLeft: tl > 0 ? tl + inset : 0,
+      topRight: tr > 0 ? tr + inset : 0,
+      bottomLeft: bl > 0 ? bl + inset : 0,
+      bottomRight: brc > 0 ? brc + inset : 0,
+    }
+  }
+
+  private strokeFocusRingOutline(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    borderRadius: number | BorderRadiusCorners,
+  ): void {
     const { ctx } = this
     ctx.save()
     ctx.strokeStyle = this.focusRingColor
     ctx.lineWidth = 2
-    if (borderRadius > 0) {
+    const rounded =
+      typeof borderRadius === 'number'
+        ? borderRadius > 0
+        : Math.max(
+            borderRadius.topLeft ?? 0,
+            borderRadius.topRight ?? 0,
+            borderRadius.bottomLeft ?? 0,
+            borderRadius.bottomRight ?? 0,
+          ) > 0
+    if (rounded) {
       this.roundRect(x, y, w, h, borderRadius)
       ctx.stroke()
     } else {
