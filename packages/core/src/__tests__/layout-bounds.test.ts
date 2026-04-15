@@ -780,6 +780,14 @@ describe('finiteRootExtent', () => {
     expect(finiteRootExtent([] as unknown as number)).toBeUndefined()
   })
 
+  it('returns undefined for objects with valueOf or Symbol.toPrimitive (AppOptions parity with layoutBoundsAreFinite; no ToNumber)', () => {
+    const coercible = { valueOf: () => 100 } as unknown as number
+    expect(finiteRootExtent(coercible)).toBeUndefined()
+    const exotic = { [Symbol.toPrimitive]: () => 50 } as unknown as number
+    expect(() => finiteRootExtent(exotic)).not.toThrow()
+    expect(finiteRootExtent(exotic)).toBeUndefined()
+  })
+
   it('returns undefined for Map, Set, Promise, Date, and RegExp without throwing (typeof object; corrupt AppOptions / JSON)', () => {
     const m = new Map() as unknown as number
     const s = new Set() as unknown as number
