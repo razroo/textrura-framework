@@ -393,6 +393,17 @@ describe('coalescePatches', () => {
     ])
   })
 
+  it('does not merge [NaN] with [null] (plain JSON.stringify maps both to "[null]")', () => {
+    const merged = coalescePatches([
+      { path: [Number.NaN], x: 1 },
+      { path: [null as unknown as number], y: 2 },
+    ])
+    expect(merged).toEqual([
+      { path: [Number.NaN], x: 1 },
+      { path: [null as unknown as number], y: 2 },
+    ])
+  })
+
   it('preserves first-seen order for unrelated paths', () => {
     const merged = coalescePatches([
       { path: [2], x: 1 },

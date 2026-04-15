@@ -217,9 +217,23 @@ function isNonNegativePatchDimension(value: unknown): value is number {
 }
 
 /**
+ * Stable `Map` key for patch `path` arrays. Plain `JSON.stringify([NaN])` and `JSON.stringify([null])` both
+ * yield `"[null]"`, so a replacer tags NaN segments — keep in sync with `packages/proxy/src/diff-layout.ts`.
+ */
+function layoutPatchPathKey(path: ReadonlyArray<unknown>): string {
+  return JSON.stringify(path, (_key, value) => {
+    if (typeof value === 'number' && Number.isNaN(value)) {
+      return '\uFFFD__GEOM_PATH_NaN__'
+    }
+    return value
+  })
+}
+
+/**
  * Coalesce multiple patches on the same path (last write wins per field).
- * Paths are keyed with `JSON.stringify` so distinct index sequences never alias (e.g. `[0, 1]` vs `[0.1]` would
- * both stringify to `"0.1"` under a naive `join('.')` key).
+ * Paths are keyed with `JSON.stringify` (via {@link layoutPatchPathKey}) so distinct index sequences never alias
+ * (e.g. `[0, 1]` vs `[0.1]` would both stringify to `"0.1"` under a naive `join('.')` key), and NaN segments do not
+ * collide with null.
  * Entries with a missing or non-array `path` (including `null` list slots), or paths that `JSON.stringify`
  * rejects (`BigInt` segments, circular arrays, etc.), are skipped so corrupt hand-built batches cannot throw.
  * `x` / `y` apply when the incoming value is a finite primitive `number`. `width` / `height` additionally require
@@ -234,7 +248,7 @@ export function coalescePatches(patches: LayoutPatch[]): LayoutPatch[] {
     if (patch == null || !Array.isArray(patch.path)) continue
     let key: string
     try {
-      key = JSON.stringify(patch.path)
+      key = layoutPatchPathKey(patch.path)
     } catch {
       continue
     }
