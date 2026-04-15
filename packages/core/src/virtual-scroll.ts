@@ -1,3 +1,5 @@
+import { isFinitePlainNumber } from './layout-bounds.js'
+
 /** Indices describing the visible slice of a virtual list after {@link syncVirtualWindow}. */
 export interface VirtualWindowState {
   /** First visible row index (inclusive), in `[0, totalRows - 1]` when `totalRows > 0`. */
@@ -8,19 +10,22 @@ export interface VirtualWindowState {
   selected: number
 }
 
-/** Only plain finite `number` values count (`typeof` + `Number.isFinite`, same idea as `layoutBoundsAreFinite` in `layout-bounds.js`). */
-function finiteOr(n: number, fallback: number): number {
-  return typeof n === 'number' && Number.isFinite(n) ? n : fallback
+/**
+ * Only primitive finite numbers count — same rule as {@link isFinitePlainNumber} / protocol patch validation
+ * so corrupt host props cannot slip boxed numbers or strings into window math.
+ */
+function finiteOr(n: unknown, fallback: number): number {
+  return isFinitePlainNumber(n) ? n : fallback
 }
 
 /** Non-negative integer row index / count: finite numbers only, then floored (aligned with `windowSize` flooring). */
-function intRowMetric(n: number, fallback: number): number {
+function intRowMetric(n: unknown, fallback: number): number {
   return Math.max(0, Math.floor(finiteOr(n, fallback)))
 }
 
 /** Like `Math.max(0, n)` but maps non-finite `n` to `0` so corrupt floats cannot poison window indices. */
-function nonNegativeOrZero(n: number): number {
-  return Number.isFinite(n) ? Math.max(0, n) : 0
+function nonNegativeOrZero(n: unknown): number {
+  return isFinitePlainNumber(n) ? Math.max(0, n) : 0
 }
 
 /**
