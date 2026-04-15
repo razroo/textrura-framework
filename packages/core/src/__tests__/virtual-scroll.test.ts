@@ -185,6 +185,12 @@ describe('syncVirtualWindow', () => {
     expect(syncVirtualWindow(-3, 5, 0, 0)).toEqual({ start: 0, end: 0, selected: 0 })
   })
 
+  it('floors strictly fractional totalRows in (0, 1) to zero rows (intRowMetric; no visible items until at least one whole row)', () => {
+    expect(syncVirtualWindow(Number.EPSILON, 5, 0, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+    expect(syncVirtualWindow(0.25, 10, 0, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+    expect(syncVirtualWindow(0.99, 3, 5, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+  })
+
   it('treats IEEE negative zero totalRows like zero rows (finite signed zero; same empty list as +0)', () => {
     expect(syncVirtualWindow(-0, 5, 0, 0)).toEqual({ start: 0, end: 0, selected: 0 })
     expect(syncVirtualWindow(-0, 5, 0, 0)).toEqual(syncVirtualWindow(0, 5, 0, 0))
