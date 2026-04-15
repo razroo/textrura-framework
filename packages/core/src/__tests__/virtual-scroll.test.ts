@@ -344,6 +344,7 @@ describe('syncVirtualWindow', () => {
               }
               const maxIndex = total - 1
               const cap = Math.max(1, windowSize)
+              expect(r.start).toBeLessThanOrEqual(r.end)
               expect(r.selected).toBeGreaterThanOrEqual(0)
               expect(r.selected).toBeLessThanOrEqual(maxIndex)
               expect(r.start).toBeGreaterThanOrEqual(0)
