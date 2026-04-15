@@ -55,6 +55,9 @@ export function readPerformanceNow(): number {
  * only primitive finite numbers are honored (same `typeof` + `Number.isFinite` rule as
  * {@link import('./layout-bounds.js').isFinitePlainNumber}); otherwise the value is treated as `0`.
  * Negative finite values and IEEE **−0** become non-negative `0` via `Math.max`.
+ *
+ * @param value — Milliseconds from layout timing; widened to `unknown` so corrupt or mistyped telemetry cannot coerce via `ToNumber`.
+ * @returns A non-negative finite millisecond value, or `0` when the input is not a primitive finite number.
  */
 export function clampNonNegativeLayoutWallMs(value: unknown): number {
   return Math.max(0, typeof value === 'number' && Number.isFinite(value) ? value : 0)
