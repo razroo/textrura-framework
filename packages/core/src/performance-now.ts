@@ -49,3 +49,13 @@ export function readPerformanceNow(): number {
   }
   return 0
 }
+
+/**
+ * Clamp raw layout wall time (ms) for {@link import('./types.js').Renderer.setFrameTimings} telemetry:
+ * only primitive finite numbers are honored (same `typeof` + `Number.isFinite` rule as
+ * {@link import('./layout-bounds.js').isFinitePlainNumber}); otherwise the value is treated as `0`.
+ * Negative finite values and IEEE **−0** become non-negative `0` via `Math.max`.
+ */
+export function clampNonNegativeLayoutWallMs(value: unknown): number {
+  return Math.max(0, typeof value === 'number' && Number.isFinite(value) ? value : 0)
+}

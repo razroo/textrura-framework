@@ -4,7 +4,8 @@
  * `image`, `scene3d`), app mount, layout-tree
  * conversion, hit-testing, shared layout coordinate helpers ({@link finiteNumberOrZero}, {@link finiteRootExtent},
  * {@link isFinitePlainNumber}, {@link layoutBoundsAreFinite}, {@link scrollSafeChildOffsets},
- * {@link pointInInclusiveLayoutRect}), monotonic timing helpers ({@link safePerformanceNowMs}, {@link readPerformanceNow}),
+ * {@link pointInInclusiveLayoutRect}), monotonic timing helpers ({@link safePerformanceNowMs}, {@link readPerformanceNow},
+ * {@link clampNonNegativeLayoutWallMs}),
  * focus and
  * keyboard/composition dispatch, text selection and input, web font
  * helpers, {@link streamText} for coalesced token streams, viewport/breakpoint helpers ({@link createViewport},
@@ -52,7 +53,7 @@ export {
   pointInInclusiveLayoutRect,
   scrollSafeChildOffsets,
 } from './layout-bounds.js'
-export { safePerformanceNowMs, readPerformanceNow } from './performance-now.js'
+export { safePerformanceNowMs, readPerformanceNow, clampNonNegativeLayoutWallMs } from './performance-now.js'
 
 // Web fonts (browser)
 export {

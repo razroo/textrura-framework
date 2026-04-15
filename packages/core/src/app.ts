@@ -9,7 +9,7 @@ import { focusedElement, setFocus } from './focus.js'
 import { collectFontFamiliesFromTree, resolveFontLoadTimeoutMs, waitForFonts } from './fonts.js'
 import { dispatchKeyboardEvent, dispatchCompositionEvent } from './keyboard.js'
 import { finiteRootExtent } from './layout-bounds.js'
-import { safePerformanceNowMs } from './performance-now.js'
+import { clampNonNegativeLayoutWallMs, safePerformanceNowMs } from './performance-now.js'
 
 export interface AppOptions {
   /**
@@ -149,7 +149,7 @@ export async function createApp(
         if (rootH !== undefined) computeOpts.height = rootH
         const nextLayout = computeLayout(layoutTree, computeOpts)
         const rawLayoutMs = safePerformanceNowMs() - layoutStart
-        const layoutMs = Math.max(0, Number.isFinite(rawLayoutMs) ? rawLayoutMs : 0)
+        const layoutMs = clampNonNegativeLayoutWallMs(rawLayoutMs)
         renderer.setFrameTimings?.({ layoutMs })
         renderer.render(nextLayout, nextTree)
         app.tree = nextTree

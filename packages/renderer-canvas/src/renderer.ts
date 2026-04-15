@@ -23,6 +23,7 @@ import {
   hitPathAtPoint,
   collectFocusOrder,
   readPerformanceNow,
+  clampNonNegativeLayoutWallMs,
   finiteNumberOrZero,
   findInTextNodes,
 } from '@geometra/core'
@@ -238,8 +239,7 @@ export class CanvasRenderer implements Renderer {
    * inspector HUD and telemetry never observe NaN/negative layout times.
    */
   setFrameTimings(timings: FrameTimings): void {
-    const raw = timings.layoutMs
-    this.lastLayoutWallMs = Math.max(0, Number.isFinite(raw) ? raw : 0)
+    this.lastLayoutWallMs = clampNonNegativeLayoutWallMs(timings.layoutMs)
   }
 
   render(layout: ComputedLayout, tree: UIElement): void {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { readPerformanceNow, safePerformanceNowMs } from '../performance-now.js'
+import { clampNonNegativeLayoutWallMs, readPerformanceNow, safePerformanceNowMs } from '../performance-now.js'
 
 /** Temporarily replace `globalThis.performance` with a getter that throws (outer try/catch in SUT). */
 function withHostilePerformanceGetter(run: () => void): void {
@@ -497,5 +497,36 @@ describe('readPerformanceNow', () => {
   it('returns 0 when accessing performance.now throws during the typeof probe (hostile Proxy)', () => {
     vi.stubGlobal('performance', hostilePerformanceProxyThrowsOnNow())
     expect(readPerformanceNow()).toBe(0)
+  })
+})
+
+describe('clampNonNegativeLayoutWallMs', () => {
+  it('matches createApp / CanvasRenderer.setFrameTimings telemetry: finite non-negative ms pass through', () => {
+    expect(clampNonNegativeLayoutWallMs(0)).toBe(0)
+    expect(clampNonNegativeLayoutWallMs(4.25)).toBe(4.25)
+    expect(clampNonNegativeLayoutWallMs(Number.MAX_SAFE_INTEGER)).toBe(Number.MAX_SAFE_INTEGER)
+    expect(clampNonNegativeLayoutWallMs(Number.MAX_VALUE)).toBe(Number.MAX_VALUE)
+  })
+
+  it('maps NaN, ±Infinity, and negative finite values to 0', () => {
+    expect(clampNonNegativeLayoutWallMs(Number.NaN)).toBe(0)
+    expect(clampNonNegativeLayoutWallMs(Number.POSITIVE_INFINITY)).toBe(0)
+    expect(clampNonNegativeLayoutWallMs(Number.NEGATIVE_INFINITY)).toBe(0)
+    expect(clampNonNegativeLayoutWallMs(-3)).toBe(0)
+  })
+
+  it('normalizes IEEE −0 to +0 (Math.max; parity with CanvasRenderer lastLayoutWallMs / HUD toFixed)', () => {
+    const t = clampNonNegativeLayoutWallMs(-0)
+    expect(Object.is(t, -0)).toBe(false)
+    expect(1 / t).toBe(Infinity)
+  })
+
+  it('rejects non-number and non-finite values without throwing (typeof + Number.isFinite; parity with layout-bounds)', () => {
+    expect(() => clampNonNegativeLayoutWallMs(99n as unknown as number)).not.toThrow()
+    expect(clampNonNegativeLayoutWallMs(99n as unknown as number)).toBe(0)
+    expect(clampNonNegativeLayoutWallMs('12' as unknown as number)).toBe(0)
+    expect(clampNonNegativeLayoutWallMs(undefined)).toBe(0)
+    expect(clampNonNegativeLayoutWallMs(null)).toBe(0)
+    expect(clampNonNegativeLayoutWallMs(Object(4.25) as unknown as number)).toBe(0)
   })
 })
