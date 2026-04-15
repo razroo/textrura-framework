@@ -1066,6 +1066,14 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(11, 22, 2, pr)).toEqual({ ox: 9, oy: 22 })
   })
 
+  it('coerces WeakRef scroll props to 0 without throwing (typeof object; parity with finiteNumberOrZero / WeakMap guards)', () => {
+    const r = new WeakRef({}) as unknown as number
+    expect(() => scrollSafeChildOffsets(10, 20, r, 4)).not.toThrow()
+    expect(scrollSafeChildOffsets(10, 20, r, 4)).toEqual({ ox: 10, oy: 16 })
+    expect(() => scrollSafeChildOffsets(10, 20, 3, r)).not.toThrow()
+    expect(scrollSafeChildOffsets(10, 20, 3, r)).toEqual({ ox: 7, oy: 20 })
+  })
+
   it('coerces scroll props with valueOf or Symbol.toPrimitive to 0 (typeof object; finiteNumberOrZero parity; no ToNumber)', () => {
     const coercible = { valueOf: () => 99 } as unknown as number
     expect(() => scrollSafeChildOffsets(10, 20, coercible, 4)).not.toThrow()
