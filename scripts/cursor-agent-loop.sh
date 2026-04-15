@@ -42,6 +42,8 @@ fi
 # Always interpret "unchecked roadmap items" as line-anchored list checkboxes (`- [ ]` / `^- \[ \]`), never prose.
 # Maintainer-only release playbooks (`RELEASE_CHECKLIST.md`, `v1-release-checklist.md`) use the same checkbox
 # shape for ship steps — do not treat matches there as framework/engineering backlog when searching for work.
+# `DEPLOYMENT.md` also uses `- [ ]` rows as a **production deployment / operations** checklist (TLS, proxy,
+# supervisor, load testing) — same rule: not (2a) framework backlog; pick work from ROADMAP themes or (2b) instead.
 # Both trackers may already be all `[x]` — that only means unchecked checkbox backlog is exhausted there,
 # not that the repo is "done". ROADMAP "Deferred / research" mixes `[x]` items with **plain bullets** (no `- [ ]`),
 # so an empty unchecked-box grep does not mean no roadmap-backed themes — read that subsection explicitly.
