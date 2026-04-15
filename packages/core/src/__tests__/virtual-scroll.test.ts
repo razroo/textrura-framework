@@ -477,6 +477,17 @@ describe('syncVirtualWindow', () => {
     expect(r.end - r.start + 1).toBe(windowSize)
   })
 
+  it('at MAX_SAFE_INTEGER row count with window 2, pins exactly the last two rows when the last row is selected (safe-integer nextSelected > end path)', () => {
+    const totalRows = Number.MAX_SAFE_INTEGER
+    const windowSize = 2
+    const last = totalRows - 1
+    const r = syncVirtualWindow(totalRows, windowSize, last, 0)
+    expect(r.selected).toBe(last)
+    expect(r.start).toBe(last - 1)
+    expect(r.end).toBe(last)
+    expect(r.end - r.start + 1).toBe(windowSize)
+  })
+
   it('stays finite when totalRows and windowSize are both ~1e308 (IEEE-scale virtual lists)', () => {
     // Guards against NaN/Inf window indices when host state uses scientific-magnitude counts (still finite doubles).
     const r = syncVirtualWindow(1e308, 1e308, 5e307, 5e307)
