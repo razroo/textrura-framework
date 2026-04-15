@@ -29,4 +29,13 @@ describe('parseHttpPageUrl', () => {
     expect(() => parseHttpPageUrl('   ')).toThrowError('page URL is empty')
     expect(() => parseHttpPageUrl('\t\n')).toThrowError('page URL is empty')
   })
+
+  it('propagates URL parser failures after scheme normalization (invalid WHATWG href)', () => {
+    expect(() => parseHttpPageUrl('https://')).toThrow(TypeError)
+    expect(() => parseHttpPageUrl('http://')).toThrow(TypeError)
+    // Bare host with spaces becomes `https://bad host` — invalid hostname.
+    expect(() => parseHttpPageUrl('bad host')).toThrow(TypeError)
+    // Invalid port after implicit https://
+    expect(() => parseHttpPageUrl('example.com:port')).toThrow(TypeError)
+  })
 })
