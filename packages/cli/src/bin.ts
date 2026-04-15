@@ -7,7 +7,7 @@ import { parseHttpPageUrl } from './page-url.js'
 const args = process.argv.slice(2)
 const flags = new Set(args.filter(a => a.startsWith('--')))
 const positional = args.filter(a => !a.startsWith('--'))
-const url = positional[0]
+const url = positional[0]?.trim()
 
 const textMode = flags.has('--text')
 const jsonMode = flags.has('--json')

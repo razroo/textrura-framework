@@ -16,4 +16,17 @@ describe('parseHttpPageUrl', () => {
     expect(parseHttpPageUrl('ws://127.0.0.1:9000/geometra-ws').href).toBe('ws://127.0.0.1:9000/geometra-ws')
     expect(parseHttpPageUrl('wss://host/geometra-ws').href).toBe('wss://host/geometra-ws')
   })
+
+  it('trims leading and trailing whitespace (pasted hosts / URLs)', () => {
+    expect(parseHttpPageUrl('  example.com  ').href).toBe('https://example.com/')
+    expect(parseHttpPageUrl('\tlocalhost:8080/\n').href).toBe('https://localhost:8080/')
+    expect(parseHttpPageUrl('  https://example.com/path  ').href).toBe('https://example.com/path')
+    expect(parseHttpPageUrl('  ws://127.0.0.1:9000/x  ').href).toBe('ws://127.0.0.1:9000/x')
+  })
+
+  it('throws when the input is empty or whitespace-only', () => {
+    expect(() => parseHttpPageUrl('')).toThrowError('page URL is empty')
+    expect(() => parseHttpPageUrl('   ')).toThrowError('page URL is empty')
+    expect(() => parseHttpPageUrl('\t\n')).toThrowError('page URL is empty')
+  })
 })
