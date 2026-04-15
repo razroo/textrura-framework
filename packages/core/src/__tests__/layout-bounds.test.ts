@@ -800,6 +800,12 @@ describe('finiteRootExtent', () => {
     }
   })
 
+  it('returns undefined for null-prototype objects without throwing (typeof object; mistyped host options)', () => {
+    const bare = Object.create(null) as unknown as number
+    expect(() => finiteRootExtent(bare)).not.toThrow()
+    expect(finiteRootExtent(bare)).toBeUndefined()
+  })
+
   it('returns undefined for negative sizes', () => {
     expect(finiteRootExtent(-1)).toBeUndefined()
     expect(finiteRootExtent(-Number.MIN_VALUE)).toBeUndefined()
