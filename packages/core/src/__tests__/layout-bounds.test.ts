@@ -861,6 +861,19 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(100.25, 200.5, 10.125, 40.375)).toEqual({ ox: 90.125, oy: 160.125 })
   })
 
+  it('preserves ULP-scale scroll deltas near 1.0 (IEEE next-after-1 scroll; child ox is −Number.EPSILON, not 0)', () => {
+    const onePlusUlp = 1 + Number.EPSILON
+    expect(onePlusUlp).toBeGreaterThan(1)
+    const r = scrollSafeChildOffsets(1, 7, onePlusUlp, 0)
+    expect(r).not.toBeNull()
+    expect(r!.ox).toBe(-Number.EPSILON)
+    expect(r!.oy).toBe(7)
+    const r2 = scrollSafeChildOffsets(9, 3, 0, onePlusUlp)
+    expect(r2).not.toBeNull()
+    expect(r2!.ox).toBe(9)
+    expect(r2!.oy).toBe(3 - onePlusUlp)
+  })
+
   it('preserves exact integer differences at safe-integer magnitude (large layouts; doubles stay exact)', () => {
     const max = Number.MAX_SAFE_INTEGER
     const min = Number.MIN_SAFE_INTEGER
