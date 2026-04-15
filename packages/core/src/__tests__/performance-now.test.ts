@@ -288,6 +288,13 @@ describe('safePerformanceNowMs', () => {
 })
 
 describe('readPerformanceNow', () => {
+  it('returns 0 when performance is a revoked Proxy (property access throws; same guard as safe path)', () => {
+    const { proxy, revoke } = Proxy.revocable({ now: () => 1 }, {})
+    revoke()
+    vi.stubGlobal('performance', proxy as unknown as Performance)
+    expect(readPerformanceNow()).toBe(0)
+  })
+
   it('uses inherited or prototype-chain now() implementations (polyfills may not assign own properties)', () => {
     const viaProto = Object.create({ now: () => 11.5 })
     vi.stubGlobal('performance', viaProto)
