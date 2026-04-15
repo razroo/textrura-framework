@@ -89,6 +89,9 @@ fi
 # (geometry CI, shared layout invariants, hit routing — see `requiredVitestAllowlistPaths` in verify-release-gate.mjs).
 # The verifier also requires exactly one `bun run test:terminal-input` in the gate string and that the first
 # `&&` segment runs `verify-release-gate.mjs` (fail-fast before vitest; no duplicate terminal suites).
+# It also requires **exactly three** `&&`-separated segments overall (verify script → single `vitest run` batch →
+# `bun run test:terminal-input`). Do not splice `lint`, extra vitest batches, or other steps into
+# `scripts.release:gate` — extend CI/quality.yml or run commands manually instead.
 # `npm run release:gate` runs `scripts/release/verify-release-gate.mjs`
 # first to fail fast on duplicates/missing paths and to ensure `test:terminal-input` is the final `&&` segment
 # in package.json (nothing may run after the demo-terminal input suite), then the vitest allowlist, then
