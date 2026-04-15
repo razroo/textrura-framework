@@ -75,6 +75,11 @@ export function inclusiveEndIndex(start: number, maxIndex: number, safeWindow: n
  * adjusting for selection.
  * Non-finite arguments use the same defaults as empty/reset UI state (`0` rows, window `1`, selection/start `0`).
  *
+ * @remarks Host or deserialized state may supply non-numbers, boxed numbers, bigint, symbols, etc. Each
+ *   argument is sanitized through the same primitive-finite rules as
+ *   {@link import('./layout-bounds.js').isFinitePlainNumber} (via internal helpers) so window indices never
+ *   propagate `NaN` or `±Infinity`. See `packages/core/src/__tests__/virtual-scroll.test.ts` for corrupt-input cases.
+ *
  * @returns Indices with `start <= end`, selection clamped to `[0, totalRows - 1]` (or `0` when empty), and
  *   `selected` always inside `[start, end]` whenever `totalRows > 0`.
  */
