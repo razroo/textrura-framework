@@ -2,6 +2,7 @@
 import { viewInTerminal } from './viewer.js'
 import { TerminalCompositor } from './compositor.js'
 import { dumpPage } from './text-dump.js'
+import { parseHttpPageUrl } from './page-url.js'
 
 const args = process.argv.slice(2)
 const flags = new Set(args.filter(a => a.startsWith('--')))
@@ -12,9 +13,10 @@ const textMode = flags.has('--text')
 const jsonMode = flags.has('--json')
 
 if (!url) {
-  console.error('Usage: geometra <url> [--text] [--json]')
+  console.error('Usage: geometra <url|host> [--text] [--json]')
   console.error('')
   console.error('  View any Geometra-powered site in the terminal.')
+  console.error('  HTTPS is assumed when the scheme is omitted (e.g. example.com or localhost:5173).')
   console.error('')
   console.error('Options:')
   console.error('  --text   Output page content as plain text (pipeable to Claude Code)')
@@ -22,6 +24,7 @@ if (!url) {
   console.error('')
   console.error('Examples:')
   console.error('  geometra https://artemis-two.razroo.com/')
+  console.error('  geometra artemis-two.razroo.com/')
   console.error('  geometra https://artemis-two.razroo.com/ --text')
   console.error('  geometra https://artemis-two.razroo.com/ --json')
   console.error('  geometra https://artemis-two.razroo.com/ --text | claude')
@@ -40,7 +43,7 @@ if (url.startsWith('ws://') || url.startsWith('wss://')) {
   }
 } else {
   ;(async () => {
-    const parsed = new URL(url)
+    const parsed = parseHttpPageUrl(url)
     const wsProto = parsed.protocol === 'https:' ? 'wss:' : 'ws:'
     const baseWs = `${wsProto}//${parsed.host}`
     const baseHttp = `${parsed.protocol}//${parsed.host}`
