@@ -108,6 +108,19 @@ describe('layoutBoundsAreFinite', () => {
     expect(xReads).toBe(0)
   })
 
+  it('propagates throws from a hostile children getter (Array.isArray reads children first)', () => {
+    const layout = {
+      get children() {
+        throw new Error('hostile children getter')
+      },
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+    } as unknown as ComputedLayout
+    expect(() => layoutBoundsAreFinite(layout)).toThrow('hostile children getter')
+  })
+
   it('rejects missing, null, or non-array children (corrupt geometry / bad deserialization)', () => {
     const base = { x: 0, y: 0, width: 10, height: 10 } as Record<string, unknown>
     expect(layoutBoundsAreFinite({ ...base } as unknown as ComputedLayout)).toBe(false)
