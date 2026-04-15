@@ -39,6 +39,12 @@ describe('isFinitePlainNumber', () => {
     expect(isFinitePlainNumber(Object(Number.POSITIVE_INFINITY) as unknown as number)).toBe(false)
     expect(isFinitePlainNumber(Object(Number.NEGATIVE_INFINITY) as unknown as number)).toBe(false)
   })
+
+  it('rejects null-prototype objects mistaken for numbers (typeof object; bare JSON maps / host bugs)', () => {
+    const bare = Object.create(null) as unknown as number
+    expect(() => isFinitePlainNumber(bare)).not.toThrow()
+    expect(isFinitePlainNumber(bare)).toBe(false)
+  })
 })
 
 describe('layoutBoundsAreFinite', () => {
@@ -1267,6 +1273,12 @@ describe('finiteNumberOrZero', () => {
   it('maps objects with Symbol.toPrimitive to 0 (typeof must be number; no ToNumber coercion)', () => {
     const exotic = { [Symbol.toPrimitive]: () => 99 } as unknown as number
     expect(finiteNumberOrZero(exotic)).toBe(0)
+  })
+
+  it('maps null-prototype objects to 0 without throwing (typeof object; parity with corrupt scroll props)', () => {
+    const bare = Object.create(null) as unknown as number
+    expect(() => finiteNumberOrZero(bare)).not.toThrow()
+    expect(finiteNumberOrZero(bare)).toBe(0)
   })
 })
 
