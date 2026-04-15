@@ -6,7 +6,8 @@
  * {@link layoutBoundsAreFinite}, {@link scrollSafeChildOffsets}, {@link pointInInclusiveLayoutRect}), focus and
  * keyboard/composition dispatch, text selection and input, web font
  * helpers, {@link streamText} for coalesced token streams, viewport/breakpoint helpers ({@link createViewport},
- * {@link breakpoint}, {@link responsive}), animation and virtual-scroll utilities, SEO and accessibility snapshots,
+ * {@link breakpoint}, {@link responsive}), animation helpers, and virtual list windowing ({@link syncVirtualWindow},
+ * {@link inclusiveEndIndex}, {@link VirtualWindowState}), SEO and accessibility snapshots,
  * {@link import('./focus-candidates.js').hasFocusCandidateHandlers} for parity with Tab / click-to-focus
  * routing, and shared element types (`UIElement`, `Renderer`, `FrameTimings`, …).
  *
