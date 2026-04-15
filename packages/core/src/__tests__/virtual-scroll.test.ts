@@ -432,6 +432,10 @@ describe('syncVirtualWindow', () => {
     expect(syncVirtualWindow(8, five, 2, 0)).toEqual({ start: 2, end: 2, selected: 2 })
     expect(syncVirtualWindow(8, 3, five, 0)).toEqual({ start: 0, end: 2, selected: 0 })
     expect(syncVirtualWindow(8, 3, 2, five)).toEqual({ start: 0, end: 2, selected: 2 })
+    // Boxed fractional must not unwrap to 2.7 → floor(2) visible rows; finiteOr fallback is 1 (same as corrupt non-number window).
+    const boxedFrac = Object(2.7) as unknown as number
+    expect(syncVirtualWindow(8, boxedFrac, 3, 0)).toEqual(syncVirtualWindow(8, 1, 3, 0))
+    expect(syncVirtualWindow(8, boxedFrac, 3, 0)).not.toEqual(syncVirtualWindow(8, 2, 3, 0))
   })
 
   it('returns finite start and end when window size is an extreme finite float (no NaN window indices)', () => {
