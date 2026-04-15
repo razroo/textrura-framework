@@ -252,6 +252,12 @@ describe('syncVirtualWindow', () => {
     expect(syncVirtualWindow(5, -2, 4, 0)).toEqual({ start: 4, end: 4, selected: 4 })
   })
 
+  it('floors strictly positive sub-unit windowSize (e.g. EPSILON, 0.25) to 0 then clamps to one visible row', () => {
+    const base = syncVirtualWindow(20, 1, 5, 0)
+    expect(syncVirtualWindow(20, Number.EPSILON, 5, 0)).toEqual(base)
+    expect(syncVirtualWindow(20, 0.25, 5, 0)).toEqual(base)
+  })
+
   it('floors fractional windowSize so start/end stay whole row indices (matches integer window semantics)', () => {
     expect(syncVirtualWindow(10, 2.9, 5, 0)).toEqual(syncVirtualWindow(10, 2, 5, 0))
     expect(syncVirtualWindow(8, 1.25, 3, 0)).toEqual(syncVirtualWindow(8, 1, 3, 0))
