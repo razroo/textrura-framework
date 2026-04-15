@@ -69,6 +69,28 @@ describe('CanvasRenderer.setFrameTimings', () => {
     expect(renderer.lastLayoutWallMs).toBe(4.25)
   })
 
+  it('maps double overflow and JSON exponent overflow layoutMs to 0 (parity with clampNonNegativeLayoutWallMs)', () => {
+    Object.defineProperty(globalThis, 'window', {
+      value: { devicePixelRatio: 1 },
+      configurable: true,
+      writable: true,
+    })
+    const ctx = new FakeCtx()
+    const canvas = {
+      style: {} as Record<string, string>,
+      getContext: () => ctx,
+    } as unknown as HTMLCanvasElement
+
+    const renderer = new CanvasRenderer({ canvas })
+    expect(Number.MAX_VALUE * 2).toBe(Infinity)
+    renderer.setFrameTimings({ layoutMs: Number.MAX_VALUE * 2 })
+    expect(renderer.lastLayoutWallMs).toBe(0)
+    const posOverflow = Number.parseFloat('1e400')
+    expect(posOverflow).toBe(Infinity)
+    renderer.setFrameTimings({ layoutMs: posOverflow })
+    expect(renderer.lastLayoutWallMs).toBe(0)
+  })
+
   it('preserves large finite layoutMs (telemetry is not capped below Number.isFinite truthy values)', () => {
     Object.defineProperty(globalThis, 'window', {
       value: { devicePixelRatio: 1 },
