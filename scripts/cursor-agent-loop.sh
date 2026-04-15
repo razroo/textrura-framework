@@ -115,6 +115,9 @@ fi
 #   lint, fast tests, build, benchmarks, examples, or Playwright E2E passed; run the matching earlier steps
 #   when your edits touch those surfaces. When editing MCP benchmark scripts or harness expectations,
 # run that benchmark locally (or the relevant `benchmark:mcp-*` variant), not only `release:gate`.
+# Root `npm run lint` / `bun run lint` only targets `packages/*/src/**/*.ts` (see root package.json) — edits under
+# `scripts/`, `.github/`, repo-root `*.mjs`, or other paths outside that glob are not ESLint-covered unless you
+# widen the lint script or run eslint with an explicit path; do not assume a green gate implies lint on those files.
 # Root `bun run build` also runs `cd mcp && npm run build` (see root package.json). Changes under `mcp/` need that
 # build step — `release:gate` alone does not compile the MCP package.
 # A green `release:gate` alone does not imply those steps passed — re-run the relevant ones when touching demos,
