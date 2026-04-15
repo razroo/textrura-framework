@@ -111,6 +111,11 @@ describe('safePerformanceNowMs', () => {
     expect(safePerformanceNowMs()).toBe(-Number.MAX_VALUE)
   })
 
+  it('preserves large positive finite now() at IEEE max magnitude (symmetric with negative MAX_VALUE)', () => {
+    vi.stubGlobal('performance', { now: () => Number.MAX_VALUE })
+    expect(safePerformanceNowMs()).toBe(Number.MAX_VALUE)
+  })
+
   it('returns 0 when performance or now is missing', () => {
     // @ts-expect-error — exercise partial global
     vi.stubGlobal('performance', {})
