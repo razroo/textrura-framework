@@ -516,6 +516,7 @@ describe('syncVirtualWindow', () => {
             expect(Number.isFinite(r.start)).toBe(true)
             expect(Number.isFinite(r.end)).toBe(true)
             expect(Number.isFinite(r.selected)).toBe(true)
+            expect(r.start).toBeLessThanOrEqual(r.end)
           }
         }
       }
