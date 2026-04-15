@@ -117,6 +117,20 @@ describe('inclusiveEndIndex', () => {
     expect(() => inclusiveEndIndex(boxed, 5, 4)).not.toThrow()
     expect(inclusiveEndIndex(boxed, 5, 4)).toBe(inclusiveEndIndex(Number.NaN, 5, 4))
   })
+
+  it('treats boxed maxIndex like a non-number cap (typeof guard; finite spanEnd matches NaN maxIndex branch)', () => {
+    const boxedMax = Object(9) as unknown as number
+    expect(typeof boxedMax === 'number').toBe(false)
+    expect(inclusiveEndIndex(0, boxedMax, 5)).toBe(inclusiveEndIndex(0, Number.NaN, 5))
+    expect(inclusiveEndIndex(2, boxedMax, 4)).toBe(inclusiveEndIndex(2, Number.NaN, 4))
+  })
+
+  it('treats boxed safeWindow like NaN (spanEnd non-finite; same fallback as corrupt window magnitude)', () => {
+    const boxedW = Object(5) as unknown as number
+    expect(typeof boxedW === 'number').toBe(false)
+    expect(inclusiveEndIndex(0, 9, boxedW)).toBe(inclusiveEndIndex(0, 9, Number.NaN))
+    expect(inclusiveEndIndex(4, 99, boxedW)).toBe(inclusiveEndIndex(4, 99, Number.NaN))
+  })
 })
 
 describe('syncVirtualWindow', () => {
