@@ -549,6 +549,16 @@ describe('coalescePatches', () => {
     ).toEqual([{ path: [1], x: 1 }])
   })
 
+  it('ignores Symbol geometry fields without throwing (typeof guard; parity with isFinitePlainNumber)', () => {
+    const sx = Symbol('x') as unknown as number
+    expect(
+      coalescePatches([
+        { path: [0], x: 10, y: 2, width: 40, height: 30 },
+        { path: [0], x: sx, y: sx, width: sx, height: sx },
+      ]),
+    ).toEqual([{ path: [0], x: 10, y: 2, width: 40, height: 30 }])
+  })
+
   it('coalesces burst updates to the root path (empty path segment)', () => {
     const merged = coalescePatches([
       { path: [], x: 1 },
