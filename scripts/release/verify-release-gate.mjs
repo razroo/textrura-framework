@@ -86,6 +86,12 @@ async function main() {
       'release:gate: second && segment must be the single vitest allowlist batch (must start with `vitest run`)',
     )
   }
+  // Watch mode never belongs in CI gate scripts — it blocks until interrupted and ignores the allowlist intent.
+  if (/--watch(?:All)?\b/.test(vitestSegment) || /(^|\s)-w(\s|$)/.test(vitestSegment)) {
+    throw new Error(
+      'release:gate: vitest batch segment must not include watch-mode flags (--watch, --watchAll, -w); the gate must be a single non-interactive `vitest run` batch',
+    )
+  }
 
   const tokens = gate.split(/\s+/).filter(Boolean)
   const paths = tokens.filter(t => t.startsWith('packages/') && t.endsWith('.test.ts'))
