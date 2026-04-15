@@ -76,6 +76,12 @@ describe('inclusiveEndIndex', () => {
     expect(inclusiveEndIndex(1, 20, -1)).toBe(-1)
   })
 
+  it('allows a negative inclusive end when start is negative enough that spanEnd stays negative while maxIndex is still positive (direct callers)', () => {
+    // Distinct from safeWindow ≤ 0: here window is a modest positive count but start pulls the span below zero.
+    // -20 + 10 - 1 = -11; Math.min(Math.max(0, 5), -11) = -11.
+    expect(inclusiveEndIndex(-20, 5, 10)).toBe(-11)
+  })
+
   it('clamps a finite negative maxIndex to 0 before min(spanEnd) so corrupt caps cannot yield a negative end when spanEnd is positive', () => {
     // spanEnd 4 and 5 stay positive; without clamping, Math.min(-3, 4) / Math.min(-1, 5) would be negative.
     expect(inclusiveEndIndex(0, -3, 5)).toBe(0)
