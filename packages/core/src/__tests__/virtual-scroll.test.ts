@@ -335,6 +335,14 @@ describe('syncVirtualWindow', () => {
     expect(syncVirtualWindow(8, 3, 2, Number.NEGATIVE_INFINITY)).toEqual({ start: 0, end: 2, selected: 2 })
   })
 
+  it('treats currentStart that overflows double range to Infinity like explicit ±Infinity (parity with JSON / corrupt float edges)', () => {
+    expect(Number.MAX_VALUE * 2).toBe(Infinity)
+    expect(syncVirtualWindow(10, 4, 5, Number.MAX_VALUE * 2)).toEqual(
+      syncVirtualWindow(10, 4, 5, Number.POSITIVE_INFINITY),
+    )
+    expect(syncVirtualWindow(10, 4, 5, Number.MAX_VALUE * 2)).toEqual(syncVirtualWindow(10, 4, 5, 0))
+  })
+
   it('treats non-finite totalRows as zero rows (empty list semantics)', () => {
     expect(syncVirtualWindow(Number.POSITIVE_INFINITY, 5, 0, 0)).toEqual({ start: 0, end: 0, selected: 0 })
     expect(syncVirtualWindow(Number.NEGATIVE_INFINITY, 5, 0, 0)).toEqual({ start: 0, end: 0, selected: 0 })
