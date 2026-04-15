@@ -33,6 +33,12 @@ describe('isFinitePlainNumber', () => {
     expect(isFinitePlainNumber(1n as unknown as number)).toBe(false)
     expect(isFinitePlainNumber(Object(3) as unknown as number)).toBe(false)
   })
+
+  it('rejects boxed Number objects holding NaN or ±Infinity (typeof object; no primitive unwrap)', () => {
+    expect(isFinitePlainNumber(Object(NaN) as unknown as number)).toBe(false)
+    expect(isFinitePlainNumber(Object(Number.POSITIVE_INFINITY) as unknown as number)).toBe(false)
+    expect(isFinitePlainNumber(Object(Number.NEGATIVE_INFINITY) as unknown as number)).toBe(false)
+  })
 })
 
 describe('layoutBoundsAreFinite', () => {
