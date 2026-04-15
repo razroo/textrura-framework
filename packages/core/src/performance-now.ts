@@ -29,8 +29,8 @@ export function safePerformanceNowMs(): number {
  *
  * Unlike {@link safePerformanceNowMs}, any value with `typeof t === 'number'` is returned as-is,
  * including `NaN` and `±Infinity`, so broken clocks can be detected. Values that are not primitive
- * numbers (boxed numbers, `null` — `typeof null === 'object'`, strings, bigint, etc.) become `0` — `typeof` gates avoid `ToNumber`
- * coercion that could throw on `bigint`.
+ * numbers (boxed numbers, `null` — `typeof null === 'object'`, strings, bigint, objects with
+ * `Symbol.toPrimitive`, etc.) become `0` — `typeof` gates avoid `ToNumber` coercion that could throw on `bigint`.
  *
  * Callers computing wall-time deltas should clamp with `Number.isFinite` and `Math.max(0, …)` the
  * same way layout timings are sanitized after Yoga (see canvas renderer `lastRenderWallMs`).

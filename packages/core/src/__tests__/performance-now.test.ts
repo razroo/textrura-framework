@@ -148,6 +148,16 @@ describe('safePerformanceNowMs', () => {
     expect(safePerformanceNowMs()).toBe(0)
   })
 
+  it('returns 0 when now() returns an object with Symbol.toPrimitive (typeof object; no ToPrimitive coercion)', () => {
+    vi.stubGlobal('performance', {
+      now: () =>
+        ({
+          [Symbol.toPrimitive]: () => 99,
+        }) as unknown as number,
+    })
+    expect(safePerformanceNowMs()).toBe(0)
+  })
+
   it('returns 0 when now() returns an array (typeof object; no numeric coercion)', () => {
     vi.stubGlobal('performance', { now: () => [] as unknown as number })
     expect(safePerformanceNowMs()).toBe(0)
@@ -273,6 +283,16 @@ describe('readPerformanceNow', () => {
 
   it('maps plain objects with valueOf to 0 (typeof object; no ToPrimitive / numeric coercion)', () => {
     vi.stubGlobal('performance', { now: () => ({ valueOf: () => 12 }) as unknown as number })
+    expect(readPerformanceNow()).toBe(0)
+  })
+
+  it('maps objects with Symbol.toPrimitive to 0 (typeof object; no ToPrimitive / numeric coercion)', () => {
+    vi.stubGlobal('performance', {
+      now: () =>
+        ({
+          [Symbol.toPrimitive]: () => 99,
+        }) as unknown as number,
+    })
     expect(readPerformanceNow()).toBe(0)
   })
 
