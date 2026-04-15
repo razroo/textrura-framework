@@ -5,6 +5,10 @@ export interface NormalizedConnectTarget {
   wsUrl?: string
 }
 
+/** Returned when `geometra_connect` omits both `url` and `pageUrl`, or supplies both at once. */
+export const CONNECT_TARGET_EXACTLY_ONE_ERROR =
+  'Provide exactly one of: url (WebSocket or webpage URL) or pageUrl (https://…).'
+
 export function normalizeConnectTarget(input: {
   url?: string
   pageUrl?: string
@@ -13,11 +17,11 @@ export function normalizeConnectTarget(input: {
   const rawPageUrl = normalizeOptional(input.pageUrl)
 
   if (rawUrl && rawPageUrl) {
-    return { ok: false, error: 'Provide exactly one of: url (WebSocket or webpage URL) or pageUrl (https://…).'}
+    return { ok: false, error: CONNECT_TARGET_EXACTLY_ONE_ERROR }
   }
 
   if (!rawUrl && !rawPageUrl) {
-    return { ok: false, error: 'Provide exactly one of: url (WebSocket or webpage URL) or pageUrl (https://…).'}
+    return { ok: false, error: CONNECT_TARGET_EXACTLY_ONE_ERROR }
   }
 
   if (rawPageUrl) {

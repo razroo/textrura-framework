@@ -3,7 +3,12 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { formatConnectFailureMessage, isHttpUrl, normalizeConnectTarget } from '../connect-utils.js'
+import {
+  CONNECT_TARGET_EXACTLY_ONE_ERROR,
+  formatConnectFailureMessage,
+  isHttpUrl,
+  normalizeConnectTarget,
+} from '../connect-utils.js'
 import {
   formatProxyStartupFailure,
   parseProxyReadySignalLine,
@@ -76,12 +81,12 @@ describe('normalizeConnectTarget', () => {
   it('rejects ambiguous and empty connect inputs', () => {
     expect(normalizeConnectTarget({})).toEqual({
       ok: false,
-      error: 'Provide exactly one of: url (WebSocket or webpage URL) or pageUrl (https://…).',
+      error: CONNECT_TARGET_EXACTLY_ONE_ERROR,
     })
 
     expect(normalizeConnectTarget({ url: 'ws://127.0.0.1:3100', pageUrl: 'https://example.com' })).toEqual({
       ok: false,
-      error: 'Provide exactly one of: url (WebSocket or webpage URL) or pageUrl (https://…).',
+      error: CONNECT_TARGET_EXACTLY_ONE_ERROR,
     })
   })
 
@@ -122,14 +127,14 @@ describe('normalizeConnectTarget', () => {
   it('trims whitespace-only inputs to empty (same as omitting url/pageUrl)', () => {
     expect(normalizeConnectTarget({ url: '   ', pageUrl: undefined })).toEqual({
       ok: false,
-      error: 'Provide exactly one of: url (WebSocket or webpage URL) or pageUrl (https://…).',
+      error: CONNECT_TARGET_EXACTLY_ONE_ERROR,
     })
   })
 
   it('trims whitespace-only pageUrl to empty (symmetric with url-only whitespace)', () => {
     expect(normalizeConnectTarget({ pageUrl: '   ' })).toEqual({
       ok: false,
-      error: 'Provide exactly one of: url (WebSocket or webpage URL) or pageUrl (https://…).',
+      error: CONNECT_TARGET_EXACTLY_ONE_ERROR,
     })
   })
 })
