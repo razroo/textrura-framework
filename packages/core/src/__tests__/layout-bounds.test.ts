@@ -1334,6 +1334,15 @@ describe('finiteNumberOrZero', () => {
     expect(() => finiteNumberOrZero(r)).not.toThrow()
     expect(finiteNumberOrZero(r)).toBe(0)
   })
+
+  it('maps WeakMap and WeakSet to 0 without throwing (typeof object; parity with Map/Set scroll guards)', () => {
+    const wm = new WeakMap() as unknown as number
+    const ws = new WeakSet() as unknown as number
+    expect(() => finiteNumberOrZero(wm)).not.toThrow()
+    expect(finiteNumberOrZero(wm)).toBe(0)
+    expect(() => finiteNumberOrZero(ws)).not.toThrow()
+    expect(finiteNumberOrZero(ws)).toBe(0)
+  })
 })
 
 describe('composed scroll + inclusive rect (hit-test coordinate space)', () => {
