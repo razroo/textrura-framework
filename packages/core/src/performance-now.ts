@@ -18,7 +18,7 @@ export function safePerformanceNowMs(): number {
     const perf = globalThis.performance
     if (perf && typeof perf.now === 'function') {
       const t = perf.now()
-      return typeof t === 'number' && Number.isFinite(t) ? t : 0
+      return isFinitePlainNumber(t) ? t : 0
     }
   } catch {
     // ignore
