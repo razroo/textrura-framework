@@ -101,6 +101,22 @@ describe('inclusiveEndIndex', () => {
     expect(inclusiveEndIndex(0, -3, 5)).toBe(0)
     expect(inclusiveEndIndex(2, -1, 4)).toBe(0)
   })
+
+  it('does not throw on BigInt or boxed operands; matches NaN / non-number paths (typeof guard before + and Number.isFinite)', () => {
+    const z = 0n as unknown as number
+    const one = 1n as unknown as number
+    expect(() => inclusiveEndIndex(one, 9, 4)).not.toThrow()
+    expect(inclusiveEndIndex(one, 9, 4)).toBe(inclusiveEndIndex(Number.NaN, 9, 4))
+    expect(() => inclusiveEndIndex(2, 9, one)).not.toThrow()
+    expect(inclusiveEndIndex(2, 9, one)).toBe(inclusiveEndIndex(2, 9, Number.NaN))
+    expect(() => inclusiveEndIndex(0, one, 5)).not.toThrow()
+    expect(inclusiveEndIndex(0, one, 5)).toBe(inclusiveEndIndex(0, Number.NaN, 5))
+    expect(() => inclusiveEndIndex(z, 3, 4)).not.toThrow()
+    expect(inclusiveEndIndex(z, 3, 4)).toBe(inclusiveEndIndex(Number.NaN, 3, 4))
+    const boxed = Object(3) as unknown as number
+    expect(() => inclusiveEndIndex(boxed, 5, 4)).not.toThrow()
+    expect(inclusiveEndIndex(boxed, 5, 4)).toBe(inclusiveEndIndex(Number.NaN, 5, 4))
+  })
 })
 
 describe('syncVirtualWindow', () => {

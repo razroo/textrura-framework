@@ -40,25 +40,27 @@ function nonNegativeOrZero(n: unknown): number {
  *
  * Exported for parity tests and advanced virtual-list math; {@link syncVirtualWindow} is the primary API.
  *
- * @param start — Window start row (inclusive). `syncVirtualWindow` passes floored non-negative indices; direct callers may pass corrupt values — NaN/±Inf on `start` or `safeWindow` yield non-finite `spanEnd` and fall through to the `maxIndex` / `0` branches (see tests).
+ * @param start — Window start row (inclusive). `syncVirtualWindow` passes floored non-negative indices; direct callers may pass corrupt values — NaN/±Inf on `start` or `safeWindow` yield non-finite `spanEnd` and fall through to the `maxIndex` / `0` branches (see tests). Non-number values (including `BigInt` and boxed numbers) are treated like `NaN` for span math — they must not reach `+` (which throws on `bigint`/`number` mix) or `Number.isFinite(bigint)` (which throws in ECMAScript).
  * @param maxIndex — Inclusive last row index in the list. Negative values clamp to `0` before `Math.min` with `spanEnd` so a corrupt cap cannot produce a negative end when `spanEnd` is still positive.
  * @param safeWindow — Visible row count for the span (`start + safeWindow - 1`). `syncVirtualWindow` always passes `≥ 1`; smaller or negative windows can yield negative `spanEnd` (documented for direct callers).
  * @returns Inclusive last visible row index, or a safe fallback when `spanEnd` or `maxIndex` is non-finite (see implementation).
  */
 export function inclusiveEndIndex(start: number, maxIndex: number, safeWindow: number): number {
-  const spanEnd = start + safeWindow - 1
+  const spanEnd =
+    typeof start === 'number' && typeof safeWindow === 'number' ? start + safeWindow - 1 : Number.NaN
+  const maxIdx = typeof maxIndex === 'number' ? maxIndex : Number.NaN
   if (!Number.isFinite(spanEnd)) {
     // Match the finite-span branch: clamp corrupt negative caps so callers never get a negative end when
     // span math overflowed (syncVirtualWindow always supplies non-negative maxIndex; direct callers may not).
-    if (!Number.isFinite(maxIndex)) return 0
-    return Math.max(0, maxIndex)
+    if (!Number.isFinite(maxIdx)) return 0
+    return Math.max(0, maxIdx)
   }
-  if (!Number.isFinite(maxIndex)) {
+  if (!Number.isFinite(maxIdx)) {
     return spanEnd
   }
   // maxIndex is always non-negative from syncVirtualWindow; clamp so direct callers with corrupt
   // negative caps cannot produce a negative end when spanEnd is still positive.
-  return Math.min(Math.max(0, maxIndex), spanEnd)
+  return Math.min(Math.max(0, maxIdx), spanEnd)
 }
 
 /**
