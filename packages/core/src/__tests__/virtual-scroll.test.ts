@@ -15,6 +15,12 @@ describe('inclusiveEndIndex', () => {
     expect(inclusiveEndIndex(0, 4, 100)).toBe(4)
   })
 
+  it('window of 1 yields end === start when spanEnd stays finite (single visible row; syncVirtualWindow uses window ≥ 1)', () => {
+    expect(inclusiveEndIndex(7, 99, 1)).toBe(7)
+    expect(inclusiveEndIndex(0, 0, 1)).toBe(0)
+    expect(inclusiveEndIndex(Number.MAX_SAFE_INTEGER - 1, Number.MAX_SAFE_INTEGER - 1, 1)).toBe(Number.MAX_SAFE_INTEGER - 1)
+  })
+
   it('returns maxIndex when spanEnd is -Infinity (e.g. -Infinity start; same non-finite guard as +Infinity overflow)', () => {
     const maxIndex = 12
     expect(Number.isFinite(-Infinity + 5 - 1)).toBe(false)
