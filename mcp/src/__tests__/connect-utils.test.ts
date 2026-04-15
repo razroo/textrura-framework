@@ -3,7 +3,7 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { formatConnectFailureMessage, normalizeConnectTarget } from '../connect-utils.js'
+import { formatConnectFailureMessage, isHttpUrl, normalizeConnectTarget } from '../connect-utils.js'
 import {
   formatProxyStartupFailure,
   parseProxyReadySignalLine,
@@ -71,6 +71,65 @@ describe('normalizeConnectTarget', () => {
       error: 'Provide exactly one of: url (WebSocket or webpage URL) or pageUrl (https://…).',
     })
   })
+
+  it('rejects invalid pageUrl strings (URL parser failure)', () => {
+    const result = normalizeConnectTarget({ pageUrl: 'https://exam ple.com' })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error.startsWith('Invalid pageUrl:')).toBe(true)
+    }
+  })
+
+  it('rejects non-http(s) url when using pageUrl (explicit)', () => {
+    expect(normalizeConnectTarget({ pageUrl: 'file:///tmp/x.html' })).toEqual({
+      ok: false,
+      error: 'pageUrl must use http:// or https:// (received file:)',
+    })
+  })
+
+  it('rejects invalid url strings for the url field', () => {
+    const result = normalizeConnectTarget({ url: ':::not-a-url' })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error).toContain('Invalid url:')
+      expect(result.error).toContain('ws://')
+    }
+  })
+
+  it('rejects unsupported protocols on the url field (neither http(s) nor ws(s))', () => {
+    expect(normalizeConnectTarget({ url: 'ftp://files.example.com/pub' })).toEqual({
+      ok: false,
+      error:
+        'Unsupported url protocol ftp:. Use ws://... for an already-running Geometra server, or http:// / https:// for webpages.',
+    })
+  })
+
+  it('trims whitespace-only inputs to empty (same as omitting url/pageUrl)', () => {
+    expect(normalizeConnectTarget({ url: '   ', pageUrl: undefined })).toEqual({
+      ok: false,
+      error: 'Provide exactly one of: url (WebSocket or webpage URL) or pageUrl (https://…).',
+    })
+  })
+})
+
+describe('isHttpUrl', () => {
+  it('accepts http and https URLs', () => {
+    expect(isHttpUrl('https://example.com/path')).toBe(true)
+    expect(isHttpUrl('http://localhost:8080/')).toBe(true)
+  })
+
+  it('rejects ws(s), file, and other schemes', () => {
+    expect(isHttpUrl('ws://127.0.0.1:3100')).toBe(false)
+    expect(isHttpUrl('wss://example.com')).toBe(false)
+    expect(isHttpUrl('file:///tmp/x')).toBe(false)
+  })
+
+  it('rejects malformed strings', () => {
+    expect(isHttpUrl('not a url')).toBe(false)
+    expect(isHttpUrl('')).toBe(false)
+  })
 })
 
 describe('formatConnectFailureMessage', () => {
@@ -82,6 +141,16 @@ describe('formatConnectFailureMessage', () => {
 
     expect(message).toContain('ECONNREFUSED')
     expect(message).toContain('pageUrl: "https://…"')
+  })
+
+  it('adds an install hint when the proxy package cannot be resolved', () => {
+    const message = formatConnectFailureMessage(
+      new Error('Could not resolve @geometra/proxy from mcp'),
+      { kind: 'proxy', pageUrl: 'https://example.com', autoCoercedFromUrl: false },
+    )
+
+    expect(message).toContain('Could not resolve @geometra/proxy')
+    expect(message).toContain('@geometra/proxy')
   })
 })
 
