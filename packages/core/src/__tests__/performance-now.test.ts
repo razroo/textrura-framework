@@ -515,6 +515,17 @@ describe('clampNonNegativeLayoutWallMs', () => {
     expect(clampNonNegativeLayoutWallMs(-3)).toBe(0)
   })
 
+  it('maps double overflow and JSON exponent overflow to 0 (corrupt ms is not a finite primitive number)', () => {
+    expect(Number.MAX_VALUE * 2).toBe(Infinity)
+    expect(clampNonNegativeLayoutWallMs(Number.MAX_VALUE * 2)).toBe(0)
+    const posOverflow = Number.parseFloat('1e400')
+    const negOverflow = Number.parseFloat('-1e400')
+    expect(posOverflow).toBe(Infinity)
+    expect(negOverflow).toBe(-Infinity)
+    expect(clampNonNegativeLayoutWallMs(posOverflow)).toBe(0)
+    expect(clampNonNegativeLayoutWallMs(negOverflow)).toBe(0)
+  })
+
   it('normalizes IEEE −0 to +0 (Math.max; parity with CanvasRenderer lastLayoutWallMs / HUD toFixed)', () => {
     const t = clampNonNegativeLayoutWallMs(-0)
     expect(Object.is(t, -0)).toBe(false)
