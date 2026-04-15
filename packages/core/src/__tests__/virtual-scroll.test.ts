@@ -56,6 +56,14 @@ describe('inclusiveEndIndex', () => {
     expect(inclusiveEndIndex(0, -3, Number.POSITIVE_INFINITY)).toBe(0)
   })
 
+  it('returns maxIndex when safeWindow is -Infinity (non-finite window; isFinitePlainNumber is false before addition)', () => {
+    expect(Number.isFinite(Number.NEGATIVE_INFINITY)).toBe(false)
+    expect(Number.isFinite(0 + Number.NEGATIVE_INFINITY - 1)).toBe(false)
+    expect(inclusiveEndIndex(0, 12, Number.NEGATIVE_INFINITY)).toBe(12)
+    expect(inclusiveEndIndex(4, 99, Number.NEGATIVE_INFINITY)).toBe(99)
+    expect(inclusiveEndIndex(0, -3, Number.NEGATIVE_INFINITY)).toBe(0)
+  })
+
   it('returns maxIndex when any argument makes spanEnd NaN (NaN start/window poison the sum)', () => {
     expect(inclusiveEndIndex(Number.NaN, 9, 4)).toBe(9)
     expect(inclusiveEndIndex(2, 9, Number.NaN)).toBe(9)
