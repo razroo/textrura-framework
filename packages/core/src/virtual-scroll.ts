@@ -46,6 +46,10 @@ function nonNegativeOrZero(n: unknown): number {
  *   Negative values clamp to `0` before `Math.min` with `spanEnd` so a corrupt cap cannot produce a negative end when `spanEnd` is still positive.
  * @param safeWindow — Visible row count for the span (`start + safeWindow - 1`). `syncVirtualWindow` always passes `≥ 1`; smaller or negative windows can yield negative `spanEnd` (documented for direct callers).
  * @returns Inclusive last visible row index, or a safe fallback when `spanEnd` or `maxIndex` is non-finite (see implementation).
+ *
+ * @example
+ * // Ten rows visible in a window of 3 starting at row 2 → last visible row is 4.
+ * inclusiveEndIndex(2, 99, 3) // => 4
  */
 export function inclusiveEndIndex(start: number, maxIndex: number, safeWindow: number): number {
   const spanEnd =
@@ -85,6 +89,11 @@ export function inclusiveEndIndex(start: number, maxIndex: number, safeWindow: n
  *
  * @returns Indices with `start <= end`, selection clamped to `[0, totalRows - 1]` (or `0` when empty), and
  *   `selected` always inside `[start, end]` whenever `totalRows > 0`.
+ *
+ * @example
+ * // 100 rows, 10 visible, selection at row 20, window was scrolled to start at 15.
+ * syncVirtualWindow(100, 10, 20, 15)
+ * // => { start: 15, end: 24, selected: 20 }
  */
 export function syncVirtualWindow(
   totalRows: number,
