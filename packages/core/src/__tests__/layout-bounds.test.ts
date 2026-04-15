@@ -639,6 +639,14 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(-0.001, 3, 0, 3, 20, 0)).toBe(false)
   })
 
+  it('accepts inclusive far corner for positive subnormal width and height (tiny non-degenerate area; right/bottom stay finite)', () => {
+    const w = Number.MIN_VALUE
+    const h = Number.MIN_VALUE
+    expect(pointInInclusiveLayoutRect(0, 0, 0, 0, w, h)).toBe(true)
+    expect(pointInInclusiveLayoutRect(w, h, 0, 0, w, h)).toBe(true)
+    expect(pointInInclusiveLayoutRect(w + Number.MIN_VALUE, 0, 0, 0, w, h)).toBe(false)
+  })
+
   it('treats subnormal width at extreme absX as a collapsed rect: absX+width rounds to absX; inclusive min corner still hits', () => {
     const absX = Number.MAX_VALUE
     const w = Number.MIN_VALUE
@@ -987,6 +995,11 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(0, 0, 0, max)).toEqual({ ox: 0, oy: -max })
     // Large scroll with modest abs: difference stays finite (distinct from abs±scroll overflow → null cases above).
     expect(scrollSafeChildOffsets(100, 200, max, max)).toEqual({ ox: 100 - max, oy: 200 - max })
+  })
+
+  it('preserves Number.MAX_VALUE on both axes when scroll is 0 (distinct from max − (−max) overflow → null)', () => {
+    const max = Number.MAX_VALUE
+    expect(scrollSafeChildOffsets(max, max, 0, 0)).toEqual({ ox: max, oy: max })
   })
 
   it('coerces non-finite scroll props via finiteNumberOrZero', () => {
