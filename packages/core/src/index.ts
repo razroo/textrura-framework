@@ -2,8 +2,10 @@
  * @packageDocumentation
  * Public entry for `@geometra/core`: reactive primitives, element constructors (`box`, `text`, {@link bodyText},
  * `image`, `scene3d`), app mount, layout-tree
- * conversion, hit-testing, shared layout coordinate helpers ({@link finiteNumberOrZero}, {@link isFinitePlainNumber},
- * {@link layoutBoundsAreFinite}, {@link scrollSafeChildOffsets}, {@link pointInInclusiveLayoutRect}), focus and
+ * conversion, hit-testing, shared layout coordinate helpers ({@link finiteNumberOrZero}, {@link finiteRootExtent},
+ * {@link isFinitePlainNumber}, {@link layoutBoundsAreFinite}, {@link scrollSafeChildOffsets},
+ * {@link pointInInclusiveLayoutRect}), monotonic timing helpers ({@link safePerformanceNowMs}, {@link readPerformanceNow}),
+ * focus and
  * keyboard/composition dispatch, text selection and input, web font
  * helpers, {@link streamText} for coalesced token streams, viewport/breakpoint helpers ({@link createViewport},
  * {@link breakpoint}, {@link responsive}), animation helpers, and virtual list windowing ({@link syncVirtualWindow},
