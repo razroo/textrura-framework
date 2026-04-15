@@ -80,7 +80,9 @@ export function formatConnectFailureMessage(err: unknown, target: NormalizedConn
 
   if (
     target.kind === 'ws' &&
-    /ECONNREFUSED|timed out|closed before first frame|WebSocket error connecting/i.test(base)
+    /ECONNREFUSED|ENOTFOUND|getaddrinfo|timed out|closed before first frame|WebSocket error connecting/i.test(
+      base,
+    )
   ) {
     hints.push('If this is a normal website, call geometra_connect with pageUrl: "https://…" so MCP can start @geometra/proxy for you.')
   }

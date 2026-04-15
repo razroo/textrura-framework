@@ -161,6 +161,16 @@ describe('formatConnectFailureMessage', () => {
     expect(message).toContain('pageUrl: "https://…"')
   })
 
+  it('adds the same hint when ws connect fails with DNS resolution errors (wrong host or offline resolver)', () => {
+    const message = formatConnectFailureMessage(
+      new Error('getaddrinfo ENOTFOUND bad.example.com'),
+      { kind: 'ws', wsUrl: 'ws://bad.example.com:3100', autoCoercedFromUrl: false },
+    )
+
+    expect(message).toContain('ENOTFOUND')
+    expect(message).toContain('pageUrl:')
+  })
+
   it('adds an install hint when the proxy package cannot be resolved', () => {
     const message = formatConnectFailureMessage(
       new Error('Could not resolve @geometra/proxy from mcp'),
