@@ -559,6 +559,21 @@ describe('coalescePatches', () => {
     ).toEqual([{ path: [0], x: 10, y: 2, width: 40, height: 30 }])
   })
 
+  it('ignores Map, Set, Date, RegExp, and Promise geometry fields without throwing (typeof object; parity with layout bounds)', () => {
+    const m = new Map() as unknown as number
+    const s = new Set() as unknown as number
+    const d = new Date(0) as unknown as number
+    const r = /./ as unknown as number
+    const p = Promise.resolve(1) as unknown as number
+    expect(
+      coalescePatches([
+        { path: [0], x: 10, y: 2, width: 40, height: 30 },
+        { path: [0], x: m, y: s, width: d, height: r },
+        { path: [0], x: p, y: p, width: p, height: p },
+      ]),
+    ).toEqual([{ path: [0], x: 10, y: 2, width: 40, height: 30 }])
+  })
+
   it('coalesces burst updates to the root path (empty path segment)', () => {
     const merged = coalescePatches([
       { path: [], x: 1 },
