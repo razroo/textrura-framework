@@ -124,6 +124,21 @@ describe('inclusiveEndIndex', () => {
     expect(inclusiveEndIndex(2, negZero as number, 4)).toBe(0)
   })
 
+  it('treats IEEE −0 start like +0 for finite span math (isFinitePlainNumber(−0); parity with layout-bounds signed zero)', () => {
+    const negZero: unknown = -0
+    expect(Object.is(negZero, 0)).toBe(false)
+    // spanEnd = −0 + 4 − 1 = 3; cap 10 → inclusive end 3 (same as start 0).
+    expect(inclusiveEndIndex(negZero as number, 10, 4)).toBe(inclusiveEndIndex(0, 10, 4))
+    expect(inclusiveEndIndex(negZero as number, 10, 4)).toBe(3)
+  })
+
+  it('treats IEEE −0 safeWindow like +0 for spanEnd (0 + (−0) − 1 = −1; direct callers; syncVirtualWindow floors window to ≥ 1)', () => {
+    const negZero: unknown = -0
+    expect(Object.is(negZero, 0)).toBe(false)
+    expect(inclusiveEndIndex(0, 100, negZero as number)).toBe(inclusiveEndIndex(0, 100, 0))
+    expect(inclusiveEndIndex(0, 100, negZero as number)).toBe(-1)
+  })
+
   it('direct callers: fractional positive maxIndex passes through Math.max(0, maxIdx) then Math.min with spanEnd (syncVirtualWindow uses integer caps only)', () => {
     // spanEnd = 0 + 5 - 1 = 4; cap 2.7 is below spanEnd
     expect(inclusiveEndIndex(0, 2.7, 5)).toBe(2.7)
