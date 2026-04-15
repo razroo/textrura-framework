@@ -47,6 +47,19 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ x: -10, y: 3.5, width: 0, height: 0, children: [] })).toBe(true)
   })
 
+  it('reads x/y/width/height/children from the prototype chain (ordinary [[Get]]; layout-bounds JSDoc)', () => {
+    const proto = { x: 1, y: 2, width: 30, height: 40, children: [] as const }
+    const layout = Object.create(proto) as unknown as ComputedLayout
+    expect(Object.keys(layout)).toHaveLength(0)
+    expect(layoutBoundsAreFinite(layout)).toBe(true)
+  })
+
+  it('rejects invalid dimensions inherited on the prototype chain (negative width)', () => {
+    const proto = { x: 0, y: 0, width: -4, height: 10, children: [] as const }
+    const layout = Object.create(proto) as unknown as ComputedLayout
+    expect(layoutBoundsAreFinite(layout)).toBe(false)
+  })
+
   it('accepts IEEE −0 width or height (signed zero still satisfies `>= 0`; serializers / float edges)', () => {
     expect(Object.is(-0, 0)).toBe(false)
     const w = -0
