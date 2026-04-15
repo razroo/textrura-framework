@@ -45,6 +45,11 @@ describe('isFinitePlainNumber', () => {
     expect(() => isFinitePlainNumber(bare)).not.toThrow()
     expect(isFinitePlainNumber(bare)).toBe(false)
   })
+
+  it('rejects function values (typeof function; mistaken callbacks / host mistakes)', () => {
+    const fn = (): number => 1
+    expect(isFinitePlainNumber(fn as unknown as number)).toBe(false)
+  })
 })
 
 describe('layoutBoundsAreFinite', () => {
@@ -1032,6 +1037,20 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(10, 20, d, 4)).toEqual({ ox: 10, oy: 16 })
     expect(() => scrollSafeChildOffsets(10, 20, 3, r)).not.toThrow()
     expect(scrollSafeChildOffsets(10, 20, 3, r)).toEqual({ ox: 7, oy: 20 })
+  })
+
+  it('coerces Map, Set, and Promise scroll props to 0 without throwing (typeof object; parity with finiteRootExtent exotic guards)', () => {
+    const m = new Map() as unknown as number
+    const st = new Set() as unknown as number
+    const pr = Promise.resolve(1) as unknown as number
+    expect(() => scrollSafeChildOffsets(10, 20, m, 4)).not.toThrow()
+    expect(scrollSafeChildOffsets(10, 20, m, 4)).toEqual({ ox: 10, oy: 16 })
+    expect(() => scrollSafeChildOffsets(10, 20, 3, st)).not.toThrow()
+    expect(scrollSafeChildOffsets(10, 20, 3, st)).toEqual({ ox: 7, oy: 20 })
+    expect(() => scrollSafeChildOffsets(11, 22, pr, 1)).not.toThrow()
+    expect(scrollSafeChildOffsets(11, 22, pr, 1)).toEqual({ ox: 11, oy: 21 })
+    expect(() => scrollSafeChildOffsets(11, 22, 2, pr)).not.toThrow()
+    expect(scrollSafeChildOffsets(11, 22, 2, pr)).toEqual({ ox: 9, oy: 22 })
   })
 
   it('coerces scroll props with valueOf or Symbol.toPrimitive to 0 (typeof object; finiteNumberOrZero parity; no ToNumber)', () => {
