@@ -2,8 +2,9 @@
  * @packageDocumentation
  * Public entry for `@geometra/core`: reactive primitives, element constructors (`box`, `text`, {@link bodyText},
  * `image`, `scene3d`), app mount, layout-tree
- * conversion, hit-testing, shared layout coordinate helpers ({@link finiteNumberOrZero}, {@link scrollSafeChildOffsets},
- * {@link pointInInclusiveLayoutRect}), focus and keyboard/composition dispatch, text selection and input, web font
+ * conversion, hit-testing, shared layout coordinate helpers ({@link finiteNumberOrZero}, {@link isFinitePlainNumber},
+ * {@link layoutBoundsAreFinite}, {@link scrollSafeChildOffsets}, {@link pointInInclusiveLayoutRect}), focus and
+ * keyboard/composition dispatch, text selection and input, web font
  * helpers, {@link streamText} for coalesced token streams, viewport/breakpoint helpers ({@link createViewport},
  * {@link breakpoint}, {@link responsive}), animation and virtual-scroll utilities, SEO and accessibility snapshots,
  * {@link import('./focus-candidates.js').hasFocusCandidateHandlers} for parity with Tab / click-to-focus
