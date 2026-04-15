@@ -2385,6 +2385,31 @@ describe('logical-axis props', () => {
     expect(result.children[0]!.x).toBe(100 - 12 - 20)
   })
 
+  it('marginInlineEnd offsets from inline-end with flex-end in LTR', () => {
+    const tree: BoxNode = {
+      width: 100,
+      height: 40,
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      children: [{ width: 20, height: 20, marginInlineEnd: 12 }],
+    }
+    const result = computeLayout(tree, { width: 100, direction: 'ltr' })
+    expect(result.children[0]!.x).toBe(100 - 12 - 20)
+  })
+
+  it('marginInlineEnd offsets from inline-end with flex-end in RTL', () => {
+    const tree: BoxNode = {
+      width: 100,
+      height: 40,
+      dir: 'rtl',
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      children: [{ width: 20, height: 20, marginInlineEnd: 12 }],
+    }
+    const result = computeLayout(tree, { width: 100, direction: 'rtl' })
+    expect(result.children[0]!.x).toBe(12)
+  })
+
   it('borderInlineStart reserves space in LTR', () => {
     const tree: BoxNode = {
       width: 100,
@@ -2394,6 +2419,33 @@ describe('logical-axis props', () => {
     }
     const result = computeLayout(tree, { width: 100, direction: 'ltr' })
     expect(result.children[0]!.x).toBe(5)
+  })
+
+  it('borderInlineEnd reserves inline-end space with flex-end in LTR', () => {
+    const tree: BoxNode = {
+      width: 100,
+      height: 40,
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      borderInlineEnd: 7,
+      children: [{ width: 20, height: 20 }],
+    }
+    const result = computeLayout(tree, { width: 100, direction: 'ltr' })
+    expect(result.children[0]!.x).toBe(100 - 7 - 20)
+  })
+
+  it('borderInlineEnd reserves inline-end space with flex-end in RTL', () => {
+    const tree: BoxNode = {
+      width: 100,
+      height: 40,
+      dir: 'rtl',
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      borderInlineEnd: 7,
+      children: [{ width: 20, height: 20 }],
+    }
+    const result = computeLayout(tree, { width: 100, direction: 'rtl' })
+    expect(result.children[0]!.x).toBe(7)
   })
 
   it('insetInlineStart positions absolutely in LTR', () => {
