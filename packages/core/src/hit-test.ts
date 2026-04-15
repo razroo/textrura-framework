@@ -3,6 +3,7 @@ import type { UIElement, BoxElement, EventHandlers, HitEvent } from './types.js'
 import { hasFocusCandidateHandlers } from './focus-candidates.js'
 import {
   finiteNumberOrZero,
+  isFinitePlainNumber,
   layoutBoundsAreFinite,
   pointInInclusiveLayoutRect,
   scrollSafeChildOffsets,
@@ -156,7 +157,7 @@ function collectHits(
   offsetY: number,
   results: HitTarget[],
 ): void {
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return
+  if (!isFinitePlainNumber(x) || !isFinitePlainNumber(y)) return
   if (!layoutBoundsAreFinite(layout)) return
 
   const absX = offsetX + layout.x
@@ -195,7 +196,7 @@ function dispatchHitRecursive(
   offsetY: number,
   extra: Record<string, unknown> | undefined,
 ): HitDispatchResult {
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return { handled: false }
+  if (!isFinitePlainNumber(x) || !isFinitePlainNumber(y)) return { handled: false }
   if (!layoutBoundsAreFinite(layout)) return { handled: false }
   if (element.kind !== 'box') return { handled: false }
 
@@ -287,8 +288,9 @@ function dispatchHitRecursive(
  * For `onClick` only, the return value may include `focusTarget` for focus routing
  * (including click-to-focus when there is no `onClick` handler).
  * Non-box roots (`text`, `image`, `scene3d`) always return `{ handled: false }` — attach pointer handlers to a parent {@link import('./types.js').BoxElement}.
- * Pointer `x` / `y` must be finite numbers: anything that fails `Number.isFinite` (including
- * non-numbers at runtime) returns `{ handled: false }` without invoking handlers.
+ * Pointer `x` / `y` must be **primitive** finite numbers — same rule as
+ * {@link import('./layout-bounds.js').isFinitePlainNumber} / {@link import('./layout-bounds.js').pointInInclusiveLayoutRect}
+ * (boxed numbers and non-numbers return `{ handled: false }` without invoking handlers).
  * Layout bounds must be finite and non-negative on `width` and `height`; otherwise the node is
  * skipped for hit-testing (corrupt geometry from Yoga or a bad snapshot).
  *
@@ -337,7 +339,7 @@ export function dispatchHit(
  * (`onClick`, `onPointerDown` / `Up` / `Move`, `onWheel`). Keyboard and composition
  * handlers alone do not count — use this for hover / pointer-capture style checks.
  *
- * Non-finite or non-number `x` / `y` return `false` (same `Number.isFinite` guard as {@link dispatchHit}).
+ * Non-finite or non-number `x` / `y` return `false` (same {@link import('./layout-bounds.js').isFinitePlainNumber} guard as {@link dispatchHit}).
  *
  * Optional `offsetX` / `offsetY` match {@link hitPathAtPoint} / {@link dispatchHit} for rooted coordinate transforms.
  * Non-finite or non-number offsets are treated as `0`.
@@ -388,7 +390,7 @@ function rootedLayoutPointContainment(
   offsetX: unknown,
   offsetY: unknown,
 ): { absX: number; absY: number } | null {
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+  if (!isFinitePlainNumber(x) || !isFinitePlainNumber(y)) return null
   if (!layoutBoundsAreFinite(layout)) return null
 
   const ox = finiteNumberOrZero(offsetX)
@@ -405,7 +407,7 @@ function rootedLayoutPointContainment(
  * non-finite or non-number `zIndex` values match `dispatchHit` / paint order (treated as `0`).
  * Boxes with `pointerEvents: 'none'` are skipped for path segments; if the deepest matching geometry is only such a box
  * (no deeper box under the point), returns `null` (same as missing the interactive stack).
- * Non-finite or non-number `x` / `y` return `null` (same `Number.isFinite` guard as {@link dispatchHit}).
+ * Non-finite or non-number `x` / `y` return `null` (same {@link import('./layout-bounds.js').isFinitePlainNumber} guard as {@link dispatchHit}).
  * Returns `null` when the point misses the tree, when the root is not a `box` (text/image/scene3d roots have no index path),
  * or in the `pointerEvents: 'none'` deepest-only case above. Returns `[]` when the point hits a box root or leaf box with
  * no deeper box under the point.
@@ -461,7 +463,7 @@ export function hitPathAtPoint(
  * fall through to geometry behind, matching {@link hitPathAtPoint}.
  *
  * Root `offsetX` / `offsetY` follow {@link dispatchHit}: non-finite or non-number values are treated as `0`.
- * Non-finite or non-number `x` / `y` return `null`.
+ * Non-finite or non-number `x` / `y` return `null` ({@link import('./layout-bounds.js').isFinitePlainNumber}).
  *
  * An empty-string `cursor` on a nested box does not stop the walk (child results are checked with truthiness),
  * so the nearest ancestor with a non-empty `cursor` wins. A root hit on a lone box with `cursor: ''` still
