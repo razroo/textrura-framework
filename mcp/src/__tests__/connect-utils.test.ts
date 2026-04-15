@@ -125,6 +125,13 @@ describe('normalizeConnectTarget', () => {
       error: 'Provide exactly one of: url (WebSocket or webpage URL) or pageUrl (https://…).',
     })
   })
+
+  it('trims whitespace-only pageUrl to empty (symmetric with url-only whitespace)', () => {
+    expect(normalizeConnectTarget({ pageUrl: '   ' })).toEqual({
+      ok: false,
+      error: 'Provide exactly one of: url (WebSocket or webpage URL) or pageUrl (https://…).',
+    })
+  })
 })
 
 describe('isHttpUrl', () => {
