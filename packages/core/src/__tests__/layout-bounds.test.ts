@@ -1210,6 +1210,13 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(7, e, 0, 2 * e)).toEqual({ ox: 7, oy: -e })
   })
 
+  it('preserves positive ε child origin when abs is 2ε and scroll is ε (IEEE: 2ε − ε === ε; scroll chain parity)', () => {
+    const e = Number.EPSILON
+    expect(2 * e - e).toBe(e)
+    expect(scrollSafeChildOffsets(2 * e, 100, e, 0)).toEqual({ ox: e, oy: 100 })
+    expect(scrollSafeChildOffsets(100, 2 * e, 0, e)).toEqual({ ox: 100, oy: e })
+  })
+
   it('returns +0 child origin when abs and scroll are the same subnormal (tiny - tiny is +0, not −0)', () => {
     const tiny = Number.MIN_VALUE
     expect(tiny - tiny).toBe(0)
