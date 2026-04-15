@@ -343,6 +343,11 @@ describe('readPerformanceNow', () => {
     expect(readPerformanceNow()).toBe(-Number.MIN_VALUE)
   })
 
+  it('passes through large positive finite now() at IEEE max magnitude (symmetric with safePerformanceNowMs; callers may clamp deltas)', () => {
+    vi.stubGlobal('performance', { now: () => Number.MAX_VALUE })
+    expect(readPerformanceNow()).toBe(Number.MAX_VALUE)
+  })
+
   it('maps non-number now() results to 0 without coercion', () => {
     vi.stubGlobal('performance', { now: () => Object(7) as unknown as number })
     expect(readPerformanceNow()).toBe(0)
