@@ -1787,6 +1787,69 @@ describe('dispatchHit', () => {
     expect(hasInteractiveHitAtPoint(root, layout, 10, 10)).toBe(true)
   })
 
+  it('overlapping siblings: boxed zIndex values coerce via finiteNumberOrZero (two-child path; corrupt props behave like 0)', () => {
+    const log: string[] = []
+    const first = box({
+      width: 50,
+      height: 50,
+      zIndex: Object(5) as unknown as number,
+      onClick: () => {
+        log.push('first')
+      },
+    })
+    const second = box({
+      width: 50,
+      height: 50,
+      zIndex: Object(10) as unknown as number,
+      onClick: () => {
+        log.push('second')
+      },
+    })
+    const root = box({ width: 100, height: 100 }, [first, second])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['second'])
+    expect(hitPathAtPoint(root, layout, 10, 10)).toEqual([1])
+  })
+
+  it('overlapping siblings: primitive zIndex orders above boxed zIndex coerced to 0 (two-child path)', () => {
+    const log: string[] = []
+    const front = box({ width: 50, height: 50, zIndex: 10, onClick: () => { log.push('front') } })
+    const back = box({
+      width: 50,
+      height: 50,
+      zIndex: Object(99) as unknown as number,
+      onClick: () => {
+        log.push('back')
+      },
+    })
+    const root = box({ width: 100, height: 100 }, [back, front])
+    const layout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+        { x: 0, y: 0, width: 50, height: 50, children: [] },
+      ],
+    }
+
+    dispatchHit(root, layout, 'onClick', 10, 10)
+    expect(log).toEqual(['front'])
+    expect(hitPathAtPoint(root, layout, 10, 10)).toEqual([1])
+  })
+
   it('overlapping siblings: two-child z-order updates when equal z-index ties break (fast-path cache)', () => {
     const log: string[] = []
     const first = box({ width: 50, height: 50, zIndex: 0, onClick: () => { log.push('first') } })
