@@ -128,16 +128,16 @@ describe('isBinaryFrameBuffer', () => {
 
   it('returns false for non-integer byteLength on fake views (Uint8Array ctor would throw)', () => {
     const ab = new ArrayBuffer(32)
-    expect(
-      isBinaryFrameBuffer({ buffer: ab, byteOffset: 0, byteLength: 9.5 } as unknown as Uint8Array),
-    ).toBe(false)
+    const fake = { buffer: ab, byteOffset: 0, byteLength: 9.5 } as unknown as Uint8Array
+    expect(isBinaryFrameBuffer(fake)).toBe(false)
+    expect(() => decodeBinaryFrameJson(fake)).toThrow('Not a GEOM binary frame')
   })
 
   it('returns false for non-integer byteOffset on fake views (Uint8Array ctor would throw)', () => {
     const ab = new ArrayBuffer(32)
-    expect(
-      isBinaryFrameBuffer({ buffer: ab, byteOffset: 0.5, byteLength: 16 } as unknown as Uint8Array),
-    ).toBe(false)
+    const fake = { buffer: ab, byteOffset: 0.5, byteLength: 16 } as unknown as Uint8Array
+    expect(isBinaryFrameBuffer(fake)).toBe(false)
+    expect(() => decodeBinaryFrameJson(fake)).toThrow('Not a GEOM binary frame')
   })
 
   it('returns false when a root SharedArrayBuffer is shorter than the v1 header', () => {
