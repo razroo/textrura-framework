@@ -533,4 +533,29 @@ describe('clampNonNegativeLayoutWallMs', () => {
     expect(clampNonNegativeLayoutWallMs(null)).toBe(0)
     expect(clampNonNegativeLayoutWallMs(Object(4.25) as unknown as number)).toBe(0)
   })
+
+  it('maps negative subnormal ms to 0 (Math.max; distinct from positive MIN_VALUE pass-through)', () => {
+    const negSub = -Number.MIN_VALUE
+    expect(negSub).toBeLessThan(0)
+    expect(clampNonNegativeLayoutWallMs(negSub)).toBe(0)
+  })
+
+  it('rejects function, Map/Set/Promise, null-prototype objects, and coercible objects without ToNumber (parity with layout-bounds / finiteNumberOrZero)', () => {
+    const fn = (): number => 12
+    expect(clampNonNegativeLayoutWallMs(fn as unknown as number)).toBe(0)
+    expect(() => clampNonNegativeLayoutWallMs(new Map() as unknown as number)).not.toThrow()
+    expect(clampNonNegativeLayoutWallMs(new Map() as unknown as number)).toBe(0)
+    expect(() => clampNonNegativeLayoutWallMs(new Set() as unknown as number)).not.toThrow()
+    expect(clampNonNegativeLayoutWallMs(new Set() as unknown as number)).toBe(0)
+    expect(() => clampNonNegativeLayoutWallMs(Promise.resolve(1) as unknown as number)).not.toThrow()
+    expect(clampNonNegativeLayoutWallMs(Promise.resolve(1) as unknown as number)).toBe(0)
+    const bare = Object.create(null) as unknown as number
+    expect(() => clampNonNegativeLayoutWallMs(bare)).not.toThrow()
+    expect(clampNonNegativeLayoutWallMs(bare)).toBe(0)
+    const coercible = { valueOf: () => 12 } as unknown as number
+    expect(clampNonNegativeLayoutWallMs(coercible)).toBe(0)
+    const exotic = { [Symbol.toPrimitive]: () => 7 } as unknown as number
+    expect(() => clampNonNegativeLayoutWallMs(exotic)).not.toThrow()
+    expect(clampNonNegativeLayoutWallMs(exotic)).toBe(0)
+  })
 })
