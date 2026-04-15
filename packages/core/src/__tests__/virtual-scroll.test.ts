@@ -10,6 +10,13 @@ describe('inclusiveEndIndex', () => {
     expect(inclusiveEndIndex(start, maxIndex, safeWindow)).toBe(maxIndex)
   })
 
+  it('clamps a negative finite maxIndex to 0 when spanEnd overflows (parity with finite-span Math.max(0, maxIndex))', () => {
+    const start = Number.MAX_VALUE
+    const safeWindow = Number.MAX_VALUE
+    expect(Number.isFinite(start + safeWindow - 1)).toBe(false)
+    expect(inclusiveEndIndex(start, -2, safeWindow)).toBe(0)
+  })
+
   it('returns maxIndex when 1e308-scale operands make spanEnd +Infinity (distinct magnitudes from MAX_VALUE pair)', () => {
     const maxIndex = 12
     const start = 1e308

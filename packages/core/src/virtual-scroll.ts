@@ -30,8 +30,8 @@ function nonNegativeOrZero(n: unknown): number {
 
 /**
  * Inclusive last row index for a window starting at `start`. When `start + safeWindow - 1` overflows or is
- * otherwise non-finite, returns `maxIndex` when it is finite, else `0` (same overflow idea as
- * {@link import('./layout-bounds.js').pointInInclusiveLayoutRect}).
+ * otherwise non-finite, returns `Math.max(0, maxIndex)` when `maxIndex` is finite, else `0` (same overflow idea as
+ * {@link import('./layout-bounds.js').pointInInclusiveLayoutRect}; negative caps clamp like the finite-`spanEnd` branch).
  *
  * When `spanEnd` is finite but `maxIndex` is not, returns `spanEnd` so corrupt caps cannot yield `NaN` from
  * `Math.min`. {@link syncVirtualWindow} always passes a non-negative integer `maxIndex`. When both are
@@ -48,7 +48,10 @@ function nonNegativeOrZero(n: unknown): number {
 export function inclusiveEndIndex(start: number, maxIndex: number, safeWindow: number): number {
   const spanEnd = start + safeWindow - 1
   if (!Number.isFinite(spanEnd)) {
-    return Number.isFinite(maxIndex) ? maxIndex : 0
+    // Match the finite-span branch: clamp corrupt negative caps so callers never get a negative end when
+    // span math overflowed (syncVirtualWindow always supplies non-negative maxIndex; direct callers may not).
+    if (!Number.isFinite(maxIndex)) return 0
+    return Math.max(0, maxIndex)
   }
   if (!Number.isFinite(maxIndex)) {
     return spanEnd
