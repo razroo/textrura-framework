@@ -43,7 +43,8 @@ describe('layoutBoundsAreFinite', () => {
 
   it('accepts IEEE −0 width or height (signed zero still satisfies `>= 0`; serializers / float edges)', () => {
     expect(Object.is(-0, 0)).toBe(false)
-    expect(-0 >= 0).toBe(true)
+    const w = -0
+    expect(w >= 0).toBe(true)
     expect(layoutBoundsAreFinite({ x: 0, y: 0, width: -0, height: 10, children: [] })).toBe(true)
     expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 10, height: -0, children: [] })).toBe(true)
   })
