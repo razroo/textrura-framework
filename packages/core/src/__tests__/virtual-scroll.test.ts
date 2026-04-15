@@ -406,6 +406,12 @@ describe('syncVirtualWindow', () => {
     expect(syncVirtualWindow(8, z, 2, 0)).toEqual({ start: 2, end: 2, selected: 2 })
     expect(syncVirtualWindow(8, 3, z, 0)).toEqual({ start: 0, end: 2, selected: 0 })
     expect(syncVirtualWindow(8, 3, 2, z)).toEqual({ start: 0, end: 2, selected: 2 })
+    // Non-zero bigint must not coerce to a row count / index (distinct from 0n looking like “empty”).
+    const many = 100n as unknown as number
+    expect(syncVirtualWindow(many, 10, 0, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+    expect(syncVirtualWindow(8, many, 2, 0)).toEqual(syncVirtualWindow(8, 1, 2, 0))
+    expect(syncVirtualWindow(8, 3, many, 0)).toEqual({ start: 0, end: 2, selected: 0 })
+    expect(syncVirtualWindow(8, 3, 2, many)).toEqual({ start: 0, end: 2, selected: 2 })
   })
 
   it('treats Symbol arguments like non-numbers on every axis (parity with layoutBoundsAreFinite / protocol guards)', () => {
