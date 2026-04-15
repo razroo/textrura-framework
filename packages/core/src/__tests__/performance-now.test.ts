@@ -68,6 +68,22 @@ describe('safePerformanceNowMs', () => {
     expect(readPerformanceNow()).toBe(13.25)
   })
 
+  it('supports Proxy-wrapped performance hosts that forward now() (instrumentation / test doubles)', () => {
+    const target = { now: () => 55.5 }
+    const proxied = new Proxy(target, {})
+    vi.stubGlobal('performance', proxied as unknown as Performance)
+    expect(safePerformanceNowMs()).toBe(55.5)
+    expect(readPerformanceNow()).toBe(55.5)
+  })
+
+  it('returns 0 when performance is a revoked Proxy (now access throws; outer try/catch)', () => {
+    const { proxy, revoke } = Proxy.revocable({ now: () => 1 }, {})
+    revoke()
+    vi.stubGlobal('performance', proxy as unknown as Performance)
+    expect(safePerformanceNowMs()).toBe(0)
+    expect(readPerformanceNow()).toBe(0)
+  })
+
   it('returns 0 when inherited prototype now is not callable (typeof perf.now must be function)', () => {
     const badProto = Object.create({ now: 404 })
     vi.stubGlobal('performance', badProto)
