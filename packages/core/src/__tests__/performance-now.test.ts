@@ -60,6 +60,14 @@ describe('safePerformanceNowMs', () => {
     expect(readPerformanceNow()).toBe(22.25)
   })
 
+  it('accepts null-prototype performance host objects with own now() (no Object.prototype chain)', () => {
+    const perf = Object.create(null) as { now: () => number }
+    perf.now = () => 13.25
+    vi.stubGlobal('performance', perf)
+    expect(safePerformanceNowMs()).toBe(13.25)
+    expect(readPerformanceNow()).toBe(13.25)
+  })
+
   it('returns 0 when inherited prototype now is not callable (typeof perf.now must be function)', () => {
     const badProto = Object.create({ now: 404 })
     vi.stubGlobal('performance', badProto)
