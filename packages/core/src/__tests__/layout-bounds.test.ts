@@ -1031,6 +1031,15 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(10, 20, 3, sy)).toEqual({ ox: 7, oy: 20 })
   })
 
+  it('coerces function scroll props to 0 without throwing (typeof function; distinct from object coercions)', () => {
+    const sx = ((): number => 12) as unknown as number
+    const sy = ((): number => 9) as unknown as number
+    expect(() => scrollSafeChildOffsets(10, 20, sx, 4)).not.toThrow()
+    expect(scrollSafeChildOffsets(10, 20, sx, 4)).toEqual({ ox: 10, oy: 16 })
+    expect(() => scrollSafeChildOffsets(10, 20, 3, sy)).not.toThrow()
+    expect(scrollSafeChildOffsets(10, 20, 3, sy)).toEqual({ ox: 7, oy: 20 })
+  })
+
   it('coerces string scroll props to 0 without throwing (JSON number-as-string; same rule as finiteNumberOrZero)', () => {
     expect(() => scrollSafeChildOffsets(22, 30, '12' as unknown as number, 4)).not.toThrow()
     expect(scrollSafeChildOffsets(22, 30, '12' as unknown as number, 4)).toEqual({ ox: 22, oy: 26 })
@@ -1302,6 +1311,12 @@ describe('finiteNumberOrZero', () => {
   it('maps boolean values to 0 (typeof guard; corrupt JSON / mistaken host props)', () => {
     expect(finiteNumberOrZero(true as unknown as number)).toBe(0)
     expect(finiteNumberOrZero(false as unknown as number)).toBe(0)
+  })
+
+  it('maps function values to 0 without throwing (typeof function; distinct from object; host mistakes)', () => {
+    const fn = (): number => 1
+    expect(() => finiteNumberOrZero(fn as unknown as number)).not.toThrow()
+    expect(finiteNumberOrZero(fn as unknown as number)).toBe(0)
   })
 
   it('maps double overflow (e.g. MAX_VALUE * 2) to 0 so scroll math cannot become non-finite', () => {
