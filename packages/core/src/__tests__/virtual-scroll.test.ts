@@ -340,6 +340,21 @@ describe('syncVirtualWindow', () => {
     expect(syncVirtualWindow(Number.NEGATIVE_INFINITY, 5, 0, 0)).toEqual({ start: 0, end: 0, selected: 0 })
   })
 
+  it('treats JSON exponent overflow and double overflow as non-finite (parity with layout-bounds / corrupt transport)', () => {
+    const posOverflow = Number.parseFloat('1e400')
+    const negOverflow = Number.parseFloat('-1e400')
+    expect(posOverflow).toBe(Infinity)
+    expect(negOverflow).toBe(-Infinity)
+    expect(Number.MAX_VALUE * 2).toBe(Infinity)
+    // totalRows: any non-finite magnitude → empty list (same as explicit ±Infinity).
+    expect(syncVirtualWindow(posOverflow, 5, 2, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+    expect(syncVirtualWindow(negOverflow, 5, 2, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+    expect(syncVirtualWindow(Number.MAX_VALUE * 2, 5, 2, 0)).toEqual({ start: 0, end: 0, selected: 0 })
+    // windowSize: overflow coerces via finiteOr fallback → visible height 1; selection still valid.
+    expect(syncVirtualWindow(8, posOverflow, 2, 0)).toEqual({ start: 2, end: 2, selected: 2 })
+    expect(syncVirtualWindow(8, Number.MAX_VALUE * 2, 2, 0)).toEqual({ start: 2, end: 2, selected: 2 })
+  })
+
   it('treats non-finite windowSize as a single visible row', () => {
     expect(syncVirtualWindow(8, Number.POSITIVE_INFINITY, 3, 0)).toEqual({ start: 3, end: 3, selected: 3 })
     expect(syncVirtualWindow(8, Number.NEGATIVE_INFINITY, 1, 0)).toEqual({ start: 1, end: 1, selected: 1 })
