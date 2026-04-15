@@ -41,14 +41,17 @@ function nonNegativeOrZero(n: unknown): number {
  * Exported for parity tests and advanced virtual-list math; {@link syncVirtualWindow} is the primary API.
  *
  * @param start — Window start row (inclusive). `syncVirtualWindow` passes floored non-negative indices; direct callers may pass corrupt values — NaN/±Inf on `start` or `safeWindow` are rejected by {@link isFinitePlainNumber} before `+`, yielding non-finite `spanEnd` and falling through to the `maxIndex` / `0` branches (see tests). Non-number values (including `BigInt` and boxed numbers) are treated like invalid span operands — they must not reach `+` (which throws on `bigint`/`number` mix) or `Number.isFinite(bigint)` (which throws in ECMAScript).
- * @param maxIndex — Inclusive last row index in the list. Negative values clamp to `0` before `Math.min` with `spanEnd` so a corrupt cap cannot produce a negative end when `spanEnd` is still positive.
+ * @param maxIndex — Inclusive last row index in the list. Only **primitive** finite numbers are honored (same as
+ *   {@link isFinitePlainNumber}); `NaN`, `±Infinity`, boxed numbers, and non-numbers are treated like a missing cap.
+ *   Negative values clamp to `0` before `Math.min` with `spanEnd` so a corrupt cap cannot produce a negative end when `spanEnd` is still positive.
  * @param safeWindow — Visible row count for the span (`start + safeWindow - 1`). `syncVirtualWindow` always passes `≥ 1`; smaller or negative windows can yield negative `spanEnd` (documented for direct callers).
  * @returns Inclusive last visible row index, or a safe fallback when `spanEnd` or `maxIndex` is non-finite (see implementation).
  */
 export function inclusiveEndIndex(start: number, maxIndex: number, safeWindow: number): number {
   const spanEnd =
     isFinitePlainNumber(start) && isFinitePlainNumber(safeWindow) ? start + safeWindow - 1 : Number.NaN
-  const maxIdx = typeof maxIndex === 'number' ? maxIndex : Number.NaN
+  // Match start/safeWindow: only primitive finite numbers (NaN/±Infinity/boxed values → NaN cap).
+  const maxIdx = isFinitePlainNumber(maxIndex) ? maxIndex : Number.NaN
   if (!Number.isFinite(spanEnd)) {
     // Match the finite-span branch: clamp corrupt negative caps so callers never get a negative end when
     // span math overflowed (syncVirtualWindow always supplies non-negative maxIndex; direct callers may not).
