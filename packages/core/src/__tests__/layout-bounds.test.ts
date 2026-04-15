@@ -729,7 +729,8 @@ describe('pointInInclusiveLayoutRect', () => {
   it('returns false for string, null, undefined, or boxed rect args without coercion (JSON / host bug guard)', () => {
     const str = '10' as unknown as number
     const boxed = Object(10) as unknown as number
-    for (const bad of [str, null as unknown as number, undefined as unknown as number, boxed] as const) {
+    const bare = Object.create(null) as unknown as number
+    for (const bad of [str, null as unknown as number, undefined as unknown as number, boxed, bare] as const) {
       expect(() => pointInInclusiveLayoutRect(5, 5, bad, 0, 10, 10)).not.toThrow()
       expect(pointInInclusiveLayoutRect(5, 5, bad, 0, 10, 10)).toBe(false)
       expect(() => pointInInclusiveLayoutRect(5, 5, 0, bad, 10, 10)).not.toThrow()
@@ -978,6 +979,15 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(10, 20, 3, new Uint8Array(1) as unknown as number)).toEqual({ ox: 7, oy: 20 })
     expect(() => scrollSafeChildOffsets(10, 20, new ArrayBuffer(0) as unknown as number, 0)).not.toThrow()
     expect(scrollSafeChildOffsets(10, 20, new ArrayBuffer(0) as unknown as number, 0)).toEqual({ ox: 10, oy: 20 })
+  })
+
+  it('coerces null-prototype object scroll props to 0 without throwing (typeof object; mistyped host / bare JSON maps)', () => {
+    const bareX = Object.create(null) as unknown as number
+    const bareY = Object.create(null) as unknown as number
+    expect(() => scrollSafeChildOffsets(10, 20, bareX, 4)).not.toThrow()
+    expect(scrollSafeChildOffsets(10, 20, bareX, 4)).toEqual({ ox: 10, oy: 16 })
+    expect(() => scrollSafeChildOffsets(10, 20, 3, bareY)).not.toThrow()
+    expect(scrollSafeChildOffsets(10, 20, 3, bareY)).toEqual({ ox: 7, oy: 20 })
   })
 
   it('coerces Date and RegExp scroll props to 0 without throwing (typeof object; parity with layoutBoundsAreFinite / finiteRootExtent)', () => {
