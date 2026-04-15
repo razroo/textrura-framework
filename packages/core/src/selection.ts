@@ -58,6 +58,8 @@ export interface SelectionRange {
  * geometry cannot poison absolute coordinates or flood selection with unusable entries.
  * Boxes with a missing or non-array {@link import('./types.js').BoxElement.children} field are treated as
  * leaves (no throw), matching {@link import('./focus.js').collectFocusOrder} and hit-testing.
+ * Parallel walks skip an index when the element child is missing but `layout.children[i]` exists
+ * (holey `children` arrays), matching hit-testing.
  *
  * For each box, child origins subtract {@link import('./types.js').StyleProps.scrollX} /
  * `scrollY` (non-finite values → `0`), matching {@link import('./hit-test.js').dispatchHit} and
@@ -131,10 +133,11 @@ function collectTextNodesWalk(
   if (!childOrigin) return
 
   for (let i = 0; i < kids.length; i++) {
+    const child = kids[i]
     const childLayout = layout.children[i]
-    if (childLayout) {
+    if (child && childLayout) {
       collectTextNodesWalk(
-        kids[i]!,
+        child,
         childLayout,
         childOrigin.ox,
         childOrigin.oy,

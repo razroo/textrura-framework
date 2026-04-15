@@ -32,6 +32,8 @@ export function clearFocus(): void {
  * Non-box leaves (`text`, `image`, `scene3d`) are ignored — only `box` nodes participate in this walk.
  * Boxes with a missing or non-array `children` field are treated as leaf boxes (no throw) so bad
  * deserialization cannot take down focus walks.
+ * At each index, both the element child and `layout.children[i]` must be present — a hole in the
+ * element `children` array with a layout slot still present is skipped (same rule as hit-testing).
  * Skips boxes whose layout bounds are non-finite or have negative width/height, and does not walk
  * their subtrees — same rule as hit-testing so corrupt geometry cannot enter focus order.
  *
@@ -62,9 +64,10 @@ function collectFocusable(
     const kids = element.children
     const n = Array.isArray(kids) ? kids.length : 0
     for (let i = 0; i < n; i++) {
+      const child = kids[i]
       const childLayout = layout.children[i]
-      if (childLayout) {
-        collectFocusable(kids[i]!, childLayout, results)
+      if (child && childLayout) {
+        collectFocusable(child, childLayout, results)
       }
     }
   }

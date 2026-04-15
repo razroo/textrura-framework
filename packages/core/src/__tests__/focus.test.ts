@@ -79,6 +79,24 @@ describe('collectFocusOrder', () => {
     expect(order[1]!.element).toBe(b)
   })
 
+  it('skips missing element children when layout lists an extra slot (holey children array; no throw)', () => {
+    const btn = box({ width: 10, height: 10, onClick: () => {} })
+    const root = box({ width: 100, height: 100 }, [btn])
+    const kids = root.children as unknown as (typeof btn | undefined)[]
+    kids.length = 2
+    const layout = {
+      ...makeLayout(),
+      children: [
+        makeLayout({ width: 10, height: 10 }),
+        makeLayout({ x: 20, width: 10, height: 10 }),
+      ],
+    }
+    expect(() => collectFocusOrder(root, layout)).not.toThrow()
+    const order = collectFocusOrder(root, layout)
+    expect(order).toHaveLength(1)
+    expect(order[0]!.element).toBe(btn)
+  })
+
   it('includes boxes with composition handlers', () => {
     const el = box({ width: 10, height: 10, onCompositionStart: () => {} })
     const root = box({ width: 100, height: 100 }, [el])

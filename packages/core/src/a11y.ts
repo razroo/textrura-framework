@@ -121,11 +121,10 @@ function walk(
     const childOrigin = scrollSafeChildOffsets(x, y, element.props.scrollX, element.props.scrollY)
     if (childOrigin) {
       for (let i = 0; i < element.children.length; i++) {
+        const child = element.children[i]
         const childLayout = layout.children[i]
-        if (childLayout) {
-          children.push(
-            walk(element.children[i]!, childLayout, childOrigin.ox, childOrigin.oy, [...path, i]),
-          )
+        if (child && childLayout) {
+          children.push(walk(child, childLayout, childOrigin.ox, childOrigin.oy, [...path, i]))
         }
       }
     }

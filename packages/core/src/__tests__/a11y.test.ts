@@ -263,6 +263,27 @@ describe('toAccessibilityTree', () => {
     expect(a11y.focusable).toBe(false)
   })
 
+  it('skips missing element children when layout lists an extra slot (holey children array; no throw)', () => {
+    const btn = box({ width: 10, height: 10, onClick: () => undefined })
+    const root = box({ width: 100, height: 100 }, [btn])
+    const kids = root.children as unknown as (typeof btn | undefined)[]
+    kids.length = 2
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 10, height: 10, children: [] },
+        { x: 20, y: 0, width: 10, height: 10, children: [] },
+      ],
+    }
+    expect(() => toAccessibilityTree(root, layout)).not.toThrow()
+    const a11y = toAccessibilityTree(root, layout)
+    expect(a11y.children).toHaveLength(1)
+    expect(a11y.children[0]!.focusable).toBe(true)
+  })
+
   it('emits a zero-bounds stub when layout.children is missing or not an array (same guard as layoutBoundsAreFinite)', () => {
     const tree = box({ width: 100, height: 100, semantic: { tag: 'main' } }, [])
     const base = { x: 0, y: 0, width: 100, height: 100 } as Record<string, unknown>

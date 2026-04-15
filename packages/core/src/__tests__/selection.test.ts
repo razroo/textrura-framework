@@ -221,6 +221,27 @@ describe('collectTextNodes', () => {
     expect(results[0].element.props.text).toBe('Only')
   })
 
+  it('skips missing element child when layout lists an extra slot (holey children array; no throw)', () => {
+    const t = text({ text: 'Kept', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 })
+    const root = box({ width: 200, height: 100 }, [t])
+    const kids = root.children as unknown as (typeof t | undefined)[]
+    kids.length = 2
+    const layout: ComputedLayout = {
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+      children: [
+        { x: 0, y: 0, width: 100, height: 18, children: [] },
+        { x: 0, y: 40, width: 100, height: 18, children: [] },
+      ],
+    }
+    const results: TextNodeInfo[] = []
+    expect(() => collectTextNodes(root, layout, 0, 0, results)).not.toThrow()
+    expect(results).toHaveLength(1)
+    expect(results[0].element.props.text).toBe('Kept')
+  })
+
   it('sparse layout children array: still collects a later text node when an earlier slot is missing', () => {
     const el = box({ width: 200, height: 100 }, [
       text({ text: 'NoLayout', font: '14px sans-serif', lineHeight: 18, width: 100, height: 18 }),
