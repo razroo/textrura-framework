@@ -371,6 +371,16 @@ describe('createViewport edge cases', () => {
     expect(vp.height.value).toBe(0)
   })
 
+  it('preserves positive subnormal dimensions on init and resize (finiteNumberOrZero; tiny resize payloads stay exact)', () => {
+    const tiny = Number.MIN_VALUE
+    const vp = createViewport(tiny, 100)
+    expect(vp.width.value).toBe(tiny)
+    expect(vp.height.value).toBe(100)
+    vp.resize(200, tiny)
+    expect(vp.width.value).toBe(200)
+    expect(vp.height.value).toBe(tiny)
+  })
+
   it('preserves IEEE negative zero on init and resize (finiteNumberOrZero parity with layout math)', () => {
     const vp = createViewport(-0, 10)
     expect(Object.is(vp.width.peek(), -0)).toBe(true)
