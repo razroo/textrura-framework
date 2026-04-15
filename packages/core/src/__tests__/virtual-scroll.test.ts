@@ -117,6 +117,13 @@ describe('inclusiveEndIndex', () => {
     expect(inclusiveEndIndex(2, negSub, 4)).toBe(0)
   })
 
+  it('clamps IEEE −0 maxIndex to +0 before Math.min with finite spanEnd (distinct object identity from +0; serializers / float edge cases)', () => {
+    const negZero: unknown = -0
+    expect(Object.is(negZero, 0)).toBe(false)
+    expect(inclusiveEndIndex(0, negZero as number, 5)).toBe(0)
+    expect(inclusiveEndIndex(2, negZero as number, 4)).toBe(0)
+  })
+
   it('does not throw on BigInt or boxed operands; matches NaN / non-number paths (typeof guard before + and Number.isFinite)', () => {
     const z = 0n as unknown as number
     const one = 1n as unknown as number
