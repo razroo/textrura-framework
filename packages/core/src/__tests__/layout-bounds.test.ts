@@ -597,6 +597,15 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(-10, -19, -10, -20, 0, 0)).toBe(false)
   })
 
+  it('zero-size rect at fractional absolute origin hits only that corner (sub-pixel Yoga output; inclusive min test)', () => {
+    const ax = 3.125
+    const ay = 4.375
+    expect(pointInInclusiveLayoutRect(ax, ay, ax, ay, 0, 0)).toBe(true)
+    // ULP at ~3 is larger than Number.EPSILON — need a delta that actually moves the float past the corner.
+    expect(pointInInclusiveLayoutRect(ax + 0.0001, ay, ax, ay, 0, 0)).toBe(false)
+    expect(pointInInclusiveLayoutRect(ax, ay + 0.0001, ax, ay, 0, 0)).toBe(false)
+  })
+
   it('zero width with positive height is a vertical segment (inclusive x = absX only; y spans absY..absY+height)', () => {
     expect(pointInInclusiveLayoutRect(5, 7, 5, 0, 0, 20)).toBe(true)
     expect(pointInInclusiveLayoutRect(5, 0, 5, 0, 0, 20)).toBe(true)
