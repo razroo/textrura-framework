@@ -41,12 +41,14 @@ fi
 # Maintainer-only release playbooks (`RELEASE_CHECKLIST.md`, `v1-release-checklist.md`) use the same checkbox
 # shape for ship steps — do not treat matches there as framework/engineering backlog when searching for work.
 # Both trackers may already be all `[x]` — that only means unchecked checkbox backlog is exhausted there,
-# not that the repo is "done". ROADMAP "Deferred / research" uses plain bullets (no `- [ ]`), so an empty
-# roadmap grep does not mean no roadmap-backed themes — read that subsection when casting next work (RTL through
-# Textura, animation beyond helpers, extra render targets). In-repo anchors: Textura `direction` / per-node `dir`
-# and tests in packages/textura/src/__tests__/compute-layout.test.ts; `RTL_PARITY_MATRIX.md` (repo root) for RTL
-# parity across paths; core animation helpers under packages/core;
-# Concrete open: `rg -n '^## Deferred / research' ROADMAP.md` (section starts ~line 28; thematic bullets only).
+# not that the repo is "done". ROADMAP "Deferred / research" mixes `[x]` items with **plain bullets** (no `- [ ]`),
+# so an empty unchecked-box grep does not mean no roadmap-backed themes — read that subsection explicitly.
+# As of current ROADMAP, RTL/logical-axis Textura work and WebGPU/PDF extra render targets are checked off; the
+# remaining **unchecked prose** line there is animation beyond the shipped helpers (choreography, gestures,
+# keyframe scrubbing — distinct from the 1.2 animation-model work already marked done elsewhere). In-repo anchors
+# when touching those areas: Textura `direction` / per-node `dir` and packages/textura/src/__tests__/compute-layout.test.ts;
+# `RTL_PARITY_MATRIX.md` for RTL parity; core animation under packages/core/src/animation.ts (+ animation tests).
+# Concrete anchor: `rg -n '^## Deferred / research' ROADMAP.md` (section starts ~line 28; read bullets, not only boxes).
 # WebGPU geometry consumer under packages/renderer-webgpu. Optional GEOM v1 binary envelopes: decode/encode
 # behavior is duplicated with intentional parity in packages/server/src/binary-frame.ts and
 # packages/client/src/binary-frame.ts — touch both (and their binary-frame tests) when changing frame guards.
