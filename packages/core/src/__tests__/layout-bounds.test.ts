@@ -689,6 +689,17 @@ describe('pointInInclusiveLayoutRect', () => {
     expect(pointInInclusiveLayoutRect(0, false as unknown as number, 0, 0, 10, 10)).toBe(false)
   })
 
+  it('returns false for null or undefined pointer coordinates without throwing (JSON / loose host props)', () => {
+    expect(() => pointInInclusiveLayoutRect(null as unknown as number, 0, 0, 0, 10, 10)).not.toThrow()
+    expect(pointInInclusiveLayoutRect(null as unknown as number, 0, 0, 0, 10, 10)).toBe(false)
+    expect(() => pointInInclusiveLayoutRect(0, null as unknown as number, 0, 0, 10, 10)).not.toThrow()
+    expect(pointInInclusiveLayoutRect(0, null as unknown as number, 0, 0, 10, 10)).toBe(false)
+    expect(() => pointInInclusiveLayoutRect(undefined as unknown as number, 0, 0, 0, 10, 10)).not.toThrow()
+    expect(pointInInclusiveLayoutRect(undefined as unknown as number, 0, 0, 0, 10, 10)).toBe(false)
+    expect(() => pointInInclusiveLayoutRect(0, undefined as unknown as number, 0, 0, 10, 10)).not.toThrow()
+    expect(pointInInclusiveLayoutRect(0, undefined as unknown as number, 0, 0, 10, 10)).toBe(false)
+  })
+
   it('returns false for bigint rect origin or size without throwing (corrupt abs layout / bad coercion)', () => {
     const b = 3n as unknown as number
     expect(() => pointInInclusiveLayoutRect(0, 0, b, 0, 10, 10)).not.toThrow()
