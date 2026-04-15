@@ -36,6 +36,12 @@ describe('inclusiveEndIndex', () => {
     expect(inclusiveEndIndex(-Infinity, maxIndex, 5)).toBe(maxIndex)
   })
 
+  it('returns maxIndex when start is +Infinity (finite safeWindow still yields non-finite spanEnd)', () => {
+    const maxIndex = 9
+    expect(Number.isFinite(Number.POSITIVE_INFINITY + 5 - 1)).toBe(false)
+    expect(inclusiveEndIndex(Number.POSITIVE_INFINITY, maxIndex, 5)).toBe(maxIndex)
+  })
+
   it('returns maxIndex when any argument makes spanEnd NaN (NaN start/window poison the sum)', () => {
     expect(inclusiveEndIndex(Number.NaN, 9, 4)).toBe(9)
     expect(inclusiveEndIndex(2, 9, Number.NaN)).toBe(9)
