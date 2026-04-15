@@ -343,8 +343,12 @@ export type Component<P = Record<string, never>> = (props: P) => UIElement
 export interface FrameTimings {
   /**
    * Wall time for `computeLayout` (or equivalent) in milliseconds.
-   * `createApp` passes a finite, non-negative value; renderers that implement optional `setFrameTimings`
-   * may clamp similarly when invoked outside `createApp`.
+   *
+   * {@link import('./app.js').createApp} measures with {@link import('./performance-now.js').safePerformanceNowMs}
+   * and passes the delta through {@link import('./performance-now.js').clampNonNegativeLayoutWallMs}, so the value
+   * is always a primitive finite non-negative number (including `0` when the clock is unusable or the raw delta is
+   * corrupt). Custom hosts that call `setFrameTimings` without `createApp` should apply the same sanitization for
+   * consistent inspector and telemetry behavior.
    */
   layoutMs: number
 }
@@ -356,8 +360,9 @@ export interface Renderer {
   /** Clean up renderer resources. */
   destroy(): void
   /**
-   * When present, called by `createApp` after layout and before `render`
-   * so backends (e.g. canvas inspector) can show layout vs paint split.
+   * When present, called by {@link import('./app.js').createApp} immediately after `computeLayout` and before
+   * `render` with {@link FrameTimings} (`layoutMs` only). Lets backends (e.g. canvas inspector HUD) split Yoga/layout
+   * wall time from paint; see {@link FrameTimings.layoutMs} for measurement and clamping rules.
    */
   setFrameTimings?(timings: FrameTimings): void
 }
