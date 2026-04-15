@@ -109,11 +109,12 @@ async function main() {
     'packages/core/src/__tests__/text-input-invariants.test.ts',
     'packages/core/src/__tests__/text-input-history.test.ts',
     'packages/core/src/__tests__/virtual-scroll.test.ts',
+    'packages/core/src/__tests__/performance-now.test.ts',
   ]
   for (const required of requiredVitestAllowlistPaths) {
     if (!paths.includes(required)) {
       throw new Error(
-        `release:gate: required vitest allowlist entry missing: ${required} (geometry CI, layout-bounds, hit-test, text input + IME/history, virtual-scroll windowing are release-critical; see GEOMETRY_SNAPSHOT_TESTING.md / FRAMEWORK_NORTH_STAR)`,
+        `release:gate: required vitest allowlist entry missing: ${required} (geometry CI, layout-bounds, hit-test, text input + IME/history, virtual-scroll windowing, performance-now timing guards are release-critical; see GEOMETRY_SNAPSHOT_TESTING.md / FRAMEWORK_NORTH_STAR)`,
       )
     }
   }
