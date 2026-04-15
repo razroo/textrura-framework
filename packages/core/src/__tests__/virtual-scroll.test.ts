@@ -153,6 +153,21 @@ describe('inclusiveEndIndex', () => {
     expect(inclusiveEndIndex(0, 9, boxedW)).toBe(inclusiveEndIndex(0, 9, Number.NaN))
     expect(inclusiveEndIndex(4, 99, boxedW)).toBe(inclusiveEndIndex(4, 99, Number.NaN))
   })
+
+  it('treats JSON number-as-string operands like non-numbers (typeof guard; no numeric coercion)', () => {
+    const strStart = '0' as unknown as number
+    const strWindow = '5' as unknown as number
+    const strCap = '9' as unknown as number
+    expect(typeof strStart === 'number').toBe(false)
+    expect(typeof strWindow === 'number').toBe(false)
+    expect(typeof strCap === 'number').toBe(false)
+    // Span math skipped → non-finite spanEnd; finite maxIndex clamps to the cap (same as corrupt start/window).
+    expect(inclusiveEndIndex(strStart, 4, 5)).toBe(4)
+    expect(inclusiveEndIndex(0, 4, strWindow)).toBe(4)
+    // maxIndex string → absent cap when span is finite; same branch as NaN maxIndex.
+    expect(inclusiveEndIndex(0, strCap, 5)).toBe(inclusiveEndIndex(0, Number.NaN, 5))
+    expect(inclusiveEndIndex(2, strCap, 4)).toBe(inclusiveEndIndex(2, Number.NaN, 4))
+  })
 })
 
 describe('syncVirtualWindow', () => {
