@@ -86,10 +86,10 @@ fi
 # `verify-release-gate.mjs` also resolves paths canonically, so `packages/a/../b/x.test.ts` counts as the same
 # file as `packages/b/x.test.ts` for duplicate detection. Gate paths must use forward slashes only (backslashes rejected).
 # The same script enforces a **required** subset of the allowlist (do not drop these when editing `release:gate`):
-# `geometry-snapshot-ci.test.ts`, `layout-bounds.test.ts`, `hit-test.test.ts`, `text-input.test.ts`,
+# `geometry-snapshot-ci.test.ts`, `layout-bounds.test.ts`, `hit-test.test.ts`, `keyboard.test.ts`, `text-input.test.ts`,
 # `text-input-invariants.test.ts`, `text-input-history.test.ts`, `virtual-scroll.test.ts`, and `performance-now.test.ts`
-# (geometry CI, layout coordinate invariants, hit routing, text input + IME/history, virtual list windowing,
-# monotonic timing / hostile `performance` guards — see `requiredVitestAllowlistPaths` in verify-release-gate.mjs).
+# (geometry CI, layout coordinate invariants, hit routing, keyboard dispatch / focus order, text input + IME/history,
+# virtual list windowing, monotonic timing / hostile `performance` guards — see `requiredVitestAllowlistPaths` in verify-release-gate.mjs).
 # The verifier also requires exactly one `bun run test:terminal-input` in the gate string and that the first
 # `&&` segment runs `verify-release-gate.mjs` (fail-fast before vitest; no duplicate terminal suites).
 # The vitest batch segment must not include `--watch` / `--watchAll` / `-w` — watch mode would hang CI instead of running the allowlist once.
