@@ -3,7 +3,6 @@ import type { UIElement } from '@geometra/core'
 import { CanvasRenderer } from '@geometra/renderer-canvas'
 
 const canvas = document.getElementById('app') as HTMLCanvasElement
-const overlay = document.getElementById('overlay') as HTMLDivElement
 const renderer = new CanvasRenderer({ canvas, background: '#0b1020' })
 
 const ROW_HEIGHT = 34
@@ -11,7 +10,11 @@ const VIEWPORT_ROWS = 12
 
 const items = signal(Array.from({ length: 2000 }, (_, i) => `Row ${i + 1}`))
 const selected = signal(0)
+/** First visible row index (not CSS pixels); passed to {@link syncVirtualWindow} as `currentStart`. */
 const scrollTop = signal(0)
+const renderMs = signal(0)
+const nodeCount = signal(0)
+const hotPaths = signal('-')
 let lastRenderMs = 0
 let lastNodeCount = 0
 let lastHotPaths = '-'
@@ -43,6 +46,18 @@ function view() {
     text({
       text: `Total ${data.length} rows | visible ${start + 1}-${end} | selected ${selected.value + 1}`,
       font: '13px JetBrains Mono',
+      lineHeight: 18,
+      color: '#94a3b8',
+    }),
+    text({
+      text: `render_ms: ${renderMs.value.toFixed(2)} | nodes: ${nodeCount.value} | hot: ${hotPaths.value}`,
+      font: '12px JetBrains Mono',
+      lineHeight: 16,
+      color: '#cbd5e1',
+    }),
+    text({
+      text: 'Use j/k or ArrowUp/ArrowDown. Selection stays stable while the list window virtualizes.',
+      font: '13px Inter',
       lineHeight: 18,
       color: '#94a3b8',
     }),
@@ -90,10 +105,12 @@ renderer.render = (layout, tree) => {
   lastNodeCount = countNodes(tree)
   const s = selected.peek()
   lastHotPaths = `[2,${Math.max(0, s - scrollTop.peek())}]`
-  overlay.textContent =
-    `render_ms: ${lastRenderMs.toFixed(2)}\n` +
-    `node_count: ${lastNodeCount}\n` +
-    `hot_paths: ${lastHotPaths}`
+  // Defer signal writes so they run after the current reactive `app.update()` / effect stack unwinds.
+  queueMicrotask(() => {
+    renderMs.set(lastRenderMs)
+    nodeCount.set(lastNodeCount)
+    hotPaths.set(lastHotPaths)
+  })
 }
 app.update()
 
