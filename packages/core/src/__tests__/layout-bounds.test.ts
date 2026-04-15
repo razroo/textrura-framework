@@ -41,6 +41,13 @@ describe('layoutBoundsAreFinite', () => {
     expect(layoutBoundsAreFinite({ x: -10, y: 3.5, width: 0, height: 0, children: [] })).toBe(true)
   })
 
+  it('accepts IEEE −0 width or height (signed zero still satisfies `>= 0`; serializers / float edges)', () => {
+    expect(Object.is(-0, 0)).toBe(false)
+    expect(-0 >= 0).toBe(true)
+    expect(layoutBoundsAreFinite({ x: 0, y: 0, width: -0, height: 10, children: [] })).toBe(true)
+    expect(layoutBoundsAreFinite({ x: 0, y: 0, width: 10, height: -0, children: [] })).toBe(true)
+  })
+
   it('ignores extra enumerable keys on the layout object (only x, y, width, height are validated)', () => {
     const withExtra = {
       x: 0,
