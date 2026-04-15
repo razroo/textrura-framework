@@ -931,6 +931,15 @@ describe('scrollSafeChildOffsets', () => {
     expect(scrollSafeChildOffsets(10, 20, new ArrayBuffer(0) as unknown as number, 0)).toEqual({ ox: 10, oy: 20 })
   })
 
+  it('coerces Date and RegExp scroll props to 0 without throwing (typeof object; parity with layoutBoundsAreFinite / finiteRootExtent)', () => {
+    const d = new Date(0) as unknown as number
+    const r = /./ as unknown as number
+    expect(() => scrollSafeChildOffsets(10, 20, d, 4)).not.toThrow()
+    expect(scrollSafeChildOffsets(10, 20, d, 4)).toEqual({ ox: 10, oy: 16 })
+    expect(() => scrollSafeChildOffsets(10, 20, 3, r)).not.toThrow()
+    expect(scrollSafeChildOffsets(10, 20, 3, r)).toEqual({ ox: 7, oy: 20 })
+  })
+
   it('coerces scroll props with valueOf or Symbol.toPrimitive to 0 (typeof object; finiteNumberOrZero parity; no ToNumber)', () => {
     const coercible = { valueOf: () => 99 } as unknown as number
     expect(() => scrollSafeChildOffsets(10, 20, coercible, 4)).not.toThrow()
