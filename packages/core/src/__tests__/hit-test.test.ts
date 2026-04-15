@@ -1434,6 +1434,40 @@ describe('dispatchHit', () => {
     expect(getCursorAtPoint(parent, layout, max, 25)).toBeNull()
   })
 
+  it('scroll-adjusted child origin overflow skips descendants on Y (symmetric with scrollX + large child x)', () => {
+    const max = Number.MAX_VALUE
+    let childFired = false
+    const child = box({
+      y: max,
+      width: 50,
+      height: 50,
+      onClick: () => {
+        childFired = true
+      },
+    })
+    const parent = box(
+      {
+        width: 100,
+        height: 300,
+        scrollY: -max,
+      },
+      [child],
+    )
+    const layout = {
+      x: 0,
+      y: max,
+      width: 100,
+      height: 300,
+      children: [{ x: 0, y: max, width: 50, height: 50, children: [] as const }],
+    }
+    expect(() => dispatchHit(parent, layout, 'onClick', 25, max)).not.toThrow()
+    expect(dispatchHit(parent, layout, 'onClick', 25, max)).toEqual({ handled: false })
+    expect(childFired).toBe(false)
+    expect(hitPathAtPoint(parent, layout, 25, max)).toEqual([])
+    expect(hasInteractiveHitAtPoint(parent, layout, 25, max)).toBe(false)
+    expect(getCursorAtPoint(parent, layout, 25, max)).toBeNull()
+  })
+
   it('merges extra onto the event when offsetX and offsetY are provided', () => {
     let shift = false
     const child = box({
