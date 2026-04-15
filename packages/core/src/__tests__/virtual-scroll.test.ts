@@ -69,6 +69,13 @@ describe('inclusiveEndIndex', () => {
     expect(inclusiveEndIndex(2, 9, Number.NaN)).toBe(9)
   })
 
+  it('rejects bigint start or safeWindow without bigint+number addition (typeof guard; + would throw)', () => {
+    expect(() => inclusiveEndIndex(1n as unknown as number, 4, 3)).not.toThrow()
+    expect(inclusiveEndIndex(1n as unknown as number, 4, 3)).toBe(4)
+    expect(() => inclusiveEndIndex(2, 9, 3n as unknown as number)).not.toThrow()
+    expect(inclusiveEndIndex(2, 9, 3n as unknown as number)).toBe(9)
+  })
+
   it('returns 0 when spanEnd is non-finite and maxIndex is also non-finite (no NaN window end)', () => {
     expect(inclusiveEndIndex(Number.NaN, Number.NaN, 4)).toBe(0)
     expect(inclusiveEndIndex(Number.POSITIVE_INFINITY, Number.NaN, 4)).toBe(0)
