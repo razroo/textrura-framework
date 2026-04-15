@@ -1,3 +1,5 @@
+import { isFinitePlainNumber } from './layout-bounds.js'
+
 /**
  * Monotonic layout timing without throwing when `performance` is partial or hostile
  * (missing `now`, non-function `now`, or a throwing implementation).
@@ -60,5 +62,5 @@ export function readPerformanceNow(): number {
  * @returns A non-negative finite millisecond value, or `0` when the input is not a primitive finite number.
  */
 export function clampNonNegativeLayoutWallMs(value: unknown): number {
-  return Math.max(0, typeof value === 'number' && Number.isFinite(value) ? value : 0)
+  return Math.max(0, isFinitePlainNumber(value) ? value : 0)
 }
