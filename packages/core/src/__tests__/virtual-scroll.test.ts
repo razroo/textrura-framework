@@ -545,4 +545,27 @@ describe('syncVirtualWindow', () => {
     },
     30_000,
   )
+
+  it('fractional totalRows matches the same window state as Math.max(0, Math.floor(totalRows)) (intRowMetric parity)', () => {
+    const pairs: Array<[number, number]> = [
+      [-9.2, 0],
+      [-0.25, 0],
+      [0.1, 0],
+      [0.99, 0],
+      [3.2, 3],
+      [3.999, 3],
+      [12.25, 12],
+    ]
+    for (const [totalRows, intTotal] of pairs) {
+      for (let windowSize = 1; windowSize <= 10; windowSize++) {
+        for (let selected = 0; selected <= 18; selected++) {
+          for (let currentStart = 0; currentStart <= 18; currentStart++) {
+            expect(syncVirtualWindow(totalRows, windowSize, selected, currentStart)).toEqual(
+              syncVirtualWindow(intTotal, windowSize, selected, currentStart),
+            )
+          }
+        }
+      }
+    }
+  })
 })
