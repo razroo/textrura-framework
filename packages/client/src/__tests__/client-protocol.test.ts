@@ -112,6 +112,39 @@ describe('applyServerMessage', () => {
     expect(state.layout?.width).toBe(77)
   })
 
+  it('accepts patch dimensions as IEEE −0 (same non-negative rule as layoutBoundsAreFinite / server protocol)', () => {
+    const { renderer, renders } = createRendererSpy()
+    const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
+    const errors: string[] = []
+    const wNeg0 = -0
+    const hNeg0 = -0
+    expect(Object.is(wNeg0, 0)).toBe(false)
+
+    applyServerMessage(
+      state,
+      renderer,
+      { type: 'frame', layout: layout(0, 0, 100, 50), tree: tree(), protocolVersion: 1 },
+      err => errors.push(String(err)),
+    )
+    expect(errors).toHaveLength(0)
+
+    applyServerMessage(
+      state,
+      renderer,
+      {
+        type: 'patch',
+        patches: [{ path: [], width: wNeg0, height: hNeg0 }],
+        protocolVersion: 1,
+      },
+      err => errors.push(String(err)),
+    )
+    expect(errors).toHaveLength(0)
+    expect(renders).toHaveLength(2)
+    expect(state.layout).not.toBeNull()
+    expect(Object.is(state.layout!.width, -0)).toBe(true)
+    expect(Object.is(state.layout!.height, -0)).toBe(true)
+  })
+
   it('accepts finite protocolVersion at or below client (including 0 and negative)', () => {
     const { renderer, renders } = createRendererSpy()
     const state = { layout: null as ComputedLayout | null, tree: null as UIElement | null }
