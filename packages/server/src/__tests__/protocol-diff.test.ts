@@ -493,6 +493,19 @@ describe('coalescePatches', () => {
     expect(Object.is(merged[0]!.height, -0)).toBe(true)
   })
 
+  it('ignores boxed IEEE −0 for width/height (typeof object; distinct from primitive −0 merged above)', () => {
+    expect(
+      coalescePatches([
+        { path: [0], width: 10, height: 20 },
+        {
+          path: [0],
+          width: Object(-0) as unknown as number,
+          height: Object(-0) as unknown as number,
+        },
+      ]),
+    ).toEqual([{ path: [0], width: 10, height: 20 }])
+  })
+
   it('ignores boxed Number and bigint geometry fields (only finite primitive numbers merge)', () => {
     expect(
       coalescePatches([
