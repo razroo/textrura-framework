@@ -15,6 +15,41 @@ describe('createViewport', () => {
     expect(vp.width.value).toBe(1024)
     expect(vp.height.value).toBe(768)
   })
+
+  it('coerces initial dimensions with finiteNumberOrZero (NaN, ±Infinity, non-numbers → 0)', () => {
+    const vp = createViewport(Number.NaN, Number.POSITIVE_INFINITY)
+    expect(vp.width.value).toBe(0)
+    expect(vp.height.value).toBe(0)
+    const vp2 = createViewport(Number.NEGATIVE_INFINITY, '800' as unknown as number)
+    expect(vp2.width.value).toBe(0)
+    expect(vp2.height.value).toBe(0)
+    expect(() => createViewport(1n as unknown as number, 2n as unknown as number)).not.toThrow()
+    const vp3 = createViewport(1n as unknown as number, 2n as unknown as number)
+    expect(vp3.width.value).toBe(0)
+    expect(vp3.height.value).toBe(0)
+  })
+
+  it('coerces resize payloads the same way (corrupt server resize messages cannot poison breakpoints)', () => {
+    const vp = createViewport(100, 100)
+    vp.resize(Number.NaN, 200)
+    expect(vp.width.value).toBe(0)
+    expect(vp.height.value).toBe(200)
+    vp.resize(300, Number.NEGATIVE_INFINITY)
+    expect(vp.width.value).toBe(300)
+    expect(vp.height.value).toBe(0)
+    vp.resize(Object(400) as unknown as number, 500)
+    expect(vp.width.value).toBe(0)
+    expect(vp.height.value).toBe(500)
+  })
+
+  it('preserves negative finite dimensions (same finiteNumberOrZero rule as scroll offsets)', () => {
+    const vp = createViewport(-10, 20)
+    expect(vp.width.value).toBe(-10)
+    expect(vp.height.value).toBe(20)
+    vp.resize(5, -3.5)
+    expect(vp.width.value).toBe(5)
+    expect(vp.height.value).toBe(-3.5)
+  })
 })
 
 describe('breakpoint', () => {
