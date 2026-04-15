@@ -110,6 +110,13 @@ describe('inclusiveEndIndex', () => {
     expect(inclusiveEndIndex(2, -1, 4)).toBe(0)
   })
 
+  it('clamps negative subnormal maxIndex to 0 (IEEE cap slightly below zero; parity with layout-bounds negative subnormals)', () => {
+    const negSub = -Number.MIN_VALUE
+    expect(negSub).toBeLessThan(0)
+    expect(inclusiveEndIndex(0, negSub, 5)).toBe(0)
+    expect(inclusiveEndIndex(2, negSub, 4)).toBe(0)
+  })
+
   it('does not throw on BigInt or boxed operands; matches NaN / non-number paths (typeof guard before + and Number.isFinite)', () => {
     const z = 0n as unknown as number
     const one = 1n as unknown as number
