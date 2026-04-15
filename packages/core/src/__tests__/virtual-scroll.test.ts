@@ -10,6 +10,15 @@ describe('inclusiveEndIndex', () => {
     expect(inclusiveEndIndex(start, maxIndex, safeWindow)).toBe(maxIndex)
   })
 
+  it('returns maxIndex when 1e308-scale operands make spanEnd +Infinity (distinct magnitudes from MAX_VALUE pair)', () => {
+    const maxIndex = 12
+    const start = 1e308
+    const safeWindow = 1e308
+    expect(1e308 + 1e308).toBe(Infinity)
+    expect(Number.isFinite(start + safeWindow - 1)).toBe(false)
+    expect(inclusiveEndIndex(start, maxIndex, safeWindow)).toBe(maxIndex)
+  })
+
   it('returns Math.min(maxIndex, spanEnd) when the span sum stays finite', () => {
     expect(inclusiveEndIndex(2, 99, 5)).toBe(6)
     expect(inclusiveEndIndex(0, 4, 100)).toBe(4)
