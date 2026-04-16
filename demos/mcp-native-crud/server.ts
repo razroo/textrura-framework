@@ -155,7 +155,6 @@ const BORDER = '#334155'
 const TEXT_PRIMARY = '#f8fafc'
 const TEXT_MUTED = '#94a3b8'
 const ACCENT = '#38bdf8'
-const ACCENT_DIM = '#0c4a6e'
 
 // ---------------------------------------------------------------------------
 // View helpers
