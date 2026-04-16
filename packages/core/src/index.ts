@@ -126,6 +126,7 @@ export type { AccessibilityNode, AccessibilityBounds } from './a11y.js'
 export {
   isCollapsedSelection,
   getInputSelectionText,
+  normalizePasteText,
   replaceInputSelection,
   insertInputText,
   backspaceInput,

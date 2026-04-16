@@ -275,6 +275,8 @@ async function handleClientMessage(
         fieldId: msg.fieldId,
         exact: msg.exact,
         cache: fieldLookupCache,
+        typingDelayMs: msg.typingDelayMs,
+        imeFriendly: msg.imeFriendly,
       })
       onViewportOrInput('input', requestId)
       return

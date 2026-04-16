@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { ElementHandle, Frame, Locator, Page } from 'playwright'
+import { canonicalizeHtmlInputValue } from './input-canonical.js'
 import type { ClientChoiceType, ClientFillField } from './types.js'
 
 export function delay(ms: number): Promise<void> {
@@ -892,7 +893,12 @@ async function resolveOwnedPopupHandle(
   }
 }
 
-async function typeIntoEditableLocator(page: Page, locator: Locator, text: string): Promise<void> {
+async function typeIntoEditableLocator(
+  page: Page,
+  locator: Locator,
+  text: string,
+  opts?: { delayMs?: number },
+): Promise<void> {
   try {
     await locator.fill(text)
     return
@@ -901,7 +907,12 @@ async function typeIntoEditableLocator(page: Page, locator: Locator, text: strin
   }
 
   await locator.click()
-  await page.keyboard.type(text)
+  const delay = opts?.delayMs
+  if (delay !== undefined && delay > 0) {
+    await page.keyboard.type(text, { delay })
+  } else {
+    await page.keyboard.type(text)
+  }
 }
 
 async function typeIntoActiveEditableElement(page: Page, text: string): Promise<boolean> {
@@ -3055,9 +3066,15 @@ function fieldValueMatches(actual: string | null | undefined, expected: string):
   return normalizedActual === normalizedExpected || normalizedActual.includes(normalizedExpected)
 }
 
-async function setLocatorTextValue(locator: Locator, value: string): Promise<boolean> {
+async function setLocatorTextValue(
+  locator: Locator,
+  value: string,
+  opts?: { imeFriendly?: boolean },
+): Promise<boolean> {
   try {
-    return await locator.evaluate((el, nextValue) => {
+    return await locator.evaluate((el, payload: { value: string; imeFriendly: boolean }) => {
+      const nextValue = payload.value
+      const imeFriendly = payload.imeFriendly
       // React Greenhouse/Workday/Lever fix: React stores the previous value on
       // a hidden `_valueTracker` property that React uses to short-circuit
       // onChange when the value "hasn't changed". If we set el.value through
@@ -3108,9 +3125,33 @@ async function setLocatorTextValue(locator: Locator, value: string): Promise<boo
         }
       }
 
+      function dispatchImeHints(target: HTMLElement): void {
+        if (!imeFriendly) return
+        try {
+          target.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: '' }))
+          target.dispatchEvent(new CompositionEvent('compositionupdate', { bubbles: true, data: nextValue }))
+          target.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: nextValue }))
+        } catch { /* ignore */ }
+      }
+
+      /** Bulk `textContent` is unsafe for rich editors (paragraphs, mentions). */
+      function isPlainContentEditable(host: HTMLElement): boolean {
+        if (!host.isContentEditable) return true
+        for (const node of host.childNodes) {
+          if (node.nodeType === Node.TEXT_NODE) continue
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const tag = (node as Element).tagName.toLowerCase()
+            if (tag === 'br' && host.childNodes.length === 1) continue
+            return false
+          }
+        }
+        return true
+      }
+
       if (el instanceof HTMLInputElement) {
         if (['checkbox', 'radio', 'file', 'button', 'submit', 'reset', 'hidden'].includes(el.type)) return false
         el.focus()
+        dispatchImeHints(el)
         setInputLikeValue(el, nextValue)
         dispatch(el)
         return true
@@ -3118,21 +3159,24 @@ async function setLocatorTextValue(locator: Locator, value: string): Promise<boo
 
       if (el instanceof HTMLTextAreaElement) {
         el.focus()
+        dispatchImeHints(el)
         setInputLikeValue(el, nextValue)
         dispatch(el)
         return true
       }
 
       if (el instanceof HTMLElement && (el.isContentEditable || el.getAttribute('role') === 'textbox' || el.getAttribute('role') === 'combobox')) {
+        if (el.isContentEditable && !isPlainContentEditable(el)) return false
         el.focus()
         clearReactTracker(el)
+        dispatchImeHints(el)
         el.textContent = nextValue
         dispatch(el)
         return true
       }
 
       return false
-    }, value)
+    }, { value, imeFriendly: opts?.imeFriendly ?? false })
   } catch {
     return false
   }
@@ -3175,6 +3219,10 @@ async function attemptNativeBatchFill(page: Page, fields: FormFieldFill[]): Prom
         // batch means it falls through to `setFieldText`, which auto-
         // routes to the `fillOtp` primitive.
         if (labelLooksLikeOtp(field.fieldLabel) && /^\S{4,}$/.test(field.value)) {
+          continue
+        }
+        // Keyboard timing / IME hints need the full `setFieldText` path.
+        if (field.typingDelayMs !== undefined || field.imeFriendly) {
           continue
         }
         pending.push({
@@ -3322,8 +3370,121 @@ async function attemptNativeBatchFill(page: Page, fields: FormFieldFill[]): Prom
           normalized === 'opt out'
       }
 
+      /** Keep in sync with `packages/proxy/src/input-canonical.ts` `canonicalizeHtmlInputValue`. */
+      function canonicalizeHtmlInputValueInPage(inputType: string, raw: string): string {
+        const t = (inputType || 'text').toLowerCase()
+        if (
+          t === ''
+          || t === 'text'
+          || t === 'search'
+          || t === 'url'
+          || t === 'tel'
+          || t === 'email'
+          || t === 'password'
+          || t === 'textarea'
+          || t === 'hidden'
+        ) {
+          return raw
+        }
+        const s = raw.trim()
+        if (!s) return raw
+        if (t === 'number' || t === 'range') {
+          const cleaned = s.replace(/,/g, '').replace(/\s/g, '')
+          const n = parseFloat(cleaned)
+          if (Number.isFinite(n)) return String(n)
+          return raw
+        }
+        if (t === 'date') {
+          if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+          const d = new Date(s)
+          if (!Number.isNaN(d.getTime())) {
+            const y = d.getFullYear()
+            const m = String(d.getMonth() + 1).padStart(2, '0')
+            const day = String(d.getDate()).padStart(2, '0')
+            return `${y}-${m}-${day}`
+          }
+          return raw
+        }
+        if (t === 'datetime-local') {
+          if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return s.slice(0, 16)
+          const d = new Date(s)
+          if (!Number.isNaN(d.getTime())) {
+            const y = d.getFullYear()
+            const mo = String(d.getMonth() + 1).padStart(2, '0')
+            const day = String(d.getDate()).padStart(2, '0')
+            const h = String(d.getHours()).padStart(2, '0')
+            const min = String(d.getMinutes()).padStart(2, '0')
+            return `${y}-${mo}-${day}T${h}:${min}`
+          }
+          return raw
+        }
+        if (t === 'time') {
+          const tm = /^(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(s)
+          if (tm) {
+            const hh = Math.min(23, Math.max(0, parseInt(tm[1]!, 10)))
+            const mm = tm[2]!
+            const ss = tm[3]
+            const h = String(hh).padStart(2, '0')
+            return ss ? `${h}:${mm}:${ss}` : `${h}:${mm}`
+          }
+          return s
+        }
+        if (t === 'month') {
+          if (/^\d{4}-\d{2}$/.test(s)) return s
+          const d = new Date(s)
+          if (!Number.isNaN(d.getTime())) {
+            const y = d.getFullYear()
+            const mo = String(d.getMonth() + 1).padStart(2, '0')
+            return `${y}-${mo}`
+          }
+          return raw
+        }
+        if (t === 'week') {
+          const wm = /^(\d{4})-w(\d{2})$/i.exec(s)
+          if (wm) return `${wm[1]}-W${wm[2]}`
+          return raw
+        }
+        return raw
+      }
+
+      function collectTextControlsDeep(): Element[] {
+        const parts = ['input', 'textarea', '[contenteditable="true"]']
+        const seen = new Set<Element>()
+        const out: Element[] = []
+        function visit(root: Document | ShadowRoot) {
+          for (const part of parts) {
+            try {
+              root.querySelectorAll(part).forEach((el) => {
+                if (!seen.has(el)) {
+                  seen.add(el)
+                  out.push(el)
+                }
+              })
+            } catch { /* ignore */ }
+          }
+          root.querySelectorAll('*').forEach((host) => {
+            if (host.shadowRoot) visit(host.shadowRoot)
+          })
+        }
+        visit(document)
+        return out
+      }
+
+      function isPlainContentEditableBatch(host: HTMLElement): boolean {
+        if (!host.isContentEditable) return true
+        for (const node of host.childNodes) {
+          if (node.nodeType === Node.TEXT_NODE) continue
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const tag = (node as Element).tagName.toLowerCase()
+            if (tag === 'br' && host.childNodes.length === 1) continue
+            return false
+          }
+        }
+        return true
+      }
+
       function setTextField(fieldLabel: string, value: string, exact: boolean): boolean {
-        const controls = Array.from(document.querySelectorAll('input, textarea, [contenteditable="true"]'))
+        const controls = collectTextControlsDeep()
         for (const control of controls) {
           if (!(control instanceof Element) || !visible(control)) continue
           if (control instanceof HTMLInputElement && ['checkbox', 'radio', 'file', 'button', 'submit', 'reset', 'hidden'].includes(control.type)) {
@@ -3331,12 +3492,15 @@ async function attemptNativeBatchFill(page: Page, fields: FormFieldFill[]): Prom
           }
           if (!matches(explicitLabelText(control), fieldLabel, exact)) continue
           if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement) {
+            const inputType = control instanceof HTMLInputElement ? control.type : 'textarea'
+            const v = canonicalizeHtmlInputValueInPage(inputType, value)
             control.focus()
-            setInputLikeValue(control, value)
+            setInputLikeValue(control, v)
             dispatch(control)
-            return matches(currentValue(control), value, false)
+            return matches(currentValue(control), v, false)
           }
           if (control instanceof HTMLElement && control.isContentEditable) {
+            if (!isPlainContentEditableBatch(control)) return false
             control.focus()
             control.textContent = value
             dispatch(control)
@@ -3999,7 +4163,15 @@ export async function setFieldText(
   page: Page,
   fieldLabel: string,
   value: string,
-  opts?: { exact?: boolean; cache?: FillLookupCache; fieldId?: string },
+  opts?: {
+    exact?: boolean
+    cache?: FillLookupCache
+    fieldId?: string
+    /** Delay between keystrokes when using keyboard typing fallback (masked inputs). */
+    typingDelayMs?: number
+    /** Composition events before assignment; small default key delay when typing. */
+    imeFriendly?: boolean
+  },
 ): Promise<void> {
   // Bug #2 (v1.43) auto-routing: if the caller's label looks like a
   // verification-code / security-code / OTP prompt, try the dedicated OTP
@@ -4024,21 +4196,29 @@ export async function setFieldText(
   }
 
   await locator.scrollIntoViewIfNeeded()
-  const applied = await setLocatorTextValue(locator, value)
+  const inputType = await locator.evaluate(el => {
+    if (el instanceof HTMLInputElement) return el.type
+    if (el instanceof HTMLTextAreaElement) return 'textarea'
+    return 'text'
+  })
+  const normalized = canonicalizeHtmlInputValue(inputType, value)
+  const applied = await setLocatorTextValue(locator, normalized, { imeFriendly: opts?.imeFriendly })
   if (!applied) {
     try {
-      await locator.fill(value)
+      await locator.fill(normalized)
     } catch {
       await locator.click()
-      await typeIntoEditableLocator(page, locator, value)
+      await typeIntoEditableLocator(page, locator, normalized, {
+        delayMs: opts?.typingDelayMs ?? (opts?.imeFriendly ? 5 : undefined),
+      })
     }
   }
 
   const current = await locatorCurrentValue(locator)
-  if (fieldValueMatches(current, value)) return
+  if (fieldValueMatches(current, normalized)) return
 
   const displayed = await locatorDisplayedValues(locator)
-  if (displayed.some(candidate => fieldValueMatches(candidate, value))) return
+  if (displayed.some(candidate => fieldValueMatches(candidate, normalized))) return
 
   throw new Error(`setFieldText: set "${fieldLabel}" but could not confirm value ${JSON.stringify(value)}`)
 }
@@ -4440,7 +4620,13 @@ export async function fillFields(page: Page, fields: FormFieldFill[], cache = cr
   const textFillFailures: Array<{ label: string; error: string }> = []
   if (textFills.length > 0) {
     const results = await Promise.allSettled(textFills.map(({ field }) =>
-      setFieldText(page, field.fieldLabel, field.value, { fieldId: field.fieldId, exact: field.exact, cache }),
+      setFieldText(page, field.fieldLabel, field.value, {
+        fieldId: field.fieldId,
+        exact: field.exact,
+        cache,
+        typingDelayMs: field.typingDelayMs,
+        imeFriendly: field.imeFriendly,
+      }),
     ))
     for (let i = 0; i < results.length; i++) {
       const result = results[i]!

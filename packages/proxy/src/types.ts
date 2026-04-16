@@ -94,6 +94,10 @@ export type ClientSetFieldTextMessage = {
   fieldLabel: string
   value: string
   exact?: boolean
+  /** Optional delay between keystrokes when falling back to keyboard typing (masked fields, rich editors). */
+  typingDelayMs?: number
+  /** Dispatch composition + input events before assignment (some IME-heavy controlled inputs). */
+  imeFriendly?: boolean
   requestId?: string
   protocolVersion?: number
 }
@@ -112,7 +116,15 @@ export type ClientSetFieldChoiceMessage = {
 
 export type ClientFillField =
   | { kind: 'auto'; fieldId?: string; fieldLabel: string; value: string | boolean; exact?: boolean }
-  | { kind: 'text'; fieldId?: string; fieldLabel: string; value: string; exact?: boolean }
+  | {
+      kind: 'text'
+      fieldId?: string
+      fieldLabel: string
+      value: string
+      exact?: boolean
+      typingDelayMs?: number
+      imeFriendly?: boolean
+    }
   | { kind: 'choice'; fieldId?: string; fieldLabel: string; value: string; query?: string; exact?: boolean; choiceType?: ClientChoiceType }
   | { kind: 'toggle'; fieldId?: string; label: string; checked?: boolean; exact?: boolean; controlType?: 'checkbox' | 'radio' }
   | { kind: 'file'; fieldId?: string; fieldLabel: string; paths: string[]; exact?: boolean }

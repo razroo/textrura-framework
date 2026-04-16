@@ -7,6 +7,7 @@ import {
   moveInputCaret,
   moveInputCaretByWord,
   moveInputCaretToLineBoundary,
+  normalizePasteText,
   replaceInputSelection,
   type TextInputState,
 } from '../text-input.js'
@@ -135,5 +136,12 @@ describe('text-input invariants', () => {
     assertStateInvariants(replaceInputSelection(corrupt.nodes, corrupt.selection, 'xy'))
     assertStateInvariants(insertInputText(corrupt, 'z'))
     assertStateInvariants(moveInputCaret(corrupt, 'right', false))
+  })
+})
+
+describe('normalizePasteText', () => {
+  it('collapses CRLF and strips BOM', () => {
+    expect(normalizePasteText('a\r\nb')).toBe('a\nb')
+    expect(normalizePasteText('\uFEFFx')).toBe('x')
   })
 })

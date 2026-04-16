@@ -111,6 +111,14 @@ export function getInputSelectionText(nodes: string[], selection: SelectionRange
 }
 
 /**
+ * Normalize clipboard/paste-style payloads: CRLF → LF, strip leading BOM.
+ * Apply before {@link insertInputText} when integrating external paste.
+ */
+export function normalizePasteText(text: string): string {
+  return text.replace(/\r\n/g, '\n').replace(/^\uFEFF/, '')
+}
+
+/**
  * Replace current selection with inserted text.
  * For multi-line insertion, newlines create additional nodes.
  */
@@ -152,7 +160,11 @@ export function replaceInputSelection(
   }
 }
 
-/** Insert text at current selection/caret. */
+/**
+ * Insert text at current selection/caret.
+ * For paste-sized payloads, consider {@link normalizePasteText} so CRLF and BOM
+ * match how browsers deliver `paste` on some platforms.
+ */
 export function insertInputText(
   state: TextInputState,
   text: string,
