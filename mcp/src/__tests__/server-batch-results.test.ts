@@ -85,6 +85,7 @@ vi.mock('../session.js', () => ({
   connectThroughProxy: mockState.connectThroughProxy,
   prewarmProxy: mockState.prewarmProxy,
   disconnect: vi.fn(),
+  pruneDisconnectedSessions: vi.fn(() => []),
   getSession: vi.fn(() => mockState.session),
   resolveSession: vi.fn((id?: string) => ({ kind: 'ok' as const, session: mockState.session, ...(id ? { id } : {}) })),
   listSessions: vi.fn(() => [{ id: 's1', url: 'https://jobs.example.com/application' }]),
