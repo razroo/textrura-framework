@@ -4052,6 +4052,7 @@ async function setNativeSelectByLabel(locator: Locator, value: string, exact: bo
       if (!expected) return false
 
       const option = Array.from(el.options).find((candidate) => {
+        if (candidate.disabled) return false
         const label = normalize(candidate.textContent)
         const rawValue = normalize(candidate.value)
         if (payload.exact) return label === expected || rawValue === expected
@@ -4371,10 +4372,17 @@ export async function setFieldChoice(
   const locator = await findLabeledControlInPage(page, fieldLabel, exact, { cache: opts?.cache, fieldId: opts?.fieldId })
   if (locator) {
     await locator.scrollIntoViewIfNeeded()
+    const isNativeSelect = await locator.evaluate(el => el instanceof HTMLSelectElement)
     if (await setNativeSelectByLabel(locator, value, exact)) {
       const displayed = await locatorDisplayedValues(locator)
       if (displayed.some(candidate => displayedValueMatchesSelection(candidate, value, exact))) return
       throw new Error(`setFieldChoice: selected "${value}" for field "${fieldLabel}" but could not confirm it`)
+    }
+    // Avoid pickListboxOption on a real <select> — option text/value did not match.
+    if (isNativeSelect) {
+      throw new Error(
+        `setFieldChoice: no enabled <option> matching "${value}" for native <select> "${fieldLabel}"`,
+      )
     }
   }
 
@@ -4530,19 +4538,47 @@ export async function selectNativeOption(page: Page, x: number, y: number, opt: 
   for (const frame of page.frames()) {
     const applied = await frame.evaluate(
       (payload: { value: string | null; label: string | null; index: number | undefined }) => {
+        const normalize = (input: string | undefined | null) => input?.replace(/\s+/g, ' ').trim().toLowerCase() ?? ''
+        const optionMatchesExpected = (
+          o: HTMLOptionElement,
+          expected: string,
+        ): boolean => {
+          if (o.disabled) return false
+          const label = normalize(o.textContent)
+          const rawValue = normalize(o.value)
+          return label === expected || rawValue === expected || label.includes(expected) || rawValue.includes(expected)
+        }
+
         const a = document.activeElement
         if (!a || a.tagName !== 'SELECT') return false
         const sel = a as HTMLSelectElement
         if (typeof payload.index === 'number' && Number.isFinite(payload.index)) {
           const i = Math.trunc(payload.index)
           if (i < 0 || i >= sel.options.length) return false
+          if (sel.options[i]!.disabled) return false
           sel.selectedIndex = i
         } else if (payload.value !== null && payload.value !== undefined) {
-          sel.value = payload.value
+          const raw = String(payload.value)
+          sel.value = raw
+          const expected = normalize(raw)
+          if (!expected) return false
+          const selected = sel.selectedOptions[0]
+          const ok =
+            selected &&
+            !selected.disabled &&
+            (normalize(selected.value) === expected ||
+              normalize(selected.textContent) === expected ||
+              normalize(selected.value).includes(expected) ||
+              normalize(selected.textContent).includes(expected))
+          if (!ok) {
+            const found = Array.from(sel.options).find(o => optionMatchesExpected(o, expected))
+            if (!found) return false
+            sel.value = found.value
+          }
         } else if (payload.label !== null && payload.label !== undefined) {
-          const optEl = Array.from(sel.options).find(
-            o => o.text.trim() === payload.label || o.text.includes(payload.label!),
-          )
+          const expected = normalize(payload.label)
+          if (!expected) return false
+          const optEl = Array.from(sel.options).find(o => optionMatchesExpected(o, expected))
           if (!optEl) return false
           sel.value = optEl.value
         } else {
