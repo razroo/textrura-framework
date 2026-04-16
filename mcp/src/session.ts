@@ -380,6 +380,7 @@ export interface Session {
   cachedA11yRevision?: number
   cachedFormSchemas?: Map<string, { revision: number; forms: FormSchemaModel[] }>
   workflowState?: WorkflowState
+  reconnectInFlight?: Promise<boolean>
 }
 
 export interface SessionConnectTrace {
@@ -450,11 +451,20 @@ const FILL_BATCH_CHOICE_FIELD_TIMEOUT_MS = 500
 const FILL_BATCH_TOGGLE_FIELD_TIMEOUT_MS = 225
 const FILL_BATCH_FILE_FIELD_TIMEOUT_MS = 5000
 const FILL_BATCH_MAX_TIMEOUT_MS = 60_000
+const SESSION_RECONNECT_TIMEOUT_MS = 5_000
 let nextRequestSequence = 0
 
 export type ProxyFillField =
   | { kind: 'auto'; fieldId?: string; fieldLabel: string; value: string | boolean; exact?: boolean }
-  | { kind: 'text'; fieldId?: string; fieldLabel: string; value: string; exact?: boolean }
+  | {
+      kind: 'text'
+      fieldId?: string
+      fieldLabel: string
+      value: string
+      exact?: boolean
+      typingDelayMs?: number
+      imeFriendly?: boolean
+    }
   | { kind: 'choice'; fieldId?: string; fieldLabel: string; value: string; query?: string; exact?: boolean; choiceType?: FormSchemaChoiceType }
   | { kind: 'toggle'; label: string; checked?: boolean; exact?: boolean; controlType?: 'checkbox' | 'radio' }
   | { kind: 'file'; fieldId?: string; fieldLabel: string; paths: string[]; exact?: boolean }
@@ -1207,6 +1217,7 @@ export function connect(
     }
 
     ws.on('pong', () => {
+      if (session.ws !== ws) return
       lastMessageAt = Date.now()
       pendingPongBy = null
     })
@@ -1220,6 +1231,7 @@ export function connect(
     }, 10_000)
 
     ws.on('open', () => {
+      if (session.ws !== ws) return
       if (session.connectTrace) {
         session.connectTrace.wsOpenMs = performance.now() - startedAt
       }
@@ -1243,6 +1255,7 @@ export function connect(
     })
 
     ws.on('message', (data) => {
+      if (session.ws !== ws) return
       lastMessageAt = Date.now()
       try {
         const msg = JSON.parse(String(data))
@@ -1283,6 +1296,7 @@ export function connect(
     })
 
     ws.on('close', () => {
+      if (session.ws !== ws) return
       if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null }
       if (activeSessions.get(session.id) === session) {
         activeSessions.delete(session.id)
@@ -1387,6 +1401,19 @@ export function getSession(id?: string): Session | null {
   return null
 }
 
+export function pruneDisconnectedSessions(): string[] {
+  const removedIds: string[] = []
+  for (const [id, session] of activeSessions.entries()) {
+    if (session.ws.readyState === WebSocket.OPEN) continue
+    removedIds.push(id)
+    activeSessions.delete(id)
+    if (defaultSessionId === id) {
+      promoteDefaultSession()
+    }
+  }
+  return removedIds
+}
+
 /**
  * Tool-side session resolution with strict routing semantics.
  *
@@ -1469,6 +1496,9 @@ function estimateFillBatchTimeout(fields: ProxyFillField[]): number {
         totalTextLength += field.value.length
         total += FILL_BATCH_TEXT_FIELD_TIMEOUT_MS
         total += Math.ceil(Math.max(1, field.value.length) / FILL_BATCH_TEXT_LENGTH_SLICE) * FILL_BATCH_TEXT_LENGTH_TIMEOUT_MS
+        if (field.typingDelayMs !== undefined) {
+          total += field.typingDelayMs * field.value.length
+        }
         break
       case 'choice':
         total += field.choiceType === 'group' ? FILL_BATCH_TOGGLE_FIELD_TIMEOUT_MS : FILL_BATCH_CHOICE_FIELD_TIMEOUT_MS
@@ -1532,21 +1562,132 @@ export function waitForUiCondition(
   })
 }
 
-function sendResizeAndWaitForUpdate(
+function reconnectUrlForSession(session: Session): string | null {
+  if (session.proxyRuntime && typeof session.proxyRuntime.wsUrl === 'string') {
+    return session.proxyRuntime.wsUrl
+  }
+  const pooled = reusableProxyEntryForSession(session)
+  if (pooled) {
+    return pooled.wsUrl
+  }
+  if (typeof session.url === 'string' && /^wss?:\/\//i.test(session.url)) {
+    return session.url
+  }
+  return null
+}
+
+async function openWebSocket(url: string, timeoutMs = SESSION_RECONNECT_TIMEOUT_MS): Promise<WebSocket> {
+  return await new Promise((resolve, reject) => {
+    const ws = new WebSocket(url)
+    const timeout = setTimeout(() => {
+      cleanup()
+      try {
+        ws.close()
+      } catch {
+        /* ignore */
+      }
+      reject(new Error(`Reconnect to ${url} timed out after ${timeoutMs}ms`))
+    }, timeoutMs)
+
+    const onOpen = () => {
+      cleanup()
+      resolve(ws)
+    }
+    const onError = (err: Error) => {
+      cleanup()
+      reject(new Error(`WebSocket reconnect failed for ${url}: ${err.message}`))
+    }
+
+    function cleanup() {
+      clearTimeout(timeout)
+      ws.off('open', onOpen)
+      ws.off('error', onError)
+    }
+
+    ws.on('open', onOpen)
+    ws.on('error', onError)
+  })
+}
+
+function bindReconnectedSocket(session: Session, ws: WebSocket): void {
+  ws.on('message', data => {
+    if (session.ws !== ws) return
+    try {
+      const msg = JSON.parse(String(data))
+      if (msg.type === 'frame') {
+        session.layout = msg.layout
+        session.tree = msg.tree
+        session.updateRevision++
+        invalidateSessionCaches(session)
+      } else if (msg.type === 'patch' && session.layout) {
+        applyPatches(session.layout, msg.patches)
+        session.updateRevision++
+        invalidateSessionCaches(session)
+      }
+    } catch {
+      /* ignore malformed messages */
+    }
+  })
+
+  ws.on('close', () => {
+    if (session.ws !== ws) return
+    if (activeSessions.get(session.id) === session) {
+      activeSessions.delete(session.id)
+      if (defaultSessionId === session.id) promoteDefaultSession()
+    }
+  })
+}
+
+async function ensureSessionConnected(session: Session): Promise<void> {
+  if (session.ws.readyState === WebSocket.OPEN) return
+  if (session.reconnectInFlight) {
+    const recovered = await session.reconnectInFlight
+    if (!recovered) {
+      throw new Error('Not connected')
+    }
+    return
+  }
+  const targetUrl = reconnectUrlForSession(session)
+  if (!targetUrl) {
+    throw new Error('Not connected')
+  }
+  const reconnectPromise = (async () => {
+    const nextWs = await openWebSocket(targetUrl)
+    try {
+      session.ws.close()
+    } catch {
+      /* ignore */
+    }
+    session.ws = nextWs
+    bindReconnectedSocket(session, nextWs)
+    activeSessions.set(session.id, session)
+    if (!session.isolated) {
+      defaultSessionId = session.id
+    }
+    return true
+  })()
+  session.reconnectInFlight = reconnectPromise
+  let recovered = false
+  try {
+    recovered = await reconnectPromise
+  } finally {
+    session.reconnectInFlight = undefined
+  }
+  if (!recovered) {
+    throw new Error('Not connected')
+  }
+}
+
+async function sendResizeAndWaitForUpdate(
   session: Session,
   width: number,
   height: number,
   timeoutMs = 5_000,
 ): Promise<UpdateWaitResult> {
-  return new Promise((resolve, reject) => {
-    if (session.ws.readyState !== WebSocket.OPEN) {
-      reject(new Error('Not connected'))
-      return
-    }
-    const startRevision = session.updateRevision
-    session.ws.send(JSON.stringify({ type: 'resize', width, height }))
-    waitForNextUpdate(session, timeoutMs, undefined, startRevision).then(resolve).catch(reject)
-  })
+  await ensureSessionConnected(session)
+  const startRevision = session.updateRevision
+  session.ws.send(JSON.stringify({ type: 'resize', width, height }))
+  return await waitForNextUpdate(session, timeoutMs, undefined, startRevision)
 }
 
 /**
@@ -1565,11 +1706,8 @@ export function sendClick(session: Session, x: number, y: number, timeoutMs?: nu
  * Send a sequence of key events to type text into the focused element.
  */
 export function sendType(session: Session, text: string, timeoutMs?: number): Promise<UpdateWaitResult> {
-  return new Promise((resolve, reject) => {
-    if (session.ws.readyState !== WebSocket.OPEN) {
-      reject(new Error('Not connected'))
-      return
-    }
+  return (async () => {
+    await ensureSessionConnected(session)
 
     // Send each character as keydown + keyup
     for (const char of text) {
@@ -1588,8 +1726,8 @@ export function sendType(session: Session, text: string, timeoutMs?: number): Pr
     }
 
     // Wait briefly for server to process and send update
-    waitForNextUpdate(session, timeoutMs).then(resolve).catch(reject)
-  })
+    return await waitForNextUpdate(session, timeoutMs)
+  })()
 }
 
 /**
@@ -1649,7 +1787,7 @@ export function sendFieldText(
   session: Session,
   fieldLabel: string,
   value: string,
-  opts?: { exact?: boolean; fieldId?: string },
+  opts?: { exact?: boolean; fieldId?: string; typingDelayMs?: number; imeFriendly?: boolean },
   timeoutMs?: number,
 ): Promise<UpdateWaitResult> {
   const payload: Record<string, unknown> = {
@@ -1659,6 +1797,8 @@ export function sendFieldText(
   }
   if (opts?.exact !== undefined) payload.exact = opts.exact
   if (opts?.fieldId) payload.fieldId = opts.fieldId
+  if (opts?.typingDelayMs !== undefined) payload.typingDelayMs = opts.typingDelayMs
+  if (opts?.imeFriendly !== undefined) payload.imeFriendly = opts.imeFriendly
   return sendAndWaitForUpdate(session, payload, timeoutMs)
 }
 
@@ -3782,22 +3922,17 @@ function applyPatches(layout: Record<string, unknown>, patches: Array<{ path: nu
   }
 }
 
-function sendAndWaitForUpdate(
+async function sendAndWaitForUpdate(
   session: Session,
   message: Record<string, unknown>,
   timeoutMs = ACTION_UPDATE_TIMEOUT_MS,
   opts?: { requireUpdateOnAck?: boolean },
 ): Promise<UpdateWaitResult> {
-  return new Promise((resolve, reject) => {
-    if (session.ws.readyState !== WebSocket.OPEN) {
-      reject(new Error('Not connected'))
-      return
-    }
-    const requestId = `req-${++nextRequestSequence}`
-    const startRevision = session.updateRevision
-    session.ws.send(JSON.stringify({ ...message, requestId }))
-    waitForNextUpdate(session, timeoutMs, requestId, startRevision, opts).then(resolve).catch(reject)
-  })
+  await ensureSessionConnected(session)
+  const requestId = `req-${++nextRequestSequence}`
+  const startRevision = session.updateRevision
+  session.ws.send(JSON.stringify({ ...message, requestId }))
+  return await waitForNextUpdate(session, timeoutMs, requestId, startRevision, opts)
 }
 
 function waitForNextUpdate(

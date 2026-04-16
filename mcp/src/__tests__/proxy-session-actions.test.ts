@@ -300,4 +300,70 @@ describe('proxy-backed MCP actions', () => {
       await new Promise<void>((resolve, reject) => wss.close(err => (err ? reject(err) : resolve())))
     }
   })
+
+  it('reconnects once when an action is sent on a closed socket', async () => {
+    const wss = new WebSocketServer({ port: 0 })
+    let connectionCount = 0
+    wss.on('connection', ws => {
+      connectionCount += 1
+      ws.on('message', raw => {
+        const msg = JSON.parse(String(raw)) as { type?: string; requestId?: string }
+        if (msg.type === 'resize') {
+          ws.send(JSON.stringify({
+            type: 'frame',
+            layout: { x: 0, y: 0, width: 1024, height: 768, children: [] },
+            tree: { kind: 'box', props: {}, semantic: { tag: 'body', role: 'group' }, children: [] },
+          }))
+          return
+        }
+        if (msg.type === 'event') {
+          ws.send(JSON.stringify({
+            type: 'frame',
+            layout: { x: 0, y: 0, width: 1024, height: 768, children: [] },
+            tree: {
+              kind: 'box',
+              props: {},
+              semantic: { tag: 'body', role: 'group', ariaLabel: 'Reconnected' },
+              children: [],
+            },
+          }))
+          ws.send(JSON.stringify({
+            type: 'ack',
+            requestId: msg.requestId,
+            result: { ok: true },
+          }))
+        }
+      })
+    })
+    const port = await new Promise<number>((resolve, reject) => {
+      wss.once('listening', () => {
+        const address = wss.address()
+        if (typeof address === 'object' && address) resolve(address.port)
+        else reject(new Error('Failed to resolve ephemeral WebSocket port'))
+      })
+      wss.once('error', reject)
+    })
+
+    try {
+      const session = await connect(`ws://127.0.0.1:${port}`)
+      await new Promise<void>(resolve => {
+        if (session.ws.readyState === session.ws.CLOSED) {
+          resolve()
+          return
+        }
+        session.ws.once('close', () => resolve())
+        session.ws.close()
+      })
+
+      await expect(sendClick(session, 5, 5, 150)).resolves.toMatchObject({
+        status: 'updated',
+        timeoutMs: 150,
+        result: { ok: true },
+      })
+      expect(connectionCount).toBeGreaterThanOrEqual(2)
+    } finally {
+      disconnect()
+      await new Promise<void>((resolve, reject) => wss.close(err => (err ? reject(err) : resolve())))
+    }
+  })
 })

@@ -7,6 +7,7 @@ import {
   connect,
   connectThroughProxy,
   disconnect,
+  pruneDisconnectedSessions,
   resolveSession,
   listSessions,
   getDefaultSessionId,
@@ -283,6 +284,17 @@ const fillFieldSchema = z.union([
     fieldLabel: z.string().describe('Visible field label / accessible name. Optional to duplicate when fieldId is present.'),
     value: z.string().describe('Text value to set'),
     exact: z.boolean().optional().describe('Exact label match'),
+    typingDelayMs: z
+      .number()
+      .int()
+      .min(0)
+      .max(500)
+      .optional()
+      .describe('Milliseconds between keystrokes when the proxy falls back to keyboard typing (masked inputs).'),
+    imeFriendly: z
+      .boolean()
+      .optional()
+      .describe('Use composition-friendly events for IME-heavy controlled fields.'),
     timeoutMs: timeoutMsInput.describe('Optional action wait timeout'),
   }),
   z.object({
@@ -291,6 +303,17 @@ const fillFieldSchema = z.union([
     fieldLabel: z.string().optional().describe('Optional when fieldId is present; MCP resolves the current label from geometra_form_schema'),
     value: z.string().describe('Text value to set'),
     exact: z.boolean().optional().describe('Exact label match'),
+    typingDelayMs: z
+      .number()
+      .int()
+      .min(0)
+      .max(500)
+      .optional()
+      .describe('Milliseconds between keystrokes when the proxy falls back to keyboard typing (masked inputs).'),
+    imeFriendly: z
+      .boolean()
+      .optional()
+      .describe('Use composition-friendly events for IME-heavy controlled fields.'),
     timeoutMs: timeoutMsInput.describe('Optional action wait timeout'),
   }),
   z.object({
@@ -357,7 +380,16 @@ const fillFieldSchema = z.union([
 
 type FillFieldInput = z.infer<typeof fillFieldSchema>
 type ResolvedFillFieldInput =
-  | { kind: 'text'; fieldId?: string; fieldLabel: string; value: string; exact?: boolean; timeoutMs?: number }
+  | {
+      kind: 'text'
+      fieldId?: string
+      fieldLabel: string
+      value: string
+      exact?: boolean
+      timeoutMs?: number
+      typingDelayMs?: number
+      imeFriendly?: boolean
+    }
   | {
       kind: 'choice'
       fieldId?: string
@@ -4412,7 +4444,12 @@ async function executeFillField(session: Session, field: ResolvedFillFieldInput,
         session,
         field.fieldLabel,
         field.value,
-        { exact: field.exact, fieldId: field.fieldId },
+        {
+          exact: field.exact,
+          fieldId: field.fieldId,
+          typingDelayMs: field.typingDelayMs,
+          imeFriendly: field.imeFriendly,
+        },
         field.timeoutMs,
       )
       const fieldSummary = summarizeFieldLabelState(session, field.fieldLabel)
@@ -4576,6 +4613,7 @@ function err(text: string) {
 function resolveToolSession(
   sessionId: string | undefined,
 ): { session: Session } | { error: ReturnType<typeof err> } {
+  pruneDisconnectedSessions()
   const result = resolveSession(sessionId)
   switch (result.kind) {
     case 'ok':
@@ -4587,7 +4625,7 @@ function resolveToolSession(
         error: err(
           `session_not_found: no active session with id "${result.id}". Active sessions: ${
             result.activeIds.length > 0 ? result.activeIds.join(', ') : '(none)'
-          }. Call geometra_connect again to start a new session — the MCP server never silently routes an explicit sessionId onto a different session.`,
+          }. The requested session may have disconnected or expired; call geometra_connect again to start a new session — the MCP server never silently routes an explicit sessionId onto a different session.`,
         ),
       }
     case 'ambiguous': {
