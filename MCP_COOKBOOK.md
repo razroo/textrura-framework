@@ -783,6 +783,109 @@ MCP sessions receive the updated frame automatically. The next tool call from an
 
 ---
 
+## 11. Submit a form in one MCP call (`geometra_submit_form`)
+
+When the flow is `fill values → click Submit → wait for success/nav`, prefer `geometra_submit_form` over three separate tool calls. It auto-connects, fills via the form-schema resolver, clicks the submit target, and waits — one round trip.
+
+### Happy path
+
+```json
+geometra_submit_form({
+  "pageUrl": "https://boards.greenhouse.io/company/jobs/123",
+  "isolated": true,
+  "valuesByLabel": {
+    "First Name": "Jane",
+    "Last Name": "Doe",
+    "Email": "jane@example.com"
+  },
+  "submit": { "role": "button", "name": "Submit application" },
+  "waitFor": { "role": "dialog", "name": "Application submitted", "timeoutMs": 15000 }
+})
+```
+
+**Check:**
+- `completed: true` — the whole chain landed.
+- `navigated: true` with `afterUrl` — the submit caused a navigation.
+- `waitFor: { present: true, matchCount: 1 }` — the success condition fired.
+- `final.invalidCount` — residual invalid fields after the submit wait resolves.
+
+### Skip the fill phase
+
+When values were already written by a prior call (e.g. resume parsing) and you only need to submit:
+
+```json
+geometra_submit_form({
+  "skipFill": true,
+  "submit": { "role": "button", "name": "Submit application" },
+  "waitFor": { "role": "dialog", "name": "Application submitted" }
+})
+```
+
+### Defaults to remember
+
+- `submit` defaults to `{ role: 'button', name: 'Submit' }` — only omit it when that generic filter picks the right button.
+- `waitFor` is optional. When omitted, the tool returns as soon as `sendClick` is acknowledged.
+- `failOnInvalid: true` turns any residual `invalidCount` into an error result (useful when a form re-renders with new validation after submit).
+
+---
+
+## 12. Read transparent fallback telemetry
+
+Semantic actions (`geometra_click`, `geometra_fill_fields`, `geometra_fill_form`) now emit `fallback` metadata when their happy-path resolution failed and a recovery attempt succeeded. `geometra_run_actions` aggregates step-level fallbacks into a top-level `fallbacks` array so the signal is visible even when `includeSteps: false`.
+
+### Click fallback shape
+
+```json
+// geometra_click result fragment
+{
+  "at": { "x": 320, "y": 480 },
+  "target": { "role": "button", "name": "Submit" },
+  "fallback": { "used": true, "reason": "relaxed-visibility", "attempts": 2 }
+}
+```
+
+Reasons:
+
+- `revision-retry` — the initial semantic resolve missed because the UI tree was still settling after a navigation. Waiting for one revision tick let the target appear.
+- `relaxed-visibility` — the caller required `fullyVisible: true` but the element could only be revealed as partially visible (sticky headers, tall inputs, overlays).
+
+### Fill fallback shape
+
+```json
+// geometra_fill_form result fragment (includeSteps: false)
+{
+  "execution": "sequential",
+  "fallback": { "used": true, "reason": "batched-threw", "attempts": 2 }
+}
+```
+
+Reasons:
+
+- `batched-unavailable` — the batched proxy path returned a recoverable error; the sequential loop picked up.
+- `batched-threw` — the batched sendFillFields threw (e.g. proxy reported an unsupported message type).
+- `batched-invalid-readback` — batched ack said "ok" but the a11y readback showed fields still invalid.
+
+### Aggregate from `geometra_run_actions`
+
+```json
+{
+  "completed": true,
+  "stepCount": 3,
+  "successCount": 3,
+  "fallbacks": [
+    { "stepIndex": 0, "type": "fill_fields", "used": true, "reason": "batched-unavailable", "attempts": 2 },
+    { "stepIndex": 2, "type": "click", "used": true, "reason": "revision-retry", "attempts": 2 }
+  ]
+}
+```
+
+### How to use the signal
+
+- Agents: **ignore `fallback` for flow control** — the action still succeeded. Don't branch on it; don't retry. The only exception is treating repeated fallbacks across a single session as a hint that the page might need a different strategy (e.g. `isolated: true` on the next connect).
+- Operators: aggregate `fallback.reason` counts in logs to prioritize native fixes. A spike in `batched-invalid-readback` for a given site means the batched proxy path needs tightening; a spike in `relaxed-visibility` suggests a sticky element that should be revealed natively.
+
+---
+
 ## Troubleshooting
 
 Common errors and how to resolve them.

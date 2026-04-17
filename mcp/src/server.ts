@@ -1670,6 +1670,10 @@ Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_lis
       const steps: Array<Record<string, unknown>> = []
       let stoppedAt: number | undefined
       const batchStartedAt = performance.now()
+      // Collect transparent-fallback signals from each step so run_actions
+      // surfaces them at top level regardless of `includeSteps` — otherwise
+      // the telemetry is dead code when callers opt out of the steps listing.
+      const fallbackRecords: Array<{ stepIndex: number; type: string; used: true; reason: string; attempts: number }> = []
 
       for (let index = 0; index < actions.length; index++) {
         const action = actions[index]!
@@ -1682,6 +1686,16 @@ Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_lis
             uiTreeWaitMs = performance.now() - uiTreeWaitStartedAt
           }
           const result = await executeBatchAction(session, action, detail, includeSteps)
+          const stepFallback = (result.compact as { fallback?: { used: true; reason: string; attempts: number } }).fallback
+          if (stepFallback?.used) {
+            fallbackRecords.push({
+              stepIndex: index,
+              type: action.type,
+              used: true,
+              reason: stepFallback.reason,
+              attempts: stepFallback.attempts,
+            })
+          }
           const elapsedMs = Number((performance.now() - startedAt).toFixed(1))
           const cumulativeMs = Number((performance.now() - batchStartedAt).toFixed(1))
 
@@ -1741,6 +1755,7 @@ Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_lis
             ...connection,
             completed: stoppedAt === undefined && steps.length === actions.length,
             ...(stoppedAt !== undefined ? { stoppedAt } : {}),
+            ...(fallbackRecords.length > 0 ? { fallbacks: fallbackRecords } : {}),
             ...(after ? { final: sessionSignalsPayload(collectSessionSignals(after), detail) } : {}),
           }
         : {
@@ -1751,6 +1766,7 @@ Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_lis
             errorCount,
             ...(includeSteps ? { steps } : {}),
             ...(stoppedAt !== undefined ? { stoppedAt } : {}),
+            ...(fallbackRecords.length > 0 ? { fallbacks: fallbackRecords } : {}),
             ...(after ? { final: sessionSignalsPayload(collectSessionSignals(after), detail) } : {}),
           }
       return ok(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
@@ -4508,6 +4524,7 @@ async function executeBatchAction(
             resolvedFields.fields.map(field => ({ field, confidence: 1.0, matchMethod: 'label-exact' as const })),
           )
         : undefined
+      let fallbackFromBatch: { used: true; reason: 'batched-unavailable'; attempts: number } | undefined
       if (!includeSteps) {
         const batched = await tryBatchedResolvedFields(session, resolvedFields.fields, detail)
         if (batched.ok) {
@@ -4523,6 +4540,10 @@ async function executeBatchAction(
             },
           }
         }
+        // Batched path unavailable — fall through into sequential and tag the
+        // step so `geometra_run_actions` result aggregation matches the shape
+        // emitted by standalone `geometra_fill_fields` / `geometra_fill_form`.
+        fallbackFromBatch = { used: true, reason: 'batched-unavailable', attempts: 2 }
       }
       const steps: Array<Record<string, unknown>> = []
       for (let index = 0; index < resolvedFields.fields.length; index++) {
@@ -4551,6 +4572,7 @@ async function executeBatchAction(
         compact: {
           fieldCount: resolvedFields.fields.length,
           ...(includeSteps ? { steps } : {}),
+          ...(fallbackFromBatch ? { fallback: fallbackFromBatch } : {}),
           ...(verification ? { verification } : {}),
         },
       }

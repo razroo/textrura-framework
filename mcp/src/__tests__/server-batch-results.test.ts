@@ -1241,6 +1241,44 @@ describe('fill transparent fallback', () => {
     resetMockSessionCaches()
   })
 
+  it('geometra_run_actions aggregates step-level fill fallback metadata into top-level fallbacks', async () => {
+    const handler = getToolHandler('geometra_run_actions')
+    mockState.currentA11yRoot = node('group', undefined, {
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 0 },
+      children: [
+        node('textbox', 'Full name', { value: '', path: [0] }),
+      ],
+    })
+    // Force the batched path to reject with a recoverable error so the
+    // fill_fields step falls through to the sequential loop and tags the step.
+    mockState.sendFillFields.mockRejectedValue(new Error('Unsupported client message type "fillFields"'))
+
+    // includeSteps:false makes the fill_fields step handler prefer the batched
+    // fast-path. When that path is unavailable, the step flips to sequential
+    // and emits fallback metadata that run_actions lifts into the top-level
+    // `fallbacks` array.
+    const result = await handler({
+      actions: [
+        {
+          type: 'fill_fields',
+          fields: [{ kind: 'text', fieldLabel: 'Full name', value: 'Taylor Applicant' }],
+        },
+      ],
+      stopOnError: true,
+      includeSteps: false,
+      detail: 'minimal',
+    })
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    expect(payload).toMatchObject({
+      completed: true,
+      stepCount: 1,
+      successCount: 1,
+      fallbacks: [
+        { stepIndex: 0, type: 'fill_fields', used: true, reason: 'batched-unavailable', attempts: 2 },
+      ],
+    })
+  })
+
   it('geometra_fill_fields surfaces fallback metadata when the batched path is unavailable', async () => {
     const handler = getToolHandler('geometra_fill_fields')
     mockState.currentA11yRoot = node('group', undefined, {
