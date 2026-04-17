@@ -1274,7 +1274,7 @@ describe('fill transparent fallback', () => {
       stepCount: 1,
       successCount: 1,
       fallbacks: [
-        { stepIndex: 0, type: 'fill_fields', used: true, reason: 'batched-unavailable', attempts: 2 },
+        { stepIndex: 0, type: 'fill_fields', attempted: true, used: true, reason: 'batched-unavailable', attempts: 2 },
       ],
     })
   })
@@ -1305,7 +1305,7 @@ describe('fill transparent fallback', () => {
       fieldCount: 1,
       successCount: 1,
       errorCount: 0,
-      fallback: { used: true, reason: 'batched-unavailable', attempts: 2 },
+      fallback: { attempted: true, used: true, reason: 'batched-unavailable', attempts: 2 },
     })
   })
 
@@ -1341,7 +1341,7 @@ describe('fill transparent fallback', () => {
     const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
     expect(payload).toMatchObject({
       execution: 'sequential',
-      fallback: { used: true, reason: 'batched-threw', attempts: 2 },
+      fallback: { attempted: true, used: true, reason: 'batched-threw', attempts: 2 },
     })
   })
 })
@@ -1350,6 +1350,34 @@ describe('click transparent fallback', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetMockSessionCaches()
+  })
+
+  it('surfaces fallback.attempted:false when click fallback attempted and failed', async () => {
+    const handler = getToolHandler('geometra_click')
+    mockState.currentA11yRoot = node('group', undefined, {
+      bounds: { x: 0, y: 0, width: 1280, height: 800 },
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 0 },
+      children: [],
+    })
+
+    const result = await handler({
+      role: 'button',
+      name: 'Does not exist',
+      fullyVisible: true,
+      maxRevealSteps: 1,
+      revealTimeoutMs: 50,
+      detail: 'terse',
+    })
+
+    // Fallback was attempted (both revision-retry — if mockWaitForUiCondition
+    // returns true — and relaxed-visibility) but neither phase recovered the
+    // missing target, so the handler returns a structured error carrying the
+    // attempted-but-failed telemetry.
+    const errorText = result.content[0]!.text
+    expect(errorText).toContain('"fallback"')
+    const parsed = JSON.parse(errorText) as { error: string; fallback: Record<string, unknown> }
+    expect(parsed.fallback).toMatchObject({ attempted: true, used: false })
+    expect((parsed.fallback.reasonsTried as string[]).length).toBeGreaterThan(0)
   })
 
   it('surfaces fallback.used when relaxed-visibility lets an offscreen submit resolve', async () => {
@@ -1387,7 +1415,7 @@ describe('click transparent fallback', () => {
     const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
     expect(payload).toMatchObject({
       target: { role: 'button', name: 'Submit' },
-      fallback: { used: true, reason: 'relaxed-visibility' },
+      fallback: { attempted: true, used: true, reason: 'relaxed-visibility' },
     })
   })
 })

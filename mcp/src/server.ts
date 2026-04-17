@@ -1031,7 +1031,7 @@ Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / combo
       const resolvedFields = resolveFillFieldInputs(session, fields)
       if (!resolvedFields.ok) return err(resolvedFields.error)
 
-      let fallbackFromBatch: { used: true; reason: 'batched-unavailable'; attempts: number } | undefined
+      let fallbackFromBatch: { attempted: true; used: true; reason: 'batched-unavailable'; attempts: number } | undefined
       if (!includeSteps) {
         try {
           const batched = await tryBatchedResolvedFields(session, resolvedFields.fields, detail)
@@ -1053,7 +1053,7 @@ Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / combo
           // Batched path returned {ok: false} — this is the transparent fallback
           // case. Continue into the sequential loop and mark the result so
           // operators can aggregate how often it fires.
-          fallbackFromBatch = { used: true, reason: 'batched-unavailable', attempts: 2 }
+          fallbackFromBatch = { attempted: true, used: true, reason: 'batched-unavailable', attempts: 2 }
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e)
           return err(message)
@@ -1292,7 +1292,7 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
         }
       }
 
-      let fallbackFromBatch: { used: true; reason: 'batched-threw' | 'batched-invalid-readback'; attempts: number } | undefined
+      let fallbackFromBatch: { attempted: true; used: true; reason: 'batched-threw' | 'batched-invalid-readback'; attempts: number } | undefined
       if (!includeSteps) {
         let usedBatch = false
         let batchAckResult: ProxyFillAckResult | undefined
@@ -1325,7 +1325,7 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
             const message = e instanceof Error ? e.message : String(e)
             return err(message)
           }
-          fallbackFromBatch = { used: true, reason: 'batched-threw', attempts: 2 }
+          fallbackFromBatch = { attempted: true, used: true, reason: 'batched-threw', attempts: 2 }
         }
 
         if (usedBatch) {
@@ -1334,7 +1334,7 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
           const invalidRemaining = signals?.invalidFields.length ?? 0
           if ((!batchAckResult || batchAckResult.invalidCount > 0) && invalidRemaining > 0) {
             usedBatch = false
-            fallbackFromBatch = { used: true, reason: 'batched-invalid-readback', attempts: 2 }
+            fallbackFromBatch = { attempted: true, used: true, reason: 'batched-invalid-readback', attempts: 2 }
           }
         }
 
@@ -1673,7 +1673,7 @@ Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_lis
       // Collect transparent-fallback signals from each step so run_actions
       // surfaces them at top level regardless of `includeSteps` — otherwise
       // the telemetry is dead code when callers opt out of the steps listing.
-      const fallbackRecords: Array<{ stepIndex: number; type: string; used: true; reason: string; attempts: number }> = []
+      const fallbackRecords: Array<{ stepIndex: number; type: string; attempted: true; used: true; reason: string; attempts: number }> = []
 
       for (let index = 0; index < actions.length; index++) {
         const action = actions[index]!
@@ -1686,11 +1686,12 @@ Supported step types: \`click\`, \`type\`, \`key\`, \`upload_files\`, \`pick_lis
             uiTreeWaitMs = performance.now() - uiTreeWaitStartedAt
           }
           const result = await executeBatchAction(session, action, detail, includeSteps)
-          const stepFallback = (result.compact as { fallback?: { used: true; reason: string; attempts: number } }).fallback
+          const stepFallback = (result.compact as { fallback?: { attempted: true; used: true; reason: string; attempts: number } }).fallback
           if (stepFallback?.used) {
             fallbackRecords.push({
               stepIndex: index,
               type: action.type,
+              attempted: true,
               used: true,
               reason: stepFallback.reason,
               attempts: stepFallback.attempts,
@@ -2067,7 +2068,7 @@ After clicking, returns a compact semantic delta when possible (dialogs/forms/li
         maxRevealSteps,
         revealTimeoutMs,
       })
-      if (!resolved.ok) return err(resolved.error)
+      if (!resolved.ok) return err(clickFallbackErrorMessage(resolved))
 
       const wait = await sendClick(session, resolved.value.x, resolved.value.y, timeoutMs)
 
@@ -3649,11 +3650,23 @@ async function resolveClickLocation(
  * metadata is surfaced in tool results so operators can prioritize native fixes
  * for the most common recovery patterns (Phase 4 of `MCP_PERFORMANCE_ROADMAP.md`).
  */
-interface ResolveClickFallbackInfo {
+type ClickFallbackReason = 'revision-retry' | 'relaxed-visibility'
+
+interface ResolveClickFallbackSuccess {
+  attempted: true
   used: true
-  reason: 'revision-retry' | 'relaxed-visibility'
+  reason: ClickFallbackReason
   attempts: number
 }
+
+interface ResolveClickFallbackFailure {
+  attempted: true
+  used: false
+  reasonsTried: ClickFallbackReason[]
+  attempts: number
+}
+
+type ResolveClickFallbackInfo = ResolveClickFallbackSuccess | ResolveClickFallbackFailure
 
 async function resolveClickLocationWithFallback(
   session: Session,
@@ -3667,8 +3680,8 @@ async function resolveClickLocationWithFallback(
     revealTimeoutMs?: number
   },
 ): Promise<
-  | { ok: true; value: ResolvedClickLocation; fallback?: ResolveClickFallbackInfo }
-  | { ok: false; error: string; fallback?: ResolveClickFallbackInfo }
+  | { ok: true; value: ResolvedClickLocation; fallback?: ResolveClickFallbackSuccess }
+  | { ok: false; error: string; fallback?: ResolveClickFallbackFailure }
 > {
   const first = await resolveClickLocation(session, options)
   if (first.ok) return first
@@ -3679,6 +3692,7 @@ async function resolveClickLocationWithFallback(
   if (hasExplicitCoordinates) return first
   if (!hasNodeFilter(options.filter)) return first
 
+  const reasonsTried: ClickFallbackReason[] = []
   let attempts = 1
 
   const startRevision = session.updateRevision
@@ -3689,18 +3703,20 @@ async function resolveClickLocationWithFallback(
   )
   if (revisionAdvanced) {
     attempts += 1
+    reasonsTried.push('revision-retry')
     const retry = await resolveClickLocation(session, options)
     if (retry.ok) {
       return {
         ok: true,
         value: retry.value,
-        fallback: { used: true, reason: 'revision-retry', attempts },
+        fallback: { attempted: true, used: true, reason: 'revision-retry', attempts },
       }
     }
   }
 
   if (options.fullyVisible !== false) {
     attempts += 1
+    reasonsTried.push('relaxed-visibility')
     const relaxed = await resolveClickLocation(session, {
       ...options,
       fullyVisible: false,
@@ -3710,12 +3726,32 @@ async function resolveClickLocationWithFallback(
       return {
         ok: true,
         value: relaxed.value,
-        fallback: { used: true, reason: 'relaxed-visibility', attempts },
+        fallback: { attempted: true, used: true, reason: 'relaxed-visibility', attempts },
       }
     }
   }
 
-  return first
+  // All fallback phases tried and none recovered. Carry the trace of what we
+  // tried so operators see the attempted-but-failed signal alongside the
+  // successful-recovery signal.
+  if (reasonsTried.length === 0) return first
+  return {
+    ok: false,
+    error: first.error,
+    fallback: { attempted: true, used: false, reasonsTried, attempts },
+  }
+}
+
+/**
+ * Expose the attempted-but-failed fallback telemetry on error responses. When
+ * `resolved.fallback` is present on a failure, return a structured JSON error
+ * so operators can aggregate recovery failures the same way they aggregate
+ * successful recoveries. Plain-text errors are preserved for the no-fallback
+ * case to avoid churning that error contract.
+ */
+function clickFallbackErrorMessage(resolved: { error: string; fallback?: ResolveClickFallbackFailure }): string {
+  if (!resolved.fallback) return resolved.error
+  return JSON.stringify({ error: resolved.error, fallback: resolved.fallback })
 }
 
 function describeFormattedNode(node: FormattedNodePayload): string {
@@ -4273,7 +4309,7 @@ async function executeBatchAction(
         maxRevealSteps: action.maxRevealSteps,
         revealTimeoutMs: action.revealTimeoutMs,
       })
-      if (!resolved.ok) throw new Error(resolved.error)
+      if (!resolved.ok) throw new Error(clickFallbackErrorMessage(resolved))
 
       const wait = await sendClick(session, resolved.value.x, resolved.value.y, action.timeoutMs)
       const targetSummary = resolved.value.target
@@ -4524,7 +4560,7 @@ async function executeBatchAction(
             resolvedFields.fields.map(field => ({ field, confidence: 1.0, matchMethod: 'label-exact' as const })),
           )
         : undefined
-      let fallbackFromBatch: { used: true; reason: 'batched-unavailable'; attempts: number } | undefined
+      let fallbackFromBatch: { attempted: true; used: true; reason: 'batched-unavailable'; attempts: number } | undefined
       if (!includeSteps) {
         const batched = await tryBatchedResolvedFields(session, resolvedFields.fields, detail)
         if (batched.ok) {
@@ -4543,7 +4579,7 @@ async function executeBatchAction(
         // Batched path unavailable — fall through into sequential and tag the
         // step so `geometra_run_actions` result aggregation matches the shape
         // emitted by standalone `geometra_fill_fields` / `geometra_fill_form`.
-        fallbackFromBatch = { used: true, reason: 'batched-unavailable', attempts: 2 }
+        fallbackFromBatch = { attempted: true, used: true, reason: 'batched-unavailable', attempts: 2 }
       }
       const steps: Array<Record<string, unknown>> = []
       for (let index = 0; index < resolvedFields.fields.length; index++) {

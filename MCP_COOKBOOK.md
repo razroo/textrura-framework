@@ -833,14 +833,14 @@ geometra_submit_form({
 
 Semantic actions (`geometra_click`, `geometra_fill_fields`, `geometra_fill_form`) now emit `fallback` metadata when their happy-path resolution failed and a recovery attempt succeeded. `geometra_run_actions` aggregates step-level fallbacks into a top-level `fallbacks` array so the signal is visible even when `includeSteps: false`.
 
-### Click fallback shape
+### Click fallback shape — recovery succeeded
 
 ```json
 // geometra_click result fragment
 {
   "at": { "x": 320, "y": 480 },
   "target": { "role": "button", "name": "Submit" },
-  "fallback": { "used": true, "reason": "relaxed-visibility", "attempts": 2 }
+  "fallback": { "attempted": true, "used": true, "reason": "relaxed-visibility", "attempts": 2 }
 }
 ```
 
@@ -849,13 +849,31 @@ Reasons:
 - `revision-retry` — the initial semantic resolve missed because the UI tree was still settling after a navigation. Waiting for one revision tick let the target appear.
 - `relaxed-visibility` — the caller required `fullyVisible: true` but the element could only be revealed as partially visible (sticky headers, tall inputs, overlays).
 
+### Click fallback shape — recovery failed
+
+When every fallback phase was attempted but none recovered the target, the tool returns an error result whose text is a structured JSON payload:
+
+```json
+{
+  "error": "No elements found matching { \"role\": \"button\", \"name\": \"Submit\" }",
+  "fallback": {
+    "attempted": true,
+    "used": false,
+    "reasonsTried": ["revision-retry", "relaxed-visibility"],
+    "attempts": 3
+  }
+}
+```
+
+Parse the error as JSON when you need the telemetry. Plain-text errors still come back unchanged when no fallback was attempted (explicit coordinates, empty filter).
+
 ### Fill fallback shape
 
 ```json
 // geometra_fill_form result fragment (includeSteps: false)
 {
   "execution": "sequential",
-  "fallback": { "used": true, "reason": "batched-threw", "attempts": 2 }
+  "fallback": { "attempted": true, "used": true, "reason": "batched-threw", "attempts": 2 }
 }
 ```
 
@@ -873,8 +891,8 @@ Reasons:
   "stepCount": 3,
   "successCount": 3,
   "fallbacks": [
-    { "stepIndex": 0, "type": "fill_fields", "used": true, "reason": "batched-unavailable", "attempts": 2 },
-    { "stepIndex": 2, "type": "click", "used": true, "reason": "revision-retry", "attempts": 2 }
+    { "stepIndex": 0, "type": "fill_fields", "attempted": true, "used": true, "reason": "batched-unavailable", "attempts": 2 },
+    { "stepIndex": 2, "type": "click", "attempted": true, "used": true, "reason": "revision-retry", "attempts": 2 }
   ]
 }
 ```

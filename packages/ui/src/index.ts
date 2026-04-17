@@ -1,5 +1,5 @@
-import { box, bodyText, text } from '@geometra/core'
-import type { UIElement, EventHandlers } from '@geometra/core'
+import { box, bodyText, text, signal, createPanRecognizer } from '@geometra/core'
+import type { UIElement, EventHandlers, Signal, PanRecognizer } from '@geometra/core'
 import { theme, font, lineHeight } from './theme.js'
 
 // Re-export theme API
@@ -1507,4 +1507,146 @@ export function sheet(options: SheetOptions): UIElement {
     },
     [backdrop, panel],
   )
+}
+
+export interface SwipeableListOptions<T> {
+  /** Ordered items to page through. */
+  items: ReadonlyArray<T>
+  /** Renders one item's UI. Called every frame — keep it cheap. */
+  renderItem: (item: T, index: number) => UIElement
+  /** Track width in px. Each item takes this much horizontal space. */
+  width: number
+  /** Track height in px. Default `200`. */
+  height?: number
+  /** Starting index. Default `0`. */
+  initialIndex?: number
+  /** Fires when the committed index changes (after a drag snaps or a .goTo / .next / .prev). */
+  onIndexChange?: (index: number) => void
+  /** Pointer distance in px that must be exceeded before pan starts. Default `8`. */
+  minDragDistance?: number
+  /**
+   * Flick velocity (px/ms) above which a short drag still advances one item.
+   * Default `0.3`. Set to `Infinity` to disable flick detection.
+   */
+  flickVelocity?: number
+}
+
+export interface SwipeableList {
+  /** Call from your view function; re-runs each time the signals change. */
+  view(): UIElement
+  /** Gesture recognizers for `attachGestureRecognizers(canvas, list.recognizers)`. */
+  recognizers: PanRecognizer[]
+  /** Currently-committed item index. */
+  currentIndex: Signal<number>
+  /** Clamp + set the index, firing `onIndexChange` if it changed. */
+  goTo(index: number): void
+  /** Advance by one, clamped to `[0, items.length - 1]`. */
+  next(): void
+  /** Retreat by one, clamped. */
+  prev(): void
+}
+
+/**
+ * Horizontal paging list driven by a pan recognizer. Drag follows the pointer;
+ * release snaps to the nearest item, plus one more in the flick direction if
+ * the final velocity exceeded `flickVelocity`. Composable with the canvas
+ * gesture adapter:
+ *
+ * ```ts
+ * const list = swipeableList({ items, renderItem, width: 320 })
+ * attachGestureRecognizers(canvas, list.recognizers)
+ * // `list.view()` goes inside your `view()` function; `list.currentIndex`
+ * // is a live signal you can read for pagination dots, keyboard nav, etc.
+ * ```
+ *
+ * Item width is fixed at `options.width`; the underlying track is
+ * `width * items.length` wide and shifts via an absolute `left` offset so the
+ * renderer only paints visible pixels (assuming the parent clips overflow,
+ * which is how `view()` wraps the track).
+ */
+export function swipeableList<T>(options: SwipeableListOptions<T>): SwipeableList {
+  const items = options.items.length
+  const minDrag = typeof options.minDragDistance === 'number' && Number.isFinite(options.minDragDistance) && options.minDragDistance >= 0
+    ? options.minDragDistance
+    : 8
+  // Allow `Infinity` as an explicit "disable flick detection" sentinel (the
+  // JSDoc promises this). NaN is the only number we refuse.
+  const flickVelocity = typeof options.flickVelocity === 'number' && !Number.isNaN(options.flickVelocity) && options.flickVelocity > 0
+    ? options.flickVelocity
+    : 0.3
+  const width = options.width
+  const height = options.height ?? 200
+
+  const currentIndex = signal(clampIndex(options.initialIndex ?? 0, items))
+  const dragOffset = signal(0)
+  let panStartOffset = 0
+
+  function goTo(index: number): void {
+    const next = clampIndex(index, items)
+    if (next === currentIndex.peek()) return
+    currentIndex.set(next)
+    options.onIndexChange?.(next)
+  }
+
+  function next(): void { goTo(currentIndex.peek() + 1) }
+  function prev(): void { goTo(currentIndex.peek() - 1) }
+
+  const pan = createPanRecognizer({
+    minDistance: minDrag,
+    onStart: () => {
+      panStartOffset = dragOffset.peek()
+    },
+    onMove: (e) => {
+      dragOffset.set(panStartOffset + e.deltaX)
+    },
+    onEnd: (e) => {
+      const total = panStartOffset + e.deltaX
+      const velocity = e.elapsedMs > 0 ? e.deltaX / e.elapsedMs : 0
+      const flickBoost = Math.abs(velocity) >= flickVelocity ? (velocity < 0 ? 1 : -1) : 0
+      const snapDelta = Math.round(-total / width)
+      goTo(currentIndex.peek() + snapDelta + flickBoost)
+      dragOffset.set(0)
+      panStartOffset = 0
+    },
+    onCancel: () => {
+      dragOffset.set(0)
+      panStartOffset = 0
+    },
+  })
+
+  function view(): UIElement {
+    const shift = -(currentIndex.value * width) + dragOffset.value
+    return box(
+      { width, height, overflow: 'hidden' },
+      [
+        box(
+          {
+            position: 'relative',
+            left: shift,
+            flexDirection: 'row',
+            width: width * Math.max(1, items),
+            height,
+          },
+          options.items.map((item, i) =>
+            box({ width, height, flexShrink: 0 }, [options.renderItem(item, i)]),
+          ),
+        ),
+      ],
+    )
+  }
+
+  return {
+    view,
+    recognizers: [pan],
+    currentIndex,
+    goTo,
+    next,
+    prev,
+  }
+}
+
+function clampIndex(index: number, itemCount: number): number {
+  if (itemCount <= 0) return 0
+  if (!Number.isFinite(index)) return 0
+  return Math.max(0, Math.min(itemCount - 1, Math.round(index)))
 }
