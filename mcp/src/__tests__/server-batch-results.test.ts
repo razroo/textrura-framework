@@ -1235,6 +1235,79 @@ describe('submit_form tool', () => {
   })
 })
 
+describe('fill transparent fallback', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetMockSessionCaches()
+  })
+
+  it('geometra_fill_fields surfaces fallback metadata when the batched path is unavailable', async () => {
+    const handler = getToolHandler('geometra_fill_fields')
+    mockState.currentA11yRoot = node('group', undefined, {
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 0 },
+      children: [
+        node('textbox', 'Full name', { value: '', path: [0] }),
+      ],
+    })
+    // Force the batched path to throw a recoverable error so the handler
+    // falls through to the sequential loop and tags the fallback.
+    mockState.sendFillFields.mockRejectedValueOnce(new Error('Unsupported client message type "fillFields"'))
+
+    const result = await handler({
+      fields: [{ kind: 'text', fieldLabel: 'Full name', value: 'Taylor Applicant' }],
+      stopOnError: true,
+      failOnInvalid: false,
+      includeSteps: false,
+      detail: 'minimal',
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    expect(payload).toMatchObject({
+      completed: true,
+      fieldCount: 1,
+      successCount: 1,
+      errorCount: 0,
+      fallback: { used: true, reason: 'batched-unavailable', attempts: 2 },
+    })
+  })
+
+  it('geometra_fill_form surfaces fallback metadata when batched throws recoverable error', async () => {
+    const handler = getToolHandler('geometra_fill_form')
+    mockState.currentA11yRoot = node('group', undefined, {
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 0 },
+      children: [
+        node('textbox', 'Full name', { value: '', path: [0] }),
+      ],
+    })
+    mockState.formSchemas = [{
+      formId: 'fm:0',
+      name: 'Application',
+      fieldCount: 1,
+      requiredCount: 1,
+      invalidCount: 1,
+      fields: [
+        { id: 'ff:0.0', kind: 'text', label: 'Full name' },
+      ],
+    }]
+    // Both the batched-direct path and the schema-backed batched path call
+    // sendFillFields. Reject all calls so both hit the recoverable-error
+    // branch and the handler lands in the sequential loop.
+    mockState.sendFillFields.mockRejectedValue(new Error('Unsupported client message type "fillFields"'))
+
+    const result = await handler({
+      valuesByLabel: { 'Full name': 'Taylor Applicant' },
+      includeSteps: false,
+      detail: 'minimal',
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    expect(payload).toMatchObject({
+      execution: 'sequential',
+      fallback: { used: true, reason: 'batched-threw', attempts: 2 },
+    })
+  })
+})
+
 describe('click transparent fallback', () => {
   beforeEach(() => {
     vi.clearAllMocks()

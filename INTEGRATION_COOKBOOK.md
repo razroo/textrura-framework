@@ -9,6 +9,48 @@ Short recipes for common stacks. All paths assume a Geometra workspace install.
 3. Paint with `CanvasRenderer` from `@geometra/renderer-canvas`.
 4. **Inspector**: `new CanvasRenderer({ canvas, layoutInspector: true })`. With **`createApp`**, the HUD shows **`layout`** ms (Yoga) and **`render`** ms (canvas). Optionally set `renderer.inspectorProbe = { x, y }` on pointer move for `hitPathAtPoint`. Custom hosts can implement **`Renderer.setFrameTimings`** themselves before calling `render`.
 
+## Gesture recognizers
+
+Pan / swipe / pinch ship as host-agnostic state machines in `@geometra/core`.
+`attachGestureRecognizers` from `@geometra/renderer-canvas` is the canvas adapter
+— it converts browser `PointerEvent`s to `PointerSample`s and fans them out to
+every recognizer you pass in.
+
+```ts
+import { createPanRecognizer, createSwipeRecognizer, createPinchRecognizer, signal } from '@geometra/core'
+import { attachGestureRecognizers } from '@geometra/renderer-canvas'
+
+const offsetX = signal(0)
+const scale = signal(1)
+
+const pan = createPanRecognizer({
+  minDistance: 4,
+  onMove: e => offsetX.set(e.deltaX),
+})
+const swipe = createSwipeRecognizer({
+  minVelocity: 0.4,
+  onSwipe: e => console.log('swipe', e.direction),
+})
+const pinch = createPinchRecognizer({
+  onMove: e => scale.set(e.scale),
+})
+
+const stop = attachGestureRecognizers(canvas, [pan, swipe, pinch])
+// …on teardown:
+stop()
+```
+
+Notes:
+
+- Coordinates on `PanEvent` / `SwipeEvent` / `PinchEvent` are in canvas CSS pixels
+  (same space as `HitEvent.x/y`). Use them directly to update signals driving
+  `box({ translateX: offsetX.value })` etc.
+- By default `pointermove` / `pointerup` / `pointercancel` bind to `document` so
+  drags continue past the canvas edge. Pass `{ trackOutsideCanvas: false }` to
+  clamp to the canvas bounds.
+- Gestures compose with `enableInputForwarding` / `enableSelection` — they use
+  their own listeners and don't stop the regular hit-test pipeline from firing.
+
 ## Thin client + server
 
 1. Server: `createServer` from `@geometra/server` — layout and diffs stay on the server.

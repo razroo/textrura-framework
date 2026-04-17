@@ -1031,6 +1031,7 @@ Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / combo
       const resolvedFields = resolveFillFieldInputs(session, fields)
       if (!resolvedFields.ok) return err(resolvedFields.error)
 
+      let fallbackFromBatch: { used: true; reason: 'batched-unavailable'; attempts: number } | undefined
       if (!includeSteps) {
         try {
           const batched = await tryBatchedResolvedFields(session, resolvedFields.fields, detail)
@@ -1049,6 +1050,10 @@ Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / combo
             }
             return ok(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
           }
+          // Batched path returned {ok: false} — this is the transparent fallback
+          // case. Continue into the sequential loop and mark the result so
+          // operators can aggregate how often it fires.
+          fallbackFromBatch = { used: true, reason: 'batched-unavailable', attempts: 2 }
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e)
           return err(message)
@@ -1104,6 +1109,7 @@ Use \`kind: "text"\` for textboxes / textareas, \`"choice"\` for selects / combo
         errorCount,
         ...(includeSteps ? { steps } : {}),
         ...(stoppedAt !== undefined ? { stoppedAt } : {}),
+        ...(fallbackFromBatch ? { fallback: fallbackFromBatch } : {}),
         ...(signals ? { final: sessionSignalsPayload(signals, detail) } : {}),
       }
 
@@ -1286,6 +1292,7 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
         }
       }
 
+      let fallbackFromBatch: { used: true; reason: 'batched-threw' | 'batched-invalid-readback'; attempts: number } | undefined
       if (!includeSteps) {
         let usedBatch = false
         let batchAckResult: ProxyFillAckResult | undefined
@@ -1318,6 +1325,7 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
             const message = e instanceof Error ? e.message : String(e)
             return err(message)
           }
+          fallbackFromBatch = { used: true, reason: 'batched-threw', attempts: 2 }
         }
 
         if (usedBatch) {
@@ -1326,6 +1334,7 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
           const invalidRemaining = signals?.invalidFields.length ?? 0
           if ((!batchAckResult || batchAckResult.invalidCount > 0) && invalidRemaining > 0) {
             usedBatch = false
+            fallbackFromBatch = { used: true, reason: 'batched-invalid-readback', attempts: 2 }
           }
         }
 
@@ -1408,6 +1417,7 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
         ...(startIndex > 0 ? { resumedFromIndex: startIndex } : {}),
         ...(includeSteps ? { steps } : {}),
         ...(stoppedAt !== undefined ? { stoppedAt, resumeFromIndex: stoppedAt + 1 } : {}),
+        ...(fallbackFromBatch ? { fallback: fallbackFromBatch } : {}),
         ...(verification ? { verification } : {}),
         ...(signals ? { final: sessionSignalsPayload(signals, detail) } : {}),
       }
