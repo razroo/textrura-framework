@@ -1123,6 +1123,164 @@ describe('batch MCP result shaping', () => {
   })
 })
 
+describe('submit_form tool', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetMockSessionCaches()
+    mockState.formSchemas = []
+  })
+
+  it('combines fill + submit-click + post-submit wait in one call', async () => {
+    const handler = getToolHandler('geometra_submit_form')
+
+    mockState.currentA11yRoot = node('group', undefined, {
+      bounds: { x: 0, y: 0, width: 1280, height: 800 },
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 0 },
+      children: [
+        node('textbox', 'Full name', { value: '', path: [0] }),
+        node('textbox', 'Email', { value: '', path: [1] }),
+        node('button', 'Submit application', {
+          bounds: { x: 60, y: 480, width: 180, height: 40 },
+          path: [2],
+        }),
+      ],
+    })
+    mockState.formSchemas = [{
+      formId: 'fm:0',
+      name: 'Application',
+      fieldCount: 2,
+      requiredCount: 2,
+      invalidCount: 2,
+      fields: [
+        { id: 'ff:0.0', kind: 'text', label: 'Full name' },
+        { id: 'ff:0.1', kind: 'text', label: 'Email' },
+      ],
+    }]
+    mockState.sendFillFields.mockImplementationOnce(async () => ({
+      status: 'acknowledged',
+      timeoutMs: 6000,
+      result: { invalidCount: 0, alertCount: 0, dialogCount: 0, busyCount: 0, pageUrl: 'https://jobs.example.com/application' },
+    }))
+    mockState.sendClick.mockImplementationOnce(async () => {
+      mockState.currentA11yRoot = node('group', undefined, {
+        bounds: { x: 0, y: 0, width: 1280, height: 800 },
+        meta: { pageUrl: 'https://jobs.example.com/confirm', scrollX: 0, scrollY: 0 },
+        children: [
+          node('dialog', 'Application submitted', {
+            bounds: { x: 240, y: 140, width: 420, height: 260 },
+            path: [0],
+          }),
+        ],
+      })
+      bumpMockUiRevision()
+      return { status: 'updated' as const, timeoutMs: 2000 }
+    })
+
+    const result = await handler({
+      valuesByLabel: { 'Full name': 'Taylor Applicant', Email: 'taylor@example.com' },
+      submit: { role: 'button', name: 'Submit application' },
+      waitFor: { role: 'dialog', name: 'Application submitted', timeoutMs: 5000 },
+      detail: 'minimal',
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    expect(payload).toMatchObject({
+      completed: true,
+      fill: { fieldCount: 2, formId: 'fm:0' },
+      submit: { target: { role: 'button', name: 'Submit application' } },
+      waitFor: { present: true, matchCount: 1 },
+      navigated: true,
+      afterUrl: 'https://jobs.example.com/confirm',
+    })
+    expect(mockState.sendFillFields).toHaveBeenCalledTimes(1)
+    expect(mockState.sendClick).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects missing values when skipFill is false', async () => {
+    const handler = getToolHandler('geometra_submit_form')
+    mockState.currentA11yRoot = node('group', undefined, {
+      bounds: { x: 0, y: 0, width: 1280, height: 800 },
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 0 },
+      children: [
+        node('button', 'Submit', { bounds: { x: 60, y: 480, width: 100, height: 40 }, path: [0] }),
+      ],
+    })
+    const result = await handler({ detail: 'minimal' })
+    expect(result.content[0]!.text).toContain('Provide at least one value')
+  })
+
+  it('skipFill: true goes straight to submit + wait', async () => {
+    const handler = getToolHandler('geometra_submit_form')
+    mockState.currentA11yRoot = node('group', undefined, {
+      bounds: { x: 0, y: 0, width: 1280, height: 800 },
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 0 },
+      children: [
+        node('button', 'Submit', { bounds: { x: 60, y: 480, width: 100, height: 40 }, path: [0] }),
+      ],
+    })
+    mockState.sendClick.mockImplementationOnce(async () => {
+      bumpMockUiRevision()
+      return { status: 'updated' as const, timeoutMs: 2000 }
+    })
+    const result = await handler({
+      skipFill: true,
+      submit: { role: 'button', name: 'Submit' },
+      detail: 'minimal',
+    })
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    expect(payload).toMatchObject({ completed: true })
+    expect(payload).not.toHaveProperty('fill')
+    expect(mockState.sendFillFields).not.toHaveBeenCalled()
+    expect(mockState.sendClick).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('click transparent fallback', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetMockSessionCaches()
+  })
+
+  it('surfaces fallback.used when relaxed-visibility lets an offscreen submit resolve', async () => {
+    const handler = getToolHandler('geometra_click')
+
+    // First tree: target exists but is offscreen below the viewport, so a
+    // fullyVisible requirement cannot be satisfied before the reveal budget runs out.
+    // The relaxed-visibility fallback drops the fullyVisible requirement and tries
+    // once more with a larger reveal budget.
+    const offscreenTree = node('group', undefined, {
+      bounds: { x: 0, y: 0, width: 1280, height: 800 },
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 0 },
+      children: [
+        node('button', 'Submit', {
+          // Starts fully offscreen-below and wheel stubs don't move it in tests,
+          // so the fullyVisible attempt will fail. Relaxed-visibility sees it
+          // intersect enough to count as revealed.
+          bounds: { x: 60, y: 780, width: 180, height: 60 },
+          path: [0],
+        }),
+      ],
+    })
+    mockState.currentA11yRoot = offscreenTree
+    mockState.sendClick.mockResolvedValueOnce({ status: 'updated', timeoutMs: 2000 })
+
+    const result = await handler({
+      role: 'button',
+      name: 'Submit',
+      fullyVisible: true,
+      maxRevealSteps: 1,
+      revealTimeoutMs: 100,
+      detail: 'terse',
+    })
+
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    expect(payload).toMatchObject({
+      target: { role: 'button', name: 'Submit' },
+      fallback: { used: true, reason: 'relaxed-visibility' },
+    })
+  })
+})
+
 describe('query and reveal tools', () => {
   beforeEach(() => {
     vi.clearAllMocks()

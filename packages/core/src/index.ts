@@ -96,6 +96,37 @@ export type {
   PropertyTimeline,
   MotionPreference,
 } from './animation.js'
+export {
+  sequence,
+  parallel,
+  stagger,
+  createKeyframeTimeline,
+} from './animation-choreography.js'
+export type {
+  Choreographable,
+  Choreography,
+  Keyframe,
+  KeyframeTimeline,
+  KeyframeTimelinePlaybackState,
+} from './animation-choreography.js'
+export {
+  createPanRecognizer,
+  createSwipeRecognizer,
+  createPinchRecognizer,
+} from './gestures.js'
+export type {
+  PointerSample,
+  PanEvent,
+  PanRecognizer,
+  PanRecognizerOptions,
+  SwipeDirection,
+  SwipeEvent,
+  SwipeRecognizer,
+  SwipeRecognizerOptions,
+  PinchEvent,
+  PinchRecognizer,
+  PinchRecognizerOptions,
+} from './gestures.js'
 
 // Streaming text
 export { streamText } from './stream-text.js'

@@ -531,7 +531,7 @@ type BatchAction = z.infer<typeof batchActionSchema>
 
 export function createServer(): McpServer {
   const server = new McpServer(
-    { name: 'geometra', version: '1.19.21' },
+    { name: 'geometra', version: '1.19.22' },
     { capabilities: { tools: {} } },
   )
 
@@ -1435,6 +1435,179 @@ Pass \`valuesById\` with field ids from \`geometra_form_schema\` for the most st
     }
   )
 
+  // ── fill + submit + wait ──────────────────────────────────────
+  server.tool(
+    'geometra_submit_form',
+    `Fill a form, click its submit button, and optionally wait for the post-submit UI state — all in one MCP call. This is the preferred path for the canonical ATS / sign-in flow when the whole sequence should run server-side.
+
+Pass \`valuesById\` or \`valuesByLabel\` to populate fields, \`submit\` to target the submit button (default: semantic \`{ role: 'button', name: 'Submit' }\`), and \`waitFor\` to block on the post-submit state (success banner, navigation, submit button gone, etc.). Navigation is detected automatically and surfaced as \`navigated: true\` with \`afterUrl\`.
+
+Pass \`pageUrl\`/\`url\` to auto-connect in the same call — use \`isolated: true\` for safe parallel submissions.`,
+    {
+      url: z.string().optional().describe('Optional target URL. Use a ws:// Geometra server URL or an http(s) page URL to auto-connect before submitting.'),
+      pageUrl: z.string().optional().describe('Optional http(s) page URL to auto-connect before submitting. Prefer this over url for browser pages.'),
+      port: z.number().int().min(0).max(65535).optional().describe('Preferred local port for an auto-spawned proxy (default: ephemeral OS-assigned port).'),
+      headless: z.boolean().optional().describe('Run Chromium headless when auto-spawning a proxy (default false = visible window).'),
+      width: z.number().int().positive().optional().describe('Viewport width for auto-connected sessions.'),
+      height: z.number().int().positive().optional().describe('Viewport height for auto-connected sessions.'),
+      slowMo: z.number().int().nonnegative().optional().describe('Playwright slowMo (ms) when auto-spawning a proxy.'),
+      isolated: z.boolean().optional().default(false).describe('When auto-connecting via pageUrl/url, request an isolated proxy. Required for safe parallel form submission.'),
+      formId: z.string().optional().describe('Optional form id from geometra_form_schema or geometra_page_model'),
+      valuesById: formValuesRecordSchema.optional().describe('Form values keyed by stable field id from geometra_form_schema'),
+      valuesByLabel: formValuesRecordSchema.optional().describe('Form values keyed by schema field label'),
+      submit: z.object(nodeFilterShape()).optional().describe('Semantic target for the submit button. Defaults to {role: "button", name: "Submit"}.'),
+      submitIndex: z.number().int().min(0).optional().default(0).describe('Which matching submit target to click after sorting top-to-bottom (default 0)'),
+      submitTimeoutMs: z.number().int().min(50).max(60_000).optional().default(15_000).describe('Action wait timeout for the submit click (default 15000ms). Increase for slow backends.'),
+      waitFor: z.object(waitConditionShape()).optional().describe('Optional semantic condition to wait for after the submit click (success banner, navigation, submit gone, etc.)'),
+      skipFill: z.boolean().optional().default(false).describe('Skip the fill phase and go straight to submit+wait. Use when values have already been filled by a previous call.'),
+      failOnInvalid: z.boolean().optional().default(false).describe('Return an error if invalid fields remain after the submit wait resolves.'),
+      detail: detailInput(),
+      sessionId: sessionIdInput,
+    },
+    async ({ url, pageUrl, port, headless, width, height, slowMo, isolated, formId, valuesById, valuesByLabel, submit, submitIndex, submitTimeoutMs, waitFor, skipFill, failOnInvalid, detail, sessionId }) => {
+      const resolved = await ensureToolSession(
+        { sessionId, url, pageUrl, port, headless, width, height, slowMo, isolated },
+        'Not connected. Call geometra_connect first, or pass pageUrl/url to geometra_submit_form.',
+      )
+      if (!resolved.ok) return err(resolved.error)
+      const session = resolved.session
+      const connection = autoConnectionPayload(resolved)
+
+      if (!session.tree || !session.layout) {
+        await waitForUiCondition(session, () => Boolean(session.tree && session.layout), 2_000)
+      }
+      const entryA11y = sessionA11y(session)
+      if (!entryA11y) return err('No UI tree available for form submission')
+      const entryUrl = entryA11y.meta?.pageUrl
+
+      let fillSummary: Record<string, unknown> | undefined
+      if (!skipFill) {
+        const entryCount = Object.keys(valuesById ?? {}).length + Object.keys(valuesByLabel ?? {}).length
+        if (entryCount === 0) {
+          return err('Provide at least one value in valuesById or valuesByLabel, or set skipFill: true to submit already-filled values.')
+        }
+
+        const schemas = getSessionFormSchemas(session, { includeOptions: true, includeContext: 'auto' })
+        if (schemas.length === 0) return err('No forms found in the current UI')
+
+        const resolution = resolveTargetFormSchema(schemas, { formId, valuesById, valuesByLabel })
+        if (!resolution.ok) return err(resolution.error)
+        const schema = resolution.schema
+
+        const planned = planFormFill(schema, { valuesById, valuesByLabel })
+        if (!planned.ok) return err(planned.error)
+
+        try {
+          const startRevision = session.updateRevision
+          const wait = await sendFillFields(session, planned.fields)
+          const ack = parseProxyFillAckResult(wait.result)
+          await waitForDeferredBatchUpdate(session, startRevision, wait)
+          fillSummary = {
+            formId: schema.formId,
+            fieldCount: planned.fields.length,
+            ...(ack ? { invalidCount: ack.invalidCount, alertCount: ack.alertCount } : {}),
+            ...(entryCount !== planned.fields.length ? { requestedValueCount: entryCount } : {}),
+          }
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e)
+          return err(`Failed to fill form before submit: ${message}`)
+        }
+      }
+
+      const submitFilter: NodeFilter = submit ?? { role: 'button', name: 'Submit' }
+      const resolvedClick = await resolveClickLocation(session, {
+        filter: submitFilter,
+        index: submitIndex,
+        fullyVisible: true,
+        revealTimeoutMs: 2_500,
+      })
+      if (!resolvedClick.ok) return err(`Submit target not found: ${resolvedClick.error}`)
+
+      const beforeSubmit = sessionA11y(session)
+      const clickWait = await sendClick(session, resolvedClick.value.x, resolvedClick.value.y, submitTimeoutMs)
+
+      let waitResult: WaitConditionResult | undefined
+      if (waitFor) {
+        const postWait = await waitForSemanticCondition(session, {
+          filter: {
+            id: waitFor.id,
+            role: waitFor.role,
+            name: waitFor.name,
+            text: waitFor.text,
+            contextText: waitFor.contextText,
+            promptText: waitFor.promptText,
+            sectionText: waitFor.sectionText,
+            itemText: waitFor.itemText,
+            value: waitFor.value,
+            checked: waitFor.checked,
+            disabled: waitFor.disabled,
+            focused: waitFor.focused,
+            selected: waitFor.selected,
+            expanded: waitFor.expanded,
+            invalid: waitFor.invalid,
+            required: waitFor.required,
+            busy: waitFor.busy,
+          },
+          present: waitFor.present ?? true,
+          timeoutMs: waitFor.timeoutMs ?? 15_000,
+        })
+        if (!postWait.ok) {
+          const payload = {
+            ...connection,
+            completed: false,
+            ...(fillSummary ? { fill: fillSummary } : {}),
+            submit: {
+              at: { x: resolvedClick.value.x, y: resolvedClick.value.y },
+              ...(resolvedClick.value.target ? { target: compactNodeReference(resolvedClick.value.target) } : {}),
+              ...waitStatusPayload(clickWait),
+            },
+            waitFor: { ok: false, error: postWait.error },
+          }
+          return err(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
+        }
+        waitResult = postWait.value
+      }
+
+      const after = sessionA11y(session)
+      const signals = after ? collectSessionSignals(after) : undefined
+      const afterUrl = after?.meta?.pageUrl
+      const navigated = Boolean(afterUrl && entryUrl && afterUrl !== entryUrl)
+
+      const payload: Record<string, unknown> = {
+        ...connection,
+        completed: true,
+        ...(fillSummary ? { fill: fillSummary } : {}),
+        submit: {
+          at: { x: resolvedClick.value.x, y: resolvedClick.value.y },
+          ...(resolvedClick.value.target ? { target: compactNodeReference(resolvedClick.value.target), revealSteps: resolvedClick.value.revealAttempts ?? 0 } : {}),
+          ...waitStatusPayload(clickWait),
+        },
+        ...(waitResult ? { waitFor: waitConditionCompact(waitResult) } : {}),
+        ...(navigated ? { navigated: true, afterUrl } : {}),
+        ...(signals ? { final: sessionSignalsPayload(signals, detail) } : {}),
+      }
+
+      // Pull in page model hints on navigation to mirror fill_form behavior.
+      if (navigated && after) {
+        const model = buildPageModel(after)
+        if (model.captcha) payload.captcha = model.captcha
+        if (model.verification) payload.verification = model.verification
+      }
+
+      if (failOnInvalid && signals && signals.invalidFields.length > 0) {
+        return err(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
+      }
+
+      // Swallow the unused `beforeSubmit` binding; it anchors that the a11y tree was
+      // captured pre-click and keeps the pattern consistent with other tools that
+      // diff before/after for summaries (we rely on the waitFor / final signals
+      // for the actual comparison here).
+      void beforeSubmit
+
+      return ok(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
+    }
+  )
+
   server.tool(
     'geometra_run_actions',
     `Execute several Geometra actions in one MCP round trip and return one consolidated result. This is the preferred path for long, multi-step form fills where one-tool-per-field would otherwise create too much chatter.
@@ -1841,7 +2014,7 @@ After clicking, returns a compact semantic delta when possible (dialogs/forms/li
       if ('error' in sessionResult) return sessionResult.error
       const session = sessionResult.session
       const before = sessionA11y(session)
-      const resolved = await resolveClickLocation(session, {
+      const resolved = await resolveClickLocationWithFallback(session, {
         x,
         y,
         filter: {
@@ -1907,6 +2080,7 @@ After clicking, returns a compact semantic delta when possible (dialogs/forms/li
           at: { x: resolved.value.x, y: resolved.value.y },
           ...(resolved.value.target ? { target: compactNodeReference(resolved.value.target), revealSteps: resolved.value.revealAttempts ?? 0 } : {}),
           ...waitStatusPayload(wait),
+          ...(resolved.fallback ? { fallback: resolved.fallback } : {}),
           postWait: waitConditionCompact(postWait.value),
         }
         return ok(detailText(lines.filter(Boolean).join('\n'), compact, detail))
@@ -1915,6 +2089,7 @@ After clicking, returns a compact semantic delta when possible (dialogs/forms/li
         at: { x: resolved.value.x, y: resolved.value.y },
         ...(resolved.value.target ? { target: compactNodeReference(resolved.value.target), revealSteps: resolved.value.revealAttempts ?? 0 } : {}),
         ...waitStatusPayload(wait),
+        ...(resolved.fallback ? { fallback: resolved.fallback } : {}),
       }
       return ok(detailText(lines.filter(Boolean).join('\n'), compact, detail))
     }
@@ -3431,6 +3606,92 @@ async function resolveClickLocation(
   }
 }
 
+/**
+ * Transparent fallback for semantic click resolution. Extends
+ * {@link resolveClickLocation} with two recovery phases when the initial attempt
+ * fails to find a target:
+ *
+ * 1. **revision-retry** — wait briefly for the UI tree revision to tick (common
+ *    when the agent clicks while a post-navigation re-render is still landing),
+ *    then re-resolve with the original filter.
+ * 2. **relaxed-visibility** — if the caller required full visibility, retry with
+ *    intersection-only visibility and an expanded reveal budget. Handles sticky
+ *    headers, overlays, and very tall inputs that never become fully visible.
+ *
+ * Returns the same ok/error shape as {@link resolveClickLocation}, with an
+ * additional `fallback` field when a recovery phase succeeded. The fallback
+ * metadata is surfaced in tool results so operators can prioritize native fixes
+ * for the most common recovery patterns (Phase 4 of `MCP_PERFORMANCE_ROADMAP.md`).
+ */
+interface ResolveClickFallbackInfo {
+  used: true
+  reason: 'revision-retry' | 'relaxed-visibility'
+  attempts: number
+}
+
+async function resolveClickLocationWithFallback(
+  session: Session,
+  options: {
+    x?: number
+    y?: number
+    filter: NodeFilter
+    index?: number
+    fullyVisible?: boolean
+    maxRevealSteps?: number
+    revealTimeoutMs?: number
+  },
+): Promise<
+  | { ok: true; value: ResolvedClickLocation; fallback?: ResolveClickFallbackInfo }
+  | { ok: false; error: string; fallback?: ResolveClickFallbackInfo }
+> {
+  const first = await resolveClickLocation(session, options)
+  if (first.ok) return first
+
+  // Fallback only applies to semantic resolves. Explicit coordinates never enter
+  // the reveal path, so there is nothing to retry.
+  const hasExplicitCoordinates = options.x !== undefined || options.y !== undefined
+  if (hasExplicitCoordinates) return first
+  if (!hasNodeFilter(options.filter)) return first
+
+  let attempts = 1
+
+  const startRevision = session.updateRevision
+  const revisionAdvanced = await waitForUiCondition(
+    session,
+    () => session.updateRevision > startRevision,
+    600,
+  )
+  if (revisionAdvanced) {
+    attempts += 1
+    const retry = await resolveClickLocation(session, options)
+    if (retry.ok) {
+      return {
+        ok: true,
+        value: retry.value,
+        fallback: { used: true, reason: 'revision-retry', attempts },
+      }
+    }
+  }
+
+  if (options.fullyVisible !== false) {
+    attempts += 1
+    const relaxed = await resolveClickLocation(session, {
+      ...options,
+      fullyVisible: false,
+      maxRevealSteps: Math.max(options.maxRevealSteps ?? 0, 24),
+    })
+    if (relaxed.ok) {
+      return {
+        ok: true,
+        value: relaxed.value,
+        fallback: { used: true, reason: 'relaxed-visibility', attempts },
+      }
+    }
+  }
+
+  return first
+}
+
 function describeFormattedNode(node: FormattedNodePayload): string {
   return `${node.role}${node.name ? ` ${JSON.stringify(node.name)}` : ''} (${node.id})`
 }
@@ -3959,7 +4220,7 @@ async function executeBatchAction(
   switch (action.type) {
     case 'click': {
       const before = sessionA11y(session)
-      const resolved = await resolveClickLocation(session, {
+      const resolved = await resolveClickLocationWithFallback(session, {
         x: action.x,
         y: action.y,
         filter: {
@@ -4030,6 +4291,7 @@ async function executeBatchAction(
           at: { x: resolved.value.x, y: resolved.value.y },
           ...(resolved.value.target ? { target: compactNodeReference(resolved.value.target), revealSteps: resolved.value.revealAttempts ?? 0 } : {}),
           ...waitStatusPayload(wait),
+          ...(resolved.fallback ? { fallback: resolved.fallback } : {}),
           ...(postWaitCompact ? { postWait: postWaitCompact } : {}),
         },
       }
