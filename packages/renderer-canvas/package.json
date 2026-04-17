@@ -1,6 +1,6 @@
 {
   "name": "@geometra/renderer-canvas",
-  "version": "1.53.0",
+  "version": "1.54.0",
   "description": "Canvas2D renderer for Geometra — the geometry protocol for UI",
   "license": "MIT",
   "type": "module",
