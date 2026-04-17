@@ -1,5 +1,5 @@
-import { box, bodyText, text, signal, createPanRecognizer } from '@geometra/core'
-import type { UIElement, EventHandlers, Signal, PanRecognizer } from '@geometra/core'
+import { box, bodyText, text, signal, createPanRecognizer, createKeyframeTimeline, getMotionPreference } from '@geometra/core'
+import type { UIElement, EventHandlers, Signal, PanRecognizer, KeyframeTimeline } from '@geometra/core'
 import { theme, font, lineHeight } from './theme.js'
 
 // Re-export theme API
@@ -267,6 +267,151 @@ export function dialog(title: string, body: string, actions: UIElement[] = []): 
       box({ flexDirection: 'row', gap: 8 }, actions),
     ],
   )
+}
+
+export interface AnimatedDialogOptions {
+  title: string
+  body: string
+  actions?: UIElement[]
+  /** Mount the dialog already open. Default `false`. */
+  initialOpen?: boolean
+  /** Enter/exit transition duration in ms. Default `180`. */
+  durationMs?: number
+}
+
+export interface AnimatedDialog {
+  /** Render the dialog. When fully closed, returns a zero-size placeholder box. */
+  view(): UIElement
+  /** Begin the enter transition. No-op when already open or opening. */
+  open(): void
+  /**
+   * Begin the exit transition. `isOpen` flips to `false` immediately (so consumers
+   * treating it as "user intent" can react), while `isMounted` stays `true` until
+   * the exit transition completes.
+   */
+  close(): void
+  /**
+   * Advance the active transition by `deltaMs`. No-op when idle. Non-finite or
+   * negative `deltaMs` is treated as `0` — matches {@link KeyframeTimeline.step}.
+   */
+  step(deltaMs: number): void
+  /** `true` from `open()` until the exit transition finishes. Drives mount/unmount. */
+  isMounted: Signal<boolean>
+  /** `true` only when fully open. `false` while entering, while exiting, and while closed. */
+  isOpen: Signal<boolean>
+  /** Underlying timeline, exposed for inspectors and tests. */
+  timeline: KeyframeTimeline
+}
+
+/**
+ * Dialog with a keyframe-driven enter/exit transition. First {@link dialog}
+ * variant that composes the 1.53.0 choreography primitives:
+ *
+ * ```ts
+ * const dlg = animatedDialog({ title: 'Signed in', body: 'Welcome back.' })
+ * // Drive frame step from your app loop:
+ * animationLoop(dt => { dlg.step(dt * 1000); return true })
+ * // Open/close from signals:
+ * dlg.open()
+ * // ... later
+ * dlg.close()
+ * ```
+ *
+ * The transition interpolates `opacity` (0 → 1) and `top` (12 → 0) via a
+ * two-frame {@link KeyframeTimeline}. Closing reverses the same timeline —
+ * progress scrubs back to `0ms` before unmounting — so interrupting an open
+ * mid-flight doesn't snap.
+ */
+export function animatedDialog(options: AnimatedDialogOptions): AnimatedDialog {
+  const durationMs = typeof options.durationMs === 'number' && Number.isFinite(options.durationMs) && options.durationMs > 0
+    ? options.durationMs
+    : 180
+  const timeline = createKeyframeTimeline([
+    { at: 0, values: { opacity: 0, translateY: 12 } },
+    { at: durationMs, values: { opacity: 1, translateY: 0 } },
+  ])
+
+  let elapsed = options.initialOpen ? durationMs : 0
+  let direction: 'idle' | 'opening' | 'closing' = 'idle'
+  timeline.scrubToMs(elapsed)
+
+  const isOpen = signal(Boolean(options.initialOpen))
+  const isMounted = signal(Boolean(options.initialOpen))
+
+  function open(): void {
+    if (isMounted.peek() && direction !== 'closing') return
+    isMounted.set(true)
+    if (getMotionPreference() === 'reduced') {
+      elapsed = durationMs
+      timeline.scrubToMs(elapsed)
+      direction = 'idle'
+      isOpen.set(true)
+      return
+    }
+    direction = 'opening'
+  }
+
+  function close(): void {
+    if (!isMounted.peek()) return
+    isOpen.set(false)
+    if (getMotionPreference() === 'reduced') {
+      elapsed = 0
+      timeline.scrubToMs(elapsed)
+      direction = 'idle'
+      isMounted.set(false)
+      return
+    }
+    direction = 'closing'
+  }
+
+  function step(deltaMs: number): void {
+    if (direction === 'idle') return
+    const delta = typeof deltaMs === 'number' && Number.isFinite(deltaMs) ? Math.max(0, deltaMs) : 0
+    if (direction === 'opening') {
+      elapsed = Math.min(durationMs, elapsed + delta)
+      timeline.scrubToMs(elapsed)
+      if (elapsed >= durationMs) {
+        direction = 'idle'
+        isOpen.set(true)
+      }
+    } else {
+      elapsed = Math.max(0, elapsed - delta)
+      timeline.scrubToMs(elapsed)
+      if (elapsed <= 0) {
+        direction = 'idle'
+        isMounted.set(false)
+      }
+    }
+  }
+
+  function view(): UIElement {
+    if (!isMounted.value) return box({ width: 0, height: 0 }, [])
+    const t = theme()
+    const opacity = timeline.values.opacity!.value
+    const translateY = timeline.values.translateY!.value
+    return box(
+      {
+        position: 'relative',
+        top: translateY,
+        opacity,
+        flexDirection: 'column',
+        gap: t.spacing.md,
+        padding: t.spacing.lg,
+        borderRadius: t.radii.lg,
+        borderColor: t.colors.border,
+        borderWidth: 1,
+        backgroundColor: t.colors.bg,
+        semantic: { role: 'dialog', ariaLabel: options.title },
+      },
+      [
+        bodyText({ text: options.title, font: font('bold', 'heading'), lineHeight: lineHeight('heading'), color: t.colors.textHeading }),
+        bodyText({ text: options.body, font: font('', 'base'), lineHeight: lineHeight('base'), color: t.colors.textSubtle }),
+        box({ flexDirection: 'row', gap: 8 }, options.actions ?? []),
+      ],
+    )
+  }
+
+  return { view, open, close, step, isMounted, isOpen, timeline }
 }
 
 export interface CheckboxOptions {
@@ -1614,10 +1759,33 @@ export function swipeableList<T>(options: SwipeableListOptions<T>): SwipeableLis
     },
   })
 
+  // Keyboard complement to pointer panning: standard paging keys map to the
+  // imperative controls so the list is usable without a pointer. The handler
+  // is attached to the outer container, so the container registers as a focus
+  // target via `collectFocusOrder` in `@geometra/core`.
+  const onKeyDown: EventHandlers['onKeyDown'] = (e) => {
+    switch (e.key) {
+      case 'ArrowLeft':
+      case 'PageUp':
+        prev()
+        return
+      case 'ArrowRight':
+      case 'PageDown':
+        next()
+        return
+      case 'Home':
+        goTo(0)
+        return
+      case 'End':
+        goTo(items - 1)
+        return
+    }
+  }
+
   function view(): UIElement {
     const shift = -(currentIndex.value * width) + dragOffset.value
     return box(
-      { width, height, overflow: 'hidden' },
+      { width, height, overflow: 'hidden', onKeyDown },
       [
         box(
           {

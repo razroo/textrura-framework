@@ -1,6 +1,18 @@
 import { describe, it, expect } from 'vitest'
-import type { PointerSample } from '../../../core/src/index.js'
+import type { KeyboardHitEvent, PointerSample } from '../../../core/src/index.js'
 import { swipeableList } from '../index.js'
+
+function keyEvent(key: string): KeyboardHitEvent {
+  return {
+    key,
+    code: key,
+    shiftKey: false,
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    target: { x: 0, y: 0, width: 0, height: 0, children: [] },
+  }
+}
 
 function sample(id: number, x: number, y: number, timestampMs: number): PointerSample {
   return { id, x, y, timestampMs }
@@ -87,6 +99,41 @@ describe('swipeableList', () => {
     pan!.pointerMove(sample(1, 180, 10, 5)) // 20px in 5ms = 4 px/ms, well above flick threshold
     pan!.pointerUp(sample(1, 180, 10, 10))
     expect(list.currentIndex.peek()).toBe(1)
+  })
+
+  it('keyboard: arrow/PageUp/Down step by one; Home/End jump to edges', () => {
+    const list = swipeableList({
+      items: ['a', 'b', 'c', 'd'],
+      renderItem: () => ({ kind: 'text', text: '', font: '14px ui', lineHeight: 18 } as never),
+      width: 100,
+    })
+    const container = list.view() as { handlers: { onKeyDown: (e: KeyboardHitEvent) => void } }
+    expect(container.handlers?.onKeyDown).toBeTypeOf('function')
+
+    container.handlers.onKeyDown(keyEvent('ArrowRight'))
+    expect(list.currentIndex.peek()).toBe(1)
+    container.handlers.onKeyDown(keyEvent('PageDown'))
+    expect(list.currentIndex.peek()).toBe(2)
+    container.handlers.onKeyDown(keyEvent('ArrowLeft'))
+    expect(list.currentIndex.peek()).toBe(1)
+    container.handlers.onKeyDown(keyEvent('PageUp'))
+    expect(list.currentIndex.peek()).toBe(0)
+    container.handlers.onKeyDown(keyEvent('End'))
+    expect(list.currentIndex.peek()).toBe(3)
+    container.handlers.onKeyDown(keyEvent('Home'))
+    expect(list.currentIndex.peek()).toBe(0)
+  })
+
+  it('keyboard: unrelated keys are ignored', () => {
+    const list = swipeableList({
+      items: ['a', 'b', 'c'],
+      renderItem: () => ({ kind: 'text', text: '', font: '14px ui', lineHeight: 18 } as never),
+      width: 100,
+    })
+    const container = list.view() as { handlers: { onKeyDown: (e: KeyboardHitEvent) => void } }
+    container.handlers.onKeyDown(keyEvent('Enter'))
+    container.handlers.onKeyDown(keyEvent('a'))
+    expect(list.currentIndex.peek()).toBe(0)
   })
 
   it('pointerCancel resets drag offset without committing', () => {
