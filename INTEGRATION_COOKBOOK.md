@@ -51,6 +51,57 @@ Notes:
 - Gestures compose with `enableInputForwarding` / `enableSelection` — they use
   their own listeners and don't stop the regular hit-test pipeline from firing.
 
+## Modal focus policy (dialog / sheet / overlay)
+
+`animatedDialog` captures and restores `focusedElement` on its own, but moving
+focus **into** the dialog on open and containing Tab inside it while it's open
+are tree-aware concerns that belong in the app. The two pieces:
+
+- `focusFirstInside(tree, layout, scopePath)` — seed focus to the first
+  focusable box inside a subtree. Call when the dialog becomes fully open.
+- `trapFocusStep(tree, layout, scopePath, direction)` — cycle focus within the
+  subtree on Tab / Shift+Tab. Returns `true` when it moved focus.
+
+Both live in `@geometra/core`. `scopePath` is the index path from your root
+`view()` element to the dialog's root box — the same structure `dispatchHit`
+and layout walks use.
+
+```ts
+import { focusFirstInside, trapFocusStep } from '@geometra/core'
+import { animatedDialog } from '@geometra/ui'
+
+const dlg = animatedDialog({ title: 'Sign in', body: '…' })
+const DIALOG_PATH = [2] // wherever dlg.view() sits in your tree
+
+// 1. Seed focus when the dialog becomes fully open.
+let hasSeededFocus = false
+dlg.isOpen.subscribe((open) => {
+  if (!open) { hasSeededFocus = false; return }
+  // Defer to next frame so layout is computed before we seed focus.
+  queueMicrotask(() => {
+    if (!hasSeededFocus && app.tree && app.layout) {
+      focusFirstInside(app.tree, app.layout, DIALOG_PATH)
+      hasSeededFocus = true
+    }
+  })
+})
+
+// 2. Contain Tab while the dialog is open.
+canvas.addEventListener('keydown', (e) => {
+  if (e.key !== 'Tab' || !dlg.isOpen.peek()) return
+  if (!app.tree || !app.layout) return
+  const moved = trapFocusStep(app.tree, app.layout, DIALOG_PATH, e.shiftKey ? 'prev' : 'next')
+  if (moved) e.preventDefault()
+})
+
+// 3. On close, animatedDialog restores focus to the pre-open element.
+//    Nothing else to do — `restoreFocusOnClose` defaults to `true`.
+```
+
+Opt out of focus restoration (tooltips, hover popovers, toasts that should
+never steal focus) with `restoreFocusOnClose: false` on the `animatedDialog`
+options.
+
 ## Thin client + server
 
 1. Server: `createServer` from `@geometra/server` — layout and diffs stay on the server.

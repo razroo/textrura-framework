@@ -1233,6 +1233,55 @@ describe('submit_form tool', () => {
     expect(mockState.sendFillFields).not.toHaveBeenCalled()
     expect(mockState.sendClick).toHaveBeenCalledTimes(1)
   })
+
+  it('aggregates fill + submit fallback into a top-level fallbacks[] on the submit_form result', async () => {
+    const handler = getToolHandler('geometra_submit_form')
+    mockState.currentA11yRoot = node('group', undefined, {
+      bounds: { x: 0, y: 0, width: 1280, height: 800 },
+      meta: { pageUrl: 'https://jobs.example.com/application', scrollX: 0, scrollY: 0 },
+      children: [
+        node('textbox', 'Full name', { value: '', path: [0] }),
+        node('button', 'Submit', {
+          // Fully offscreen so the fullyVisible resolve misses and the
+          // relaxed-visibility fallback picks it up — mirrors the click test above.
+          bounds: { x: 60, y: 780, width: 180, height: 60 },
+          path: [1],
+        }),
+      ],
+    })
+    mockState.formSchemas = [{
+      formId: 'fm:0',
+      name: 'Application',
+      fieldCount: 1,
+      requiredCount: 1,
+      invalidCount: 1,
+      fields: [{ id: 'ff:0.0', kind: 'text', label: 'Full name' }],
+    }]
+    // Force the fill batched path to throw a recoverable error so submit_form
+    // falls through to the sequential fill loop and tags fill fallback.
+    mockState.sendFillFields.mockRejectedValue(new Error('Unsupported client message type "fillFields"'))
+    mockState.sendClick.mockResolvedValueOnce({ status: 'updated', timeoutMs: 2000 })
+
+    const result = await handler({
+      valuesByLabel: { 'Full name': 'Taylor Applicant' },
+      submit: { role: 'button', name: 'Submit' },
+      submitTimeoutMs: 1000,
+      detail: 'minimal',
+    })
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, unknown>
+    const fallbacks = payload.fallbacks as Array<Record<string, unknown>>
+    expect(Array.isArray(fallbacks)).toBe(true)
+    const phases = fallbacks.map(f => f.phase)
+    expect(phases).toContain('fill')
+    expect(phases).toContain('submit')
+    expect(fallbacks.find(f => f.phase === 'fill')).toMatchObject({
+      attempted: true, used: true, reason: 'batched-threw',
+    })
+    expect(fallbacks.find(f => f.phase === 'submit')).toMatchObject({
+      attempted: true, used: true, reason: 'relaxed-visibility',
+    })
+    expect(payload.fill).toMatchObject({ execution: 'sequential' })
+  })
 })
 
 describe('fill transparent fallback', () => {

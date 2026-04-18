@@ -1491,6 +1491,7 @@ Pass \`pageUrl\`/\`url\` to auto-connect in the same call — use \`isolated: tr
       const entryUrl = entryA11y.meta?.pageUrl
 
       let fillSummary: Record<string, unknown> | undefined
+      let fillFallback: { attempted: true; used: true; reason: 'batched-threw'; attempts: number } | undefined
       if (!skipFill) {
         const entryCount = Object.keys(valuesById ?? {}).length + Object.keys(valuesByLabel ?? {}).length
         if (entryCount === 0) {
@@ -1507,6 +1508,7 @@ Pass \`pageUrl\`/\`url\` to auto-connect in the same call — use \`isolated: tr
         const planned = planFormFill(schema, { valuesById, valuesByLabel })
         if (!planned.ok) return err(planned.error)
 
+        let usedBatch = true
         try {
           const startRevision = session.updateRevision
           const wait = await sendFillFields(session, planned.fields)
@@ -1514,24 +1516,63 @@ Pass \`pageUrl\`/\`url\` to auto-connect in the same call — use \`isolated: tr
           await waitForDeferredBatchUpdate(session, startRevision, wait)
           fillSummary = {
             formId: schema.formId,
+            execution: 'batched',
             fieldCount: planned.fields.length,
             ...(ack ? { invalidCount: ack.invalidCount, alertCount: ack.alertCount } : {}),
             ...(entryCount !== planned.fields.length ? { requestedValueCount: entryCount } : {}),
           }
         } catch (e) {
-          const message = e instanceof Error ? e.message : String(e)
-          return err(`Failed to fill form before submit: ${message}`)
+          if (!canFallbackToSequentialFill(e)) {
+            const message = e instanceof Error ? e.message : String(e)
+            return err(`Failed to fill form before submit: ${message}`)
+          }
+          usedBatch = false
+          fillFallback = { attempted: true, used: true, reason: 'batched-threw', attempts: 2 }
+        }
+
+        if (!usedBatch) {
+          let successCount = 0
+          let firstErr: string | undefined
+          for (const field of planned.fields) {
+            try {
+              await executeFillField(session, field, detail)
+              successCount += 1
+            } catch (e) {
+              firstErr = e instanceof Error ? e.message : String(e)
+              break
+            }
+          }
+          if (firstErr !== undefined && successCount === 0) {
+            return err(`Failed to fill form before submit (sequential fallback): ${firstErr}`)
+          }
+          fillSummary = {
+            formId: schema.formId,
+            execution: 'sequential',
+            fieldCount: planned.fields.length,
+            successCount,
+            ...(entryCount !== planned.fields.length ? { requestedValueCount: entryCount } : {}),
+          }
         }
       }
 
       const submitFilter: NodeFilter = submit ?? { role: 'button', name: 'Submit' }
-      const resolvedClick = await resolveClickLocation(session, {
+      const resolvedClick = await resolveClickLocationWithFallback(session, {
         filter: submitFilter,
         index: submitIndex,
         fullyVisible: true,
         revealTimeoutMs: 2_500,
       })
-      if (!resolvedClick.ok) return err(`Submit target not found: ${resolvedClick.error}`)
+      if (!resolvedClick.ok) {
+        const payload = {
+          ...connection,
+          completed: false,
+          ...(fillSummary ? { fill: fillSummary } : {}),
+          ...(fillFallback ? { fill_fallback: fillFallback } : {}),
+          submit: { ok: false, error: `Submit target not found: ${resolvedClick.error}` },
+          ...(resolvedClick.fallback ? { submit_fallback: resolvedClick.fallback } : {}),
+        }
+        return err(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
+      }
 
       const beforeSubmit = sessionA11y(session)
       const clickWait = await sendClick(session, resolvedClick.value.x, resolvedClick.value.y, submitTimeoutMs)
@@ -1562,6 +1603,9 @@ Pass \`pageUrl\`/\`url\` to auto-connect in the same call — use \`isolated: tr
           timeoutMs: waitFor.timeoutMs ?? 15_000,
         })
         if (!postWait.ok) {
+          const preErrFallbacks: Array<Record<string, unknown>> = []
+          if (fillFallback) preErrFallbacks.push({ phase: 'fill', ...fillFallback })
+          if (resolvedClick.fallback) preErrFallbacks.push({ phase: 'submit', ...resolvedClick.fallback })
           const payload = {
             ...connection,
             completed: false,
@@ -1571,6 +1615,7 @@ Pass \`pageUrl\`/\`url\` to auto-connect in the same call — use \`isolated: tr
               ...(resolvedClick.value.target ? { target: compactNodeReference(resolvedClick.value.target) } : {}),
               ...waitStatusPayload(clickWait),
             },
+            ...(preErrFallbacks.length > 0 ? { fallbacks: preErrFallbacks } : {}),
             waitFor: { ok: false, error: postWait.error },
           }
           return err(JSON.stringify(payload, null, detail === 'verbose' ? 2 : undefined))
@@ -1583,6 +1628,17 @@ Pass \`pageUrl\`/\`url\` to auto-connect in the same call — use \`isolated: tr
       const afterUrl = after?.meta?.pageUrl
       const navigated = Boolean(afterUrl && entryUrl && afterUrl !== entryUrl)
 
+      // Aggregate all fallback usage into a single top-level `fallbacks[]`
+      // array so this tool matches the shape emitted by `geometra_run_actions`
+      // and can be aggregated the same way by operators.
+      const fallbackRecords: Array<Record<string, unknown>> = []
+      if (fillFallback) {
+        fallbackRecords.push({ phase: 'fill', ...fillFallback })
+      }
+      if (resolvedClick.fallback) {
+        fallbackRecords.push({ phase: 'submit', ...resolvedClick.fallback })
+      }
+
       const payload: Record<string, unknown> = {
         ...connection,
         completed: true,
@@ -1593,6 +1649,7 @@ Pass \`pageUrl\`/\`url\` to auto-connect in the same call — use \`isolated: tr
           ...waitStatusPayload(clickWait),
         },
         ...(waitResult ? { waitFor: waitConditionCompact(waitResult) } : {}),
+        ...(fallbackRecords.length > 0 ? { fallbacks: fallbackRecords } : {}),
         ...(navigated ? { navigated: true, afterUrl } : {}),
         ...(signals ? { final: sessionSignalsPayload(signals, detail) } : {}),
       }
