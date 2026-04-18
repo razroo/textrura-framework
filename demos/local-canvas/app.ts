@@ -11,6 +11,7 @@ import {
   toast,
   button,
   swipeableList,
+  draggableSort,
   animatedDialog,
   animatedSheet,
   animatedToast,
@@ -127,6 +128,49 @@ const snackbar = animatedToast({
   durationMs: 160,
 })
 
+// --- draggableSort showcase --------------------------------------------------
+// Gesture wiring is intentionally omitted from this demo because
+// `swipeable.recognizers` are already attached canvas-wide — scoping recognizers
+// to a region is an app-level concern. The keyboard + imperative rails below
+// demonstrate reorder without the pan.
+
+const tasks = [
+  'Write release notes',
+  'Verify npm publish',
+  'Update INTEGRATION_COOKBOOK',
+  'Reply to issue #42',
+]
+
+const sortableTasks = draggableSort({
+  items: tasks,
+  itemHeight: 32,
+  renderItem: (task, { index, isDragging }) =>
+    box(
+      {
+        flexDirection: 'row',
+        gap: 8,
+        alignItems: 'center',
+        padding: 6,
+        backgroundColor: isDragging ? '#533483' : '#16213e',
+        borderRadius: 4,
+      },
+      [
+        text({
+          text: `${index + 1}.`,
+          font: 'bold 12px ui-monospace, SF Mono, monospace',
+          lineHeight: 16,
+          color: 'rgba(255,255,255,0.5)',
+        }),
+        text({
+          text: task,
+          font: '13px Inter, system-ui',
+          lineHeight: 16,
+          color: '#ffffff',
+        }),
+      ],
+    ),
+})
+
 // --- Layout ------------------------------------------------------------------
 
 function cardView(index: number) {
@@ -189,6 +233,39 @@ function overlayPanel() {
   )
 }
 
+function sortablePanel() {
+  return box(
+    {
+      flexDirection: 'column',
+      gap: 8,
+      padding: 12,
+      backgroundColor: '#0b1421',
+      borderRadius: 8,
+    },
+    [
+      box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, [
+        text({
+          text: 'draggableSort (keyboard)',
+          font: 'bold 12px Inter, system-ui',
+          lineHeight: 16,
+          color: '#cbd5f5',
+        }),
+        box({ flexDirection: 'row', gap: 6 }, [
+          button('↑', () => sortableTasks.moveUp(0)),
+          button('↓', () => sortableTasks.moveDown(sortableTasks.order.peek().length - 1)),
+        ]),
+      ]),
+      sortableTasks.view(),
+      text({
+        text: 'click row + focus + ArrowUp/Down · Home/End · pan wiring is app-scoped',
+        font: '10px Inter, system-ui',
+        lineHeight: 14,
+        color: '#4c5773',
+      }),
+    ],
+  )
+}
+
 function swipeablePanel() {
   return box(
     {
@@ -229,7 +306,7 @@ function view() {
       padding: 24,
       gap: 16,
       width: 600,
-      height: 640,
+      height: 800,
     },
     [
       // Header
@@ -261,6 +338,7 @@ function view() {
       ]),
       overlayPanel(),
       swipeablePanel(),
+      sortablePanel(),
       // Card grid (kept from previous demo)
       box(
         {
@@ -285,7 +363,7 @@ function view() {
 }
 
 // Mount
-createApp(view, renderer, { width: 600, height: 640 }).then((app) => {
+createApp(view, renderer, { width: 600, height: 800 }).then((app) => {
   document.getElementById('btn-add')!.addEventListener('click', () => {
     count.set(count.peek() + 1)
   })

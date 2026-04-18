@@ -35,5 +35,17 @@ export default defineConfig({
     testTimeout: 30_000,
     hookTimeout: 60_000,
     setupFiles: [fromRoot('vitest.setup.ts')],
+    exclude: [
+      // Vitest's default exclude list (kept explicit so it composes with our additions).
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/cypress/**',
+      '**/.{idea,git,cache,output,temp}/**',
+      '**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build,eslint,prettier}.config.*',
+      // Playwright specs under tests/e2e live in their own runner — vitest's
+      // default glob (**/*.spec.ts) otherwise picks them up and throws on the
+      // @playwright/test import, which has bitten every fresh-checkout `vitest run`.
+      'tests/e2e/**',
+    ],
   },
 })
