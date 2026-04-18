@@ -2072,3 +2072,169 @@ function clampIndex(index: number, itemCount: number): number {
   if (!Number.isFinite(index)) return 0
   return Math.max(0, Math.min(itemCount - 1, Math.round(index)))
 }
+
+export interface DraggableSortItemState {
+  /** Stable identity passed in `items`. */
+  item: unknown
+  /** Current visual index (reflects live reorder while dragging). */
+  index: number
+  /** True while this row is the one being dragged. */
+  isDragging: boolean
+}
+
+export interface DraggableSortOptions<T> {
+  /** Initial item order. The primitive owns a signal that mutates this copy on reorder. */
+  items: ReadonlyArray<T>
+  /** Renders one row. `state.isDragging` is true for the row currently held by the user. */
+  renderItem: (item: T, state: DraggableSortItemState) => UIElement
+  /** Height of each row in px. All rows are the same height; variable rows are out of scope. */
+  itemHeight: number
+  /** Fires after a reorder commits. `nextOrder` is the post-commit snapshot. */
+  onReorder?: (fromIndex: number, toIndex: number, nextOrder: T[]) => void
+  /** Pan distance (px) before a drag begins. Default `6`. */
+  minDragDistance?: number
+}
+
+export interface DraggableSort<T> {
+  /** Current order. Mutates on reorder; live signal so you can read it directly. */
+  order: Signal<T[]>
+  /** Index of the row currently held in a drag gesture, or `null` when idle. */
+  draggingIndex: Signal<number | null>
+  /** Gesture recognizers for `attachGestureRecognizers(canvas, list.recognizers)`. */
+  recognizers: PanRecognizer[]
+  /** Render the list. Re-runs on `order` / `draggingIndex` changes via signals. */
+  view(): UIElement
+  /** Move item from `fromIndex` to `toIndex`. Clamped; no-op if equal. Fires `onReorder`. */
+  move(fromIndex: number, toIndex: number): void
+  /** Move item at `index` up by one slot (keyboard-friendly). */
+  moveUp(index: number): void
+  /** Move item at `index` down by one slot. */
+  moveDown(index: number): void
+}
+
+/**
+ * Vertical list whose rows can be reordered via pan or keyboard. Rows each
+ * carry an `onClick` hit handler that latches the row under the pointer at
+ * pointerdown time; the pan recognizer's `onStart` reads that latch to decide
+ * which row is being dragged.
+ *
+ * Keyboard rail: each row has `onKeyDown` handling `ArrowUp` / `ArrowDown`
+ * (move the focused row up / down by one slot) and `Home` / `End`. Rows enter
+ * Tab order automatically because they declare hit handlers — same rule as
+ * everything else in `@geometra/core/focus.ts`.
+ *
+ * ```ts
+ * const list = draggableSort({
+ *   items: tasks,
+ *   itemHeight: 48,
+ *   renderItem: (task, { isDragging }) => taskRow(task, isDragging),
+ *   onReorder: (_, __, next) => saveOrder(next),
+ * })
+ * attachGestureRecognizers(canvas, list.recognizers)
+ * ```
+ */
+export function draggableSort<T>(options: DraggableSortOptions<T>): DraggableSort<T> {
+  const minDrag = typeof options.minDragDistance === 'number' && Number.isFinite(options.minDragDistance) && options.minDragDistance >= 0
+    ? options.minDragDistance
+    : 6
+  const itemHeight = options.itemHeight
+  const order = signal<T[]>([...options.items])
+  const draggingIndex = signal<number | null>(null)
+  // Pending index is the row latched at pointerdown. It becomes the
+  // active drag index once the pan recognizer crosses its minDistance.
+  let pendingIndex: number | null = null
+  let dragStartIndex = 0
+
+  function move(fromIndex: number, toIndex: number): void {
+    const current = order.peek()
+    const from = clampIndex(fromIndex, current.length)
+    const to = clampIndex(toIndex, current.length)
+    if (from === to) return
+    const next = [...current]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved as T)
+    order.set(next)
+    options.onReorder?.(from, to, next)
+  }
+
+  function moveUp(index: number): void { move(index, index - 1) }
+  function moveDown(index: number): void { move(index, index + 1) }
+
+  const pan = createPanRecognizer({
+    minDistance: minDrag,
+    onStart: () => {
+      if (pendingIndex === null) return
+      dragStartIndex = pendingIndex
+      draggingIndex.set(pendingIndex)
+    },
+    onMove: (e) => {
+      const active = draggingIndex.peek()
+      if (active === null) return
+      const slotDelta = Math.round(e.deltaY / itemHeight)
+      const nextIdx = clampIndex(dragStartIndex + slotDelta, order.peek().length)
+      if (nextIdx !== active) {
+        const current = order.peek()
+        const next = [...current]
+        const [moved] = next.splice(active, 1)
+        next.splice(nextIdx, 0, moved as T)
+        order.set(next)
+        draggingIndex.set(nextIdx)
+      }
+    },
+    onEnd: () => {
+      const active = draggingIndex.peek()
+      if (active !== null && active !== dragStartIndex) {
+        options.onReorder?.(dragStartIndex, active, order.peek())
+      }
+      draggingIndex.set(null)
+      pendingIndex = null
+    },
+    onCancel: () => {
+      draggingIndex.set(null)
+      pendingIndex = null
+    },
+  })
+
+  function itemKeyHandler(index: number): EventHandlers['onKeyDown'] {
+    return (e) => {
+      switch (e.key) {
+        case 'ArrowUp': moveUp(index); return
+        case 'ArrowDown': moveDown(index); return
+        case 'Home': move(index, 0); return
+        case 'End': move(index, order.peek().length - 1); return
+      }
+    }
+  }
+
+  function view(): UIElement {
+    const currentOrder = order.value
+    const active = draggingIndex.value
+    return box(
+      { flexDirection: 'column', gap: 0 },
+      currentOrder.map((item, index) =>
+        box(
+          {
+            height: itemHeight,
+            opacity: active === index ? 0.8 : 1,
+            // The row owns a click handler so pointerdown on the row latches
+            // `pendingIndex` — this is what the pan recognizer's onStart reads
+            // when the pointer crosses minDistance.
+            onClick: () => { pendingIndex = index },
+            onKeyDown: itemKeyHandler(index),
+          },
+          [options.renderItem(item, { item, index, isDragging: active === index })],
+        ),
+      ),
+    )
+  }
+
+  return {
+    order,
+    draggingIndex,
+    recognizers: [pan],
+    view,
+    move,
+    moveUp,
+    moveDown,
+  }
+}

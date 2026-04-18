@@ -67,15 +67,17 @@ Both live in `@geometra/core`. `scopePath` is the index path from your root
 and layout walks use.
 
 ```ts
-import { focusFirstInside, trapFocusStep } from '@geometra/core'
+import { effect, focusFirstInside, trapFocusStep } from '@geometra/core'
 import { animatedDialog } from '@geometra/ui'
 
 const dlg = animatedDialog({ title: 'Sign in', body: '…' })
 const DIALOG_PATH = [2] // wherever dlg.view() sits in your tree
 
-// 1. Seed focus when the dialog becomes fully open.
+// 1. Seed focus when the dialog becomes fully open. `effect` re-runs whenever
+//    the signals it reads change (here: `dlg.isOpen`).
 let hasSeededFocus = false
-dlg.isOpen.subscribe((open) => {
+effect(() => {
+  const open = dlg.isOpen.value
   if (!open) { hasSeededFocus = false; return }
   // Defer to next frame so layout is computed before we seed focus.
   queueMicrotask(() => {
