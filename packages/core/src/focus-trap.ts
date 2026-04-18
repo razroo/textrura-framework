@@ -101,3 +101,32 @@ export function trapFocusStep(
   setFocus(next.element, next.layout)
   return true
 }
+
+/**
+ * Move focus to the first focusable box inside a subtree. Companion to
+ * {@link trapFocusStep}: call this on mount of a modal / overlay to seed focus,
+ * then use `trapFocusStep` on Tab / Shift+Tab to contain it.
+ *
+ * Follows the same rules as `trapFocusStep` for resolving the scope (invalid
+ * path → `false`, corrupt layout bounds skipped, non-array `children` treated
+ * as empty). Returns `true` if focus was moved, `false` if the scope is invalid
+ * or contains no focusables.
+ *
+ * @param tree — UI root containing the trap subtree.
+ * @param layout — Computed layout parallel to `tree`.
+ * @param scopePath — Indices from `tree` to the scope root. `[]` uses `tree` as the scope.
+ */
+export function focusFirstInside(
+  tree: UIElement,
+  layout: ComputedLayout,
+  scopePath: number[],
+): boolean {
+  const scope = resolveSubtree(tree, layout, scopePath)
+  if (!scope) return false
+  const targets: FocusTarget[] = []
+  collectFocusable(scope.element, scope.layout, targets)
+  if (targets.length === 0) return false
+  const first = targets[0]!
+  setFocus(first.element, first.layout)
+  return true
+}

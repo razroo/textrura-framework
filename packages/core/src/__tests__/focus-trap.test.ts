@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import type { ComputedLayout } from 'textura'
 import { box, image, scene3d, sphere, text } from '../elements.js'
 import { clearFocus, focusedElement, setFocus } from '../focus.js'
-import { trapFocusStep } from '../focus-trap.js'
+import { focusFirstInside, trapFocusStep } from '../focus-trap.js'
 
 describe('trapFocusStep', () => {
   beforeEach(() => clearFocus())
@@ -680,5 +680,59 @@ describe('trapFocusStep', () => {
 
     expect(trapFocusStep(tree, layout, [0], 'next')).toBe(true)
     expect(focusedElement.peek()?.element).toBe(keyOnly)
+  })
+})
+
+describe('focusFirstInside', () => {
+  beforeEach(() => clearFocus())
+
+  it('moves focus to the first focusable in tree order within the scoped subtree', () => {
+    const modalA = box({ onKeyDown: () => undefined }, [])
+    const modalB = box({ onKeyDown: () => undefined }, [])
+    const outside = box({ onKeyDown: () => undefined }, [])
+    const tree = box({}, [
+      box({}, [modalA, modalB]),
+      outside,
+    ])
+    const layout: ComputedLayout = {
+      x: 0, y: 0, width: 300, height: 100,
+      children: [
+        {
+          x: 0, y: 0, width: 200, height: 100,
+          children: [
+            { x: 0, y: 0, width: 100, height: 40, children: [] },
+            { x: 0, y: 50, width: 100, height: 40, children: [] },
+          ],
+        },
+        { x: 220, y: 0, width: 80, height: 40, children: [] },
+      ],
+    }
+
+    expect(focusFirstInside(tree, layout, [0])).toBe(true)
+    expect(focusedElement.peek()?.element).toBe(modalA)
+  })
+
+  it('returns false when the scope has no focusables', () => {
+    const tree = box({}, [
+      box({}, [text({ text: 'label', font: '14px ui', lineHeight: 18 })]),
+    ])
+    const layout: ComputedLayout = {
+      x: 0, y: 0, width: 100, height: 40,
+      children: [
+        {
+          x: 0, y: 0, width: 100, height: 40,
+          children: [{ x: 0, y: 0, width: 100, height: 40, children: [] }],
+        },
+      ],
+    }
+    expect(focusFirstInside(tree, layout, [0])).toBe(false)
+    expect(focusedElement.peek()).toBe(null)
+  })
+
+  it('returns false on an invalid scope path', () => {
+    const tree = box({}, [])
+    const layout: ComputedLayout = { x: 0, y: 0, width: 0, height: 0, children: [] }
+    expect(focusFirstInside(tree, layout, [5])).toBe(false)
+    expect(focusFirstInside(tree, layout, [-1 as number])).toBe(false)
   })
 })

@@ -67,7 +67,7 @@ export {
 export { focusedElement, setFocus, clearFocus, focusNext, focusPrev, collectFocusOrder } from './focus.js'
 export type { FocusTarget } from './focus.js'
 export { hasFocusCandidateHandlers } from './focus-candidates.js'
-export { trapFocusStep } from './focus-trap.js'
+export { trapFocusStep, focusFirstInside } from './focus-trap.js'
 export { dispatchCompositionEvent, dispatchKeyboardEvent } from './keyboard.js'
 
 // Text selection
