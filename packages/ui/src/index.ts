@@ -1,5 +1,5 @@
-import { box, bodyText, text, signal, createPanRecognizer, createKeyframeTimeline, getMotionPreference } from '@geometra/core'
-import type { UIElement, EventHandlers, Signal, PanRecognizer, KeyframeTimeline } from '@geometra/core'
+import { box, bodyText, text, signal, createPanRecognizer, createKeyframeTimeline, getMotionPreference, focusedElement } from '@geometra/core'
+import type { UIElement, EventHandlers, Signal, PanRecognizer, KeyframeTimeline, Keyframe } from '@geometra/core'
 import { theme, font, lineHeight } from './theme.js'
 
 // Re-export theme API
@@ -269,67 +269,58 @@ export function dialog(title: string, body: string, actions: UIElement[] = []): 
   )
 }
 
-export interface AnimatedDialogOptions {
-  title: string
-  body: string
-  actions?: UIElement[]
-  /** Mount the dialog already open. Default `false`. */
+export interface OverlayTransitionOptions {
+  /** Keyframe sequence defining the enter pose. Closing plays it in reverse. */
+  keyframes: ReadonlyArray<Keyframe>
+  /** Mount already open. Default `false`. */
   initialOpen?: boolean
-  /** Enter/exit transition duration in ms. Default `180`. */
-  durationMs?: number
+  /**
+   * When set, capture `focusedElement` on `open()` and restore it when the
+   * exit transition completes. Honest no-op when nothing was focused or the
+   * captured reference has become stale (e.g. removed from the tree).
+   */
+  restoreFocusOnClose?: boolean
 }
 
-export interface AnimatedDialog {
-  /** Render the dialog. When fully closed, returns a zero-size placeholder box. */
-  view(): UIElement
+export interface OverlayTransition {
   /** Begin the enter transition. No-op when already open or opening. */
   open(): void
   /**
-   * Begin the exit transition. `isOpen` flips to `false` immediately (so consumers
-   * treating it as "user intent" can react), while `isMounted` stays `true` until
-   * the exit transition completes.
+   * Begin the exit transition. `isOpen` flips to `false` immediately;
+   * `isMounted` stays `true` until the exit transition completes.
    */
   close(): void
-  /**
-   * Advance the active transition by `deltaMs`. No-op when idle. Non-finite or
-   * negative `deltaMs` is treated as `0` — matches {@link KeyframeTimeline.step}.
-   */
+  /** Advance the active transition by `deltaMs`. Idle-safe; clamps non-finite/negative input to `0`. */
   step(deltaMs: number): void
-  /** `true` from `open()` until the exit transition finishes. Drives mount/unmount. */
+  /** `true` while entering, while fully open, and while exiting. Drives mount/unmount. */
   isMounted: Signal<boolean>
   /** `true` only when fully open. `false` while entering, while exiting, and while closed. */
   isOpen: Signal<boolean>
-  /** Underlying timeline, exposed for inspectors and tests. */
+  /** Underlying keyframe timeline — read `timeline.values.<key>.value` for animated props. */
   timeline: KeyframeTimeline
 }
 
 /**
- * Dialog with a keyframe-driven enter/exit transition. First {@link dialog}
- * variant that composes the 1.53.0 choreography primitives:
+ * Reusable enter/exit transition for overlays. Extracts the state machine
+ * that drives `animatedDialog` (and siblings) so each overlay primitive can
+ * declare its keyframes and borrow the rest.
  *
- * ```ts
- * const dlg = animatedDialog({ title: 'Signed in', body: 'Welcome back.' })
- * // Drive frame step from your app loop:
- * animationLoop(dt => { dlg.step(dt * 1000); return true })
- * // Open/close from signals:
- * dlg.open()
- * // ... later
- * dlg.close()
- * ```
- *
- * The transition interpolates `opacity` (0 → 1) and `top` (12 → 0) via a
- * two-frame {@link KeyframeTimeline}. Closing reverses the same timeline —
- * progress scrubs back to `0ms` before unmounting — so interrupting an open
- * mid-flight doesn't snap.
+ * - Uses {@link createKeyframeTimeline} — respects `setMotionPreference('reduced')`
+ *   by jumping straight to the final pose on open and unmounting on close.
+ * - `step(deltaMs)` is the only time source. Drive it from your app loop or
+ *   `animationLoop((dt) => t.step(dt * 1000))`.
+ * - Interrupting a partial transition reverses progress smoothly; the timeline
+ *   never snaps.
+ * - Optional `restoreFocusOnClose` captures the pre-open `focusedElement` and
+ *   re-applies it when the exit transition completes.
  */
-export function animatedDialog(options: AnimatedDialogOptions): AnimatedDialog {
-  const durationMs = typeof options.durationMs === 'number' && Number.isFinite(options.durationMs) && options.durationMs > 0
-    ? options.durationMs
-    : 180
-  const timeline = createKeyframeTimeline([
-    { at: 0, values: { opacity: 0, translateY: 12 } },
-    { at: durationMs, values: { opacity: 1, translateY: 0 } },
-  ])
+export function createOverlayTransition(options: OverlayTransitionOptions): OverlayTransition {
+  const keyframes = options.keyframes
+  if (keyframes.length < 2) {
+    throw new Error('createOverlayTransition requires at least two keyframes (start + end)')
+  }
+  const timeline = createKeyframeTimeline(keyframes)
+  const durationMs = timeline.duration
 
   let elapsed = options.initialOpen ? durationMs : 0
   let direction: 'idle' | 'opening' | 'closing' = 'idle'
@@ -338,8 +329,13 @@ export function animatedDialog(options: AnimatedDialogOptions): AnimatedDialog {
   const isOpen = signal(Boolean(options.initialOpen))
   const isMounted = signal(Boolean(options.initialOpen))
 
+  let capturedFocus: ReturnType<typeof focusedElement.peek> = null
+
   function open(): void {
     if (isMounted.peek() && direction !== 'closing') return
+    if (options.restoreFocusOnClose) {
+      capturedFocus = focusedElement.peek()
+    }
     isMounted.set(true)
     if (getMotionPreference() === 'reduced') {
       elapsed = durationMs
@@ -359,6 +355,7 @@ export function animatedDialog(options: AnimatedDialogOptions): AnimatedDialog {
       timeline.scrubToMs(elapsed)
       direction = 'idle'
       isMounted.set(false)
+      restoreCapturedFocus()
       return
     }
     direction = 'closing'
@@ -380,15 +377,77 @@ export function animatedDialog(options: AnimatedDialogOptions): AnimatedDialog {
       if (elapsed <= 0) {
         direction = 'idle'
         isMounted.set(false)
+        restoreCapturedFocus()
       }
     }
   }
 
+  function restoreCapturedFocus(): void {
+    if (!options.restoreFocusOnClose) return
+    // Clearing first avoids a transient "two elements focused" state if the
+    // captured target is still in the tree. If the captured target is stale
+    // (removed / replaced since open), the host's next hit/keyboard dispatch
+    // will re-resolve a fresh focus target; we don't need to guard further here.
+    focusedElement.set(capturedFocus)
+    capturedFocus = null
+  }
+
+  return { open, close, step, isMounted, isOpen, timeline }
+}
+
+export interface AnimatedDialogOptions {
+  title: string
+  body: string
+  actions?: UIElement[]
+  /** Mount the dialog already open. Default `false`. */
+  initialOpen?: boolean
+  /** Enter/exit transition duration in ms. Default `180`. */
+  durationMs?: number
+  /**
+   * Capture `focusedElement` at open time and restore it when the exit
+   * transition completes. Default `true` — dialogs almost always want this,
+   * and opting out is explicit. Focus-in (moving focus *into* the dialog on
+   * open) is an app-level concern; this primitive only handles the restore.
+   */
+  restoreFocusOnClose?: boolean
+}
+
+export interface AnimatedDialog extends OverlayTransition {
+  /** Render the dialog. When fully closed, returns a zero-size placeholder box. */
+  view(): UIElement
+}
+
+/**
+ * Dialog with a keyframe-driven enter/exit transition and focus restoration.
+ * Thin wrapper around {@link createOverlayTransition}:
+ *
+ * ```ts
+ * const dlg = animatedDialog({ title: 'Signed in', body: 'Welcome back.' })
+ * animationLoop(dt => { dlg.step(dt * 1000); return true })
+ * dlg.open()   // focus captured
+ * dlg.close()  // focus restored once the exit animation finishes
+ * ```
+ *
+ * Keyframes: `opacity` (0 → 1) and `top` (12 → 0) over `durationMs` (default 180ms).
+ */
+export function animatedDialog(options: AnimatedDialogOptions): AnimatedDialog {
+  const durationMs = typeof options.durationMs === 'number' && Number.isFinite(options.durationMs) && options.durationMs > 0
+    ? options.durationMs
+    : 180
+  const transition = createOverlayTransition({
+    keyframes: [
+      { at: 0, values: { opacity: 0, translateY: 12 } },
+      { at: durationMs, values: { opacity: 1, translateY: 0 } },
+    ],
+    initialOpen: options.initialOpen,
+    restoreFocusOnClose: options.restoreFocusOnClose ?? true,
+  })
+
   function view(): UIElement {
-    if (!isMounted.value) return box({ width: 0, height: 0 }, [])
+    if (!transition.isMounted.value) return box({ width: 0, height: 0 }, [])
     const t = theme()
-    const opacity = timeline.values.opacity!.value
-    const translateY = timeline.values.translateY!.value
+    const opacity = transition.timeline.values.opacity!.value
+    const translateY = transition.timeline.values.translateY!.value
     return box(
       {
         position: 'relative',
@@ -411,7 +470,202 @@ export function animatedDialog(options: AnimatedDialogOptions): AnimatedDialog {
     )
   }
 
-  return { view, open, close, step, isMounted, isOpen, timeline }
+  return {
+    view,
+    open: transition.open,
+    close: transition.close,
+    step: transition.step,
+    isMounted: transition.isMounted,
+    isOpen: transition.isOpen,
+    timeline: transition.timeline,
+  }
+}
+
+export type SheetSideValue = 'left' | 'right' | 'top' | 'bottom'
+
+export interface AnimatedSheetOptions {
+  /** Body content rendered inside the sheet panel. */
+  content: UIElement
+  /** Panel size along the slide axis (width for left/right, height for top/bottom). Default `280`. */
+  size?: number
+  /** Slide-in direction. Default `'right'`. */
+  side?: SheetSideValue
+  /** Enter/exit transition duration in ms. Default `220`. */
+  durationMs?: number
+  initialOpen?: boolean
+  restoreFocusOnClose?: boolean
+}
+
+export interface AnimatedSheet extends OverlayTransition {
+  view(): UIElement
+}
+
+/**
+ * Sheet overlay that slides in from an edge. Shares the state machine with
+ * {@link animatedDialog} but uses a side-aware translate keyframe so the panel
+ * enters from (and exits toward) the correct edge.
+ */
+export function animatedSheet(options: AnimatedSheetOptions): AnimatedSheet {
+  const size = typeof options.size === 'number' && Number.isFinite(options.size) && options.size > 0 ? options.size : 280
+  const side: SheetSideValue = options.side ?? 'right'
+  const durationMs = typeof options.durationMs === 'number' && Number.isFinite(options.durationMs) && options.durationMs > 0
+    ? options.durationMs
+    : 220
+  const axis: 'top' | 'left' = side === 'left' || side === 'right' ? 'left' : 'top'
+  // Enter from the edge: start fully offset in the direction the panel comes
+  // *from*; end flush with the container edge.
+  const startOffset = side === 'right' || side === 'bottom' ? size : -size
+
+  const transition = createOverlayTransition({
+    keyframes: [
+      { at: 0, values: { [axis]: startOffset, opacity: 0 } },
+      { at: durationMs, values: { [axis]: 0, opacity: 1 } },
+    ],
+    initialOpen: options.initialOpen,
+    restoreFocusOnClose: options.restoreFocusOnClose ?? true,
+  })
+
+  function view(): UIElement {
+    if (!transition.isMounted.value) return box({ width: 0, height: 0 }, [])
+    const t = theme()
+    const axisValue = transition.timeline.values[axis]!.value
+    const opacity = transition.timeline.values.opacity!.value
+    const isVertical = axis === 'top'
+    // Left/right sheets fix width to `size` and let the parent flex-stretch
+    // height; top/bottom sheets do the inverse. The caller is expected to
+    // wrap the sheet in a sized parent for the cross-axis dimension.
+    return box(
+      {
+        position: 'relative',
+        [axis]: axisValue,
+        opacity,
+        ...(isVertical ? { height: size } : { width: size }),
+        padding: t.spacing.lg,
+        backgroundColor: t.colors.bg,
+        borderColor: t.colors.border,
+        borderWidth: 1,
+        semantic: { role: 'dialog', ariaLabel: 'Sheet' },
+      },
+      [options.content],
+    )
+  }
+
+  return {
+    view,
+    open: transition.open,
+    close: transition.close,
+    step: transition.step,
+    isMounted: transition.isMounted,
+    isOpen: transition.isOpen,
+    timeline: transition.timeline,
+  }
+}
+
+export interface AnimatedToastOptions {
+  message: string
+  /** Visual variant — reuses `toast()` color palette. Default `'info'`. */
+  variant?: 'info' | 'success' | 'warning' | 'error'
+  /** Enter/exit transition duration in ms. Default `160`. */
+  durationMs?: number
+  /** When set, auto-close after `autoCloseMs` ms from the moment `isOpen` becomes true. */
+  autoCloseMs?: number
+  initialOpen?: boolean
+}
+
+export interface AnimatedToast extends OverlayTransition {
+  view(): UIElement
+}
+
+/**
+ * Toast with a fade + slide-up entrance. Composes {@link createOverlayTransition}
+ * and an optional auto-close timer driven off `step` (same time source as the
+ * transition) so tests stay deterministic.
+ */
+export function animatedToast(options: AnimatedToastOptions): AnimatedToast {
+  const durationMs = typeof options.durationMs === 'number' && Number.isFinite(options.durationMs) && options.durationMs > 0
+    ? options.durationMs
+    : 160
+  const autoCloseMs = typeof options.autoCloseMs === 'number' && Number.isFinite(options.autoCloseMs) && options.autoCloseMs > 0
+    ? options.autoCloseMs
+    : undefined
+  const variant = options.variant ?? 'info'
+
+  const transition = createOverlayTransition({
+    keyframes: [
+      { at: 0, values: { opacity: 0, translateY: 8 } },
+      { at: durationMs, values: { opacity: 1, translateY: 0 } },
+    ],
+    initialOpen: options.initialOpen,
+    // Toasts are typically not taking focus, so no restoration needed.
+    restoreFocusOnClose: false,
+  })
+
+  let openElapsed = 0
+
+  const baseStep = transition.step
+  const wrappedStep = (deltaMs: number): void => {
+    baseStep(deltaMs)
+    if (autoCloseMs !== undefined && transition.isOpen.peek()) {
+      const delta = typeof deltaMs === 'number' && Number.isFinite(deltaMs) ? Math.max(0, deltaMs) : 0
+      openElapsed += delta
+      if (openElapsed >= autoCloseMs) {
+        transition.close()
+        openElapsed = 0
+      }
+    } else if (!transition.isOpen.peek()) {
+      openElapsed = 0
+    }
+  }
+
+  function view(): UIElement {
+    if (!transition.isMounted.value) return box({ width: 0, height: 0 }, [])
+    const opacity = transition.timeline.values.opacity!.value
+    const translateY = transition.timeline.values.translateY!.value
+    // Delegate color palette to the static `toast()` helper by grabbing its style.
+    const palette = toastPalette(variant)
+    return box(
+      {
+        position: 'relative',
+        top: translateY,
+        opacity,
+        padding: 12,
+        borderRadius: 6,
+        borderColor: palette.border,
+        borderWidth: 1,
+        backgroundColor: palette.bg,
+        semantic: { role: 'status' },
+      },
+      [
+        bodyText({
+          text: options.message,
+          font: font('', 'base'),
+          lineHeight: lineHeight('base'),
+          color: palette.text,
+        }),
+      ],
+    )
+  }
+
+  return {
+    view,
+    open: transition.open,
+    close: transition.close,
+    step: wrappedStep,
+    isMounted: transition.isMounted,
+    isOpen: transition.isOpen,
+    timeline: transition.timeline,
+  }
+}
+
+function toastPalette(variant: 'info' | 'success' | 'warning' | 'error'): { bg: string; border: string; text: string } {
+  const t = theme()
+  switch (variant) {
+    case 'success': return { bg: '#1f3a2e', border: '#2e6a46', text: '#a8e6bc' }
+    case 'warning': return { bg: '#3a331f', border: '#6a5c2e', text: '#e6d4a8' }
+    case 'error': return { bg: '#3a1f27', border: '#6a2e3f', text: '#e6a8b7' }
+    case 'info':
+    default: return { bg: t.colors.bgSubtle, border: t.colors.border, text: t.colors.text }
+  }
 }
 
 export interface CheckboxOptions {
