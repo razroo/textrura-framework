@@ -73,6 +73,7 @@
     "@rolldown/binding-linux-x64-gnu": "1.0.0-rc.12"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.92"
+    "@anthropic-ai/claude-agent-sdk": "^0.2.92",
+    "@razroo/parallel-mcp": "^0.1.0"
   }
 }
