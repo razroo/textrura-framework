@@ -1,7 +1,15 @@
 import type { ChildProcess } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { performance } from 'node:perf_hooks'
 import WebSocket from 'ws'
 import { spawnGeometraProxy, startEmbeddedGeometraProxy, type EmbeddedProxyRuntime } from './proxy-spawn.js'
+import {
+  completeSessionLifecycle,
+  failSessionLifecycle,
+  heartbeatSessionLifecycle,
+  initializeSessionLifecycle,
+  recordSessionSnapshot,
+} from './session-state.js'
 
 /**
  * Parsed accessibility node from the UI tree + computed layout.
@@ -355,7 +363,7 @@ export interface WorkflowState {
 }
 
 export interface Session {
-  /** Short stable identifier (e.g. "s1", "s2") returned by geometra_connect. */
+  /** Durable unique identifier returned by geometra_connect. */
   id: string
   ws: WebSocket
   layout: Record<string, unknown> | null
@@ -381,6 +389,14 @@ export interface Session {
   cachedFormSchemas?: Map<string, { revision: number; forms: FormSchemaModel[] }>
   workflowState?: WorkflowState
   reconnectInFlight?: Promise<boolean>
+  lifecycleTaskId?: string
+  lifecycleTaskKind?: string
+  lifecycleLeaseId?: string
+  lifecycleWorkerId?: string
+  lifecycleFinalized?: boolean
+  heartbeatInterval?: ReturnType<typeof setInterval> | null
+  heartbeatLastMessageAt?: number
+  heartbeatPendingPongBy?: number | null
 }
 
 export interface SessionConnectTrace {
@@ -432,8 +448,7 @@ interface ReusableProxyEntry {
 const activeSessions = new Map<string, Session>()
 let defaultSessionId: string | null = null
 const MAX_ACTIVE_SESSIONS = 5
-let nextSessionId = 0
-function generateSessionId(): string { return `s${++nextSessionId}` }
+function generateSessionId(): string { return `s_${randomUUID()}` }
 
 let reusableProxies: ReusableProxyEntry[] = []
 const REUSABLE_PROXY_POOL_LIMIT = 6
@@ -696,13 +711,23 @@ function retractDefaultIfPointsTo(sessionId: string): void {
   }
 }
 
-function shutdownSession(id: string, opts?: { closeProxy?: boolean }): void {
+function shutdownSession(id: string, opts?: { closeProxy?: boolean; reason?: string }): void {
   const prev = activeSessions.get(id)
   if (!prev) return
+  const forceCloseProxy = prev.isolated === true
+  safeCompleteSessionLifecycle(prev, opts?.reason ?? 'disconnect', {
+    closeProxy: opts?.closeProxy ?? false,
+    forceCloseProxy,
+  })
   activeSessions.delete(id)
   if (defaultSessionId === id) promoteDefaultSession()
+  stopSessionHeartbeat(prev)
+  releaseSessionResources(prev, { closeProxy: opts?.closeProxy ?? false })
+}
+
+function releaseSessionResources(session: Session, opts?: { closeProxy?: boolean }): void {
   try {
-    prev.ws.close()
+    session.ws.close()
   } catch {
     /* ignore */
   }
@@ -711,41 +736,41 @@ function shutdownSession(id: string, opts?: { closeProxy?: boolean }): void {
   // the underlying browser would defeat the entire point of the
   // isolation flag (the next non-isolated connect could attach to a
   // proxy with stale storage from this session's job).
-  const forceCloseProxy = prev.isolated === true
-  if (prev.proxyChild) {
-    const shouldKeepProxy = !forceCloseProxy && prev.proxyReusable && opts?.closeProxy === false
-    rememberReusableProxyPageUrl(prev)
+  const forceCloseProxy = session.isolated === true
+  if (session.proxyChild) {
+    const shouldKeepProxy = !forceCloseProxy && session.proxyReusable && opts?.closeProxy === false
+    rememberReusableProxyPageUrl(session)
     if (shouldKeepProxy) {
-      const entry = reusableProxyEntryForSession(prev)
+      const entry = reusableProxyEntryForSession(session)
       if (entry) touchReusableProxy(entry)
       return
     }
-    const entry = reusableProxyEntryForSession(prev)
+    const entry = reusableProxyEntryForSession(session)
     if (entry) {
       closeReusableProxy(entry)
       return
     }
     try {
-      prev.proxyChild.kill('SIGTERM')
+      session.proxyChild.kill('SIGTERM')
     } catch {
       /* ignore */
     }
     return
   }
-  if (prev.proxyRuntime) {
-    const shouldKeepProxy = !forceCloseProxy && prev.proxyReusable && opts?.closeProxy === false
-    rememberReusableProxyPageUrl(prev)
+  if (session.proxyRuntime) {
+    const shouldKeepProxy = !forceCloseProxy && session.proxyReusable && opts?.closeProxy === false
+    rememberReusableProxyPageUrl(session)
     if (shouldKeepProxy) {
-      const entry = reusableProxyEntryForSession(prev)
+      const entry = reusableProxyEntryForSession(session)
       if (entry) touchReusableProxy(entry)
       return
     }
-    const entry = reusableProxyEntryForSession(prev)
+    const entry = reusableProxyEntryForSession(session)
     if (entry) {
       closeReusableProxy(entry)
       return
     }
-    void prev.proxyRuntime.close().catch(() => {})
+    void session.proxyRuntime.close().catch(() => {})
   }
 }
 
@@ -753,11 +778,104 @@ function shutdownSession(id: string, opts?: { closeProxy?: boolean }): void {
 function evictOldestSession(): void {
   if (activeSessions.size < MAX_ACTIVE_SESSIONS) return
   const oldestId = activeSessions.keys().next().value as string
-  shutdownSession(oldestId, { closeProxy: false })
+  shutdownSession(oldestId, { closeProxy: false, reason: 'evicted' })
 }
 
 function formatUnknownError(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
+}
+
+function warnSessionLifecycleError(action: string, session: Session, err: unknown): void {
+  console.warn(`geometra-mcp: failed to ${action} for session ${session.id}: ${formatUnknownError(err)}`)
+}
+
+function safeRecordSessionSnapshot(
+  session: Session,
+  label: string,
+  extra?: Record<string, unknown>,
+): void {
+  try {
+    recordSessionSnapshot(session, label, extra)
+  } catch (err) {
+    warnSessionLifecycleError(`record snapshot "${label}"`, session, err)
+  }
+}
+
+function safeHeartbeatSessionLifecycle(session: Session): void {
+  try {
+    heartbeatSessionLifecycle(session)
+  } catch (err) {
+    warnSessionLifecycleError('heartbeat durable state', session, err)
+  }
+}
+
+function safeCompleteSessionLifecycle(
+  session: Session,
+  reason: string,
+  extra?: Record<string, unknown>,
+): void {
+  try {
+    completeSessionLifecycle(session, reason, extra)
+  } catch (err) {
+    warnSessionLifecycleError(`complete durable state as "${reason}"`, session, err)
+  }
+}
+
+function safeFailSessionLifecycle(
+  session: Session,
+  error: string,
+  extra?: Record<string, unknown>,
+): void {
+  try {
+    failSessionLifecycle(session, error, extra)
+  } catch (err) {
+    warnSessionLifecycleError(`fail durable state as "${error}"`, session, err)
+  }
+}
+
+function noteSessionSocketActivity(session: Session, ws: WebSocket): void {
+  if (session.ws !== ws) return
+  session.heartbeatLastMessageAt = Date.now()
+  session.heartbeatPendingPongBy = null
+}
+
+// Keep the durable lease alive independently from a transient socket and only
+// ping the WebSocket transport when a socket is actually open.
+function startSessionHeartbeat(session: Session): void {
+  if (session.heartbeatInterval) return
+  session.heartbeatLastMessageAt ??= Date.now()
+  session.heartbeatPendingPongBy ??= null
+  session.heartbeatInterval = setInterval(() => {
+    safeHeartbeatSessionLifecycle(session)
+    const ws = session.ws
+    if (ws.readyState !== WebSocket.OPEN) return
+    const pendingPongBy = session.heartbeatPendingPongBy ?? null
+    if (pendingPongBy !== null && Date.now() > pendingPongBy) {
+      try {
+        ws.close()
+      } catch {
+        /* ignore */
+      }
+      return
+    }
+    if (Date.now() - (session.heartbeatLastMessageAt ?? 0) > 10_000) {
+      try {
+        ws.ping()
+        session.heartbeatPendingPongBy = Date.now() + 30_000
+      } catch {
+        /* ignore */
+      }
+    }
+  }, 15_000)
+  session.heartbeatInterval.unref()
+}
+
+function stopSessionHeartbeat(session: Session): void {
+  if (session.heartbeatInterval) {
+    clearInterval(session.heartbeatInterval)
+    session.heartbeatInterval = null
+  }
+  session.heartbeatPendingPongBy = null
 }
 
 function reusableProxyMatchesOptions(
@@ -997,6 +1115,11 @@ async function attachToReusableProxy(proxy: ReusableProxyEntry, options: {
     totalMs: performance.now() - startedAt,
   }
   updateReusableProxySnapshotState(proxy, session)
+  safeRecordSessionSnapshot(session, 'session.proxy_attached', {
+    transportMode: 'reused-proxy',
+    targetPageUrl: options.pageUrl,
+    reusedExistingSession: reusedExistingSession !== null,
+  })
   return session
 }
 
@@ -1078,6 +1201,12 @@ async function startFreshProxySession(options: {
       resolvedWithoutInitialFrame: baseConnectTrace?.resolvedWithoutInitialFrame,
       totalMs: performance.now() - startedAt,
     }
+    safeRecordSessionSnapshot(session, 'session.proxy_attached', {
+      transportMode: 'fresh-proxy',
+      proxyStartMode: 'embedded',
+      requestedPageUrl: options.pageUrl,
+      isolated: options.isolated === true,
+    })
     return session
   } catch (e) {
     // If startEmbeddedGeometraProxy() returned but the subsequent connect()
@@ -1137,6 +1266,12 @@ async function startFreshProxySession(options: {
         resolvedWithoutInitialFrame: baseConnectTrace?.resolvedWithoutInitialFrame,
         totalMs: performance.now() - startedAt,
       }
+      safeRecordSessionSnapshot(session, 'session.proxy_attached', {
+        transportMode: 'fresh-proxy',
+        proxyStartMode: 'child',
+        requestedPageUrl: options.pageUrl,
+        isolated: options.isolated === true,
+      })
       return session
     } catch (fallbackError) {
       try {
@@ -1179,53 +1314,39 @@ export function connect(
       cachedA11y: null,
       cachedA11yRevision: -1,
       cachedFormSchemas: new Map(),
+      heartbeatInterval: null,
+      heartbeatLastMessageAt: Date.now(),
+      heartbeatPendingPongBy: null,
+    }
+    try {
+      initializeSessionLifecycle(session, { transportMode: 'direct-ws' })
+    } catch (err) {
+      try {
+        ws.terminate()
+      } catch {
+        /* ignore */
+      }
+      reject(new Error(`Failed to initialize durable session state for ${url}: ${formatUnknownError(err)}`))
+      return
     }
     let resolved = false
-    let lastMessageAt = Date.now()
-    let heartbeatInterval: ReturnType<typeof setInterval> | null = null
-    let pendingPongBy: number | null = null
-
-    // Heartbeat: send a real WS-level ping every 15s and only tear the socket
-    // down if the peer fails to respond to two consecutive pings (i.e. ~45s of
-    // true unresponsiveness). Previous versions used a dumb idle timer that
-    // closed the socket after 30s of no inbound frames — which killed sessions
-    // during normal form-submission flows where the DOM is legitimately idle
-    // for 20-30+ seconds while the backend processes (Greenhouse submit →
-    // security-code dialog is the canonical repro). A real ping/pong cycle
-    // distinguishes a silent-but-healthy session from a dead one.
-    function startHeartbeat(): void {
-      if (heartbeatInterval) return
-      heartbeatInterval = setInterval(() => {
-        // If we're waiting on a pong and it's overdue, the peer is dead.
-        if (pendingPongBy !== null && Date.now() > pendingPongBy) {
-          try { ws.close() } catch { /* ignore */ }
-          return
-        }
-        // Only send a new ping if we haven't heard anything for a while,
-        // to avoid spamming a chatty session.
-        if (Date.now() - lastMessageAt > 10_000) {
-          try {
-            ws.ping()
-            // Allow 30s for the pong before declaring the peer dead.
-            pendingPongBy = Date.now() + 30_000
-          } catch {
-            /* if ping throws, the socket is already gone — let 'close' handle */
-          }
-        }
-      }, 15_000)
-      heartbeatInterval.unref()
-    }
 
     ws.on('pong', () => {
-      if (session.ws !== ws) return
-      lastMessageAt = Date.now()
-      pendingPongBy = null
+      noteSessionSocketActivity(session, ws)
     })
 
     const timeout = setTimeout(() => {
       if (!resolved) {
+        safeFailSessionLifecycle(session, 'connect_timeout', {
+          transportUrl: url,
+          timeoutMs: 10_000,
+        })
         resolved = true
-        ws.close()
+        try {
+          ws.close()
+        } catch {
+          /* ignore */
+        }
         reject(new Error(`Connection to ${url} timed out after 10s`))
       }
     }, 10_000)
@@ -1249,14 +1370,17 @@ export function connect(
         }
         activeSessions.set(session.id, session)
         defaultSessionId = session.id
-        startHeartbeat()
+        startSessionHeartbeat(session)
+        safeRecordSessionSnapshot(session, 'session.open', {
+          awaitInitialFrame: false,
+        })
         resolve(session)
       }
     })
 
     ws.on('message', (data) => {
+      noteSessionSocketActivity(session, ws)
       if (session.ws !== ws) return
-      lastMessageAt = Date.now()
       try {
         const msg = JSON.parse(String(data))
         if (msg.type === 'frame') {
@@ -1265,6 +1389,7 @@ export function connect(
           session.updateRevision++
           invalidateSessionCaches(session)
           const connectTrace = session.connectTrace
+          const firstFrame = connectTrace?.firstFrameMs === undefined
           if (connectTrace && connectTrace.firstFrameMs === undefined) {
             connectTrace.firstFrameMs = performance.now() - startedAt
           }
@@ -1276,8 +1401,13 @@ export function connect(
             }
             activeSessions.set(session.id, session)
             defaultSessionId = session.id
-            startHeartbeat()
+            startSessionHeartbeat(session)
+            safeRecordSessionSnapshot(session, 'session.connected')
             resolve(session)
+          } else if (firstFrame) {
+            safeRecordSessionSnapshot(session, 'session.connected', {
+              lateInitialFrame: session.connectTrace?.resolvedWithoutInitialFrame === true,
+            })
           }
         } else if (msg.type === 'patch' && session.layout) {
           applyPatches(session.layout, msg.patches)
@@ -1289,6 +1419,10 @@ export function connect(
 
     ws.on('error', (err) => {
       if (!resolved) {
+        safeFailSessionLifecycle(session, 'websocket_error', {
+          transportUrl: url,
+          message: err.message,
+        })
         resolved = true
         clearTimeout(timeout)
         reject(new Error(`WebSocket error connecting to ${url}: ${err.message}`))
@@ -1297,25 +1431,19 @@ export function connect(
 
     ws.on('close', () => {
       if (session.ws !== ws) return
-      if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null }
-      if (activeSessions.get(session.id) === session) {
-        activeSessions.delete(session.id)
-        if (defaultSessionId === session.id) promoteDefaultSession()
-        if (session.proxyChild && !session.proxyReusable) {
-          try {
-            session.proxyChild.kill('SIGTERM')
-          } catch {
-            /* ignore */
-          }
-        }
-        if (session.proxyRuntime && !session.proxyReusable) {
-          void session.proxyRuntime.close().catch(() => {})
-        }
-      }
       if (!resolved) {
+        safeFailSessionLifecycle(session, 'websocket_closed_before_ready', {
+          transportUrl: url,
+        })
         resolved = true
         clearTimeout(timeout)
         reject(new Error(`Connection to ${url} closed before first frame`))
+        return
+      }
+      if (activeSessions.get(session.id) === session && !session.lifecycleFinalized) {
+        safeRecordSessionSnapshot(session, 'session.transport_closed', {
+          reconnectable: reconnectUrlForSession(session) !== null,
+        })
       }
     })
   })
@@ -1404,7 +1532,7 @@ export function getSession(id?: string): Session | null {
 export function pruneDisconnectedSessions(): string[] {
   const removedIds: string[] = []
   for (const [id, session] of activeSessions.entries()) {
-    if (session.ws.readyState === WebSocket.OPEN) continue
+    if (session.ws.readyState === WebSocket.OPEN || session.reconnectInFlight || reconnectUrlForSession(session)) continue
     removedIds.push(id)
     activeSessions.delete(id)
     if (defaultSessionId === id) {
@@ -1477,9 +1605,9 @@ export function getDefaultSessionId(): string | null {
 
 export function disconnect(opts?: { closeProxy?: boolean; sessionId?: string }): void {
   if (opts?.sessionId) {
-    shutdownSession(opts.sessionId, { closeProxy: opts.closeProxy ?? false })
+    shutdownSession(opts.sessionId, { closeProxy: opts?.closeProxy ?? false, reason: 'disconnect' })
   } else if (defaultSessionId) {
-    shutdownSession(defaultSessionId, { closeProxy: opts?.closeProxy ?? false })
+    shutdownSession(defaultSessionId, { closeProxy: opts?.closeProxy ?? false, reason: 'disconnect' })
   }
   if (opts?.closeProxy) closeReusableProxies()
 }
@@ -1611,6 +1739,7 @@ async function openWebSocket(url: string, timeoutMs = SESSION_RECONNECT_TIMEOUT_
 
 function bindReconnectedSocket(session: Session, ws: WebSocket): void {
   ws.on('message', data => {
+    noteSessionSocketActivity(session, ws)
     if (session.ws !== ws) return
     try {
       const msg = JSON.parse(String(data))
@@ -1629,11 +1758,16 @@ function bindReconnectedSocket(session: Session, ws: WebSocket): void {
     }
   })
 
+  ws.on('pong', () => {
+    noteSessionSocketActivity(session, ws)
+  })
+
   ws.on('close', () => {
     if (session.ws !== ws) return
-    if (activeSessions.get(session.id) === session) {
-      activeSessions.delete(session.id)
-      if (defaultSessionId === session.id) promoteDefaultSession()
+    if (activeSessions.get(session.id) === session && !session.lifecycleFinalized) {
+      safeRecordSessionSnapshot(session, 'session.transport_closed', {
+        reconnectable: reconnectUrlForSession(session) !== null,
+      })
     }
   })
 }
@@ -1652,19 +1786,38 @@ async function ensureSessionConnected(session: Session): Promise<void> {
     throw new Error('Not connected')
   }
   const reconnectPromise = (async () => {
-    const nextWs = await openWebSocket(targetUrl)
     try {
-      session.ws.close()
-    } catch {
-      /* ignore */
+      const nextWs = await openWebSocket(targetUrl)
+      try {
+        session.ws.close()
+      } catch {
+        /* ignore */
+      }
+      session.ws = nextWs
+      noteSessionSocketActivity(session, nextWs)
+      bindReconnectedSocket(session, nextWs)
+      activeSessions.set(session.id, session)
+      if (!session.isolated) {
+        defaultSessionId = session.id
+      }
+      startSessionHeartbeat(session)
+      safeRecordSessionSnapshot(session, 'session.reconnected', {
+        targetUrl,
+      })
+      return true
+    } catch (err) {
+      safeFailSessionLifecycle(session, 'reconnect_failed', {
+        targetUrl,
+        message: formatUnknownError(err),
+      })
+      if (activeSessions.get(session.id) === session) {
+        activeSessions.delete(session.id)
+        if (defaultSessionId === session.id) promoteDefaultSession()
+      }
+      stopSessionHeartbeat(session)
+      releaseSessionResources(session, { closeProxy: true })
+      throw err
     }
-    session.ws = nextWs
-    bindReconnectedSocket(session, nextWs)
-    activeSessions.set(session.id, session)
-    if (!session.isolated) {
-      defaultSessionId = session.id
-    }
-    return true
   })()
   session.reconnectInFlight = reconnectPromise
   let recovered = false
@@ -1951,10 +2104,18 @@ export function sendNavigate(
   url: string,
   timeoutMs = 15_000,
 ): Promise<UpdateWaitResult> {
-  return sendAndWaitForUpdate(session, {
-    type: 'navigate',
-    url,
-  }, timeoutMs, { requireUpdateOnAck: true })
+  return (async () => {
+    const result = await sendAndWaitForUpdate(session, {
+      type: 'navigate',
+      url,
+    }, timeoutMs, { requireUpdateOnAck: true })
+    safeRecordSessionSnapshot(session, 'session.navigate', {
+      requestedUrl: url,
+      status: result.status,
+      result: result.result ?? null,
+    })
+    return result
+  })()
 }
 
 /**

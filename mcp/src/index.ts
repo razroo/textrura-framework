@@ -2,7 +2,8 @@
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { createServer } from './server.js'
-import { disconnect } from './session.js'
+import { disconnect, listSessions } from './session.js'
+import { shutdownSessionLifecycleRegistry } from './session-state.js'
 
 let cleanedUp = false
 
@@ -10,7 +11,15 @@ function cleanupActiveSession() {
   if (cleanedUp) return
   cleanedUp = true
   try {
+    for (const session of listSessions()) {
+      disconnect({ sessionId: session.id, closeProxy: false })
+    }
     disconnect({ closeProxy: true })
+  } catch {
+    /* ignore */
+  }
+  try {
+    shutdownSessionLifecycleRegistry()
   } catch {
     /* ignore */
   }
