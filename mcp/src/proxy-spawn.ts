@@ -154,6 +154,20 @@ function buildLocalProxyDistIfPossible(packageDir: string, entryFile: string, er
   return undefined
 }
 
+/**
+ * BYO outbound proxy for the spawned Chromium. JobForge sets this when the
+ * user configures a residential / mobile / SOCKS proxy in `profile.yml` to
+ * bypass datacenter-IP fingerprinting on apply portals (Ashby class B,
+ * Lever Mapbox geocoder, Cloudflare Bot Management, etc.). Geometra is the
+ * wire — the user supplies the proxy.
+ */
+export interface SpawnProxyConfig {
+  server: string
+  username?: string
+  password?: string
+  bypass?: string
+}
+
 export interface SpawnProxyParams {
   pageUrl: string
   port: number
@@ -162,6 +176,7 @@ export interface SpawnProxyParams {
   height?: number
   slowMo?: number
   eagerInitialExtract?: boolean
+  proxy?: SpawnProxyConfig
 }
 
 export async function startEmbeddedGeometraProxy(
@@ -177,6 +192,7 @@ export async function startEmbeddedGeometraProxy(
       headed?: boolean
       slowMo?: number
       eagerInitialExtract?: boolean
+      proxy?: SpawnProxyConfig
     }) => Promise<EmbeddedProxyRuntime>
   }
   if (typeof runtimeModule.launchProxyRuntime !== 'function') {
@@ -191,6 +207,7 @@ export async function startEmbeddedGeometraProxy(
     headed: opts.headless !== true,
     slowMo: opts.slowMo,
     eagerInitialExtract: opts.eagerInitialExtract,
+    ...(opts.proxy && { proxy: opts.proxy }),
   })
   return { runtime, wsUrl: runtime.wsUrl }
 }
@@ -247,6 +264,12 @@ export function spawnGeometraProxy(opts: SpawnProxyParams): Promise<{ child: Chi
   if (opts.headless === true) args.push('--headless')
   else if (opts.headless === false) args.push('--headed')
   if (opts.eagerInitialExtract === false) args.push('--lazy-initial-extract')
+  if (opts.proxy?.server) {
+    args.push('--proxy-server', opts.proxy.server)
+    if (opts.proxy.username !== undefined) args.push('--proxy-username', opts.proxy.username)
+    if (opts.proxy.password !== undefined) args.push('--proxy-password', opts.proxy.password)
+    if (opts.proxy.bypass !== undefined) args.push('--proxy-bypass', opts.proxy.bypass)
+  }
 
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, args, {

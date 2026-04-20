@@ -590,6 +590,22 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
         .optional()
         .default(false)
         .describe('When true, bypass the reusable proxy pool and spawn a brand-new Chromium for this session that is destroyed on disconnect. Required for safe parallel form submission — without this, two parallel sessions can land on the same pooled proxy and contaminate each other. Default false (use the pool for speed).'),
+      proxy: z
+        .object({
+          server: z
+            .string()
+            .describe('Proxy URL (http://host:port, https://host:port, or socks5://host:port).'),
+          username: z.string().optional().describe('Proxy auth username.'),
+          password: z.string().optional().describe('Proxy auth password.'),
+          bypass: z
+            .string()
+            .optional()
+            .describe('Comma-separated host patterns to bypass (e.g. "*.internal,localhost").'),
+        })
+        .optional()
+        .describe(
+          'BYO outbound proxy for the spawned Chromium. Routes all browser traffic through the supplied residential / mobile / SOCKS proxy — useful for apply portals (Ashby, Lever, Cloudflare-fronted ATSes) that fingerprint datacenter IPs and flag headless sessions as bots. The reusable proxy pool is partitioned by proxy identity so callers with different proxy configs never share a Chromium instance.',
+        ),
       returnForms: z
         .boolean()
         .optional()
@@ -647,6 +663,7 @@ Chromium opens **visible** by default unless \`headless: true\`. File upload / w
             height: input.height,
             slowMo: input.slowMo,
             isolated: input.isolated,
+            proxy: input.proxy,
             awaitInitialFrame: deferInlinePageModel ? false : undefined,
             eagerInitialExtract: deferInlinePageModel ? true : undefined,
           })
@@ -721,10 +738,26 @@ Use this when you can prepare ahead of the user-facing task so the next \`geomet
         .nonnegative()
         .optional()
         .describe('Playwright slowMo (ms) for the warmed browser.'),
+      proxy: z
+        .object({
+          server: z
+            .string()
+            .describe('Proxy URL (http://host:port, https://host:port, or socks5://host:port).'),
+          username: z.string().optional().describe('Proxy auth username.'),
+          password: z.string().optional().describe('Proxy auth password.'),
+          bypass: z
+            .string()
+            .optional()
+            .describe('Comma-separated host patterns to bypass.'),
+        })
+        .optional()
+        .describe(
+          'BYO outbound proxy for the warmed Chromium. The pool entry is partitioned by proxy identity, so a later geometra_connect with the same proxy config will reuse this warmed browser; a different proxy config (or no proxy) will not.',
+        ),
     },
-    async ({ pageUrl, port, headless, width, height, slowMo }) => {
+    async ({ pageUrl, port, headless, width, height, slowMo, proxy }) => {
       try {
-        const prepared = await prewarmProxy({ pageUrl, port, headless, width, height, slowMo })
+        const prepared = await prewarmProxy({ pageUrl, port, headless, width, height, slowMo, proxy })
         return ok(JSON.stringify(prepared))
       } catch (e) {
         return err(`Failed to prepare browser: ${e instanceof Error ? e.message : String(e)}`)

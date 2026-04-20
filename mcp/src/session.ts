@@ -2,7 +2,7 @@ import type { ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { performance } from 'node:perf_hooks'
 import WebSocket from 'ws'
-import { spawnGeometraProxy, startEmbeddedGeometraProxy, type EmbeddedProxyRuntime } from './proxy-spawn.js'
+import { spawnGeometraProxy, startEmbeddedGeometraProxy, type EmbeddedProxyRuntime, type SpawnProxyConfig } from './proxy-spawn.js'
 import {
   completeSessionLifecycle,
   failSessionLifecycle,
@@ -421,6 +421,19 @@ export interface UpdateWaitResult {
   result?: unknown
 }
 
+/**
+ * Stable identity for an outbound proxy config, used as the reusable-pool
+ * partition key. Two sessions with different proxy configs MUST NOT share a
+ * pooled Chromium — otherwise the first apply's IP leaks into subsequent
+ * applies even when the caller opted into a fresh proxy. Password is
+ * excluded from the key to keep logs safe; `server + username + bypass` is
+ * enough to distinguish every realistic multi-tenant config.
+ */
+function proxyKeyFor(proxy?: SpawnProxyConfig): string {
+  if (!proxy?.server) return ''
+  return `${proxy.server}|${proxy.username ?? ''}|${proxy.bypass ?? ''}`
+}
+
 interface ReusableProxyEntry {
   child?: ChildProcess
   runtime?: EmbeddedProxyRuntime
@@ -430,6 +443,7 @@ interface ReusableProxyEntry {
   width: number
   height: number
   pageUrl?: string
+  proxyKey: string
   snapshotReady: boolean
   lastUsedAt: number
   /**
@@ -604,10 +618,11 @@ function enforceReusableProxyPoolLimit(): void {
 function setReusableProxy(
   proxy: { child: ChildProcess } | { runtime: EmbeddedProxyRuntime },
   wsUrl: string,
-  opts: { headless?: boolean; slowMo?: number; width?: number; height?: number; pageUrl?: string; snapshotReady?: boolean },
+  opts: { headless?: boolean; slowMo?: number; width?: number; height?: number; pageUrl?: string; snapshotReady?: boolean; proxy?: SpawnProxyConfig },
 ): void {
   clearReusableProxiesIfExited()
   const now = Date.now()
+  const proxyKey = proxyKeyFor(opts.proxy)
   const existing = reusableProxies.find(entry => sameReusableProxyEntry(entry, proxy))
 
   if (existing) {
@@ -617,6 +632,7 @@ function setReusableProxy(
     existing.width = opts.width ?? 1280
     existing.height = opts.height ?? 720
     existing.pageUrl = opts.pageUrl
+    existing.proxyKey = proxyKey
     existing.snapshotReady = opts.snapshotReady ?? existing.snapshotReady
     existing.lastUsedAt = now
     return
@@ -632,6 +648,7 @@ function setReusableProxy(
       width: opts.width ?? 1280,
       height: opts.height ?? 720,
       pageUrl: opts.pageUrl,
+      proxyKey,
       snapshotReady: opts.snapshotReady === true,
       lastUsedAt: now,
     }
@@ -658,6 +675,7 @@ function setReusableProxy(
     width: opts.width ?? 1280,
     height: opts.height ?? 720,
     pageUrl: opts.pageUrl,
+    proxyKey,
     snapshotReady: opts.snapshotReady === true,
     lastUsedAt: now,
   })
@@ -886,6 +904,7 @@ function reusableProxyMatchesOptions(
     slowMo?: number
     width?: number
     height?: number
+    proxy?: SpawnProxyConfig
   },
 ): boolean {
   return (
@@ -893,7 +912,8 @@ function reusableProxyMatchesOptions(
     entry.headless === (options.headless === true) &&
     entry.slowMo === (options.slowMo ?? 0) &&
     entry.width === (options.width ?? 1280) &&
-    entry.height === (options.height ?? 720)
+    entry.height === (options.height ?? 720) &&
+    entry.proxyKey === proxyKeyFor(options.proxy)
   )
 }
 
@@ -903,6 +923,7 @@ function findExactReusableProxy(options: {
   slowMo?: number
   width?: number
   height?: number
+  proxy?: SpawnProxyConfig
 }): ReusableProxyEntry | undefined {
   clearReusableProxiesIfExited()
   return reusableProxies
@@ -919,15 +940,24 @@ function findReusableProxy(options: {
   slowMo?: number
   width?: number
   height?: number
+  proxy?: SpawnProxyConfig
 }): ReusableProxyEntry | undefined {
   clearReusableProxiesIfExited()
   const desiredHeadless = options.headless === true
   const desiredSlowMo = options.slowMo ?? 0
   const desiredWidth = options.width ?? 1280
   const desiredHeight = options.height ?? 720
+  const desiredProxyKey = proxyKeyFor(options.proxy)
 
   return reusableProxies
-    .filter(entry => entry.headless === desiredHeadless && entry.slowMo === desiredSlowMo)
+    .filter(entry =>
+      entry.headless === desiredHeadless
+      && entry.slowMo === desiredSlowMo
+      // Proxy partition is hard — a session with residential proxy MUST NOT
+      // attach to a pooled direct-connection Chromium (and vice versa).
+      // Different proxy credentials also get separate pool entries.
+      && entry.proxyKey === desiredProxyKey,
+    )
     .sort((a, b) => {
       const score = (entry: ReusableProxyEntry) => {
         let value = 0
@@ -947,6 +977,7 @@ export async function prewarmProxy(options: {
   width?: number
   height?: number
   slowMo?: number
+  proxy?: SpawnProxyConfig
 }): Promise<{
   prepared: true
   reused: boolean
@@ -983,6 +1014,7 @@ export async function prewarmProxy(options: {
       width: options.width,
       height: options.height,
       slowMo: options.slowMo,
+      proxy: options.proxy,
     })
     try {
       await runtime.ready
@@ -997,6 +1029,7 @@ export async function prewarmProxy(options: {
       height: options.height,
       pageUrl: options.pageUrl,
       snapshotReady: true,
+      proxy: options.proxy,
     })
     return {
       prepared: true,
@@ -1020,6 +1053,7 @@ export async function prewarmProxy(options: {
       width: options.width,
       height: options.height,
       slowMo: options.slowMo,
+      proxy: options.proxy,
     })
     setReusableProxy({ child }, wsUrl, {
       headless: options.headless,
@@ -1027,6 +1061,7 @@ export async function prewarmProxy(options: {
       width: options.width,
       height: options.height,
       pageUrl: options.pageUrl,
+      proxy: options.proxy,
     })
     return {
       prepared: true,
@@ -1138,6 +1173,8 @@ async function startFreshProxySession(options: {
    * session and is destroyed on disconnect.
    */
   isolated?: boolean
+  /** Outbound residential/SOCKS proxy for Chromium. */
+  proxy?: SpawnProxyConfig
 }): Promise<Session> {
   const startedAt = performance.now()
   const eagerInitialExtract =
@@ -1157,6 +1194,7 @@ async function startFreshProxySession(options: {
       height: options.height,
       slowMo: options.slowMo,
       eagerInitialExtract,
+      proxy: options.proxy,
     })
     pendingEmbeddedRuntime = runtime
     const proxyStartMs = performance.now() - proxyStartStartedAt
@@ -1186,6 +1224,7 @@ async function startFreshProxySession(options: {
         height: options.height,
         pageUrl: options.pageUrl,
         snapshotReady: Boolean(session.tree && session.layout),
+        proxy: options.proxy,
       })
     }
     const baseConnectTrace = session.connectTrace
@@ -1228,6 +1267,7 @@ async function startFreshProxySession(options: {
       height: options.height,
       slowMo: options.slowMo,
       eagerInitialExtract,
+      proxy: options.proxy,
     })
     const proxyStartMs = performance.now() - proxyStartStartedAt
     try {
@@ -1251,6 +1291,7 @@ async function startFreshProxySession(options: {
           height: options.height,
           pageUrl: options.pageUrl,
           snapshotReady: Boolean(session.tree && session.layout),
+          proxy: options.proxy,
         })
       }
       const baseConnectTrace = session.connectTrace
@@ -1471,6 +1512,13 @@ export async function connectThroughProxy(options: {
    * leak into another. Default false preserves the existing pool behavior.
    */
   isolated?: boolean
+  /**
+   * BYO outbound proxy for the Chromium. Routes all browser traffic through
+   * the supplied residential / mobile / SOCKS proxy. The reusable pool is
+   * partitioned by proxy identity so two callers with different proxy
+   * configs never share a Chromium instance.
+   */
+  proxy?: SpawnProxyConfig
 }): Promise<Session> {
   clearReusableProxiesIfExited()
 

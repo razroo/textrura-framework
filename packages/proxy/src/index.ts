@@ -4,18 +4,23 @@ import { formatProxyFatalError, launchProxyRuntime, parseHttpPageUrl } from './r
 const READY_SIGNAL_TYPE = 'geometra-proxy-ready'
 
 function printUsage(): void {
-  console.error(`Usage: geometra-proxy <url> [--port <n>] [--width <n>] [--height <n>] [--headless] [--headed] [--slow-mo <ms>] [--lazy-initial-extract]
+  console.error(`Usage: geometra-proxy <url> [--port <n>] [--width <n>] [--height <n>] [--headless] [--headed] [--slow-mo <ms>] [--lazy-initial-extract] [--proxy-server <url> [--proxy-username <u>] [--proxy-password <p>] [--proxy-bypass <list>]]
 
 Open <url> in Chromium and stream GEOM v1 frames on WebSocket (JSON text).
 
 Default is a visible browser window (headed) so you can watch MCP-driven automation.
 Use --headless or env GEOMETRA_HEADLESS=1 for CI / servers without a display.
 
+Use --proxy-server to route all Chromium traffic through a residential / mobile / SOCKS proxy.
+Pair with --proxy-username/--proxy-password if the proxy requires auth. Helps bypass
+datacenter-IP fingerprinting on apply portals (Ashby, Lever, Cloudflare-fronted ATSes).
+
 Examples:
   geometra-proxy http://localhost:8080 --port 3200
   geometra-proxy https://example.com --port 3200 --width 1440 --height 900
   geometra-proxy https://jobs.example.com/apply --slow-mo 40
   geometra-proxy http://localhost:3000 --headless
+  geometra-proxy https://jobs.ashbyhq.com/foo --proxy-server http://res-proxy.example.com:8080 --proxy-username me --proxy-password secret
 
 Requires Chromium for Playwright:  npx playwright install chromium
 `)
@@ -62,6 +67,10 @@ function parseArgs(argv: string[]): {
   headed: boolean
   slowMo: number
   eagerInitialExtract: boolean
+  proxyServer?: string
+  proxyUsername?: string
+  proxyPassword?: string
+  proxyBypass?: string
 } {
   let url = ''
   let port = 3200
@@ -70,6 +79,10 @@ function parseArgs(argv: string[]): {
   let headed = !envRequestsHeadless()
   let slowMo = 0
   let eagerInitialExtract = !envRequestsLazyInitialExtract()
+  let proxyServer: string | undefined = process.env.GEOMETRA_PROXY_SERVER || undefined
+  let proxyUsername: string | undefined = process.env.GEOMETRA_PROXY_USERNAME || undefined
+  let proxyPassword: string | undefined = process.env.GEOMETRA_PROXY_PASSWORD || undefined
+  let proxyBypass: string | undefined = process.env.GEOMETRA_PROXY_BYPASS || undefined
 
   const envSlow = process.env.GEOMETRA_SLOW_MO ?? process.env.GEOMETRA_SLOWMO
   if (envSlow !== undefined && envSlow !== '') {
@@ -94,6 +107,14 @@ function parseArgs(argv: string[]): {
       if (Number.isFinite(n) && n >= 0) slowMo = Math.floor(n)
     } else if (a === '--lazy-initial-extract') {
       eagerInitialExtract = false
+    } else if (a === '--proxy-server') {
+      proxyServer = argv[++i]
+    } else if (a === '--proxy-username') {
+      proxyUsername = argv[++i]
+    } else if (a === '--proxy-password') {
+      proxyPassword = argv[++i]
+    } else if (a === '--proxy-bypass') {
+      proxyBypass = argv[++i]
     } else if (!a.startsWith('-')) {
       url = a
     } else {
@@ -102,11 +123,11 @@ function parseArgs(argv: string[]): {
       process.exit(1)
     }
   }
-  return { url, port, width, height, headed, slowMo, eagerInitialExtract }
+  return { url, port, width, height, headed, slowMo, eagerInitialExtract, proxyServer, proxyUsername, proxyPassword, proxyBypass }
 }
 
 async function main(): Promise<void> {
-  const { url: rawUrl, port, width, height, headed, slowMo, eagerInitialExtract } = parseArgs(process.argv.slice(2))
+  const { url: rawUrl, port, width, height, headed, slowMo, eagerInitialExtract, proxyServer, proxyUsername, proxyPassword, proxyBypass } = parseArgs(process.argv.slice(2))
   if (!rawUrl) {
     printUsage()
     process.exit(1)
@@ -115,7 +136,8 @@ async function main(): Promise<void> {
 
   const mode = headed ? 'headed (visible window)' : 'headless'
   const pace = slowMo > 0 ? `, slowMo ${slowMo}ms` : ''
-  console.error(`[geometra-proxy] Chromium ${mode}${pace}`)
+  const proxyTag = proxyServer ? `, proxy ${proxyServer}` : ''
+  console.error(`[geometra-proxy] Chromium ${mode}${pace}${proxyTag}`)
   console.error(`[geometra-proxy] Loading ${url} …`)
   const runtime = await launchProxyRuntime({
     url,
@@ -126,6 +148,14 @@ async function main(): Promise<void> {
     slowMo,
     eagerInitialExtract,
     debounceMs: 50,
+    ...(proxyServer && {
+      proxy: {
+        server: proxyServer,
+        ...(proxyUsername !== undefined && { username: proxyUsername }),
+        ...(proxyPassword !== undefined && { password: proxyPassword }),
+        ...(proxyBypass !== undefined && { bypass: proxyBypass }),
+      },
+    }),
     onListening(wsUrl) {
       console.error(`[geometra-proxy] WebSocket listening on ${wsUrl}`)
     },

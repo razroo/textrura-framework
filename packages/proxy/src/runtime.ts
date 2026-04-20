@@ -29,6 +29,26 @@ export interface ProxyRuntimeHandle {
   close: () => Promise<void>
 }
 
+/**
+ * Outbound proxy config for the Chromium that geometra-proxy launches.
+ *
+ * Set `server` to a single URL like `http://proxy.example.com:8080`,
+ * `https://...`, or `socks5://...`. Authenticate via `username` / `password`
+ * if the proxy requires it. `bypass` is a comma-separated host pattern list
+ * Playwright passes through to Chromium (e.g. `"*.internal,localhost"`).
+ *
+ * Use case: residential / mobile proxies that present non-datacenter IPs to
+ * the target site so anti-bot fingerprinting (Ashby, Lever Mapbox geocoder,
+ * Cloudflare Bot Management, etc.) is less likely to flag the session as
+ * automation. Geometra is the wire — the user supplies the proxy.
+ */
+export interface ProxyConfig {
+  server: string
+  username?: string
+  password?: string
+  bypass?: string
+}
+
 export interface LaunchProxyRuntimeOptions {
   url: string
   port: number
@@ -38,6 +58,8 @@ export interface LaunchProxyRuntimeOptions {
   slowMo?: number
   debounceMs?: number
   eagerInitialExtract?: boolean
+  /** Outbound HTTP/SOCKS proxy for Chromium (BYO residential/mobile IP). */
+  proxy?: ProxyConfig
   onListening?: (wsUrl: string) => void
   onError?: (err: unknown) => void
 }
@@ -146,7 +168,7 @@ export async function launchProxyRuntime(options: LaunchProxyRuntimeOptions): Pr
       height: options.height ?? 720,
     }
     const browserLaunchStartedAt = performance.now()
-    const launchOpts: Parameters<typeof chromium.launch>[0] = { 
+    const launchOpts: Parameters<typeof chromium.launch>[0] = {
       headless: options.headed !== true,
       args: [
         '--disable-blink-features=AutomationControlled',
@@ -158,6 +180,14 @@ export async function launchProxyRuntime(options: LaunchProxyRuntimeOptions): Pr
       ]
     }
     if (options.slowMo && options.slowMo > 0) launchOpts.slowMo = options.slowMo
+    if (options.proxy?.server) {
+      launchOpts.proxy = {
+        server: options.proxy.server,
+        ...(options.proxy.username !== undefined && { username: options.proxy.username }),
+        ...(options.proxy.password !== undefined && { password: options.proxy.password }),
+        ...(options.proxy.bypass !== undefined && { bypass: options.proxy.bypass }),
+      }
+    }
     browser = await chromium.launch(launchOpts)
     trace.browserLaunchMs = performance.now() - browserLaunchStartedAt
     browser?.on('disconnected', () => {
