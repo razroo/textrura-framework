@@ -1050,6 +1050,107 @@ describe('pickListboxOption', () => {
     await page.close()
   }, 60_000)
 
+  it('opens a GitHub-Primer-style menu trigger whose accessible name is the current value, not the field name', async () => {
+    // Regression: GitHub's "Add deployment branch or tag rule" dialog (and
+    // many Primer-based admin UIs) renders dropdowns as
+    //   <label>Ref type</label>
+    //   <button aria-haspopup="menu">Branch</button>
+    //   <div role="menu">
+    //     <div role="menuitemradio">Branch</div>
+    //     <div role="menuitemradio">Tag</div>
+    //   </div>
+    // The button's accessible name is the current value ("Branch"), NOT
+    // "Ref type", so Playwright's role+name lookup misses it. The container-
+    // label fallback in findLabeledControlInPage walks the parent chain to
+    // match on visible label text ("Ref type"), then returns the trigger.
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; }
+        .field { width: 360px; position: relative; display: grid; gap: 4px; }
+        #trigger { width: 100%; min-height: 40px; text-align: left; }
+        #menu[hidden] { display: none; }
+        #menu { border: 1px solid #ccc; margin-top: 6px; padding: 8px; display: grid; gap: 6px; }
+        [role="menuitemradio"] { padding: 6px; cursor: pointer; }
+      </style>
+      <div class="field">
+        <span>Ref type</span>
+        <button id="trigger" type="button" aria-haspopup="menu" aria-expanded="false">Branch</button>
+        <div id="menu" role="menu" hidden>
+          <div role="menuitemradio" aria-checked="true" data-value="branch">Branch</div>
+          <div role="menuitemradio" aria-checked="false" data-value="tag">Tag</div>
+        </div>
+      </div>
+      <script>
+        const trigger = document.getElementById('trigger')
+        const menu = document.getElementById('menu')
+        trigger.addEventListener('click', () => {
+          menu.hidden = false
+          trigger.setAttribute('aria-expanded', 'true')
+        })
+        for (const option of menu.querySelectorAll('[role="menuitemradio"]')) {
+          option.addEventListener('click', () => {
+            trigger.textContent = option.textContent
+            for (const sibling of menu.querySelectorAll('[role="menuitemradio"]')) {
+              sibling.setAttribute('aria-checked', 'false')
+            }
+            option.setAttribute('aria-checked', 'true')
+            menu.hidden = true
+            trigger.setAttribute('aria-expanded', 'false')
+          })
+        }
+      </script>
+    `)
+
+    await pickListboxOption(page, 'Tag', {
+      fieldLabel: 'Ref type',
+      exact: true,
+    })
+
+    expect(await page.locator('#trigger').textContent()).toBe('Tag')
+    await page.close()
+  })
+
+  it('matches "Ref type:" container labels with a trailing colon', async () => {
+    // GitHub's rendered text is often "Ref type:" (with a colon) rather than
+    // "Ref type". The container-label normalizer strips a trailing colon so
+    // the caller can pass either form.
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    await page.setContent(`
+      <style>
+        body { margin: 24px; font-family: sans-serif; }
+        #container { display: flex; gap: 8px; align-items: center; }
+        #menu[hidden] { display: none; }
+      </style>
+      <div id="container">
+        <span>Ref type:</span>
+        <button id="trigger" type="button" aria-haspopup="menu" aria-expanded="false">Branch</button>
+      </div>
+      <div id="menu" role="menu" hidden>
+        <div role="menuitemradio" data-value="tag">Tag</div>
+      </div>
+      <script>
+        const trigger = document.getElementById('trigger')
+        const menu = document.getElementById('menu')
+        trigger.addEventListener('click', () => { menu.hidden = false })
+        for (const option of menu.querySelectorAll('[role="menuitemradio"]')) {
+          option.addEventListener('click', () => {
+            trigger.textContent = option.textContent
+            menu.hidden = true
+          })
+        }
+      </script>
+    `)
+
+    await pickListboxOption(page, 'Tag', {
+      fieldLabel: 'Ref type',
+      exact: true,
+    })
+
+    expect(await page.locator('#trigger').textContent()).toBe('Tag')
+    await page.close()
+  })
+
   it('returns visible options in the failure payload when no custom dropdown option matches', async () => {
     const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
     await page.setContent(`

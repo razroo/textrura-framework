@@ -11,7 +11,10 @@ export function delay(ms: number): Promise<void> {
 export type FileAttachStrategy = 'auto' | 'chooser' | 'hidden' | 'drop'
 
 const LABELED_CONTROL_SELECTOR =
-  'input, select, textarea, button, [role="combobox"], [role="textbox"], [aria-haspopup="listbox"], [contenteditable="true"]'
+  'input, select, textarea, button, [role="combobox"], [role="textbox"], [aria-haspopup="listbox"], [aria-haspopup="menu"], [aria-haspopup="true"], [contenteditable="true"]'
+
+const MENU_TRIGGER_SELECTOR =
+  'button[aria-haspopup="menu"], button[aria-haspopup="true"], [role="button"][aria-haspopup="menu"], [role="button"][aria-haspopup="true"]'
 
 const POPUP_CONTAINER_SELECTOR =
   '[role="listbox"], [role="menu"], [role="dialog"], [aria-modal="true"], [data-radix-popper-content-wrapper], [class*="menu"], [class*="option"], [class*="select"], [class*="dropdown"]'
@@ -23,6 +26,8 @@ const OPTION_PICKER_SELECTOR =
   [
     '[role="option"]',
     '[role="menuitem"]',
+    '[role="menuitemradio"]',
+    '[role="menuitemcheckbox"]',
     '[role="treeitem"]',
     'button',
     'li',
@@ -640,6 +645,127 @@ function stripTruncationEllipsis(label: string): string {
   return label.replace(/\s*(?:\u2026|\.\.\.)\s*$/u, '').trimEnd()
 }
 
+/**
+ * Locate a menu-trigger button whose container-level label matches `fieldLabel`.
+ *
+ * Motivating case: GitHub Primer (and similar design systems) renders a
+ * dropdown as `<label>Ref type</label><button aria-haspopup="menu">Branch</button>`
+ * where the button's accessible name is the *current value* ("Branch"), not
+ * the field name. Playwright's `getByRole('button', { name: 'Ref type' })`
+ * therefore misses the trigger, and the existing `<label>/<legend>` proximity
+ * scan doesn't match either because the visible label is a plain `<span>` /
+ * `<div>` rather than a `<label>` element.
+ *
+ * This helper broadens the label search to any visible element whose text
+ * (minus the button's own text) matches the field name, then returns the
+ * menu-trigger button inside that container. It complements `findLabeledControl`
+ * rather than replacing it — the scan is restricted to menu-trigger buttons
+ * so it can't shadow existing combobox / textbox / native-select matches.
+ */
+async function findMenuTriggerByContainerLabel(
+  frame: Frame,
+  fieldLabel: string,
+  exact: boolean,
+): Promise<Locator | null> {
+  const triggers = frame.locator(MENU_TRIGGER_SELECTOR)
+  const count = await triggers.count()
+  if (count === 0) return null
+
+  const bestIndex = await triggers.evaluateAll((elements, payload) => {
+    function normalize(value: string): string {
+      return value.replace(/\s+/g, ' ').trim().toLowerCase()
+    }
+
+    function stripTrailingColon(value: string): string {
+      return value.replace(/\s*:\s*$/u, '').trim()
+    }
+
+    function matches(candidate: string | undefined): boolean {
+      if (!candidate) return false
+      const normalizedCandidate = normalize(stripTrailingColon(candidate))
+      const normalizedExpected = normalize(payload.fieldLabel)
+      if (!normalizedCandidate || !normalizedExpected) return false
+      return payload.exact
+        ? normalizedCandidate === normalizedExpected
+        : normalizedCandidate.includes(normalizedExpected)
+    }
+
+    function visible(el: Element): boolean {
+      if (!(el instanceof HTMLElement)) return false
+      const rect = el.getBoundingClientRect()
+      if (rect.width <= 0 || rect.height <= 0) return false
+      const style = getComputedStyle(el)
+      return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0'
+    }
+
+    function containerLabelText(el: Element): string | undefined {
+      // Walk up a few parent levels looking for a container that holds BOTH
+      // the trigger and some sibling label text. The label text is the
+      // container's visible text minus the trigger's own text.
+      let container: Element | null = el.parentElement
+      let depth = 0
+      const triggerText = el.textContent?.trim() ?? ''
+      while (container && depth < 4) {
+        const containerText = container.textContent?.trim() ?? ''
+        if (containerText && containerText.length < 240) {
+          const residual = triggerText && containerText.endsWith(triggerText)
+            ? containerText.slice(0, containerText.length - triggerText.length).trim()
+            : triggerText && containerText.includes(triggerText)
+              ? containerText.split(triggerText)[0]?.trim() ?? ''
+              : containerText
+          if (residual && residual.length > 0 && residual.length < 120) {
+            return residual
+          }
+        }
+        container = container.parentElement
+        depth++
+      }
+      return undefined
+    }
+
+    let best: { index: number; score: number } | null = null
+    for (let i = 0; i < elements.length; i++) {
+      const el = elements[i]
+      if (!(el instanceof HTMLElement)) continue
+      if (!visible(el)) continue
+
+      const aria = el.getAttribute('aria-label')?.trim()
+      if (matches(aria)) {
+        const score = 0
+        if (!best || score < best.score) best = { index: i, score }
+        continue
+      }
+
+      const labelledBy = el.getAttribute('aria-labelledby')
+      if (labelledBy) {
+        const text = labelledBy
+          .split(/\s+/)
+          .map(id => document.getElementById(id)?.textContent?.trim() ?? '')
+          .filter(Boolean)
+          .join(' ')
+          .trim()
+        if (matches(text)) {
+          const score = 10
+          if (!best || score < best.score) best = { index: i, score }
+          continue
+        }
+      }
+
+      const container = containerLabelText(el)
+      if (matches(container)) {
+        const rect = el.getBoundingClientRect()
+        const sizePenalty = rect.width < 48 || rect.height < 18 ? 120 : 0
+        const score = 100 + sizePenalty
+        if (!best || score < best.score) best = { index: i, score }
+      }
+    }
+
+    return best?.index ?? -1
+  }, { fieldLabel, exact })
+
+  return bestIndex >= 0 ? triggers.nth(bestIndex) : null
+}
+
 async function findLabeledControlInPage(
   page: Page,
   fieldLabel: string,
@@ -671,6 +797,22 @@ async function findLabeledControlInPage(
   if (!exact && stripped !== fieldLabel && stripped.length > 0) {
     for (const frame of page.frames()) {
       const locator = await findLabeledControl(frame, stripped, exact, { preferredAnchor: opts?.preferredAnchor })
+      if (!locator) continue
+      if (cacheable) writeCachedLocator(opts?.cache, 'control', fieldLabel, exact, opts?.fieldId, locator)
+      return locator
+    }
+  }
+
+  // Fallback: menu-trigger buttons whose accessible name is the CURRENT VALUE
+  // (e.g. "Branch" for a "Ref type: Branch" GitHub Primer dropdown) rather
+  // than the field name. Restricted to aria-haspopup="menu"/"true" triggers
+  // so it cannot shadow existing combobox/textbox/native-select matches.
+  const candidateLabels = [fieldLabel, stripped].filter((label, index, array) =>
+    label && label.length > 0 && array.indexOf(label) === index,
+  )
+  for (const candidate of candidateLabels) {
+    for (const frame of page.frames()) {
+      const locator = await findMenuTriggerByContainerLabel(frame, candidate, exact)
       if (!locator) continue
       if (cacheable) writeCachedLocator(opts?.cache, 'control', fieldLabel, exact, opts?.fieldId, locator)
       return locator
