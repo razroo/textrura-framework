@@ -134,6 +134,20 @@ const actions: Record<ActionId, AgentActionContract> = {
   },
 }
 
+const actionButtonLabels: Record<ActionId, string> = {
+  'approve-payout': 'Approve payout',
+  'request-evidence': 'Request docs',
+  'escalate-claim': 'Escalate',
+  'export-audit-packet': 'Export audit',
+}
+
+const compactActionButtonLabels: Record<ActionId, string> = {
+  'approve-payout': 'Approve',
+  'request-evidence': 'Docs',
+  'escalate-claim': 'Escalate',
+  'export-audit-packet': 'Audit',
+}
+
 const activeClaimId = signal(claims[0]!.id)
 const statusByClaim = signal<Record<string, string>>(
   Object.fromEntries(claims.map(claim => [claim.id, claim.status])),
@@ -187,12 +201,18 @@ const gateway = createAgentGateway({
   },
 })
 const trace = signal(gateway.getTrace())
+const pendingApprovals = signal(gateway.getPendingApprovals())
 const lastMessage = signal('Gateway ready. Four agent contracts are published from the Geometra tree.')
 const agentRunning = signal(false)
 
 function syncGatewayFrame() {
   if (!appRef?.tree || !appRef.layout) return null
   return gateway.setFrame(appRef.tree, appRef.layout, { route: 'claims-review' })
+}
+
+function publishGatewayState(): void {
+  trace.set(gateway.getTrace())
+  pendingApprovals.set(gateway.getPendingApprovals())
 }
 
 async function runAction(actionId: ActionId): Promise<void> {
@@ -214,7 +234,7 @@ async function runAction(actionId: ActionId): Promise<void> {
   syncGatewayFrame()
   const contract = actions[actionId]
   batch(() => {
-    trace.set(gateway.getTrace())
+    publishGatewayState()
     lastMessage.set(
       result.status === 'completed'
         ? `${contract.title} completed for ${claim.id}; gateway trace has ${result.trace.events.length} events.`
@@ -241,14 +261,17 @@ async function runAgentAction(actionId: ActionId, claim: Claim): Promise<void> {
     actor: 'agent',
     input: { claimId: claim.id, approver: 'Ops manager' },
   })
-  let final = requested
+  const final = requested
   if (requested.status === 'awaiting_approval' && requested.approvalId) {
-    lastMessage.set(`${actions[actionId].title} is awaiting approval ${requested.approvalId}.`)
-    final = await gateway.approveAction({ approvalId: requested.approvalId, actor: 'Ops manager' })
+    batch(() => {
+      publishGatewayState()
+      lastMessage.set(`${actions[actionId].title} is awaiting approval ${requested.approvalId}.`)
+    })
+    return
   }
   syncGatewayFrame()
   batch(() => {
-    trace.set(gateway.getTrace())
+    publishGatewayState()
     lastMessage.set(
       final.status === 'completed'
         ? `Agent completed ${actions[actionId].title} for ${claim.id}; replay ${final.replayId} captured before/after frames.`
@@ -271,10 +294,26 @@ async function runAgentPlan(): Promise<void> {
       return
     }
     await runAgentAction('approve-payout', claim)
-    await runAgentAction('export-audit-packet', claim)
   } finally {
     agentRunning.set(false)
   }
+}
+
+async function decidePendingApproval(approvalId: string, approved: boolean): Promise<void> {
+  const result = await gateway.approveAction({
+    approvalId,
+    actor: 'Ops manager',
+    approved,
+  })
+  syncGatewayFrame()
+  batch(() => {
+    publishGatewayState()
+    lastMessage.set(
+      result.status === 'completed'
+        ? `Approval ${approvalId} completed ${result.actionId}; replay ${result.replayId} captured.`
+        : `Approval ${approvalId} ${result.status}: ${result.reason ?? 'gateway recorded the decision'}.`,
+    )
+  })
 }
 
 function t(value: string, size = 13, weight = '', color = '#1f2933'): UIElement {
@@ -313,9 +352,11 @@ function panel(children: UIElement[], width?: number, grow = false): UIElement {
 }
 
 function metric(label: string, value: string, color: string): UIElement {
+  const compact = viewport.value.width < 760
   return box(
     {
-      width: 128,
+      width: compact ? 100 : 128,
+      flexShrink: 0,
       flexDirection: 'column',
       gap: 4,
       padding: 10,
@@ -378,9 +419,8 @@ function actionButton(actionId: ActionId, color: string): UIElement {
       semantic: agentAction(contract, { role: 'button', ariaLabel: contract.title }),
     },
     [
-      t(contract.title, 13, '700', '#ffffff'),
+      t(actionButtonLabels[actionId], 13, '700', '#ffffff'),
       t(contract.risk ?? 'write', 10, '700', 'rgba(255,255,255,0.82)'),
-      copy(contract.description ?? 'Agent-invokable workflow operation.', 'rgba(255,255,255,0.78)'),
     ],
   )
 }
@@ -401,27 +441,95 @@ function agentPlanButton(): UIElement {
       semantic: { role: 'button', ariaLabel: 'Run agent plan', ariaDisabled: agentRunning.value },
     },
     [
-      t(agentRunning.value ? 'Agent running' : 'Run agent plan', 13, '700', '#ffffff'),
+      t(agentRunning.value ? 'Running' : 'Run plan', 13, '700', '#ffffff'),
       t('gateway', 10, '700', 'rgba(255,255,255,0.82)'),
-      copy('Lists actions, requests one, records approval, executes, and stores replay.', 'rgba(255,255,255,0.78)'),
     ],
+  )
+}
+
+function compactActionButton(actionId: ActionId, color: string): UIElement {
+  const contract = actions[actionId]
+  return box(
+    {
+      width: 104,
+      minHeight: 54,
+      flexShrink: 0,
+      flexDirection: 'column',
+      gap: 4,
+      padding: 10,
+      backgroundColor: color,
+      borderRadius: 7,
+      cursor: 'pointer',
+      onClick: () => {
+        void runAction(actionId)
+      },
+      semantic: agentAction(contract, { role: 'button', ariaLabel: contract.title }),
+    },
+    [
+      t(compactActionButtonLabels[actionId], 12, '700', '#ffffff'),
+      t(contract.risk ?? 'write', 10, '700', 'rgba(255,255,255,0.82)'),
+    ],
+  )
+}
+
+function compactAgentPlanButton(): UIElement {
+  return box(
+    {
+      width: 104,
+      minHeight: 54,
+      flexShrink: 0,
+      flexDirection: 'column',
+      gap: 4,
+      padding: 10,
+      backgroundColor: agentRunning.value ? '#4b5563' : '#111827',
+      borderRadius: 7,
+      cursor: agentRunning.value ? 'not-allowed' : 'pointer',
+      onClick: () => {
+        void runAgentPlan()
+      },
+      semantic: { role: 'button', ariaLabel: 'Run agent plan', ariaDisabled: agentRunning.value },
+    },
+    [
+      t(agentRunning.value ? 'Running' : 'Plan', 12, '700', '#ffffff'),
+      t('gateway', 10, '700', 'rgba(255,255,255,0.82)'),
+    ],
+  )
+}
+
+function approvalDecisionButton(label: string, color: string, onClick: () => void): UIElement {
+  return box(
+    {
+      paddingLeft: 10,
+      paddingRight: 10,
+      paddingTop: 7,
+      paddingBottom: 7,
+      backgroundColor: color,
+      borderRadius: 5,
+      cursor: 'pointer',
+      onClick,
+      semantic: { role: 'button', ariaLabel: label },
+    },
+    [t(label, 12, '700', '#ffffff')],
   )
 }
 
 function claimDetails(claim: Claim): UIElement {
   const status = statusByClaim.value[claim.id] ?? claim.status
+  const compact = viewport.value.width < 760
   return panel([
-    box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 }, [
+    box({ flexDirection: compact ? 'column' : 'row', justifyContent: 'space-between', alignItems: compact ? 'stretch' : 'center', gap: 12 }, [
       box({ flexDirection: 'column', gap: 4, flexGrow: 1 }, [
         t(`${claim.id} / ${claim.claimant}`, 18, '700', '#111827'),
         copy(claim.summary),
       ]),
-      metric('Risk', claim.riskScore, Number(claim.riskScore) >= 0.7 ? '#b42318' : '#166534'),
-      metric('Amount', claim.amount, '#0f766e'),
-      metric('Status', status, status === 'Approved' ? '#166534' : '#7c2d12'),
+      box({ ...(compact ? {} : { width: 400, flexShrink: 0 }), flexDirection: 'row', gap: 8, flexWrap: 'wrap' }, [
+        metric('Risk', claim.riskScore, Number(claim.riskScore) >= 0.7 ? '#b42318' : '#166534'),
+        metric('Amount', claim.amount, '#0f766e'),
+        metric('Status', status, status === 'Approved' ? '#166534' : '#7c2d12'),
+      ]),
     ]),
     box({ height: 1, backgroundColor: '#e6dfd2' }, []),
-    box({ flexDirection: 'row', gap: 14 }, [
+    box({ flexDirection: compact ? 'column' : 'row', gap: 14 }, [
       panel(
         [
           t('Evidence', 14, '700', '#111827'),
@@ -432,7 +540,7 @@ function claimDetails(claim: Claim): UIElement {
             ]),
           ),
         ],
-        300,
+        compact ? undefined : 300,
       ),
       panel(
         [
@@ -451,6 +559,7 @@ function claimDetails(claim: Claim): UIElement {
 function tracePanel(): UIElement {
   const summary = summarizeAgentTrace(trace.value)
   const events = trace.value.events.slice(-5).reverse()
+  const pending = pendingApprovals.value
   return panel(
     [
       box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, [
@@ -462,6 +571,31 @@ function tracePanel(): UIElement {
         metric('Completed', String(summary.completedCount), '#166534'),
         metric('Denied', String(summary.deniedCount), '#b42318'),
       ]),
+      ...pending.map(approval =>
+        box(
+          {
+            flexDirection: 'column',
+            gap: 8,
+            padding: 10,
+            backgroundColor: '#fff7ed',
+            borderColor: '#fdba74',
+            borderWidth: 1,
+            borderRadius: 6,
+          },
+          [
+            t('Pending approval', 12, '800', '#9a3412'),
+            copy(`${approval.target.title} / ${approval.reason}`, '#7c2d12'),
+            box({ flexDirection: 'row', gap: 8 }, [
+              approvalDecisionButton('Approve', '#166534', () => {
+                void decidePendingApproval(approval.id, true)
+              }),
+              approvalDecisionButton('Deny', '#b42318', () => {
+                void decidePendingApproval(approval.id, false)
+              }),
+            ]),
+          ],
+        ),
+      ),
       ...(events.length === 0
         ? [copy('No actions have run yet. Click a contracted operation to create a trace.')]
         : events.map(event =>
@@ -485,24 +619,60 @@ function tracePanel(): UIElement {
             ),
           )),
     ],
-    310,
+    viewport.value.width < 980 ? undefined : 310,
   )
 }
 
+function replayPanel(): UIElement {
+  const replay = gateway.getReplay()
+  const lastAction = replay.actions.at(-1)
+  return panel([
+    box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, [
+      t('Replay Viewer', 14, '700', '#111827'),
+      t(`${replay.actions.length} actions`, 12, '700', '#0f766e'),
+    ]),
+    box({ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }, [
+      metric('Frames', String(replay.frames.length), '#5b5bd6'),
+      metric('Trace events', String(replay.trace.events.length), '#0f766e'),
+      metric('Pending', String(pendingApprovals.value.length), pendingApprovals.value.length > 0 ? '#b45309' : '#166534'),
+    ]),
+    ...(lastAction
+      ? [
+          box(
+            {
+              flexDirection: 'column',
+              gap: 6,
+              padding: 10,
+              backgroundColor: '#fbfaf6',
+              borderColor: '#e6dfd2',
+              borderWidth: 1,
+              borderRadius: 6,
+            },
+            [
+              t(lastAction.actionId, 12, '800', '#111827'),
+              copy(`Status: ${lastAction.status}. Before: ${lastAction.frameBefore?.id ?? 'none'}. After: ${lastAction.frameAfter?.id ?? 'pending'}.`),
+            ],
+          ),
+        ]
+      : [copy('Replay will show frame-before, policy, approval, output, and frame-after once an agent action runs.')]),
+  ])
+}
+
 function protocolPanel(): UIElement {
+  const compact = viewport.value.width < 760
   const items: Array<[string, string]> = [
-    ['Frame', 'Tree, layout, semantics, and action contracts are published together.'],
-    ['Policy', 'Risk classes drive confirmation before the gateway executes work.'],
-    ['Trace', 'Every request, approval, and completion is replayable for audit review.'],
-    ['Value', 'Agents operate a smaller trusted surface than DOM or screenshot automation.'],
+    ['Frame', 'Tree, layout, semantics, and contracts ship together.'],
+    ['Policy', 'Risk classes gate execution.'],
+    ['Trace', 'Requests, approvals, and completions replay.'],
+    ['Value', 'Smaller trusted surface than DOM automation.'],
   ]
   return panel([
     t('Agent-Native Frame', 14, '700', '#111827'),
-    box({ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }, items.map(([label, value]) =>
+    box({ flexDirection: compact ? 'column' : 'row', gap: 10, flexWrap: 'wrap' }, items.map(([label, value]) =>
       box(
         {
-          width: 190,
-          minHeight: 86,
+          ...(compact ? {} : { width: 142 }),
+          minHeight: 92,
           flexDirection: 'column',
           gap: 6,
           padding: 12,
@@ -520,10 +690,135 @@ function protocolPanel(): UIElement {
   ])
 }
 
+function compactQueueItem(claim: Claim): UIElement {
+  const selected = claim.id === activeClaimId.value
+  const status = statusByClaim.value[claim.id] ?? claim.status
+  return box(
+    {
+      width: 104,
+      minHeight: 58,
+      flexShrink: 0,
+      flexDirection: 'column',
+      gap: 4,
+      padding: 8,
+      backgroundColor: selected ? '#e7f4ef' : '#fbfaf6',
+      borderColor: selected ? '#2f8f75' : '#ddd6c8',
+      borderWidth: 1,
+      borderRadius: 6,
+      cursor: 'pointer',
+      onClick: () => activeClaimId.set(claim.id),
+      semantic: { role: 'button', ariaLabel: `Select ${claim.id}` },
+    },
+    [
+      t(claim.id, 12, '700', '#111827'),
+      t(claim.sla, 11, '700', claim.sla === '7m' ? '#b42318' : '#6b7280'),
+      t(status === 'Needs evidence' ? 'Needs docs' : status, 10, '700', selected ? '#166534' : '#6b7280'),
+    ],
+  )
+}
+
+function compactTraceReplayPanel(): UIElement {
+  const summary = summarizeAgentTrace(trace.value)
+  const pending = pendingApprovals.value
+  const replay = gateway.getReplay()
+  const lastAction = replay.actions.at(-1)
+
+  return panel([
+    box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }, [
+      t('Gateway Trace', 14, '700', '#111827'),
+      t(`${summary.eventCount} events`, 12, '700', '#0f766e'),
+    ]),
+    copy(lastMessage.value),
+    box({ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }, [
+      metric('Completed', String(summary.completedCount), '#166534'),
+      metric('Pending', String(pending.length), pending.length > 0 ? '#b45309' : '#166534'),
+      metric('Replay', String(replay.actions.length), '#5b5bd6'),
+    ]),
+    ...pending.map(approval =>
+      box(
+        {
+          flexDirection: 'column',
+          gap: 8,
+          padding: 10,
+          backgroundColor: '#fff7ed',
+          borderColor: '#fdba74',
+          borderWidth: 1,
+          borderRadius: 6,
+        },
+        [
+          t('Pending approval', 12, '800', '#9a3412'),
+          copy(`${approval.target.title} / ${approval.reason}`, '#7c2d12'),
+          box({ flexDirection: 'row', gap: 8 }, [
+            approvalDecisionButton('Approve', '#166534', () => {
+              void decidePendingApproval(approval.id, true)
+            }),
+            approvalDecisionButton('Deny', '#b42318', () => {
+              void decidePendingApproval(approval.id, false)
+            }),
+          ]),
+        ],
+      ),
+    ),
+    ...(lastAction
+      ? [copy(`${lastAction.actionId}: ${lastAction.status}. ${lastAction.frameAfter?.id ?? 'pending'}.`)]
+      : [copy('Replay records before/after frames once an agent action runs.')]),
+  ])
+}
+
+function compactView(claim: Claim, size: { width: number; height: number }): UIElement {
+  const status = statusByClaim.value[claim.id] ?? claim.status
+
+  return box(
+    {
+      width: size.width,
+      height: size.height,
+      flexDirection: 'column',
+      gap: 10,
+      padding: 12,
+      backgroundColor: '#f6f3ec',
+    },
+    [
+      box({ flexDirection: 'column', gap: 3 }, [
+        t('Claims Agent Gateway', 21, '800', '#111827'),
+        copy('Agent contracts, policy gates, and replayable approvals.'),
+      ]),
+      panel([
+        t('Review Queue', 14, '700', '#111827'),
+        box({ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }, claims.map(compactQueueItem)),
+      ]),
+      panel([
+        t(`${claim.id} / ${claim.claimant}`, 16, '700', '#111827'),
+        copy(claim.summary),
+        box({ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }, [
+          metric('Risk', claim.riskScore, Number(claim.riskScore) >= 0.7 ? '#b42318' : '#166534'),
+          metric('Amount', claim.amount, '#0f766e'),
+          metric('Status', status, status === 'Approved' ? '#166534' : '#7c2d12'),
+        ]),
+      ]),
+      panel([
+        t('Contracted Operations', 14, '700', '#111827'),
+        box({ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }, [
+          compactActionButton('approve-payout', '#0f766e'),
+          compactActionButton('request-evidence', '#7c3aed'),
+          compactActionButton('escalate-claim', '#b45309'),
+          compactActionButton('export-audit-packet', '#1d4ed8'),
+          compactAgentPlanButton(),
+        ]),
+      ]),
+      compactTraceReplayPanel(),
+    ],
+  )
+}
+
 function view(): UIElement {
   const claim = activeClaim()
   const size = viewport.value
   const compact = size.width < 980
+  const narrow = size.width < 760
+
+  if (narrow) {
+    return compactView(claim, size)
+  }
 
   return box(
     {
@@ -535,12 +830,12 @@ function view(): UIElement {
       backgroundColor: '#f6f3ec',
     },
     [
-      box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 }, [
+      box({ flexDirection: narrow ? 'column' : 'row', justifyContent: 'space-between', alignItems: narrow ? 'stretch' : 'center', gap: 12 }, [
         box({ flexDirection: 'column', gap: 3, flexGrow: 1 }, [
           t('Claims Agent Gateway', 22, '800', '#111827'),
           copy('Enterprise workflow demo: Geometra geometry, explicit action contracts, policy gates, and replayable traces.'),
         ]),
-        box({ flexDirection: 'row', gap: 8 }, [
+        box({ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }, [
           metric('Contracts', String(Object.keys(actions).length), '#0f766e'),
           metric('Protocol', 'native', '#5b5bd6'),
           metric('Replay', 'on', '#166534'),
@@ -574,6 +869,7 @@ function view(): UIElement {
               ]),
             ]),
             protocolPanel(),
+            replayPanel(),
           ]),
           tracePanel(),
         ],
@@ -583,7 +879,7 @@ function view(): UIElement {
 }
 
 function resizeCanvas(): void {
-  const width = Math.max(720, Math.round(window.innerWidth))
+  const width = Math.max(360, Math.round(window.innerWidth))
   const height = Math.max(620, Math.round(window.innerHeight))
   canvas.width = width
   canvas.height = height

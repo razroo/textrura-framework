@@ -23,6 +23,8 @@ Geometra's security pitch is not that canvas is magic. The pitch is that the aut
 - Redact secrets before publishing frame snapshots or traces.
 - Let tenant policy allow or deny actions by route, id, risk, and actor.
 - Deny external and destructive risk classes by default in the policy helper unless the app explicitly opts into a different posture.
+- Gate HTTP access with tenant-scoped API keys and separate read/request/approve scopes.
+- Persist replay through a store so audit records survive process restarts.
 
 ## Security Boundary
 

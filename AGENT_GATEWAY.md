@@ -55,6 +55,37 @@ This is not the final network gateway. It is the deterministic core that a brows
 
 The transport is intentionally thin. Policy, stale-frame checks, approvals, redaction, trace, and replay all remain inside the core gateway.
 
+HTTP deployments can also attach:
+
+- API-key auth with tenant ids and `read`, `request`, `approve`, or `admin` scopes.
+- A replay store, including a file-backed store for local/self-hosted persistence.
+- CORS for browser-hosted operator consoles.
+
+```ts
+const server = await createAgentGatewayHttpServer({
+  gateway,
+  replayStore: new FileAgentGatewayReplayStore({ directory: './replays' }),
+  auth: {
+    apiKeys: {
+      'ops-key': { tenantId: 'acme', subject: 'ops-manager', scopes: ['read', 'approve'] },
+      'agent-key': { tenantId: 'acme', subject: 'claims-agent', scopes: ['read', 'request'] },
+    },
+  },
+})
+```
+
+## MCP-Style Tools
+
+`createAgentGatewayToolAdapter(gateway)` returns a small tool surface that can be wrapped by an MCP server:
+
+- `geometra_gateway_list_actions`
+- `geometra_gateway_request_action`
+- `geometra_gateway_approve_action`
+- `geometra_gateway_get_trace`
+- `geometra_gateway_get_replay`
+
+This keeps the agent interface narrow: list current frame actions, request one by id, approve/deny pending work, and inspect audit/replay output.
+
 ## Replay
 
 Replay records:

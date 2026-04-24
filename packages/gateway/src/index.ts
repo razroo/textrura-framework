@@ -6,11 +6,38 @@ import type {
   AgentGatewayApprovalRequest,
   AgentGatewayFrameSnapshot,
 } from '@geometra/core'
+import type { AgentGatewayReplayStore } from './replay-store.js'
+
+export { FileAgentGatewayReplayStore, MemoryAgentGatewayReplayStore } from './replay-store.js'
+export type { AgentGatewayReplayStore, FileAgentGatewayReplayStoreOptions } from './replay-store.js'
+export { createAgentGatewayToolAdapter } from './tools.js'
+export type {
+  AgentGatewayTool,
+  AgentGatewayToolAdapter,
+  AgentGatewayToolCallResult,
+  AgentGatewayToolName,
+} from './tools.js'
+
+export type AgentGatewayHttpScope = 'read' | 'request' | 'approve' | 'admin'
+
+export interface AgentGatewayHttpIdentity {
+  tenantId: string
+  subject?: string
+  scopes?: AgentGatewayHttpScope[]
+}
+
+export interface AgentGatewayHttpAuthOptions {
+  apiKeys: Record<string, AgentGatewayHttpIdentity>
+  /** Header to read before falling back to Authorization: Bearer. Default: x-geometra-api-key. */
+  headerName?: string
+}
 
 export interface AgentGatewayHttpOptions {
   gateway: AgentGateway
   cors?: boolean
   maxBodyBytes?: number
+  auth?: AgentGatewayHttpAuthOptions
+  replayStore?: AgentGatewayReplayStore
 }
 
 export interface AgentGatewayHttpServerOptions extends AgentGatewayHttpOptions {
@@ -32,7 +59,7 @@ function latestFrame(gateway: AgentGateway): AgentGatewayFrameSnapshot | null {
 function sendJson(res: ServerResponse, status: number, body: unknown, cors: boolean): void {
   if (cors) {
     res.setHeader('Access-Control-Allow-Origin', '*')
-    res.setHeader('Access-Control-Allow-Headers', 'content-type')
+    res.setHeader('Access-Control-Allow-Headers', 'content-type, authorization, x-geometra-api-key')
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
   }
   res.statusCode = status
@@ -42,6 +69,52 @@ function sendJson(res: ServerResponse, status: number, body: unknown, cors: bool
 
 function sendError(res: ServerResponse, status: number, message: string, cors: boolean): void {
   sendJson(res, status, { error: message }, cors)
+}
+
+function bearerToken(value: string | undefined): string | null {
+  if (!value) return null
+  const match = value.match(/^Bearer\s+(.+)$/i)
+  return match?.[1] ?? null
+}
+
+function scopeAllows(identity: AgentGatewayHttpIdentity, scope: AgentGatewayHttpScope): boolean {
+  const scopes = identity.scopes ?? ['admin']
+  return scopes.includes('admin') || scopes.includes(scope)
+}
+
+function authenticate(
+  req: IncomingMessage,
+  auth: AgentGatewayHttpAuthOptions | undefined,
+): AgentGatewayHttpIdentity | null {
+  if (!auth) return null
+  const headerName = (auth.headerName ?? 'x-geometra-api-key').toLowerCase()
+  const explicitKey = req.headers[headerName]
+  const key =
+    (Array.isArray(explicitKey) ? explicitKey[0] : explicitKey) ??
+    bearerToken(Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization)
+  if (!key) {
+    throw Object.assign(new Error('missing gateway API key'), { statusCode: 401 })
+  }
+  const identity = auth.apiKeys[key]
+  if (!identity) {
+    throw Object.assign(new Error('invalid gateway API key'), { statusCode: 403 })
+  }
+  return identity
+}
+
+function requireScope(identity: AgentGatewayHttpIdentity | null, scope: AgentGatewayHttpScope): void {
+  if (!identity) return
+  if (!scopeAllows(identity, scope)) {
+    throw Object.assign(new Error(`API key is missing "${scope}" scope`), { statusCode: 403 })
+  }
+}
+
+function errorStatus(error: unknown): number {
+  if (error && typeof error === 'object' && 'statusCode' in error) {
+    const status = Number(error.statusCode)
+    if (Number.isInteger(status) && status >= 400 && status <= 599) return status
+  }
+  return 400
 }
 
 async function readJson(req: IncomingMessage, maxBodyBytes: number): Promise<unknown> {
@@ -65,7 +138,11 @@ function routeNotFound(req: IncomingMessage, res: ServerResponse, cors: boolean)
 }
 
 export function createAgentGatewayHttpHandler(options: AgentGatewayHttpOptions) {
-  const { gateway, cors = true, maxBodyBytes = 64 * 1024 } = options
+  const { gateway, cors = true, maxBodyBytes = 64 * 1024, auth, replayStore } = options
+
+  const persistReplay = async (): Promise<void> => {
+    await replayStore?.save(gateway.getReplay())
+  }
 
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     try {
@@ -79,15 +156,21 @@ export function createAgentGatewayHttpHandler(options: AgentGatewayHttpOptions) 
         sendJson(res, 200, { ok: true }, cors)
         return
       }
+
+      const identity = authenticate(req, auth)
+
       if (req.method === 'GET' && url.pathname === '/frame') {
-        sendJson(res, 200, { frame: latestFrame(gateway) }, cors)
+        requireScope(identity, 'read')
+        sendJson(res, 200, { tenant: identity?.tenantId, frame: latestFrame(gateway) }, cors)
         return
       }
       if (req.method === 'GET' && url.pathname === '/actions') {
+        requireScope(identity, 'read')
         sendJson(
           res,
           200,
           {
+            tenant: identity?.tenantId,
             frame: latestFrame(gateway),
             actions: gateway.listActions(),
             pendingApprovals: gateway.getPendingApprovals(),
@@ -97,29 +180,49 @@ export function createAgentGatewayHttpHandler(options: AgentGatewayHttpOptions) 
         return
       }
       if (req.method === 'GET' && url.pathname === '/trace') {
-        sendJson(res, 200, { trace: gateway.getTrace() }, cors)
+        requireScope(identity, 'read')
+        sendJson(res, 200, { tenant: identity?.tenantId, trace: gateway.getTrace() }, cors)
         return
       }
       if (req.method === 'GET' && url.pathname === '/replay') {
-        sendJson(res, 200, { replay: gateway.getReplay() }, cors)
+        requireScope(identity, 'read')
+        const requestedSessionId = url.searchParams.get('sessionId')
+        if (requestedSessionId) {
+          const currentReplay = gateway.getReplay()
+          const replay =
+            requestedSessionId === currentReplay.sessionId ? currentReplay : await replayStore?.load(requestedSessionId)
+          sendJson(
+            res,
+            replay ? 200 : 404,
+            replay ? { tenant: identity?.tenantId, replay } : { error: 'replay not found' },
+            cors,
+          )
+          return
+        }
+        await persistReplay()
+        sendJson(res, 200, { tenant: identity?.tenantId, replay: gateway.getReplay() }, cors)
         return
       }
       if (req.method === 'POST' && url.pathname === '/actions/request') {
+        requireScope(identity, 'request')
         const body = await readJson(req, maxBodyBytes)
         const result = await gateway.requestAction(body as AgentGatewayActionRequest)
-        sendJson(res, 200, { result, pendingApprovals: gateway.getPendingApprovals() }, cors)
+        await persistReplay()
+        sendJson(res, 200, { tenant: identity?.tenantId, result, pendingApprovals: gateway.getPendingApprovals() }, cors)
         return
       }
       if (req.method === 'POST' && url.pathname === '/actions/approve') {
+        requireScope(identity, 'approve')
         const body = await readJson(req, maxBodyBytes)
         const result = await gateway.approveAction(body as AgentGatewayApprovalRequest)
-        sendJson(res, 200, { result, pendingApprovals: gateway.getPendingApprovals() }, cors)
+        await persistReplay()
+        sendJson(res, 200, { tenant: identity?.tenantId, result, pendingApprovals: gateway.getPendingApprovals() }, cors)
         return
       }
 
       routeNotFound(req, res, cors)
     } catch (error) {
-      sendError(res, 400, error instanceof Error ? error.message : String(error), cors)
+      sendError(res, errorStatus(error), error instanceof Error ? error.message : String(error), cors)
     }
   }
 }

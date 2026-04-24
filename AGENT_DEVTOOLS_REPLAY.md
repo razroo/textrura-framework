@@ -26,7 +26,7 @@ Replay stores:
 
 Replay should support deterministic inspection before it supports full time travel. A reviewer must be able to answer: which action did the agent request, what did the user approve, what geometry was visible, and what changed after execution?
 
-The current core gateway exposes `getReplay()`, and `@geometra/gateway` serves it at `GET /replay`.
+The current core gateway exposes `getReplay()`, and `@geometra/gateway` serves it at `GET /replay`. Browser demos can also render replay summaries in Geometra itself; the claims demo now shows frame counts, trace counts, pending approvals, and the last action's before/after frame ids.
 
 ## Developer Value
 

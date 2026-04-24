@@ -208,7 +208,7 @@ The next layer is explicit agent contracts on top of geometry: stable action ids
 
 Try the enterprise workflow demo with `bun run --filter @geometra/demo-agent-native-ops dev`, or run the deterministic value harness with `bun run benchmark:agent-native:assert`.
 
-The first runtime slice is available through `createAgentGateway()` in `@geometra/core` and the HTTP transport in `@geometra/gateway`.
+The first runtime slice is available through `createAgentGateway()` in `@geometra/core` and the HTTP/tool transport in `@geometra/gateway`: frame-bound action catalogs, tenant-scoped API keys, approvals, redaction, replay persistence, and MCP-style gateway tools.
 
 ## Why geometry, not components?
 
