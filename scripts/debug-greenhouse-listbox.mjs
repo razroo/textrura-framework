@@ -352,7 +352,7 @@ async function main() {
           let cur = el
           let depth = 0
           let textRead = null
-          let walkLog = []
+          const walkLog = []
           while (cur && depth < 4) {
             const candidates = cur.querySelectorAll('[class*="placeholder"], [class*="single-value"], [class*="singleValue"]')
             walkLog.push({ depth, currentClass: cur.className?.toString().slice(0, 60) ?? '', candidateCount: candidates.length })

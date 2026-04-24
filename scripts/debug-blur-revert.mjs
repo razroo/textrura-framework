@@ -10,7 +10,6 @@ import { chromium } from 'playwright'
 
 const TARGET_URL = 'https://job-boards.greenhouse.io/anthropic/jobs/5062712008'
 const FIELD_LABEL = 'AI Policy for Application'
-const TARGET_OPTION = 'Yes'
 
 function ts() { return new Date().toISOString().split('T')[1].replace('Z', '') }
 function log(label, payload) {

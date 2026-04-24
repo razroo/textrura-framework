@@ -850,7 +850,7 @@ fn sdRoundRect(p: vec2f, b: vec2f, r: vec4f) -> f32 {
   var col = in.color1;
   if (hasGradient) {
     if (in.gradientV >= 0.0) {
-      col = textureSample(gradTexture, gradSampler, vec2f(t, in.gradientV));
+      col = textureSampleLevel(gradTexture, gradSampler, vec2f(t, in.gradientV), 0.0);
       col = vec4f(col.rgb, col.a * in.color1.a);
     } else {
       col = mix(in.color1, in.color2, t);

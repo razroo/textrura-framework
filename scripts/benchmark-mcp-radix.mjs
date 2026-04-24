@@ -261,7 +261,7 @@ async function runScenario(createServer, options) {
     let schemaStep, schemaPayload, targetForm
     let fillStep, fillPayload
     /** Per-eligibility-field ground-truth check via geometra_query. */
-    let groundTruth = []
+    const groundTruth = []
     try {
       schemaStep = await invokeTool(formSchema, 'geometra_form_schema', {
         pageUrl: url,

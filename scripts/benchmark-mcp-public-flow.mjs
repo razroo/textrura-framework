@@ -346,7 +346,7 @@ return {
 `.trim()
 }
 
-function renderPlaywrightCartCode(scenario) {
+function renderPlaywrightCartCode() {
   return `
 await page.locator('[data-test="add-to-cart-sauce-labs-backpack"]').click();
 const cartCount = await page.locator('[data-test="shopping-cart-badge"]').textContent();

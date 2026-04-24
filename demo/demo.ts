@@ -715,11 +715,11 @@ function animationDemo(): UIElement {
   ensureAnimLoop()
 
   // Read signals to subscribe to updates
-  const _t = animTime.value
+  void animTime.value
   const fps = animFps.value
   const sx = springX.value
   const sy = springY.value
-  const _pTick = particleSignal.value
+  void particleSignal.value
   const phase = orbitPhase.value
 
   const areaW = Math.max(w - 48, 250)
@@ -2315,7 +2315,7 @@ function footerSection(): UIElement {
 
 // ─── Nebula Background ───────────────────────────────────────────────────────
 function nebulaBackground(viewportWidth: number, viewportHeight: number): UIElement[] {
-  const _tick = nebulaTick.value
+  void nebulaTick.value
   return nebulaOrbs.map(orb => box({
     position: 'absolute',
     left: Math.round(orb.x * viewportWidth - orb.size / 2),

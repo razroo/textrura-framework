@@ -17,7 +17,15 @@ const rl = readline.createInterface({
 
 let lastTexts: string[] = []
 
-function extractTexts(node: any): string[] {
+interface FrameNode {
+  kind?: string
+  props?: {
+    text?: string
+  }
+  children?: FrameNode[]
+}
+
+function extractTexts(node: FrameNode): string[] {
   const texts: string[] = []
   if (node?.kind === 'text' && node?.props?.text) {
     texts.push(node.props.text)
@@ -30,7 +38,7 @@ function extractTexts(node: any): string[] {
   return texts
 }
 
-function renderFrame(tree: any): void {
+function renderFrame(tree: FrameNode): void {
   const texts = extractTexts(tree)
   // Only re-render if content changed
   const key = texts.join('|')
@@ -72,7 +80,7 @@ ws.on('message', (raw) => {
   try {
     const msg = JSON.parse(String(raw))
     if (msg.type === 'frame' && msg.tree) {
-      renderFrame(msg.tree)
+      renderFrame(msg.tree as FrameNode)
     } else if (msg.type === 'patch') {
       // For patches we'd need the full tree; just request a re-render
     }

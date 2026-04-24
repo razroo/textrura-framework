@@ -549,20 +549,27 @@ describe('syncVirtualWindow', () => {
           for (let selected = 0; selected <= 15; selected++) {
             for (let currentStart = 0; currentStart <= 15; currentStart++) {
               const r = syncVirtualWindow(total, windowSize, selected, currentStart)
+              const fail = (message: string) => {
+                throw new Error(
+                  `${message}: total=${total}, windowSize=${windowSize}, selected=${selected}, currentStart=${currentStart}, result=${JSON.stringify(r)}`,
+                )
+              }
               if (total <= 0) {
-                expect(r).toEqual({ start: 0, end: 0, selected: 0 })
+                if (r.start !== 0 || r.end !== 0 || r.selected !== 0) {
+                  fail('expected empty window result')
+                }
                 continue
               }
               const maxIndex = total - 1
               const cap = Math.max(1, windowSize)
-              expect(r.start).toBeLessThanOrEqual(r.end)
-              expect(r.selected).toBeGreaterThanOrEqual(0)
-              expect(r.selected).toBeLessThanOrEqual(maxIndex)
-              expect(r.start).toBeGreaterThanOrEqual(0)
-              expect(r.end).toBeLessThanOrEqual(maxIndex)
-              expect(r.selected).toBeGreaterThanOrEqual(r.start)
-              expect(r.selected).toBeLessThanOrEqual(r.end)
-              expect(r.end - r.start + 1).toBeLessThanOrEqual(Math.min(cap, total))
+              if (r.start > r.end) fail('expected start <= end')
+              if (r.selected < 0) fail('expected selected >= 0')
+              if (r.selected > maxIndex) fail('expected selected <= maxIndex')
+              if (r.start < 0) fail('expected start >= 0')
+              if (r.end > maxIndex) fail('expected end <= maxIndex')
+              if (r.selected < r.start) fail('expected selected >= start')
+              if (r.selected > r.end) fail('expected selected <= end')
+              if (r.end - r.start + 1 > Math.min(cap, total)) fail('expected visible span within cap')
             }
           }
         }

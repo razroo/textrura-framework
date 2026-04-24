@@ -8,7 +8,7 @@
  * MCP-layer interaction (caching, batched fills, etc.).
  */
 import { chromium } from 'playwright'
-import { pickListboxOption, fillFields, setFieldText, createFillLookupCache } from '../packages/proxy/dist/dom-actions.js'
+import { pickListboxOption, fillFields } from '../packages/proxy/dist/dom-actions.js'
 
 const TARGET_URL = 'https://job-boards.greenhouse.io/anthropic/jobs/5062712008'
 const FIELD_LABEL = 'AI Policy for Application'

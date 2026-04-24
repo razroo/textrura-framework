@@ -36,6 +36,9 @@ jobs:
       - name: Examples smoke
         run: bun run examples:smoke
 
+      - name: Demo shell browser smoke
+        run: bun run e2e:demo-shell
+
       - name: Full-stack browser E2E
         run: bun run e2e:demo
 

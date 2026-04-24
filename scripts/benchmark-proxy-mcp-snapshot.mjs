@@ -30,12 +30,8 @@ async function measure(url) {
   await page.waitForTimeout(2000)
 
   const html = await page.content()
-  let ariaAi = ''
-  try {
-    ariaAi = await page.locator('body').ariaSnapshot({ mode: 'ai', timeout: 15_000 })
-  } catch (e) {
-    ariaAi = `error:${e.message}`
-  }
+  const ariaAi = await page.locator('body').ariaSnapshot({ mode: 'ai', timeout: 15_000 })
+    .catch(e => `error:${e.message}`)
 
   const geom = await extractGeometry(page)
   const geometraFull = bytes({ layout: geom.layout, tree: geom.tree })

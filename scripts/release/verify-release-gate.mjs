@@ -2,6 +2,7 @@ import { access, readFile } from 'node:fs/promises'
 import { constants as fsConstants } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join, relative, resolve } from 'node:path'
+import { publishablePackages } from './package-manifest.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..')
 
@@ -26,6 +27,11 @@ async function main() {
   if (!gate.includes('verify-release-gate')) {
     throw new Error(
       'release:gate: package.json scripts.release:gate must invoke verify-release-gate (duplicate/missing test path check)',
+    )
+  }
+  if (!gate.includes('verify-pack-contents')) {
+    throw new Error(
+      'release:gate: package.json scripts.release:gate must invoke verify-pack-contents after build so npm tarballs cannot ship tests, sources, or missing entrypoints',
     )
   }
   if (!gate.includes('test:terminal-input')) {
@@ -74,16 +80,27 @@ async function main() {
     )
   }
 
-  if (segments.length !== 3) {
+  if (segments.length !== 4) {
     const preview = segments.map((s, i) => `${i + 1}:${s.length > 72 ? `${s.slice(0, 72)}…` : s}`).join(' | ')
     throw new Error(
-      `release:gate: expected exactly three && segments (verify-release-gate.mjs, single vitest run batch, bun run test:terminal-input); got ${segments.length} (${preview})`,
+      `release:gate: expected exactly four && segments (verify-release-gate.mjs, verify-pack-contents.mjs, single vitest run batch, bun run test:terminal-input); got ${segments.length} (${preview})`,
     )
   }
-  const vitestSegment = segments[1] ?? ''
+  const packSegment = segments[1] ?? ''
+  if (!/^\s*node\s+scripts\/release\/verify-pack-contents\.mjs\s*$/.test(packSegment)) {
+    throw new Error(
+      'release:gate: second && segment must be `node scripts/release/verify-pack-contents.mjs` so tarball contents are checked before the long vitest batch',
+    )
+  }
+  const vitestSegment = segments[2] ?? ''
   if (!/^\s*vitest\s+run\b/.test(vitestSegment)) {
     throw new Error(
-      'release:gate: second && segment must be the single vitest allowlist batch (must start with `vitest run`)',
+      'release:gate: third && segment must be the single vitest allowlist batch (must start with `vitest run`)',
+    )
+  }
+  if (!/(^|\s)--maxWorkers=1(\s|$)/.test(vitestSegment)) {
+    throw new Error(
+      'release:gate: vitest batch must include `--maxWorkers=1` so wall-clock perf smoke tests do not contend with the rest of the release allowlist',
     )
   }
   // Watch mode never belongs in CI gate scripts — it blocks until interrupted and ignores the allowlist intent.
@@ -181,6 +198,35 @@ async function main() {
       await access(abs, fsConstants.R_OK)
     } catch {
       throw new Error(`release:gate: missing or unreadable file: ${rel}`)
+    }
+  }
+
+  const build = pkg.scripts?.build
+  if (typeof build !== 'string' || !build.trim()) {
+    throw new Error('package.json: missing scripts.build string')
+  }
+  for (const publishable of publishablePackages) {
+    const expected =
+      publishable.path === 'mcp'
+        ? 'bun run mcp:build'
+        : `bun run --filter ${publishable.name} build`
+    if (!build.includes(expected)) {
+      throw new Error(
+        `scripts.build: publishable package ${publishable.name} is missing expected build command: ${expected}`,
+      )
+    }
+  }
+
+  for (const [scriptName, expected] of [
+    ['release:verify-pack', 'node scripts/release/verify-pack-contents.mjs'],
+    ['examples:html', 'node scripts/examples/verify-demo-html.mjs'],
+    ['mcp:build', 'cd mcp && npm run build'],
+    ['mcp:check', 'cd mcp && npm run check'],
+    ['mcp:test', 'cd mcp && npm run test'],
+    ['clean', 'node scripts/clean.mjs'],
+  ]) {
+    if (pkg.scripts?.[scriptName] !== expected) {
+      throw new Error(`package.json scripts.${scriptName} must be exactly: ${expected}`)
     }
   }
 }

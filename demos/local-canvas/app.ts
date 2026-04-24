@@ -317,12 +317,16 @@ function view() {
           lineHeight: 24,
           color: '#ffffff',
         }),
-        text({
-          text: `${count.value} cards · ${direction.value}`,
-          font: '14px Inter, system-ui',
-          lineHeight: 20,
-          color: '#888888',
-        }),
+        box({ flexDirection: 'row', gap: 8, alignItems: 'center' }, [
+          button('Add card', () => count.set(count.peek() + 1)),
+          button('Toggle layout', () => direction.set(direction.peek() === 'row' ? 'column' : 'row')),
+          text({
+            text: `${count.value} cards · ${direction.value}`,
+            font: '14px Inter, system-ui',
+            lineHeight: 20,
+            color: '#888888',
+          }),
+        ]),
       ]),
       box({ flexDirection: 'column', gap: 8 }, [
         toast('Inspector HUD + hit path (move pointer over canvas)', { variant: 'info' }),
@@ -364,14 +368,6 @@ function view() {
 
 // Mount
 createApp(view, renderer, { width: 600, height: 800 }).then((app) => {
-  document.getElementById('btn-add')!.addEventListener('click', () => {
-    count.set(count.peek() + 1)
-  })
-
-  document.getElementById('btn-toggle')!.addEventListener('click', () => {
-    direction.set(direction.peek() === 'row' ? 'column' : 'row')
-  })
-
   const setProbe = (e: PointerEvent) => {
     const rect = canvas.getBoundingClientRect()
     renderer.inspectorProbe = { x: e.clientX - rect.left, y: e.clientY - rect.top }
