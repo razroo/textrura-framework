@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
+import { threadId } from 'node:worker_threads'
 import {
   ParallelMcpOrchestrator,
   SqliteParallelMcpStore,
@@ -40,7 +41,7 @@ function resolveSessionStateFile(): string {
   }
   const dir = path.join(homedir(), '.geometra-mcp')
   mkdirSync(dir, { recursive: true })
-  return path.join(dir, `parallel-mcp-${process.pid}.sqlite`)
+  return path.join(dir, `parallel-mcp-${process.pid}-${threadId}.sqlite`)
 }
 
 const orchestrator = new ParallelMcpOrchestrator(

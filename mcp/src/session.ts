@@ -119,7 +119,7 @@ interface PageSectionSummaryBase {
 }
 
 /** Higher-level webpage structures extracted from the a11y tree. */
-export interface PageLandmark extends PageSectionSummaryBase {}
+export type PageLandmark = PageSectionSummaryBase
 
 export interface PagePrimaryAction {
   id: string
@@ -1076,6 +1076,7 @@ export async function prewarmProxy(options: {
   } catch (spawnFailure) {
     throw new Error(
       `Failed to prewarm embedded browser session: ${formatUnknownError(embeddedFailure)}\nChild-process proxy prewarm also failed: ${formatUnknownError(spawnFailure)}`,
+      { cause: spawnFailure },
     )
   }
 }
@@ -1255,7 +1256,6 @@ async function startFreshProxySession(options: {
     // every time we fall through to the child-process fallback path.
     if (pendingEmbeddedRuntime) {
       const leaked = pendingEmbeddedRuntime
-      pendingEmbeddedRuntime = undefined
       void leaked.close().catch(() => {})
     }
     const proxyStartStartedAt = performance.now()
@@ -1565,6 +1565,7 @@ export async function connectThroughProxy(options: {
     if (reuseFailure) {
       throw new Error(
         `Failed to recover reusable browser session after it became stale: ${formatUnknownError(reuseFailure)}\nFresh proxy start also failed: ${formatUnknownError(e)}`,
+        { cause: e },
       )
     }
     throw e
@@ -1700,7 +1701,7 @@ export function waitForUiCondition(
 ): Promise<boolean> {
   return new Promise((resolve) => {
     const check = () => {
-      let matched = false
+      let matched: boolean
       try {
         matched = predicate()
       } catch {
@@ -1868,7 +1869,7 @@ async function ensureSessionConnected(session: Session): Promise<void> {
     }
   })()
   session.reconnectInFlight = reconnectPromise
-  let recovered = false
+  let recovered: boolean
   try {
     recovered = await reconnectPromise
   } finally {
@@ -2231,7 +2232,6 @@ const DIALOG_ROLES = new Set([
   'alertdialog',
 ])
 
-const FIELD_LABEL_ROLES = new Set(['textbox', 'combobox', 'checkbox', 'radio'])
 const CONTENT_NAME_ROLES = new Set(['heading', 'text'])
 
 function encodePath(path: number[]): string {
@@ -2511,10 +2511,6 @@ function cloneValidation(validation: A11yNode['validation'] | undefined): A11yNo
   if (validation.description) next.description = validation.description
   if (validation.error) next.error = validation.error
   return Object.keys(next).length > 0 ? next : undefined
-}
-
-function clonePath(path: number[]): number[] {
-  return [...path]
 }
 
 function sortByBounds<T extends { bounds: A11yNode['bounds'] }>(items: T[]): T[] {
@@ -3157,10 +3153,6 @@ function buildFormSchemaForNode(
   }
 }
 
-function trimSchemaFieldContexts(fields: FormSchemaField[]): FormSchemaField[] {
-  return presentFormSchemaFields(fields, { includeOptions: true, includeContext: 'auto' })
-}
-
 function presentFormSchemaFields(
   fields: FormSchemaField[],
   options?: Pick<FormSchemaBuildOptions, 'includeOptions' | 'includeContext'>,
@@ -3523,19 +3515,6 @@ function headingModels(node: A11yNode, maxHeadings: number, includeBounds: boole
   }))
 }
 
-function nestedListSummaries(node: A11yNode, maxLists: number, selfPath: number[]): PageListModel[] {
-  const nestedLists = sortByBounds(
-    collectDescendants(node, candidate => candidate.role === 'list' && pathKey(candidate.path) !== pathKey(selfPath)),
-  )
-  return nestedLists.slice(0, maxLists).map(list => ({
-    id: sectionIdForPath('list', list.path),
-    role: list.role,
-    ...(sectionDisplayName(list, 'list') ? { name: sectionDisplayName(list, 'list') } : {}),
-    bounds: cloneBounds(list.bounds),
-    itemCount: collectDescendants(list, candidate => candidate.role === 'listitem').length,
-  }))
-}
-
 function sectionKindForNode(node: A11yNode): PageSectionKind | null {
   if (node.role === 'form') return 'form'
   if (DIALOG_ROLES.has(node.role)) return 'dialog'
@@ -3762,10 +3741,6 @@ function diffCompactNodes(before: CompactUiNode, after: CompactUiNode): string[]
   }
 
   return changes
-}
-
-function pageContainerKey<T extends { path: number[]; name?: string }>(value: T): string {
-  return `${pathKey(value.path)}|${value.name ?? ''}`
 }
 
 /**

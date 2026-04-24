@@ -35,7 +35,7 @@ describe('proxy-backed MCP actions', () => {
             ws.send(JSON.stringify({
               type: 'error',
               requestId: msg.requestId,
-              message: 'listboxPick: no visible option matching \"Japan\"',
+              message: 'listboxPick: no visible option matching "Japan"',
             }))
           }, 20)
         }

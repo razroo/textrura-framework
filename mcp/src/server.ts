@@ -50,8 +50,6 @@ import type {
   FormSchemaModel,
   Session,
   UpdateWaitResult,
-  WorkflowPageEntry,
-  WorkflowState,
 } from './session.js'
 
 type NodeStateFilterValue = boolean | 'mixed'
@@ -2417,7 +2415,7 @@ Pass \`fieldLabel\` to open a labeled dropdown semantically instead of relying o
       detail: detailInput(),
       sessionId: sessionIdInput,
     },
-    async ({ label, exact, openX, openY, fieldLabel, contextText, sectionText, query, timeoutMs, detail, sessionId }) => {
+    async ({ label, exact, openX, openY, fieldLabel, contextText: _contextText, sectionText: _sectionText, query, timeoutMs, detail, sessionId }) => {
       const sessionResult = resolveToolSession(sessionId)
       if ('error' in sessionResult) return sessionResult.error
       const session = sessionResult.session
@@ -3756,8 +3754,6 @@ interface ResolveClickFallbackFailure {
   attempts: number
 }
 
-type ResolveClickFallbackInfo = ResolveClickFallbackSuccess | ResolveClickFallbackFailure
-
 async function resolveClickLocationWithFallback(
   session: Session,
   options: {
@@ -5082,85 +5078,6 @@ function sortA11yNodes(nodes: A11yNode[]): A11yNode[] {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
-}
-
-function pathStartsWith(path: number[], prefix: number[]): boolean {
-  if (prefix.length > path.length) return false
-  for (let index = 0; index < prefix.length; index++) {
-    if (path[index] !== prefix[index]) return false
-  }
-  return true
-}
-
-function namedAncestors(root: A11yNode, path: number[]): A11yNode[] {
-  const out: A11yNode[] = []
-  let current: A11yNode = root
-  for (const index of path) {
-    out.push(current)
-    if (!current.children[index]) break
-    current = current.children[index]!
-  }
-  return out
-}
-
-function collectDescendants(node: A11yNode, predicate: (candidate: A11yNode) => boolean): A11yNode[] {
-  const out: A11yNode[] = []
-  function walk(current: A11yNode) {
-    for (const child of current.children) {
-      if (predicate(child)) out.push(child)
-      walk(child)
-    }
-  }
-  walk(node)
-  return out
-}
-
-function promptContext(root: A11yNode, node: A11yNode): string | undefined {
-  const ancestors = namedAncestors(root, node.path)
-  const normalizedName = (node.name ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
-
-  for (let index = ancestors.length - 1; index >= 0; index--) {
-    const ancestor = ancestors[index]!
-    const grouped = collectDescendants(ancestor, candidate =>
-      candidate.role === 'button' || candidate.role === 'radio' || candidate.role === 'checkbox',
-    ).length >= 2
-    if (!grouped && ancestor.role !== 'group' && ancestor.role !== 'form' && ancestor.role !== 'dialog') continue
-
-    const best = collectDescendants(
-      ancestor,
-      candidate =>
-        (candidate.role === 'heading' || candidate.role === 'text') &&
-        !!truncateInlineText(candidate.name, 120) &&
-        !pathStartsWith(candidate.path, node.path),
-    )
-      .filter(candidate => candidate.bounds.y <= node.bounds.y + 8)
-      .map(candidate => {
-        const text = truncateInlineText(candidate.name, 120)
-        if (!text) return null
-        if (text.toLowerCase() === normalizedName) return null
-        const dy = Math.max(0, node.bounds.y - candidate.bounds.y)
-        const dx = Math.abs(node.bounds.x - candidate.bounds.x)
-        const headingBonus = candidate.role === 'heading' ? -32 : 0
-        return { text, score: dy * 4 + dx + headingBonus }
-      })
-      .filter((candidate): candidate is { text: string; score: number } => !!candidate)
-      .sort((a, b) => a.score - b.score)[0]
-    if (best?.text) return best.text
-  }
-
-  return undefined
-}
-
-function sectionContext(root: A11yNode, node: A11yNode): string | undefined {
-  const ancestors = namedAncestors(root, node.path)
-  for (let index = ancestors.length - 1; index >= 0; index--) {
-    const ancestor = ancestors[index]!
-    if (ancestor.role === 'form' || ancestor.role === 'dialog' || ancestor.role === 'main' || ancestor.role === 'navigation' || ancestor.role === 'region') {
-      const name = truncateInlineText(ancestor.name, 80)
-      if (name) return name
-    }
-  }
-  return undefined
 }
 
 function nodeContextText(context: { prompt?: string; section?: string; item?: string } | undefined): string | undefined {

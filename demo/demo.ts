@@ -1906,6 +1906,8 @@ function heroSection(): UIElement {
           box({ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }, [
             btn('Starter Docs', false, () => window.open('https://github.com/razroo/geometra#start-here', '_blank')),
             btn('Full-Stack Example', false, () => window.open('https://github.com/razroo/geometra/tree/main/demos/full-stack-dashboard', '_blank')),
+            btn('WebGPU Demo', false, () => { window.location.href = './webgpu.html' }),
+            btn('Export PDF', false, exportPdf),
           ]),
         ]),
       ),
@@ -2420,32 +2422,25 @@ canvas.addEventListener('mousemove', (e) => {
   mouseY.set(e.clientY + window.scrollY)
 })
 
-// ─── PDF Export ──────────────────────────────────────────────────────────────
-const exportBtn = document.getElementById('export-pdf-btn') as HTMLButtonElement | null
-if (exportBtn) {
-  exportBtn.addEventListener('click', () => {
-    if (!app?.layout || !app.tree) {
-      alert('App not ready yet — please wait for the canvas to render.')
-      return
-    }
-    const pageWidth = Math.max(400, Math.min(1200, app.layout.width))
-    const pageHeight = Math.max(600, app.layout.height)
-    const pdfRenderer = new PDFRenderer({
-      pageWidth,
-      pageHeight,
-      background: BG,
-    })
-    const bytes = pdfRenderer.generate(app.layout, app.tree)
-    const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `geometra-demo-${new Date().toISOString().slice(0, 10)}.pdf`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+function exportPdf() {
+  if (!app?.layout || !app.tree) return
+  const pageWidth = Math.max(400, Math.min(1200, app.layout.width))
+  const pageHeight = Math.max(600, app.layout.height)
+  const pdfRenderer = new PDFRenderer({
+    pageWidth,
+    pageHeight,
+    background: BG,
   })
+  const bytes = pdfRenderer.generate(app.layout, app.tree)
+  const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `geometra-demo-${new Date().toISOString().slice(0, 10)}.pdf`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }
 
 // ─── Init ────────────────────────────────────────────────────────────────────

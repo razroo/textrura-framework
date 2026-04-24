@@ -1,3 +1,5 @@
+import { publishablePackageNames } from './package-manifest.mjs'
+
 const version = process.argv[2]
 
 if (!version) {
@@ -5,19 +7,7 @@ if (!version) {
   process.exit(1)
 }
 
-const packages = [
-  '@geometra/core',
-  '@geometra/renderer-canvas',
-  '@geometra/renderer-terminal',
-  '@geometra/renderer-webgpu',
-  '@geometra/renderer-pdf',
-  '@geometra/server',
-  '@geometra/client',
-  '@geometra/ui',
-  '@geometra/router',
-  '@geometra/tw',
-  '@geometra/proxy',
-]
+const packages = publishablePackageNames()
 
 async function run() {
   for (const pkg of packages) {

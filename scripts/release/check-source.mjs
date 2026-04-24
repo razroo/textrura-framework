@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import { publishablePackageJsons } from './package-manifest.mjs'
 
 const version = process.argv[2]
 
@@ -7,29 +8,7 @@ if (!version) {
   process.exit(1)
 }
 
-// Canonical list of every package this monorepo publishes. MUST stay in
-// sync with PUBLISH_PACKAGES in .github/workflows/release.yml — if a new
-// publishable package is added there without being added here, its version
-// can drift unnoticed across releases. `scripts/release/bump-version.mjs`
-// reads the same file structure to update versions in lockstep.
-const packages = [
-  ['textura', 'packages/textura/package.json'],
-  ['@geometra/core', 'packages/core/package.json'],
-  ['@geometra/renderer-canvas', 'packages/renderer-canvas/package.json'],
-  ['@geometra/renderer-terminal', 'packages/renderer-terminal/package.json'],
-  ['@geometra/renderer-webgpu', 'packages/renderer-webgpu/package.json'],
-  ['@geometra/renderer-pdf', 'packages/renderer-pdf/package.json'],
-  ['@geometra/renderer-three', 'packages/renderer-three/package.json'],
-  ['@geometra/server', 'packages/server/package.json'],
-  ['@geometra/client', 'packages/client/package.json'],
-  ['@geometra/ui', 'packages/ui/package.json'],
-  ['@geometra/router', 'packages/router/package.json'],
-  ['@geometra/tw', 'packages/tw/package.json'],
-  ['@geometra/agent', 'packages/agent/package.json'],
-  ['@geometra/cli', 'packages/cli/package.json'],
-  ['@geometra/proxy', 'packages/proxy/package.json'],
-  ['@geometra/mcp', 'mcp/package.json'],
-]
+const packages = publishablePackageJsons()
 
 function assertNoFileProtocolDeps(pkg, relPath, releaseVersion) {
   for (const section of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {

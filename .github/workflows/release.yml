@@ -10,35 +10,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    env:
-      CORE_DEPENDENT_DIRS: >-
-        packages/renderer-canvas
-        packages/renderer-terminal
-        packages/renderer-webgpu
-        packages/renderer-pdf
-        packages/renderer-three
-        packages/server
-        packages/client
-        packages/ui
-        packages/router
-        packages/tw
-        packages/agent
-      PUBLISH_PACKAGES: >-
-        textura
-        @geometra/core
-        @geometra/renderer-canvas
-        @geometra/renderer-terminal
-        @geometra/renderer-webgpu
-        @geometra/renderer-pdf
-        @geometra/renderer-three
-        @geometra/server
-        @geometra/client
-        @geometra/ui
-        @geometra/router
-        @geometra/tw
-        @geometra/agent
-        @geometra/cli
-        @geometra/proxy
     steps:
       - uses: actions/checkout@v6
 
@@ -98,36 +69,7 @@ jobs:
         run: node scripts/release/check-source.mjs "$VERSION"
 
       - name: Normalize publish-time dependencies
-        run: |
-          cd packages/core
-          npm pkg set "dependencies.textura=^$VERSION"
-          cd "$GITHUB_WORKSPACE"
-          for dir in $CORE_DEPENDENT_DIRS; do
-            cd "$dir"
-            npm pkg set "dependencies.@geometra/core=^$VERSION"
-            cd "$GITHUB_WORKSPACE"
-          done
-          # renderer-three also depends on client and renderer-canvas
-          cd packages/renderer-three
-          npm pkg set "dependencies.@geometra/client=^$VERSION"
-          npm pkg set "dependencies.@geometra/renderer-canvas=^$VERSION"
-          cd "$GITHUB_WORKSPACE"
-          # tw also depends on textura
-          cd packages/tw
-          npm pkg set "dependencies.textura=^$VERSION"
-          cd "$GITHUB_WORKSPACE"
-          # agent depends on core, server, and ui
-          cd packages/agent
-          npm pkg set "dependencies.@geometra/core=^$VERSION"
-          npm pkg set "dependencies.@geometra/server=^$VERSION"
-          npm pkg set "dependencies.@geometra/ui=^$VERSION"
-          cd "$GITHUB_WORKSPACE"
-          # cli depends on renderer-terminal and textura
-          cd packages/cli
-          npm pkg set "dependencies.@geometra/core=^$VERSION"
-          npm pkg set "dependencies.@geometra/renderer-terminal=^$VERSION"
-          npm pkg set "dependencies.textura=^$VERSION"
-          cd "$GITHUB_WORKSPACE"
+        run: node scripts/release/normalize-publish-deps.mjs "$VERSION"
 
       - name: Install dependencies
         run: bun install
@@ -136,16 +78,6 @@ jobs:
         run: bun run build
 
       - name: Publish packages
-        run: |
-          for pkg in $PUBLISH_PACKAGES; do
-            npm publish --provenance --access public -w "$pkg"
-          done
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish MCP
-        run: |
-          cd mcp
-          npm publish --provenance --access public
+        run: node scripts/release/publish-packages.mjs
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

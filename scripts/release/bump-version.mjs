@@ -4,7 +4,7 @@
  *
  * Usage: node scripts/release/bump-version.mjs <oldVersion> <newVersion>
  *
- * Why this exists: every release in this repo touches 15 package.json files
+ * Why this exists: every release in this repo touches every publishable package.json
  * in lockstep. Doing that by hand is the kind of mechanical work that quietly
  * goes wrong (typo, missed file, off-by-one). The release workflow's
  * `check-source.mjs` then fails the publish, but only after CI has burned
@@ -19,35 +19,17 @@
  *   - Prints what it touched.
  *
  * It deliberately does NOT touch internal `^x.y.z` dependency ranges between
- * @geometra/* packages — release.yml's `Normalize publish-time dependencies`
- * step rewrites those at publish time, so source can stay loose.
+ * @geometra/* packages. `scripts/release/normalize-publish-deps.mjs`
+ * rewrites those at publish time, so source can stay loose.
  */
 import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { publishablePackageJsons } from './package-manifest.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..')
 
-// Keep this list in sync with packages[] in scripts/release/check-source.mjs
-// and PUBLISH_PACKAGES in .github/workflows/release.yml.
-const packages = [
-  ['textura', 'packages/textura/package.json'],
-  ['@geometra/core', 'packages/core/package.json'],
-  ['@geometra/renderer-canvas', 'packages/renderer-canvas/package.json'],
-  ['@geometra/renderer-terminal', 'packages/renderer-terminal/package.json'],
-  ['@geometra/renderer-webgpu', 'packages/renderer-webgpu/package.json'],
-  ['@geometra/renderer-pdf', 'packages/renderer-pdf/package.json'],
-  ['@geometra/renderer-three', 'packages/renderer-three/package.json'],
-  ['@geometra/server', 'packages/server/package.json'],
-  ['@geometra/client', 'packages/client/package.json'],
-  ['@geometra/ui', 'packages/ui/package.json'],
-  ['@geometra/router', 'packages/router/package.json'],
-  ['@geometra/tw', 'packages/tw/package.json'],
-  ['@geometra/agent', 'packages/agent/package.json'],
-  ['@geometra/cli', 'packages/cli/package.json'],
-  ['@geometra/proxy', 'packages/proxy/package.json'],
-  ['@geometra/mcp', 'mcp/package.json'],
-]
+const packages = publishablePackageJsons()
 
 const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[\w.+-]+)?$/
 
