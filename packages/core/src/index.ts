@@ -153,6 +153,48 @@ export type { SemanticHTMLOptions } from './seo.js'
 export { toAccessibilityTree } from './a11y.js'
 export type { AccessibilityNode, AccessibilityBounds } from './a11y.js'
 
+// Agent-native action contracts and trace foundation
+export { agentAction, collectAgentActions } from './agent-contracts.js'
+export type { AgentActionTarget } from './agent-contracts.js'
+export {
+  createAgentTrace,
+  appendAgentTraceEvent,
+  summarizeAgentTrace,
+} from './agent-trace.js'
+export type {
+  AgentTrace,
+  AgentTraceEvent,
+  AgentTraceStatus,
+  AgentTraceSummary,
+} from './agent-trace.js'
+export {
+  createAgentGateway,
+  createAgentGatewayPolicy,
+} from './agent-gateway.js'
+export type {
+  AgentGateway,
+  AgentGatewayActionRequest,
+  AgentGatewayActionResult,
+  AgentGatewayActionStatus,
+  AgentGatewayApprovalRequest,
+  AgentGatewayExecuteContext,
+  AgentGatewayExecutor,
+  AgentGatewayFrame,
+  AgentGatewayFrameOptions,
+  AgentGatewayFrameSnapshot,
+  AgentGatewayOptions,
+  AgentGatewayPendingApproval,
+  AgentGatewayPolicy,
+  AgentGatewayPolicyContext,
+  AgentGatewayPolicyDecision,
+  AgentGatewayPolicyOptions,
+  AgentGatewayRedactionContext,
+  AgentGatewayRedactionField,
+  AgentGatewayRedactor,
+  AgentGatewayReplay,
+  AgentGatewayReplayAction,
+} from './agent-gateway.js'
+
 // Text input foundation
 export {
   isCollapsedSelection,
@@ -198,6 +240,9 @@ export type {
   Direction,
   DirectionProps,
   SemanticProps,
+  AgentActionContract,
+  AgentActionKind,
+  AgentActionRisk,
   EventHandlers,
   HitEvent,
   KeyboardHitEvent,

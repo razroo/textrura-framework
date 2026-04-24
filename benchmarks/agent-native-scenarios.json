@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "scenarios": [
+    {
+      "id": "claims-review",
+      "title": "Claims review and payout approval",
+      "workflow": "Review claim evidence, approve payout, and export an audit packet.",
+      "outcome": "Approved payout with traceable policy decision.",
+      "modes": {
+        "geometra-native": {
+          "contextBytes": 6200,
+          "toolCalls": 4,
+          "medianLatencyMs": 820,
+          "successRate": 0.97,
+          "humanApprovals": 1,
+          "securityFailures": 0,
+          "replayable": true,
+          "postconditionChecks": 3
+        },
+        "geometra-mcp": {
+          "contextBytes": 11200,
+          "toolCalls": 7,
+          "medianLatencyMs": 1320,
+          "successRate": 0.92,
+          "humanApprovals": 1,
+          "securityFailures": 0,
+          "replayable": true,
+          "postconditionChecks": 1
+        },
+        "playwright-mcp": {
+          "contextBytes": 28400,
+          "toolCalls": 11,
+          "medianLatencyMs": 2400,
+          "successRate": 0.86,
+          "humanApprovals": 1,
+          "securityFailures": 1,
+          "replayable": false,
+          "postconditionChecks": 0
+        },
+        "vision-computer-use": {
+          "contextBytes": 71800,
+          "toolCalls": 14,
+          "medianLatencyMs": 5200,
+          "successRate": 0.79,
+          "humanApprovals": 1,
+          "securityFailures": 2,
+          "replayable": false,
+          "postconditionChecks": 0
+        }
+      }
+    },
+    {
+      "id": "compliance-queue",
+      "title": "Compliance evidence classification",
+      "workflow": "Classify case evidence, attach reason code, and escalate a sanctions hit.",
+      "outcome": "Escalated case with structured reason and immutable trace.",
+      "modes": {
+        "geometra-native": {
+          "contextBytes": 5400,
+          "toolCalls": 5,
+          "medianLatencyMs": 760,
+          "successRate": 0.96,
+          "humanApprovals": 1,
+          "securityFailures": 0,
+          "replayable": true,
+          "postconditionChecks": 4
+        },
+        "geometra-mcp": {
+          "contextBytes": 10300,
+          "toolCalls": 8,
+          "medianLatencyMs": 1260,
+          "successRate": 0.91,
+          "humanApprovals": 1,
+          "securityFailures": 0,
+          "replayable": true,
+          "postconditionChecks": 1
+        },
+        "playwright-mcp": {
+          "contextBytes": 24600,
+          "toolCalls": 12,
+          "medianLatencyMs": 2310,
+          "successRate": 0.84,
+          "humanApprovals": 1,
+          "securityFailures": 1,
+          "replayable": false,
+          "postconditionChecks": 0
+        },
+        "vision-computer-use": {
+          "contextBytes": 65500,
+          "toolCalls": 16,
+          "medianLatencyMs": 5500,
+          "successRate": 0.78,
+          "humanApprovals": 1,
+          "securityFailures": 2,
+          "replayable": false,
+          "postconditionChecks": 0
+        }
+      }
+    },
+    {
+      "id": "access-admin",
+      "title": "Privileged access administration",
+      "workflow": "Review access request, approve temporary role, and export approval evidence.",
+      "outcome": "Time-boxed role grant with approval trace and export record.",
+      "modes": {
+        "geometra-native": {
+          "contextBytes": 6800,
+          "toolCalls": 5,
+          "medianLatencyMs": 900,
+          "successRate": 0.95,
+          "humanApprovals": 2,
+          "securityFailures": 0,
+          "replayable": true,
+          "postconditionChecks": 4
+        },
+        "geometra-mcp": {
+          "contextBytes": 12400,
+          "toolCalls": 9,
+          "medianLatencyMs": 1480,
+          "successRate": 0.9,
+          "humanApprovals": 2,
+          "securityFailures": 0,
+          "replayable": true,
+          "postconditionChecks": 1
+        },
+        "playwright-mcp": {
+          "contextBytes": 31800,
+          "toolCalls": 13,
+          "medianLatencyMs": 2710,
+          "successRate": 0.82,
+          "humanApprovals": 2,
+          "securityFailures": 1,
+          "replayable": false,
+          "postconditionChecks": 0
+        },
+        "vision-computer-use": {
+          "contextBytes": 75200,
+          "toolCalls": 17,
+          "medianLatencyMs": 6100,
+          "successRate": 0.74,
+          "humanApprovals": 2,
+          "securityFailures": 2,
+          "replayable": false,
+          "postconditionChecks": 0
+        }
+      }
+    }
+  ]
+}

@@ -194,6 +194,22 @@ To uninstall, remove the server entry from your client's MCP configuration.
 
 See [mcp/README.md](mcp/README.md) for tool details, examples, and source installs from this repo.
 
+## Agent-native roadmap
+
+The next layer is explicit agent contracts on top of geometry: stable action ids, risk classes, policy gates, traces, and replay. Start with:
+
+- [Agent-native protocol](AGENT_NATIVE_PROTOCOL.md)
+- [Agent contracts](AGENT_CONTRACTS.md)
+- [Agent benchmark suite](AGENT_BENCHMARK_SUITE.md)
+- [Agent gateway](AGENT_GATEWAY.md)
+- [Security model](AGENT_SECURITY_MODEL.md)
+- [Devtools and replay](AGENT_DEVTOOLS_REPLAY.md)
+- [Business value](BUSINESS_VALUE.md)
+
+Try the enterprise workflow demo with `bun run --filter @geometra/demo-agent-native-ops dev`, or run the deterministic value harness with `bun run benchmark:agent-native:assert`.
+
+The first runtime slice is available through `createAgentGateway()` in `@geometra/core` and the HTTP transport in `@geometra/gateway`.
+
 ## Why geometry, not components?
 
 Other agent-to-UI systems (json-render, A2UI, computer-use agents) send **component descriptions** or scrape rendered output. The agent still has to interpret what it sees. Geometra sends **pixel-exact geometry** — every element's position and size, computed on the server, streamed as flat JSON. Nothing to interpret. Nothing to scrape.

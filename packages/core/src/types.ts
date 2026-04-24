@@ -128,6 +128,58 @@ export interface SemanticProps {
   ariaExpanded?: boolean
   /** State: selected. */
   ariaSelected?: boolean
+  /**
+   * Optional agent-native action contract. This describes intent and policy above raw geometry so
+   * agents can request a known business operation instead of guessing from labels and coordinates.
+   */
+  agentAction?: AgentActionContract
+}
+
+/** Risk class for an agent-invokable action. */
+export type AgentActionRisk = 'read' | 'write' | 'external' | 'destructive'
+
+/** Stable agent-facing action category. */
+export type AgentActionKind =
+  | 'navigate'
+  | 'open'
+  | 'select'
+  | 'input'
+  | 'submit'
+  | 'approve'
+  | 'reject'
+  | 'mutate'
+  | 'export'
+  | 'custom'
+
+/**
+ * Intent-level action metadata carried with a semantic UI node.
+ *
+ * Geometry remains the source of truth for hit targets, but this contract gives an MCP/gateway layer a
+ * stable id, policy metadata, and structured pre/postconditions for deterministic agent operation.
+ */
+export interface AgentActionContract {
+  /** Stable id, unique within the current app surface or route. */
+  id: string
+  /** Machine-readable category for routing and policy decisions. */
+  kind: AgentActionKind
+  /** Human-readable label for logs, permission prompts, and devtools. */
+  title: string
+  /** Optional explanation of what the action does. */
+  description?: string
+  /** Risk level; defaults to `write` in helpers unless explicitly supplied. */
+  risk?: AgentActionRisk
+  /** Whether a human approval prompt should gate execution. */
+  requiresConfirmation?: boolean
+  /** JSON-schema-like object describing accepted structured input. */
+  inputSchema?: Record<string, unknown>
+  /** JSON-schema-like object describing the structured result an agent can expect. */
+  outputSchema?: Record<string, unknown>
+  /** Conditions that must be true before execution. */
+  preconditions?: string[]
+  /** Conditions the gateway/devtools should verify after execution. */
+  postconditions?: string[]
+  /** Extra audit metadata, kept JSON-serializable for traces. */
+  audit?: Record<string, string | number | boolean>
 }
 
 /** A text node in the component tree. */

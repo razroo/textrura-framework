@@ -1,0 +1,16 @@
+{
+  "name": "@geometra/demo-agent-native-ops",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@geometra/core": "*",
+    "@geometra/renderer-canvas": "*"
+  },
+  "devDependencies": {
+    "vite": "^8.0.3"
+  }
+}
