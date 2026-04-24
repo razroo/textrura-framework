@@ -49,6 +49,27 @@ async function browserCanCreateWebGPUAdapter(page: Page): Promise<boolean> {
   })
 }
 
+async function webgpuDemoDiagnostics(page: Page): Promise<{
+  mode?: string
+  renderer?: string
+  frames?: number
+  fallbackCount?: number
+  lastError?: string
+}> {
+  return page.evaluate(() => {
+    const typedWindow = window as Window & {
+      __GEOMETRA_WEBGPU_DEMO__?: {
+        mode?: string
+        renderer?: string
+        frames?: number
+        fallbackCount?: number
+        lastError?: string
+      }
+    }
+    return typedWindow.__GEOMETRA_WEBGPU_DEMO__ ?? {}
+  })
+}
+
 test('main demo boots into Geometra-owned canvas UI', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('canvas')).toBeVisible()
@@ -67,7 +88,7 @@ test('WebGPU diagnostic page paints through the fallback renderer by default', a
   expect(consoleErrors).toEqual([])
 })
 
-test('forced WebGPU path initializes and paints when the browser supports it', async ({ page }) => {
+test('forced WebGPU path initializes and submits frames when the browser supports it', async ({ page }) => {
   await page.goto('/webgpu.html')
   test.skip(!await browserCanCreateWebGPUAdapter(page), 'Browser did not expose a WebGPU adapter in this environment')
 
@@ -79,6 +100,10 @@ test('forced WebGPU path initializes and paints when the browser supports it', a
 
   await page.goto('/webgpu.html?forceWebGPU=1')
   await expect(page.locator('canvas')).toBeVisible()
-  await expect.poll(() => canvasHasVisualVariance(page)).toBe(true)
+  await expect.poll(() => webgpuDemoDiagnostics(page)).toMatchObject({
+    mode: 'ready',
+    renderer: 'webgpu',
+  })
+  await expect.poll(async () => (await webgpuDemoDiagnostics(page)).frames ?? 0).toBeGreaterThan(0)
   expect(runtimeErrors).toEqual([])
 })

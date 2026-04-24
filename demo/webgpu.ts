@@ -13,12 +13,38 @@ const ACCENT2 = '#0ea5e9'
 const ACCENT3 = '#22c55e'
 
 type DemoMode = 'ready' | 'unsupported' | 'error'
+type DemoRendererName = 'canvas' | 'webgpu'
+
+interface WebGPUDemoDiagnostics {
+  mode: DemoMode
+  renderer: DemoRendererName
+  frames: number
+  fallbackCount: number
+  lastError?: string
+}
+
+declare global {
+  interface Window {
+    __GEOMETRA_WEBGPU_DEMO__?: WebGPUDemoDiagnostics
+  }
+}
 
 const canvas = document.getElementById('app') as HTMLCanvasElement
 let app: App | null = null
 let cleanupInputForwarding: (() => void) | null = null
 let currentMode: DemoMode = 'ready'
 let currentMessage = 'WebGPU ready. Rendering this page through the WebGPU backend.'
+let diagnostics: WebGPUDemoDiagnostics = {
+  mode: currentMode,
+  renderer: 'canvas',
+  frames: 0,
+  fallbackCount: 0,
+}
+
+function publishDiagnostics(patch: Partial<WebGPUDemoDiagnostics>): void {
+  diagnostics = { ...diagnostics, ...patch }
+  window.__GEOMETRA_WEBGPU_DEMO__ = { ...diagnostics }
+}
 
 function actionButton(label: string, onClick: () => void): UIElement {
   return box({
@@ -177,15 +203,27 @@ function view(): UIElement {
   ])
 }
 
-async function mountWith(nextRenderer: Renderer): Promise<void> {
+async function mountWith(nextRenderer: Renderer, rendererName: DemoRendererName): Promise<void> {
   app?.destroy()
+  publishDiagnostics({ mode: currentMode, renderer: rendererName, frames: 0, fallbackCount: 0, lastError: undefined })
   let renderError: unknown
-  const nextApp = await createApp(view, nextRenderer, {
+  const renderer: Renderer = {
+    render(layout, tree) {
+      nextRenderer.render(layout, tree)
+      publishDiagnostics({ frames: diagnostics.frames + 1 })
+    },
+    destroy() {
+      nextRenderer.destroy()
+    },
+    setFrameTimings: nextRenderer.setFrameTimings?.bind(nextRenderer),
+  }
+  const nextApp = await createApp(view, renderer, {
     width: window.innerWidth,
     height: window.innerHeight,
     waitForFonts: true,
     onError: err => {
       renderError = err
+      publishDiagnostics({ lastError: err instanceof Error ? err.message : String(err) })
       console.error('Geometra WebGPU demo render failed:', err)
     },
   })
@@ -202,7 +240,7 @@ async function mountWith(nextRenderer: Renderer): Promise<void> {
 async function mountFallback(mode: DemoMode, message: string): Promise<void> {
   currentMode = mode
   currentMessage = message
-  await mountWith(new CanvasRenderer({ canvas, background: BG }))
+  await mountWith(new CanvasRenderer({ canvas, background: BG }), 'canvas')
 }
 
 async function main() {
@@ -218,7 +256,11 @@ async function main() {
     return
   }
 
-  const webgpu = new WebGPURenderer({ canvas, background: BG })
+  const webgpu = new WebGPURenderer({
+    canvas,
+    background: BG,
+    onFallbackNeeded: count => publishDiagnostics({ fallbackCount: diagnostics.fallbackCount + count }),
+  })
   try {
     await webgpu.init()
   } catch (err) {
@@ -229,7 +271,7 @@ async function main() {
   currentMode = 'ready'
   currentMessage = 'WebGPU ready. Rendering this page through the WebGPU backend.'
   try {
-    await mountWith(webgpu)
+    await mountWith(webgpu, 'webgpu')
   } catch (err) {
     await mountFallback('error', `WebGPU rendering failed: ${(err as Error).message}`)
   }
