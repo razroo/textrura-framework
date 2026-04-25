@@ -1,0 +1,2768 @@
+{
+  "sessionId": "claims-review-http-demo",
+  "startedAt": "2026-04-25T09:30:00.000Z",
+  "trace": {
+    "sessionId": "claims-review-http-demo",
+    "startedAt": "2026-04-25T09:30:00.000Z",
+    "events": [
+      {
+        "id": "claims-review-http-demo:1",
+        "timestamp": "2026-04-25T09:30:01.000Z",
+        "actionId": "approve-payout",
+        "status": "requested",
+        "actor": "external-agent",
+        "input": {
+          "claimId": "CLM-1042",
+          "approver": "Ops manager"
+        },
+        "message": "Approve payout"
+      },
+      {
+        "id": "claims-review-http-demo:2",
+        "timestamp": "2026-04-25T09:30:04.000Z",
+        "actionId": "approve-payout",
+        "status": "approved",
+        "actor": "Ops manager",
+        "message": "approval recorded"
+      },
+      {
+        "id": "claims-review-http-demo:3",
+        "timestamp": "2026-04-25T09:30:05.000Z",
+        "actionId": "approve-payout",
+        "status": "completed",
+        "actor": "gateway",
+        "output": {
+          "status": "ok",
+          "action": "approve-payout",
+          "claimId": "CLM-1042",
+          "auditId": "CLM-1042-approve-payout",
+          "postconditions": [
+            "claim.status === \"Approved\"",
+            "auditId is present"
+          ]
+        }
+      }
+    ]
+  },
+  "frames": [
+    {
+      "id": "claims-review-http-demo:frame:1",
+      "route": "claims-review",
+      "createdAt": "2026-04-25T09:30:00.000Z",
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 640,
+        "height": 360,
+        "children": [
+          {
+            "x": 24,
+            "y": 24,
+            "width": 592,
+            "height": 96,
+            "children": [
+              {
+                "x": 16,
+                "y": 16,
+                "width": 220,
+                "height": 24,
+                "children": []
+              },
+              {
+                "x": 16,
+                "y": 52,
+                "width": 340,
+                "height": 20,
+                "children": []
+              }
+            ]
+          },
+          {
+            "x": 24,
+            "y": 144,
+            "width": 160,
+            "height": 48,
+            "children": [
+              {
+                "x": 18,
+                "y": 14,
+                "width": 112,
+                "height": 18,
+                "children": []
+              }
+            ]
+          },
+          {
+            "x": 200,
+            "y": 144,
+            "width": 160,
+            "height": 48,
+            "children": [
+              {
+                "x": 18,
+                "y": 14,
+                "width": 112,
+                "height": 18,
+                "children": []
+              }
+            ]
+          },
+          {
+            "x": 376,
+            "y": 144,
+            "width": 160,
+            "height": 48,
+            "children": [
+              {
+                "x": 18,
+                "y": 14,
+                "width": 112,
+                "height": 18,
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      "geometry": {
+        "id": "claims-review-http-demo:frame:1",
+        "route": "claims-review",
+        "createdAt": "2026-04-25T09:30:00.000Z",
+        "rootBounds": {
+          "x": 0,
+          "y": 0,
+          "width": 640,
+          "height": 360
+        },
+        "nodes": [
+          {
+            "id": "claims-review-surface",
+            "kind": "box",
+            "role": "main",
+            "name": "Claims review surface",
+            "path": [],
+            "bounds": {
+              "x": 0,
+              "y": 0,
+              "width": 640,
+              "height": 360
+            },
+            "hitTarget": {
+              "x": 0,
+              "y": 0,
+              "width": 640,
+              "height": 360
+            },
+            "visible": true,
+            "enabled": true,
+            "focusable": false,
+            "interactive": false
+          },
+          {
+            "id": "claim-card",
+            "kind": "box",
+            "role": "region",
+            "name": "Claim CLM-1042",
+            "path": [
+              0
+            ],
+            "bounds": {
+              "x": 24,
+              "y": 24,
+              "width": 592,
+              "height": 96
+            },
+            "hitTarget": {
+              "x": 24,
+              "y": 24,
+              "width": 592,
+              "height": 96
+            },
+            "visible": true,
+            "enabled": true,
+            "focusable": false,
+            "interactive": false
+          },
+          {
+            "id": "node:0.0",
+            "kind": "text",
+            "role": "text",
+            "name": "CLM-1042 / Northstar Fabrication",
+            "path": [
+              0,
+              0
+            ],
+            "bounds": {
+              "x": 40,
+              "y": 40,
+              "width": 220,
+              "height": 24
+            },
+            "hitTarget": {
+              "x": 40,
+              "y": 40,
+              "width": 220,
+              "height": 24
+            },
+            "visible": true,
+            "enabled": true,
+            "focusable": false,
+            "interactive": false
+          },
+          {
+            "id": "node:0.1",
+            "kind": "text",
+            "role": "text",
+            "name": "Ready for payout. Risk 0.21. Evidence validated.",
+            "path": [
+              0,
+              1
+            ],
+            "bounds": {
+              "x": 40,
+              "y": 76,
+              "width": 340,
+              "height": 20
+            },
+            "hitTarget": {
+              "x": 40,
+              "y": 76,
+              "width": 340,
+              "height": 20
+            },
+            "visible": true,
+            "enabled": true,
+            "focusable": false,
+            "interactive": false
+          },
+          {
+            "id": "approve-payout",
+            "kind": "box",
+            "role": "button",
+            "name": "Approve payout",
+            "path": [
+              1
+            ],
+            "bounds": {
+              "x": 24,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "hitTarget": {
+              "x": 24,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "visible": true,
+            "enabled": true,
+            "focusable": true,
+            "interactive": true,
+            "actionId": "approve-payout",
+            "action": {
+              "id": "approve-payout",
+              "kind": "approve",
+              "title": "Approve payout",
+              "description": "Approve claim CLM-1042 for payment after human confirmation.",
+              "risk": "write",
+              "requiresConfirmation": true,
+              "enabled": true,
+              "role": "button",
+              "name": "Approve payout",
+              "bounds": {
+                "x": 24,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "path": [
+                1
+              ],
+              "contract": {
+                "id": "approve-payout",
+                "kind": "approve",
+                "title": "Approve payout",
+                "description": "Approve claim CLM-1042 for payment after human confirmation.",
+                "risk": "write",
+                "requiresConfirmation": true,
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {
+                    "claimId": {
+                      "type": "string"
+                    },
+                    "approver": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "claimId",
+                    "approver"
+                  ]
+                },
+                "postconditions": [
+                  "claim.status === \"Approved\"",
+                  "auditId is present"
+                ],
+                "audit": {
+                  "workflow": "claims-review"
+                }
+              }
+            }
+          },
+          {
+            "id": "node:1.0",
+            "kind": "text",
+            "role": "text",
+            "name": "Approve payout",
+            "path": [
+              1,
+              0
+            ],
+            "bounds": {
+              "x": 42,
+              "y": 158,
+              "width": 112,
+              "height": 18
+            },
+            "hitTarget": {
+              "x": 42,
+              "y": 158,
+              "width": 112,
+              "height": 18
+            },
+            "visible": true,
+            "enabled": true,
+            "focusable": false,
+            "interactive": false
+          },
+          {
+            "id": "request-evidence",
+            "kind": "box",
+            "role": "button",
+            "name": "Request evidence",
+            "path": [
+              2
+            ],
+            "bounds": {
+              "x": 200,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "hitTarget": {
+              "x": 200,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "visible": true,
+            "enabled": true,
+            "focusable": false,
+            "interactive": false,
+            "actionId": "request-evidence",
+            "action": {
+              "id": "request-evidence",
+              "kind": "submit",
+              "title": "Request evidence",
+              "risk": "write",
+              "requiresConfirmation": false,
+              "enabled": true,
+              "role": "button",
+              "name": "Request evidence",
+              "bounds": {
+                "x": 200,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "path": [
+                2
+              ],
+              "contract": {
+                "id": "request-evidence",
+                "kind": "submit",
+                "title": "Request evidence",
+                "risk": "write",
+                "audit": {
+                  "workflow": "claims-review"
+                }
+              }
+            }
+          },
+          {
+            "id": "node:2.0",
+            "kind": "text",
+            "role": "text",
+            "name": "Request docs",
+            "path": [
+              2,
+              0
+            ],
+            "bounds": {
+              "x": 218,
+              "y": 158,
+              "width": 112,
+              "height": 18
+            },
+            "hitTarget": {
+              "x": 218,
+              "y": 158,
+              "width": 112,
+              "height": 18
+            },
+            "visible": true,
+            "enabled": true,
+            "focusable": false,
+            "interactive": false
+          },
+          {
+            "id": "export-audit-packet",
+            "kind": "box",
+            "role": "button",
+            "name": "Export audit packet",
+            "path": [
+              3
+            ],
+            "bounds": {
+              "x": 376,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "hitTarget": {
+              "x": 376,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "visible": true,
+            "enabled": true,
+            "focusable": false,
+            "interactive": false,
+            "actionId": "export-audit-packet",
+            "action": {
+              "id": "export-audit-packet",
+              "kind": "export",
+              "title": "Export audit packet",
+              "risk": "external",
+              "requiresConfirmation": true,
+              "enabled": true,
+              "role": "button",
+              "name": "Export audit packet",
+              "bounds": {
+                "x": 376,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "path": [
+                3
+              ],
+              "contract": {
+                "id": "export-audit-packet",
+                "kind": "export",
+                "title": "Export audit packet",
+                "risk": "external",
+                "audit": {
+                  "workflow": "claims-review"
+                }
+              }
+            }
+          },
+          {
+            "id": "node:3.0",
+            "kind": "text",
+            "role": "text",
+            "name": "Export audit",
+            "path": [
+              3,
+              0
+            ],
+            "bounds": {
+              "x": 394,
+              "y": 158,
+              "width": 112,
+              "height": 18
+            },
+            "hitTarget": {
+              "x": 394,
+              "y": 158,
+              "width": 112,
+              "height": 18
+            },
+            "visible": true,
+            "enabled": true,
+            "focusable": false,
+            "interactive": false
+          }
+        ],
+        "actions": [
+          {
+            "id": "approve-payout",
+            "kind": "approve",
+            "title": "Approve payout",
+            "description": "Approve claim CLM-1042 for payment after human confirmation.",
+            "risk": "write",
+            "requiresConfirmation": true,
+            "enabled": true,
+            "role": "button",
+            "name": "Approve payout",
+            "bounds": {
+              "x": 24,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "path": [
+              1
+            ],
+            "contract": {
+              "id": "approve-payout",
+              "kind": "approve",
+              "title": "Approve payout",
+              "description": "Approve claim CLM-1042 for payment after human confirmation.",
+              "risk": "write",
+              "requiresConfirmation": true,
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "claimId": {
+                    "type": "string"
+                  },
+                  "approver": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "claimId",
+                  "approver"
+                ]
+              },
+              "postconditions": [
+                "claim.status === \"Approved\"",
+                "auditId is present"
+              ],
+              "audit": {
+                "workflow": "claims-review"
+              }
+            }
+          },
+          {
+            "id": "request-evidence",
+            "kind": "submit",
+            "title": "Request evidence",
+            "risk": "write",
+            "requiresConfirmation": false,
+            "enabled": true,
+            "role": "button",
+            "name": "Request evidence",
+            "bounds": {
+              "x": 200,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "path": [
+              2
+            ],
+            "contract": {
+              "id": "request-evidence",
+              "kind": "submit",
+              "title": "Request evidence",
+              "risk": "write",
+              "audit": {
+                "workflow": "claims-review"
+              }
+            }
+          },
+          {
+            "id": "export-audit-packet",
+            "kind": "export",
+            "title": "Export audit packet",
+            "risk": "external",
+            "requiresConfirmation": true,
+            "enabled": true,
+            "role": "button",
+            "name": "Export audit packet",
+            "bounds": {
+              "x": 376,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "path": [
+              3
+            ],
+            "contract": {
+              "id": "export-audit-packet",
+              "kind": "export",
+              "title": "Export audit packet",
+              "risk": "external",
+              "audit": {
+                "workflow": "claims-review"
+              }
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "id": "approve-payout",
+          "kind": "approve",
+          "title": "Approve payout",
+          "description": "Approve claim CLM-1042 for payment after human confirmation.",
+          "risk": "write",
+          "requiresConfirmation": true,
+          "enabled": true,
+          "role": "button",
+          "name": "Approve payout",
+          "bounds": {
+            "x": 24,
+            "y": 144,
+            "width": 160,
+            "height": 48
+          },
+          "path": [
+            1
+          ],
+          "contract": {
+            "id": "approve-payout",
+            "kind": "approve",
+            "title": "Approve payout",
+            "description": "Approve claim CLM-1042 for payment after human confirmation.",
+            "risk": "write",
+            "requiresConfirmation": true,
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "claimId": {
+                  "type": "string"
+                },
+                "approver": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "claimId",
+                "approver"
+              ]
+            },
+            "postconditions": [
+              "claim.status === \"Approved\"",
+              "auditId is present"
+            ],
+            "audit": {
+              "workflow": "claims-review"
+            }
+          }
+        },
+        {
+          "id": "request-evidence",
+          "kind": "submit",
+          "title": "Request evidence",
+          "risk": "write",
+          "requiresConfirmation": false,
+          "enabled": true,
+          "role": "button",
+          "name": "Request evidence",
+          "bounds": {
+            "x": 200,
+            "y": 144,
+            "width": 160,
+            "height": 48
+          },
+          "path": [
+            2
+          ],
+          "contract": {
+            "id": "request-evidence",
+            "kind": "submit",
+            "title": "Request evidence",
+            "risk": "write",
+            "audit": {
+              "workflow": "claims-review"
+            }
+          }
+        },
+        {
+          "id": "export-audit-packet",
+          "kind": "export",
+          "title": "Export audit packet",
+          "risk": "external",
+          "requiresConfirmation": true,
+          "enabled": true,
+          "role": "button",
+          "name": "Export audit packet",
+          "bounds": {
+            "x": 376,
+            "y": 144,
+            "width": 160,
+            "height": 48
+          },
+          "path": [
+            3
+          ],
+          "contract": {
+            "id": "export-audit-packet",
+            "kind": "export",
+            "title": "Export audit packet",
+            "risk": "external",
+            "audit": {
+              "workflow": "claims-review"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "claims-review-http-demo:frame:2",
+      "route": "claims-review",
+      "createdAt": "2026-04-25T09:30:03.000Z",
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 640,
+        "height": 360,
+        "children": [
+          {
+            "x": 24,
+            "y": 24,
+            "width": 592,
+            "height": 96,
+            "children": [
+              {
+                "x": 16,
+                "y": 16,
+                "width": 220,
+                "height": 24,
+                "children": []
+              },
+              {
+                "x": 16,
+                "y": 52,
+                "width": 340,
+                "height": 20,
+                "children": []
+              }
+            ]
+          },
+          {
+            "x": 24,
+            "y": 144,
+            "width": 160,
+            "height": 48,
+            "children": [
+              {
+                "x": 18,
+                "y": 14,
+                "width": 112,
+                "height": 18,
+                "children": []
+              }
+            ]
+          },
+          {
+            "x": 200,
+            "y": 144,
+            "width": 160,
+            "height": 48,
+            "children": [
+              {
+                "x": 18,
+                "y": 14,
+                "width": 112,
+                "height": 18,
+                "children": []
+              }
+            ]
+          },
+          {
+            "x": 376,
+            "y": 144,
+            "width": 160,
+            "height": 48,
+            "children": [
+              {
+                "x": 18,
+                "y": 14,
+                "width": 112,
+                "height": 18,
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      "geometry": {
+        "id": "claims-review-http-demo:frame:2",
+        "route": "claims-review",
+        "createdAt": "2026-04-25T09:30:03.000Z",
+        "rootBounds": {
+          "x": 0,
+          "y": 0,
+          "width": 640,
+          "height": 360
+        },
+        "nodes": [
+          {
+            "id": "claims-review-surface",
+            "kind": "box",
+            "role": "main",
+            "name": "Claims review surface",
+            "path": [],
+            "bounds": {
+              "x": 0,
+              "y": 0,
+              "width": 640,
+              "height": 360
+            },
+            "hitTarget": {
+              "x": 0,
+              "y": 0,
+              "width": 640,
+              "height": 360
+            },
+            "visible": true,
+            "enabled": true,
+            "focusable": false,
+            "interactive": false
+          },
+          {
+            "id": "claim-card",
+            "kind": "box",
+            "role": "region",
+            "name": "Claim CLM-1042",
+            "path": [
+              0
+            ],
+            "bounds": {
+              "x": 24,
+              "y": 24,
+              "width": 592,
+              "height": 96
+            },
+            "hitTarget": {
+              "x": 24,
+              "y": 24,
+              "width": 592,
+              "height": 96
+            },
+            "visible": true,
+            "enabled": true,
+            "focusable": false,
+            "interactive": false
+          },
+          {
+            "id": "node:0.0",
+            "kind": "text",
+            "role": "text",
+            "name": "CLM-1042 / Northstar Fabrication",
+            "path": [
+              0,
+              0
+            ],
+            "bounds": {
+              "x": 40,
+              "y": 40,
+              "width": 220,
+              "height": 24
+            },
+            "hitTarget": {
+              "x": 40,
+              "y": 40,
+              "width": 220,
+              "height": 24
+            },
+            "visible": true,
+            "enabled": true,
+            "focusable": false,
+            "interactive": false
+          },
+          {
+            "id": "node:0.1",
+            "kind": "text",
+            "role": "text",
+            "name": "Ready for payout. Risk 0.21. Evidence validated.",
+            "path": [
+              0,
+              1
+            ],
+            "bounds": {
+              "x": 40,
+              "y": 76,
+              "width": 340,
+              "height": 20
+            },
+            "hitTarget": {
+              "x": 40,
+              "y": 76,
+              "width": 340,
+              "height": 20
+            },
+            "visible": true,
+            "enabled": true,
+            "focusable": false,
+            "interactive": false
+          },
+          {
+            "id": "approve-payout",
+            "kind": "box",
+            "role": "button",
+            "name": "Approve payout",
+            "path": [
+              1
+            ],
+            "bounds": {
+              "x": 24,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "hitTarget": {
+              "x": 24,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "visible": true,
+            "enabled": true,
+            "focusable": true,
+            "interactive": true,
+            "actionId": "approve-payout",
+            "action": {
+              "id": "approve-payout",
+              "kind": "approve",
+              "title": "Approve payout",
+              "description": "Approve claim CLM-1042 for payment after human confirmation.",
+              "risk": "write",
+              "requiresConfirmation": true,
+              "enabled": true,
+              "role": "button",
+              "name": "Approve payout",
+              "bounds": {
+                "x": 24,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "path": [
+                1
+              ],
+              "contract": {
+                "id": "approve-payout",
+                "kind": "approve",
+                "title": "Approve payout",
+                "description": "Approve claim CLM-1042 for payment after human confirmation.",
+                "risk": "write",
+                "requiresConfirmation": true,
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {
+                    "claimId": {
+                      "type": "string"
+                    },
+                    "approver": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "claimId",
+                    "approver"
+                  ]
+                },
+                "postconditions": [
+                  "claim.status === \"Approved\"",
+                  "auditId is present"
+                ],
+                "audit": {
+                  "workflow": "claims-review"
+                }
+              }
+            }
+          },
+          {
+            "id": "node:1.0",
+            "kind": "text",
+            "role": "text",
+            "name": "Approve payout",
+            "path": [
+              1,
+              0
+            ],
+            "bounds": {
+              "x": 42,
+              "y": 158,
+              "width": 112,
+              "height": 18
+            },
+            "hitTarget": {
+              "x": 42,
+              "y": 158,
+              "width": 112,
+              "height": 18
+            },
+            "visible": true,
+            "enabled": true,
+            "focusable": false,
+            "interactive": false
+          },
+          {
+            "id": "request-evidence",
+            "kind": "box",
+            "role": "button",
+            "name": "Request evidence",
+            "path": [
+              2
+            ],
+            "bounds": {
+              "x": 200,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "hitTarget": {
+              "x": 200,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "visible": true,
+            "enabled": true,
+            "focusable": false,
+            "interactive": false,
+            "actionId": "request-evidence",
+            "action": {
+              "id": "request-evidence",
+              "kind": "submit",
+              "title": "Request evidence",
+              "risk": "write",
+              "requiresConfirmation": false,
+              "enabled": true,
+              "role": "button",
+              "name": "Request evidence",
+              "bounds": {
+                "x": 200,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "path": [
+                2
+              ],
+              "contract": {
+                "id": "request-evidence",
+                "kind": "submit",
+                "title": "Request evidence",
+                "risk": "write",
+                "audit": {
+                  "workflow": "claims-review"
+                }
+              }
+            }
+          },
+          {
+            "id": "node:2.0",
+            "kind": "text",
+            "role": "text",
+            "name": "Request docs",
+            "path": [
+              2,
+              0
+            ],
+            "bounds": {
+              "x": 218,
+              "y": 158,
+              "width": 112,
+              "height": 18
+            },
+            "hitTarget": {
+              "x": 218,
+              "y": 158,
+              "width": 112,
+              "height": 18
+            },
+            "visible": true,
+            "enabled": true,
+            "focusable": false,
+            "interactive": false
+          },
+          {
+            "id": "export-audit-packet",
+            "kind": "box",
+            "role": "button",
+            "name": "Export audit packet",
+            "path": [
+              3
+            ],
+            "bounds": {
+              "x": 376,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "hitTarget": {
+              "x": 376,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "visible": true,
+            "enabled": true,
+            "focusable": false,
+            "interactive": false,
+            "actionId": "export-audit-packet",
+            "action": {
+              "id": "export-audit-packet",
+              "kind": "export",
+              "title": "Export audit packet",
+              "risk": "external",
+              "requiresConfirmation": true,
+              "enabled": true,
+              "role": "button",
+              "name": "Export audit packet",
+              "bounds": {
+                "x": 376,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "path": [
+                3
+              ],
+              "contract": {
+                "id": "export-audit-packet",
+                "kind": "export",
+                "title": "Export audit packet",
+                "risk": "external",
+                "audit": {
+                  "workflow": "claims-review"
+                }
+              }
+            }
+          },
+          {
+            "id": "node:3.0",
+            "kind": "text",
+            "role": "text",
+            "name": "Export audit",
+            "path": [
+              3,
+              0
+            ],
+            "bounds": {
+              "x": 394,
+              "y": 158,
+              "width": 112,
+              "height": 18
+            },
+            "hitTarget": {
+              "x": 394,
+              "y": 158,
+              "width": 112,
+              "height": 18
+            },
+            "visible": true,
+            "enabled": true,
+            "focusable": false,
+            "interactive": false
+          }
+        ],
+        "actions": [
+          {
+            "id": "approve-payout",
+            "kind": "approve",
+            "title": "Approve payout",
+            "description": "Approve claim CLM-1042 for payment after human confirmation.",
+            "risk": "write",
+            "requiresConfirmation": true,
+            "enabled": true,
+            "role": "button",
+            "name": "Approve payout",
+            "bounds": {
+              "x": 24,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "path": [
+              1
+            ],
+            "contract": {
+              "id": "approve-payout",
+              "kind": "approve",
+              "title": "Approve payout",
+              "description": "Approve claim CLM-1042 for payment after human confirmation.",
+              "risk": "write",
+              "requiresConfirmation": true,
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "claimId": {
+                    "type": "string"
+                  },
+                  "approver": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "claimId",
+                  "approver"
+                ]
+              },
+              "postconditions": [
+                "claim.status === \"Approved\"",
+                "auditId is present"
+              ],
+              "audit": {
+                "workflow": "claims-review"
+              }
+            }
+          },
+          {
+            "id": "request-evidence",
+            "kind": "submit",
+            "title": "Request evidence",
+            "risk": "write",
+            "requiresConfirmation": false,
+            "enabled": true,
+            "role": "button",
+            "name": "Request evidence",
+            "bounds": {
+              "x": 200,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "path": [
+              2
+            ],
+            "contract": {
+              "id": "request-evidence",
+              "kind": "submit",
+              "title": "Request evidence",
+              "risk": "write",
+              "audit": {
+                "workflow": "claims-review"
+              }
+            }
+          },
+          {
+            "id": "export-audit-packet",
+            "kind": "export",
+            "title": "Export audit packet",
+            "risk": "external",
+            "requiresConfirmation": true,
+            "enabled": true,
+            "role": "button",
+            "name": "Export audit packet",
+            "bounds": {
+              "x": 376,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "path": [
+              3
+            ],
+            "contract": {
+              "id": "export-audit-packet",
+              "kind": "export",
+              "title": "Export audit packet",
+              "risk": "external",
+              "audit": {
+                "workflow": "claims-review"
+              }
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "id": "approve-payout",
+          "kind": "approve",
+          "title": "Approve payout",
+          "description": "Approve claim CLM-1042 for payment after human confirmation.",
+          "risk": "write",
+          "requiresConfirmation": true,
+          "enabled": true,
+          "role": "button",
+          "name": "Approve payout",
+          "bounds": {
+            "x": 24,
+            "y": 144,
+            "width": 160,
+            "height": 48
+          },
+          "path": [
+            1
+          ],
+          "contract": {
+            "id": "approve-payout",
+            "kind": "approve",
+            "title": "Approve payout",
+            "description": "Approve claim CLM-1042 for payment after human confirmation.",
+            "risk": "write",
+            "requiresConfirmation": true,
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "claimId": {
+                  "type": "string"
+                },
+                "approver": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "claimId",
+                "approver"
+              ]
+            },
+            "postconditions": [
+              "claim.status === \"Approved\"",
+              "auditId is present"
+            ],
+            "audit": {
+              "workflow": "claims-review"
+            }
+          }
+        },
+        {
+          "id": "request-evidence",
+          "kind": "submit",
+          "title": "Request evidence",
+          "risk": "write",
+          "requiresConfirmation": false,
+          "enabled": true,
+          "role": "button",
+          "name": "Request evidence",
+          "bounds": {
+            "x": 200,
+            "y": 144,
+            "width": 160,
+            "height": 48
+          },
+          "path": [
+            2
+          ],
+          "contract": {
+            "id": "request-evidence",
+            "kind": "submit",
+            "title": "Request evidence",
+            "risk": "write",
+            "audit": {
+              "workflow": "claims-review"
+            }
+          }
+        },
+        {
+          "id": "export-audit-packet",
+          "kind": "export",
+          "title": "Export audit packet",
+          "risk": "external",
+          "requiresConfirmation": true,
+          "enabled": true,
+          "role": "button",
+          "name": "Export audit packet",
+          "bounds": {
+            "x": 376,
+            "y": 144,
+            "width": 160,
+            "height": 48
+          },
+          "path": [
+            3
+          ],
+          "contract": {
+            "id": "export-audit-packet",
+            "kind": "export",
+            "title": "Export audit packet",
+            "risk": "external",
+            "audit": {
+              "workflow": "claims-review"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "id": "claims-review-http-demo:replay:1",
+      "actionId": "approve-payout",
+      "status": "completed",
+      "requestedAt": "2026-04-25T09:30:00.000Z",
+      "frameBefore": {
+        "id": "claims-review-http-demo:frame:1",
+        "route": "claims-review",
+        "createdAt": "2026-04-25T09:30:00.000Z",
+        "layout": {
+          "x": 0,
+          "y": 0,
+          "width": 640,
+          "height": 360,
+          "children": [
+            {
+              "x": 24,
+              "y": 24,
+              "width": 592,
+              "height": 96,
+              "children": [
+                {
+                  "x": 16,
+                  "y": 16,
+                  "width": 220,
+                  "height": 24,
+                  "children": []
+                },
+                {
+                  "x": 16,
+                  "y": 52,
+                  "width": 340,
+                  "height": 20,
+                  "children": []
+                }
+              ]
+            },
+            {
+              "x": 24,
+              "y": 144,
+              "width": 160,
+              "height": 48,
+              "children": [
+                {
+                  "x": 18,
+                  "y": 14,
+                  "width": 112,
+                  "height": 18,
+                  "children": []
+                }
+              ]
+            },
+            {
+              "x": 200,
+              "y": 144,
+              "width": 160,
+              "height": 48,
+              "children": [
+                {
+                  "x": 18,
+                  "y": 14,
+                  "width": 112,
+                  "height": 18,
+                  "children": []
+                }
+              ]
+            },
+            {
+              "x": 376,
+              "y": 144,
+              "width": 160,
+              "height": 48,
+              "children": [
+                {
+                  "x": 18,
+                  "y": 14,
+                  "width": 112,
+                  "height": 18,
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "geometry": {
+          "id": "claims-review-http-demo:frame:1",
+          "route": "claims-review",
+          "createdAt": "2026-04-25T09:30:00.000Z",
+          "rootBounds": {
+            "x": 0,
+            "y": 0,
+            "width": 640,
+            "height": 360
+          },
+          "nodes": [
+            {
+              "id": "claims-review-surface",
+              "kind": "box",
+              "role": "main",
+              "name": "Claims review surface",
+              "path": [],
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 640,
+                "height": 360
+              },
+              "hitTarget": {
+                "x": 0,
+                "y": 0,
+                "width": 640,
+                "height": 360
+              },
+              "visible": true,
+              "enabled": true,
+              "focusable": false,
+              "interactive": false
+            },
+            {
+              "id": "claim-card",
+              "kind": "box",
+              "role": "region",
+              "name": "Claim CLM-1042",
+              "path": [
+                0
+              ],
+              "bounds": {
+                "x": 24,
+                "y": 24,
+                "width": 592,
+                "height": 96
+              },
+              "hitTarget": {
+                "x": 24,
+                "y": 24,
+                "width": 592,
+                "height": 96
+              },
+              "visible": true,
+              "enabled": true,
+              "focusable": false,
+              "interactive": false
+            },
+            {
+              "id": "node:0.0",
+              "kind": "text",
+              "role": "text",
+              "name": "CLM-1042 / Northstar Fabrication",
+              "path": [
+                0,
+                0
+              ],
+              "bounds": {
+                "x": 40,
+                "y": 40,
+                "width": 220,
+                "height": 24
+              },
+              "hitTarget": {
+                "x": 40,
+                "y": 40,
+                "width": 220,
+                "height": 24
+              },
+              "visible": true,
+              "enabled": true,
+              "focusable": false,
+              "interactive": false
+            },
+            {
+              "id": "node:0.1",
+              "kind": "text",
+              "role": "text",
+              "name": "Ready for payout. Risk 0.21. Evidence validated.",
+              "path": [
+                0,
+                1
+              ],
+              "bounds": {
+                "x": 40,
+                "y": 76,
+                "width": 340,
+                "height": 20
+              },
+              "hitTarget": {
+                "x": 40,
+                "y": 76,
+                "width": 340,
+                "height": 20
+              },
+              "visible": true,
+              "enabled": true,
+              "focusable": false,
+              "interactive": false
+            },
+            {
+              "id": "approve-payout",
+              "kind": "box",
+              "role": "button",
+              "name": "Approve payout",
+              "path": [
+                1
+              ],
+              "bounds": {
+                "x": 24,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "hitTarget": {
+                "x": 24,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "visible": true,
+              "enabled": true,
+              "focusable": true,
+              "interactive": true,
+              "actionId": "approve-payout",
+              "action": {
+                "id": "approve-payout",
+                "kind": "approve",
+                "title": "Approve payout",
+                "description": "Approve claim CLM-1042 for payment after human confirmation.",
+                "risk": "write",
+                "requiresConfirmation": true,
+                "enabled": true,
+                "role": "button",
+                "name": "Approve payout",
+                "bounds": {
+                  "x": 24,
+                  "y": 144,
+                  "width": 160,
+                  "height": 48
+                },
+                "path": [
+                  1
+                ],
+                "contract": {
+                  "id": "approve-payout",
+                  "kind": "approve",
+                  "title": "Approve payout",
+                  "description": "Approve claim CLM-1042 for payment after human confirmation.",
+                  "risk": "write",
+                  "requiresConfirmation": true,
+                  "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                      "claimId": {
+                        "type": "string"
+                      },
+                      "approver": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "claimId",
+                      "approver"
+                    ]
+                  },
+                  "postconditions": [
+                    "claim.status === \"Approved\"",
+                    "auditId is present"
+                  ],
+                  "audit": {
+                    "workflow": "claims-review"
+                  }
+                }
+              }
+            },
+            {
+              "id": "node:1.0",
+              "kind": "text",
+              "role": "text",
+              "name": "Approve payout",
+              "path": [
+                1,
+                0
+              ],
+              "bounds": {
+                "x": 42,
+                "y": 158,
+                "width": 112,
+                "height": 18
+              },
+              "hitTarget": {
+                "x": 42,
+                "y": 158,
+                "width": 112,
+                "height": 18
+              },
+              "visible": true,
+              "enabled": true,
+              "focusable": false,
+              "interactive": false
+            },
+            {
+              "id": "request-evidence",
+              "kind": "box",
+              "role": "button",
+              "name": "Request evidence",
+              "path": [
+                2
+              ],
+              "bounds": {
+                "x": 200,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "hitTarget": {
+                "x": 200,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "visible": true,
+              "enabled": true,
+              "focusable": false,
+              "interactive": false,
+              "actionId": "request-evidence",
+              "action": {
+                "id": "request-evidence",
+                "kind": "submit",
+                "title": "Request evidence",
+                "risk": "write",
+                "requiresConfirmation": false,
+                "enabled": true,
+                "role": "button",
+                "name": "Request evidence",
+                "bounds": {
+                  "x": 200,
+                  "y": 144,
+                  "width": 160,
+                  "height": 48
+                },
+                "path": [
+                  2
+                ],
+                "contract": {
+                  "id": "request-evidence",
+                  "kind": "submit",
+                  "title": "Request evidence",
+                  "risk": "write",
+                  "audit": {
+                    "workflow": "claims-review"
+                  }
+                }
+              }
+            },
+            {
+              "id": "node:2.0",
+              "kind": "text",
+              "role": "text",
+              "name": "Request docs",
+              "path": [
+                2,
+                0
+              ],
+              "bounds": {
+                "x": 218,
+                "y": 158,
+                "width": 112,
+                "height": 18
+              },
+              "hitTarget": {
+                "x": 218,
+                "y": 158,
+                "width": 112,
+                "height": 18
+              },
+              "visible": true,
+              "enabled": true,
+              "focusable": false,
+              "interactive": false
+            },
+            {
+              "id": "export-audit-packet",
+              "kind": "box",
+              "role": "button",
+              "name": "Export audit packet",
+              "path": [
+                3
+              ],
+              "bounds": {
+                "x": 376,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "hitTarget": {
+                "x": 376,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "visible": true,
+              "enabled": true,
+              "focusable": false,
+              "interactive": false,
+              "actionId": "export-audit-packet",
+              "action": {
+                "id": "export-audit-packet",
+                "kind": "export",
+                "title": "Export audit packet",
+                "risk": "external",
+                "requiresConfirmation": true,
+                "enabled": true,
+                "role": "button",
+                "name": "Export audit packet",
+                "bounds": {
+                  "x": 376,
+                  "y": 144,
+                  "width": 160,
+                  "height": 48
+                },
+                "path": [
+                  3
+                ],
+                "contract": {
+                  "id": "export-audit-packet",
+                  "kind": "export",
+                  "title": "Export audit packet",
+                  "risk": "external",
+                  "audit": {
+                    "workflow": "claims-review"
+                  }
+                }
+              }
+            },
+            {
+              "id": "node:3.0",
+              "kind": "text",
+              "role": "text",
+              "name": "Export audit",
+              "path": [
+                3,
+                0
+              ],
+              "bounds": {
+                "x": 394,
+                "y": 158,
+                "width": 112,
+                "height": 18
+              },
+              "hitTarget": {
+                "x": 394,
+                "y": 158,
+                "width": 112,
+                "height": 18
+              },
+              "visible": true,
+              "enabled": true,
+              "focusable": false,
+              "interactive": false
+            }
+          ],
+          "actions": [
+            {
+              "id": "approve-payout",
+              "kind": "approve",
+              "title": "Approve payout",
+              "description": "Approve claim CLM-1042 for payment after human confirmation.",
+              "risk": "write",
+              "requiresConfirmation": true,
+              "enabled": true,
+              "role": "button",
+              "name": "Approve payout",
+              "bounds": {
+                "x": 24,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "path": [
+                1
+              ],
+              "contract": {
+                "id": "approve-payout",
+                "kind": "approve",
+                "title": "Approve payout",
+                "description": "Approve claim CLM-1042 for payment after human confirmation.",
+                "risk": "write",
+                "requiresConfirmation": true,
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {
+                    "claimId": {
+                      "type": "string"
+                    },
+                    "approver": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "claimId",
+                    "approver"
+                  ]
+                },
+                "postconditions": [
+                  "claim.status === \"Approved\"",
+                  "auditId is present"
+                ],
+                "audit": {
+                  "workflow": "claims-review"
+                }
+              }
+            },
+            {
+              "id": "request-evidence",
+              "kind": "submit",
+              "title": "Request evidence",
+              "risk": "write",
+              "requiresConfirmation": false,
+              "enabled": true,
+              "role": "button",
+              "name": "Request evidence",
+              "bounds": {
+                "x": 200,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "path": [
+                2
+              ],
+              "contract": {
+                "id": "request-evidence",
+                "kind": "submit",
+                "title": "Request evidence",
+                "risk": "write",
+                "audit": {
+                  "workflow": "claims-review"
+                }
+              }
+            },
+            {
+              "id": "export-audit-packet",
+              "kind": "export",
+              "title": "Export audit packet",
+              "risk": "external",
+              "requiresConfirmation": true,
+              "enabled": true,
+              "role": "button",
+              "name": "Export audit packet",
+              "bounds": {
+                "x": 376,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "path": [
+                3
+              ],
+              "contract": {
+                "id": "export-audit-packet",
+                "kind": "export",
+                "title": "Export audit packet",
+                "risk": "external",
+                "audit": {
+                  "workflow": "claims-review"
+                }
+              }
+            }
+          ]
+        },
+        "actions": [
+          {
+            "id": "approve-payout",
+            "kind": "approve",
+            "title": "Approve payout",
+            "description": "Approve claim CLM-1042 for payment after human confirmation.",
+            "risk": "write",
+            "requiresConfirmation": true,
+            "enabled": true,
+            "role": "button",
+            "name": "Approve payout",
+            "bounds": {
+              "x": 24,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "path": [
+              1
+            ],
+            "contract": {
+              "id": "approve-payout",
+              "kind": "approve",
+              "title": "Approve payout",
+              "description": "Approve claim CLM-1042 for payment after human confirmation.",
+              "risk": "write",
+              "requiresConfirmation": true,
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "claimId": {
+                    "type": "string"
+                  },
+                  "approver": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "claimId",
+                  "approver"
+                ]
+              },
+              "postconditions": [
+                "claim.status === \"Approved\"",
+                "auditId is present"
+              ],
+              "audit": {
+                "workflow": "claims-review"
+              }
+            }
+          },
+          {
+            "id": "request-evidence",
+            "kind": "submit",
+            "title": "Request evidence",
+            "risk": "write",
+            "requiresConfirmation": false,
+            "enabled": true,
+            "role": "button",
+            "name": "Request evidence",
+            "bounds": {
+              "x": 200,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "path": [
+              2
+            ],
+            "contract": {
+              "id": "request-evidence",
+              "kind": "submit",
+              "title": "Request evidence",
+              "risk": "write",
+              "audit": {
+                "workflow": "claims-review"
+              }
+            }
+          },
+          {
+            "id": "export-audit-packet",
+            "kind": "export",
+            "title": "Export audit packet",
+            "risk": "external",
+            "requiresConfirmation": true,
+            "enabled": true,
+            "role": "button",
+            "name": "Export audit packet",
+            "bounds": {
+              "x": 376,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "path": [
+              3
+            ],
+            "contract": {
+              "id": "export-audit-packet",
+              "kind": "export",
+              "title": "Export audit packet",
+              "risk": "external",
+              "audit": {
+                "workflow": "claims-review"
+              }
+            }
+          }
+        ]
+      },
+      "request": {
+        "actor": "external-agent",
+        "input": {
+          "claimId": "CLM-1042",
+          "approver": "Ops manager"
+        }
+      },
+      "policy": {
+        "allow": true,
+        "requiresApproval": true
+      },
+      "approval": {
+        "actor": "Ops manager",
+        "approved": true,
+        "timestamp": "2026-04-25T09:30:03.000Z"
+      },
+      "output": {
+        "status": "ok",
+        "action": "approve-payout",
+        "claimId": "CLM-1042",
+        "auditId": "CLM-1042-approve-payout",
+        "postconditions": [
+          "claim.status === \"Approved\"",
+          "auditId is present"
+        ]
+      },
+      "completedAt": "2026-04-25T09:30:06.000Z",
+      "frameAfter": {
+        "id": "claims-review-http-demo:frame:2",
+        "route": "claims-review",
+        "createdAt": "2026-04-25T09:30:03.000Z",
+        "layout": {
+          "x": 0,
+          "y": 0,
+          "width": 640,
+          "height": 360,
+          "children": [
+            {
+              "x": 24,
+              "y": 24,
+              "width": 592,
+              "height": 96,
+              "children": [
+                {
+                  "x": 16,
+                  "y": 16,
+                  "width": 220,
+                  "height": 24,
+                  "children": []
+                },
+                {
+                  "x": 16,
+                  "y": 52,
+                  "width": 340,
+                  "height": 20,
+                  "children": []
+                }
+              ]
+            },
+            {
+              "x": 24,
+              "y": 144,
+              "width": 160,
+              "height": 48,
+              "children": [
+                {
+                  "x": 18,
+                  "y": 14,
+                  "width": 112,
+                  "height": 18,
+                  "children": []
+                }
+              ]
+            },
+            {
+              "x": 200,
+              "y": 144,
+              "width": 160,
+              "height": 48,
+              "children": [
+                {
+                  "x": 18,
+                  "y": 14,
+                  "width": 112,
+                  "height": 18,
+                  "children": []
+                }
+              ]
+            },
+            {
+              "x": 376,
+              "y": 144,
+              "width": 160,
+              "height": 48,
+              "children": [
+                {
+                  "x": 18,
+                  "y": 14,
+                  "width": 112,
+                  "height": 18,
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "geometry": {
+          "id": "claims-review-http-demo:frame:2",
+          "route": "claims-review",
+          "createdAt": "2026-04-25T09:30:03.000Z",
+          "rootBounds": {
+            "x": 0,
+            "y": 0,
+            "width": 640,
+            "height": 360
+          },
+          "nodes": [
+            {
+              "id": "claims-review-surface",
+              "kind": "box",
+              "role": "main",
+              "name": "Claims review surface",
+              "path": [],
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 640,
+                "height": 360
+              },
+              "hitTarget": {
+                "x": 0,
+                "y": 0,
+                "width": 640,
+                "height": 360
+              },
+              "visible": true,
+              "enabled": true,
+              "focusable": false,
+              "interactive": false
+            },
+            {
+              "id": "claim-card",
+              "kind": "box",
+              "role": "region",
+              "name": "Claim CLM-1042",
+              "path": [
+                0
+              ],
+              "bounds": {
+                "x": 24,
+                "y": 24,
+                "width": 592,
+                "height": 96
+              },
+              "hitTarget": {
+                "x": 24,
+                "y": 24,
+                "width": 592,
+                "height": 96
+              },
+              "visible": true,
+              "enabled": true,
+              "focusable": false,
+              "interactive": false
+            },
+            {
+              "id": "node:0.0",
+              "kind": "text",
+              "role": "text",
+              "name": "CLM-1042 / Northstar Fabrication",
+              "path": [
+                0,
+                0
+              ],
+              "bounds": {
+                "x": 40,
+                "y": 40,
+                "width": 220,
+                "height": 24
+              },
+              "hitTarget": {
+                "x": 40,
+                "y": 40,
+                "width": 220,
+                "height": 24
+              },
+              "visible": true,
+              "enabled": true,
+              "focusable": false,
+              "interactive": false
+            },
+            {
+              "id": "node:0.1",
+              "kind": "text",
+              "role": "text",
+              "name": "Ready for payout. Risk 0.21. Evidence validated.",
+              "path": [
+                0,
+                1
+              ],
+              "bounds": {
+                "x": 40,
+                "y": 76,
+                "width": 340,
+                "height": 20
+              },
+              "hitTarget": {
+                "x": 40,
+                "y": 76,
+                "width": 340,
+                "height": 20
+              },
+              "visible": true,
+              "enabled": true,
+              "focusable": false,
+              "interactive": false
+            },
+            {
+              "id": "approve-payout",
+              "kind": "box",
+              "role": "button",
+              "name": "Approve payout",
+              "path": [
+                1
+              ],
+              "bounds": {
+                "x": 24,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "hitTarget": {
+                "x": 24,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "visible": true,
+              "enabled": true,
+              "focusable": true,
+              "interactive": true,
+              "actionId": "approve-payout",
+              "action": {
+                "id": "approve-payout",
+                "kind": "approve",
+                "title": "Approve payout",
+                "description": "Approve claim CLM-1042 for payment after human confirmation.",
+                "risk": "write",
+                "requiresConfirmation": true,
+                "enabled": true,
+                "role": "button",
+                "name": "Approve payout",
+                "bounds": {
+                  "x": 24,
+                  "y": 144,
+                  "width": 160,
+                  "height": 48
+                },
+                "path": [
+                  1
+                ],
+                "contract": {
+                  "id": "approve-payout",
+                  "kind": "approve",
+                  "title": "Approve payout",
+                  "description": "Approve claim CLM-1042 for payment after human confirmation.",
+                  "risk": "write",
+                  "requiresConfirmation": true,
+                  "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                      "claimId": {
+                        "type": "string"
+                      },
+                      "approver": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "claimId",
+                      "approver"
+                    ]
+                  },
+                  "postconditions": [
+                    "claim.status === \"Approved\"",
+                    "auditId is present"
+                  ],
+                  "audit": {
+                    "workflow": "claims-review"
+                  }
+                }
+              }
+            },
+            {
+              "id": "node:1.0",
+              "kind": "text",
+              "role": "text",
+              "name": "Approve payout",
+              "path": [
+                1,
+                0
+              ],
+              "bounds": {
+                "x": 42,
+                "y": 158,
+                "width": 112,
+                "height": 18
+              },
+              "hitTarget": {
+                "x": 42,
+                "y": 158,
+                "width": 112,
+                "height": 18
+              },
+              "visible": true,
+              "enabled": true,
+              "focusable": false,
+              "interactive": false
+            },
+            {
+              "id": "request-evidence",
+              "kind": "box",
+              "role": "button",
+              "name": "Request evidence",
+              "path": [
+                2
+              ],
+              "bounds": {
+                "x": 200,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "hitTarget": {
+                "x": 200,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "visible": true,
+              "enabled": true,
+              "focusable": false,
+              "interactive": false,
+              "actionId": "request-evidence",
+              "action": {
+                "id": "request-evidence",
+                "kind": "submit",
+                "title": "Request evidence",
+                "risk": "write",
+                "requiresConfirmation": false,
+                "enabled": true,
+                "role": "button",
+                "name": "Request evidence",
+                "bounds": {
+                  "x": 200,
+                  "y": 144,
+                  "width": 160,
+                  "height": 48
+                },
+                "path": [
+                  2
+                ],
+                "contract": {
+                  "id": "request-evidence",
+                  "kind": "submit",
+                  "title": "Request evidence",
+                  "risk": "write",
+                  "audit": {
+                    "workflow": "claims-review"
+                  }
+                }
+              }
+            },
+            {
+              "id": "node:2.0",
+              "kind": "text",
+              "role": "text",
+              "name": "Request docs",
+              "path": [
+                2,
+                0
+              ],
+              "bounds": {
+                "x": 218,
+                "y": 158,
+                "width": 112,
+                "height": 18
+              },
+              "hitTarget": {
+                "x": 218,
+                "y": 158,
+                "width": 112,
+                "height": 18
+              },
+              "visible": true,
+              "enabled": true,
+              "focusable": false,
+              "interactive": false
+            },
+            {
+              "id": "export-audit-packet",
+              "kind": "box",
+              "role": "button",
+              "name": "Export audit packet",
+              "path": [
+                3
+              ],
+              "bounds": {
+                "x": 376,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "hitTarget": {
+                "x": 376,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "visible": true,
+              "enabled": true,
+              "focusable": false,
+              "interactive": false,
+              "actionId": "export-audit-packet",
+              "action": {
+                "id": "export-audit-packet",
+                "kind": "export",
+                "title": "Export audit packet",
+                "risk": "external",
+                "requiresConfirmation": true,
+                "enabled": true,
+                "role": "button",
+                "name": "Export audit packet",
+                "bounds": {
+                  "x": 376,
+                  "y": 144,
+                  "width": 160,
+                  "height": 48
+                },
+                "path": [
+                  3
+                ],
+                "contract": {
+                  "id": "export-audit-packet",
+                  "kind": "export",
+                  "title": "Export audit packet",
+                  "risk": "external",
+                  "audit": {
+                    "workflow": "claims-review"
+                  }
+                }
+              }
+            },
+            {
+              "id": "node:3.0",
+              "kind": "text",
+              "role": "text",
+              "name": "Export audit",
+              "path": [
+                3,
+                0
+              ],
+              "bounds": {
+                "x": 394,
+                "y": 158,
+                "width": 112,
+                "height": 18
+              },
+              "hitTarget": {
+                "x": 394,
+                "y": 158,
+                "width": 112,
+                "height": 18
+              },
+              "visible": true,
+              "enabled": true,
+              "focusable": false,
+              "interactive": false
+            }
+          ],
+          "actions": [
+            {
+              "id": "approve-payout",
+              "kind": "approve",
+              "title": "Approve payout",
+              "description": "Approve claim CLM-1042 for payment after human confirmation.",
+              "risk": "write",
+              "requiresConfirmation": true,
+              "enabled": true,
+              "role": "button",
+              "name": "Approve payout",
+              "bounds": {
+                "x": 24,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "path": [
+                1
+              ],
+              "contract": {
+                "id": "approve-payout",
+                "kind": "approve",
+                "title": "Approve payout",
+                "description": "Approve claim CLM-1042 for payment after human confirmation.",
+                "risk": "write",
+                "requiresConfirmation": true,
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {
+                    "claimId": {
+                      "type": "string"
+                    },
+                    "approver": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "claimId",
+                    "approver"
+                  ]
+                },
+                "postconditions": [
+                  "claim.status === \"Approved\"",
+                  "auditId is present"
+                ],
+                "audit": {
+                  "workflow": "claims-review"
+                }
+              }
+            },
+            {
+              "id": "request-evidence",
+              "kind": "submit",
+              "title": "Request evidence",
+              "risk": "write",
+              "requiresConfirmation": false,
+              "enabled": true,
+              "role": "button",
+              "name": "Request evidence",
+              "bounds": {
+                "x": 200,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "path": [
+                2
+              ],
+              "contract": {
+                "id": "request-evidence",
+                "kind": "submit",
+                "title": "Request evidence",
+                "risk": "write",
+                "audit": {
+                  "workflow": "claims-review"
+                }
+              }
+            },
+            {
+              "id": "export-audit-packet",
+              "kind": "export",
+              "title": "Export audit packet",
+              "risk": "external",
+              "requiresConfirmation": true,
+              "enabled": true,
+              "role": "button",
+              "name": "Export audit packet",
+              "bounds": {
+                "x": 376,
+                "y": 144,
+                "width": 160,
+                "height": 48
+              },
+              "path": [
+                3
+              ],
+              "contract": {
+                "id": "export-audit-packet",
+                "kind": "export",
+                "title": "Export audit packet",
+                "risk": "external",
+                "audit": {
+                  "workflow": "claims-review"
+                }
+              }
+            }
+          ]
+        },
+        "actions": [
+          {
+            "id": "approve-payout",
+            "kind": "approve",
+            "title": "Approve payout",
+            "description": "Approve claim CLM-1042 for payment after human confirmation.",
+            "risk": "write",
+            "requiresConfirmation": true,
+            "enabled": true,
+            "role": "button",
+            "name": "Approve payout",
+            "bounds": {
+              "x": 24,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "path": [
+              1
+            ],
+            "contract": {
+              "id": "approve-payout",
+              "kind": "approve",
+              "title": "Approve payout",
+              "description": "Approve claim CLM-1042 for payment after human confirmation.",
+              "risk": "write",
+              "requiresConfirmation": true,
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "claimId": {
+                    "type": "string"
+                  },
+                  "approver": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "claimId",
+                  "approver"
+                ]
+              },
+              "postconditions": [
+                "claim.status === \"Approved\"",
+                "auditId is present"
+              ],
+              "audit": {
+                "workflow": "claims-review"
+              }
+            }
+          },
+          {
+            "id": "request-evidence",
+            "kind": "submit",
+            "title": "Request evidence",
+            "risk": "write",
+            "requiresConfirmation": false,
+            "enabled": true,
+            "role": "button",
+            "name": "Request evidence",
+            "bounds": {
+              "x": 200,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "path": [
+              2
+            ],
+            "contract": {
+              "id": "request-evidence",
+              "kind": "submit",
+              "title": "Request evidence",
+              "risk": "write",
+              "audit": {
+                "workflow": "claims-review"
+              }
+            }
+          },
+          {
+            "id": "export-audit-packet",
+            "kind": "export",
+            "title": "Export audit packet",
+            "risk": "external",
+            "requiresConfirmation": true,
+            "enabled": true,
+            "role": "button",
+            "name": "Export audit packet",
+            "bounds": {
+              "x": 376,
+              "y": 144,
+              "width": 160,
+              "height": 48
+            },
+            "path": [
+              3
+            ],
+            "contract": {
+              "id": "export-audit-packet",
+              "kind": "export",
+              "title": "Export audit packet",
+              "risk": "external",
+              "audit": {
+                "workflow": "claims-review"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -3,6 +3,7 @@
 **The geometry protocol for UI.** Server-computed `{ x, y, w, h }` — not component descriptions — streamed to humans and AI agents over the same socket.
 
 > **AI Agents:** See [`llms.txt`](llms.txt) for a structured overview of the entire framework — architecture, props, components, protocols, and APIs.
+> **Agent-native apps:** See [`AGENT_NATIVE_UI.md`](AGENT_NATIVE_UI.md) for exact semantic geometry, stable UI ids, runtime commands, gateway inspect/actions, trace, and replay.
 
 **[Live Demo](https://razroo.github.io/geometra)** | **[npm](https://www.npmjs.com/org/geometra)** | **[GitHub](https://github.com/razroo/geometra)** | **[Auth](https://github.com/razroo/geometra-auth)** | **[Token Registry](https://github.com/razroo/geometra-token-registry)**
 
@@ -193,6 +194,25 @@ To uninstall, remove the server entry from your client's MCP configuration.
 </details>
 
 See [mcp/README.md](mcp/README.md) for tool details, examples, and source installs from this repo.
+
+## Agent-Native UI Protocol
+
+Geometra can make the UI itself the agent contract: exact semantic geometry, stable UI ids, action policy, before/after replay, and postcondition checks from the same tree that renders to humans.
+
+| Browser automation | Geometra-native UI |
+|---|---|
+| Infer state from DOM, screenshots, selectors, or OCR | Inspect `semantic.id`, role/name/state, exact bounds, and action contracts directly |
+| Click guessed selectors or coordinates | Click/focus/type by stable UI id |
+| Audit backend calls separately from what was visible | Replay frame-before/frame-after geometry plus action trace |
+| Add policy and approval as extra app logic | Carry risk, confirmation, input/output schemas, and postconditions with the UI action |
+
+Run the end-to-end external-agent flow:
+
+```bash
+bun run demo:agent-native:http
+```
+
+It starts a local gateway, calls `/inspect`, requests and approves `approve-payout`, reads `/replay`, and writes `examples/replays/claims-review.json`.
 
 ## Agent-native roadmap
 

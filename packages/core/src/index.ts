@@ -153,6 +153,16 @@ export type { SemanticHTMLOptions } from './seo.js'
 export { toAccessibilityTree } from './a11y.js'
 export type { AccessibilityNode, AccessibilityBounds } from './a11y.js'
 
+// Agent-native semantic geometry frames
+export { collectSemanticGeometry, createAgentGeometrySnapshot } from './semantic-geometry.js'
+export type {
+  AgentGeometryBounds,
+  AgentGeometryNode,
+  AgentGeometrySnapshot,
+  AgentGeometrySnapshotOptions,
+  AgentGeometryState,
+} from './semantic-geometry.js'
+
 // Agent-native action contracts and trace foundation
 export { agentAction, collectAgentActions } from './agent-contracts.js'
 export type { AgentActionTarget } from './agent-contracts.js'
@@ -194,6 +204,16 @@ export type {
   AgentGatewayReplay,
   AgentGatewayReplayAction,
 } from './agent-gateway.js'
+export { createAgentRuntime } from './agent-runtime.js'
+export type {
+  AgentRuntime,
+  AgentRuntimeActionLogEntry,
+  AgentRuntimeCommand,
+  AgentRuntimeCommandResult,
+  AgentRuntimeOptions,
+  AgentRuntimeReplayResult,
+  AgentRuntimeTypeOptions,
+} from './agent-runtime.js'
 
 // Text input foundation
 export {

@@ -155,6 +155,25 @@ function printSummary(data) {
   }
 }
 
+function printBrowserInferenceComparison(data) {
+  console.log('\n## Protocol vs Browser Inference')
+  console.log('| Scenario | Native proof | Browser inference gap |')
+  console.log('| --- | --- | --- |')
+  for (const scenario of data.scenarios) {
+    const native = scenario.modes['geometra-native']
+    const playwright = scenario.modes['playwright-mcp']
+    const vision = scenario.modes['vision-computer-use']
+    const replay = native.replayable ? 'frame geometry + before/after replay' : 'not replayable'
+    const gap = [
+      `${ratio(native.contextBytes, playwright.contextBytes)} fewer context bytes than Playwright MCP`,
+      `${ratio(native.toolCalls, playwright.toolCalls)} fewer tool calls than Playwright MCP`,
+      `${playwright.securityFailures + vision.securityFailures} browser/vision security failures avoided`,
+      `${native.postconditionChecks} native postcondition checks vs ${playwright.postconditionChecks} selector/OCR checks`,
+    ].join('; ')
+    console.log(`| ${scenario.id} | ${replay} | ${gap} |`)
+  }
+}
+
 async function main() {
   const assertMode = process.argv.includes('--assert')
   const data = JSON.parse(await readFile(SCENARIO_FILE, 'utf8'))
@@ -165,6 +184,7 @@ async function main() {
 
   printTable(data)
   printSummary(data)
+  printBrowserInferenceComparison(data)
 
   if (assertMode) {
     const advantageFailures = assertNativeAdvantage(data)

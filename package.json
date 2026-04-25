@@ -47,6 +47,7 @@
     "benchmark:proxy-startup": "node scripts/benchmark-proxy-startup-variants.mjs",
     "benchmark:agent-native": "node scripts/benchmark-agent-native-value.mjs",
     "benchmark:agent-native:assert": "node scripts/benchmark-agent-native-value.mjs --assert",
+    "demo:agent-native:http": "bun run --filter @geometra/core build && bun run --filter @geometra/gateway build && node scripts/run-agent-native-http-demo.mjs",
     "examples:check": "tsc -p tsconfig.examples.json --noEmit",
     "examples:build": "node scripts/examples/build-workspace-demos.mjs",
     "examples:html": "node scripts/examples/verify-demo-html.mjs",

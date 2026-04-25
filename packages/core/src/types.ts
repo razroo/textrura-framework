@@ -112,6 +112,8 @@ export interface StyleProps {
 
 /** Semantic properties for SEO and accessibility. */
 export interface SemanticProps {
+  /** Stable UI id for agent inspection, replay, and audit snapshots. */
+  id?: string
   /** HTML tag to use in semantic HTML output (e.g. 'h1', 'p', 'nav', 'article'). */
   tag?: string
   /** ARIA role for accessibility (e.g. 'heading', 'navigation', 'button'). */

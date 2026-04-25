@@ -93,6 +93,15 @@ describe('agent gateway HTTP transport', () => {
       actions: [{ id: 'approve-payout', requiresConfirmation: true }],
       pendingApprovals: [],
     })
+    await expect(json('/inspect')).resolves.toMatchObject({
+      frame: { id: 'frame-1', route: '/claims' },
+      geometry: {
+        id: 'frame-1',
+        route: '/claims',
+        nodes: [expect.objectContaining({ id: 'root' }), expect.objectContaining({ id: 'approve-payout' })],
+      },
+      actions: [{ id: 'approve-payout' }],
+    })
 
     const request = await json('/actions/request', {
       method: 'POST',

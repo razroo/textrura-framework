@@ -164,6 +164,23 @@ export function createAgentGatewayHttpHandler(options: AgentGatewayHttpOptions) 
         sendJson(res, 200, { tenant: identity?.tenantId, frame: latestFrame(gateway) }, cors)
         return
       }
+      if (req.method === 'GET' && url.pathname === '/inspect') {
+        requireScope(identity, 'read')
+        const frame = latestFrame(gateway)
+        sendJson(
+          res,
+          200,
+          {
+            tenant: identity?.tenantId,
+            frame,
+            geometry: frame?.geometry ?? null,
+            actions: gateway.listActions(),
+            pendingApprovals: gateway.getPendingApprovals(),
+          },
+          cors,
+        )
+        return
+      }
       if (req.method === 'GET' && url.pathname === '/actions') {
         requireScope(identity, 'read')
         sendJson(

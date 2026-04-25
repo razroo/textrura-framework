@@ -1,6 +1,7 @@
 import type { AgentGateway, AgentGatewayActionRequest, AgentGatewayApprovalRequest } from '@geometra/core'
 
 export type AgentGatewayToolName =
+  | 'geometra_gateway_inspect_frame'
   | 'geometra_gateway_list_actions'
   | 'geometra_gateway_request_action'
   | 'geometra_gateway_approve_action'
@@ -28,6 +29,11 @@ function jsonText(value: unknown): AgentGatewayToolCallResult {
 
 export function createAgentGatewayToolAdapter(gateway: AgentGateway): AgentGatewayToolAdapter {
   const tools: AgentGatewayTool[] = [
+    {
+      name: 'geometra_gateway_inspect_frame',
+      description: 'Inspect the current Geometra frame as exact semantic geometry for every reachable UI node.',
+      inputSchema: { type: 'object', properties: {} },
+    },
     {
       name: 'geometra_gateway_list_actions',
       description: 'List the current frame-bound Geometra agent actions and pending approvals.',
@@ -74,6 +80,9 @@ export function createAgentGatewayToolAdapter(gateway: AgentGateway): AgentGatew
   return {
     tools,
     async callTool(name, input = {}) {
+      if (name === 'geometra_gateway_inspect_frame') {
+        return jsonText({ frame: gateway.getReplay().frames.at(-1) ?? null })
+      }
       if (name === 'geometra_gateway_list_actions') {
         return jsonText({
           frame: gateway.getReplay().frames.at(-1) ?? null,

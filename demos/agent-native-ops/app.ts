@@ -6,11 +6,12 @@ import {
   createApp,
   createAgentGateway,
   createAgentGatewayPolicy,
+  createAgentRuntime,
   signal,
   summarizeAgentTrace,
   text,
 } from '@geometra/core'
-import type { AgentActionContract, App, UIElement } from '@geometra/core'
+import type { AgentActionContract, AgentGeometryNode, AgentRuntime, App, KeyboardHitEvent, UIElement } from '@geometra/core'
 import { CanvasRenderer } from '@geometra/renderer-canvas'
 
 type ActionId = 'approve-payout' | 'request-evidence' | 'escalate-claim' | 'export-audit-packet'
@@ -153,6 +154,7 @@ const statusByClaim = signal<Record<string, string>>(
   Object.fromEntries(claims.map(claim => [claim.id, claim.status])),
 )
 let appRef: App | null = null
+let runtimeRef: AgentRuntime | null = null
 
 function isActionId(value: string): value is ActionId {
   return Object.prototype.hasOwnProperty.call(actions, value)
@@ -204,6 +206,11 @@ const trace = signal(gateway.getTrace())
 const pendingApprovals = signal(gateway.getPendingApprovals())
 const lastMessage = signal('Gateway ready. Four agent contracts are published from the Geometra tree.')
 const agentRunning = signal(false)
+const geometryMessage = signal('Semantic geometry API ready: inspect, click, type, and replay use stable node ids.')
+const geometryNodeCount = signal(0)
+const geometryActionLogCount = signal(0)
+const selectedGeometryNode = signal<AgentGeometryNode | null>(null)
+const agentNote = signal('')
 
 function syncGatewayFrame() {
   if (!appRef?.tree || !appRef.layout) return null
@@ -213,6 +220,81 @@ function syncGatewayFrame() {
 function publishGatewayState(): void {
   trace.set(gateway.getTrace())
   pendingApprovals.set(gateway.getPendingApprovals())
+}
+
+function syncRuntimeState(): void {
+  const snapshot = runtimeRef?.snapshot({ route: 'claims-review' })
+  geometryNodeCount.set(snapshot?.nodes.length ?? 0)
+  geometryActionLogCount.set(runtimeRef?.getActionLog().length ?? 0)
+}
+
+function rememberGeometryNode(id: string): void {
+  const snapshot = runtimeRef?.snapshot({ route: 'claims-review' })
+  selectedGeometryNode.set(snapshot?.nodes.find(node => node.id === id) ?? null)
+}
+
+function nodeSummary(node: AgentGeometryNode | null): string {
+  if (!node) return 'No node selected yet. Click Inspect, Click approve, or Type note.'
+  return `${node.id} / ${node.role} / ${node.bounds.x},${node.bounds.y},${node.bounds.width}x${node.bounds.height} / enabled=${node.enabled} / focusable=${node.focusable}`
+}
+
+function inspectGeometryFrame(): void {
+  const snapshot = runtimeRef?.inspect({ route: 'claims-review' })
+  if (!snapshot) {
+    geometryMessage.set('No rendered frame is available yet.')
+    return
+  }
+  geometryMessage.set(
+    `Inspect returned ${snapshot.nodes.length} nodes, ${snapshot.actions.length} contracted actions, and exact root bounds ${snapshot.rootBounds.width}x${snapshot.rootBounds.height}.`,
+  )
+  selectedGeometryNode.set(snapshot.nodes.find(node => node.id === 'approve-payout') ?? snapshot.nodes[0] ?? null)
+  syncRuntimeState()
+}
+
+function clickApproveByGeometry(): void {
+  const result = runtimeRef?.click('approve-payout')
+  syncGatewayFrame()
+  publishGatewayState()
+  syncRuntimeState()
+  rememberGeometryNode('approve-payout')
+  geometryMessage.set(
+    result
+      ? `Runtime clicked "approve-payout" by semantic geometry id; handled=${result.handled}, status=${result.status}.`
+      : 'No runtime is available yet.',
+  )
+}
+
+function typeAgentNoteByGeometry(): void {
+  const result = runtimeRef?.type('agent-note', ' reviewed')
+  syncRuntimeState()
+  rememberGeometryNode('agent-note')
+  geometryMessage.set(
+    result
+      ? `Runtime typed into "agent-note" by id; handled=${result.handled}, log entries=${runtimeRef?.getActionLog().length ?? 0}.`
+      : 'No runtime is available yet.',
+  )
+}
+
+function replayLastGeometryCommand(): void {
+  const log = runtimeRef?.getActionLog() ?? []
+  const last = log.at(-1)
+  if (!runtimeRef || !last) {
+    geometryMessage.set('Run a geometry command before replaying.')
+    return
+  }
+  const replay = runtimeRef.replay([last])
+  syncRuntimeState()
+  geometryMessage.set(`Replayed ${replay.attempted} command; completed=${replay.completed}, failed=${replay.failed}.`)
+}
+
+function handleAgentNoteKey(event: KeyboardHitEvent): void {
+  if (event.key === 'Backspace') {
+    agentNote.set(agentNote.peek().slice(0, -1))
+    return
+  }
+  if (event.key.length === 1 && !event.metaKey && !event.ctrlKey) {
+    agentNote.set(`${agentNote.peek()}${event.key}`)
+  }
 }
 
 async function runAction(actionId: ActionId): Promise<void> {
@@ -513,6 +595,23 @@ function approvalDecisionButton(label: string, color: string, onClick: () => voi
   )
 }
 
+function geometryCommandButton(label: string, onClick: () => void): UIElement {
+  return box(
+    {
+      paddingLeft: 10,
+      paddingRight: 10,
+      paddingTop: 8,
+      paddingBottom: 8,
+      backgroundColor: '#111827',
+      borderRadius: 5,
+      cursor: 'pointer',
+      onClick,
+      semantic: { role: 'button', ariaLabel: label },
+    },
+    [t(label, 11, '700', '#ffffff')],
+  )
+}
+
 function claimDetails(claim: Claim): UIElement {
   const status = statusByClaim.value[claim.id] ?? claim.status
   const compact = viewport.value.width < 760
@@ -651,6 +750,10 @@ function replayPanel(): UIElement {
             [
               t(lastAction.actionId, 12, '800', '#111827'),
               copy(`Status: ${lastAction.status}. Before: ${lastAction.frameBefore?.id ?? 'none'}. After: ${lastAction.frameAfter?.id ?? 'pending'}.`),
+              copy(
+                `Before geometry: ${lastAction.frameBefore?.geometry.nodes.length ?? 0} nodes, ${lastAction.frameBefore?.geometry.actions.length ?? 0} actions.`,
+                '#6b7280',
+              ),
             ],
           ),
         ]
@@ -687,6 +790,49 @@ function protocolPanel(): UIElement {
         ],
       ),
     )),
+    box({ height: 1, backgroundColor: '#e6dfd2' }, []),
+    box({ flexDirection: compact ? 'column' : 'row', gap: 10, alignItems: compact ? 'stretch' : 'center', flexWrap: 'wrap' }, [
+      metric('Nodes', String(geometryNodeCount.value), '#5b5bd6'),
+      metric('Runtime log', String(geometryActionLogCount.value), '#0f766e'),
+      geometryCommandButton('Inspect', inspectGeometryFrame),
+      geometryCommandButton('Click approve', clickApproveByGeometry),
+      geometryCommandButton('Type note', typeAgentNoteByGeometry),
+      geometryCommandButton('Replay last', replayLastGeometryCommand),
+    ]),
+    box(
+      {
+        flexDirection: 'column',
+        gap: 6,
+        padding: 10,
+        backgroundColor: '#eff6ff',
+        borderColor: '#93c5fd',
+        borderWidth: 1,
+        borderRadius: 6,
+      },
+      [
+        t('What the agent saw', 12, '800', '#1d4ed8'),
+        copy(nodeSummary(selectedGeometryNode.value), '#1e3a8a'),
+      ],
+    ),
+    box(
+      {
+        minHeight: 42,
+        padding: 10,
+        backgroundColor: '#fbfaf6',
+        borderColor: '#d8d2c4',
+        borderWidth: 1,
+        borderRadius: 6,
+        cursor: 'text',
+        onKeyDown: handleAgentNoteKey,
+        semantic: {
+          id: 'agent-note',
+          role: 'textbox',
+          ariaLabel: 'Agent note',
+        },
+      },
+      [copy(agentNote.value.length > 0 ? agentNote.value : 'Agent note target: runtime.type("agent-note", "...") writes here.')],
+    ),
+    copy(geometryMessage.value),
   ])
 }
 
@@ -760,7 +906,10 @@ function compactTraceReplayPanel(): UIElement {
       ),
     ),
     ...(lastAction
-      ? [copy(`${lastAction.actionId}: ${lastAction.status}. ${lastAction.frameAfter?.id ?? 'pending'}.`)]
+      ? [
+          copy(`${lastAction.actionId}: ${lastAction.status}. ${lastAction.frameAfter?.id ?? 'pending'}.`),
+          copy(`Frame-before geometry: ${lastAction.frameBefore?.geometry.nodes.length ?? 0} nodes.`),
+        ]
       : [copy('Replay records before/after frames once an agent action runs.')]),
   ])
 }
@@ -886,12 +1035,15 @@ function resizeCanvas(): void {
   appOptions.width = width
   appOptions.height = height
   viewport.set({ width, height })
+  syncRuntimeState()
 }
 
 resizeCanvas()
 createApp(view, renderer, appOptions).then(app => {
   appRef = app
+  runtimeRef = createAgentRuntime(app, { route: 'claims-review' })
   syncGatewayFrame()
+  syncRuntimeState()
   trace.set(gateway.getTrace())
   window.addEventListener('resize', resizeCanvas)
   canvas.addEventListener('click', event => {

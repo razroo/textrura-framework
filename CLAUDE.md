@@ -12,6 +12,7 @@ See **`GEOMETRY_SNAPSHOT_TESTING.md`** for layout JSON / geometry regression pat
 See **`DEPLOYMENT.md`** for production deployment: process management, reverse proxy, auth, scaling, monitoring.
 See **`NATIVE_MCP_GUIDE.md`** for building native Geometra apps that AI agents drive via MCP.
 See **`MCP_COOKBOOK.md`** for MCP tool call recipes (proxy and native workflows).
+See **`AGENT_NATIVE_UI.md`** for semantic geometry snapshots, stable UI ids, app runtime commands, gateway inspect/actions, trace, and replay.
 
 ## Architecture
 

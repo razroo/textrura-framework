@@ -45,7 +45,16 @@ function resultJson(result: { content: Array<{ text: string }> }): unknown {
 describe('agent gateway tool adapter', () => {
   it('lists, requests, and returns replay through MCP-style tools', async () => {
     const adapter = createAgentGatewayToolAdapter(gateway())
+    expect(adapter.tools.map(tool => tool.name)).toContain('geometra_gateway_inspect_frame')
     expect(adapter.tools.map(tool => tool.name)).toContain('geometra_gateway_request_action')
+
+    const inspected = await adapter.callTool('geometra_gateway_inspect_frame')
+    expect(resultJson(inspected)).toMatchObject({
+      frame: {
+        id: 'frame-1',
+        geometry: { nodes: [expect.objectContaining({ id: 'root' }), expect.objectContaining({ id: 'approve-payout' })] },
+      },
+    })
 
     const listed = await adapter.callTool('geometra_gateway_list_actions')
     expect(resultJson(listed)).toMatchObject({ actions: [{ id: 'approve-payout' }] })

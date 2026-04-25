@@ -3,6 +3,7 @@ import type { AgentTrace } from './agent-trace.js'
 import type { AgentActionRisk, UIElement } from './types.js'
 import { appendAgentTraceEvent, createAgentTrace } from './agent-trace.js'
 import { collectAgentActions, type AgentActionTarget } from './agent-contracts.js'
+import { createAgentGeometrySnapshot, type AgentGeometrySnapshot } from './semantic-geometry.js'
 
 export type AgentGatewayActionStatus =
   | 'completed'
@@ -21,6 +22,7 @@ export interface AgentGatewayFrame {
   createdAt: string
   tree: UIElement
   layout: ComputedLayout
+  geometry: AgentGeometrySnapshot
   actions: AgentActionTarget[]
   trace: AgentTrace
 }
@@ -30,6 +32,7 @@ export interface AgentGatewayFrameSnapshot {
   route?: string
   createdAt: string
   layout: ComputedLayout
+  geometry: AgentGeometrySnapshot
   actions: AgentActionTarget[]
 }
 
@@ -208,6 +211,7 @@ function frameSnapshot(frame: AgentGatewayFrame): AgentGatewayFrameSnapshot {
     ...(frame.route !== undefined ? { route: frame.route } : {}),
     createdAt: frame.createdAt,
     layout: frame.layout,
+    geometry: frame.geometry,
     actions: frame.actions,
   }
 }
@@ -437,13 +441,20 @@ export function createAgentGateway(options: AgentGatewayOptions): AgentGateway {
     setFrame(tree, layout, frameOptions = {}) {
       frameIndex++
       const createdAt = frameOptions.createdAt ?? now()
+      const frameId = frameOptions.id ?? `${options.sessionId}:frame:${frameIndex}`
+      const actions = collectAgentActions(tree, layout)
       frame = {
-        id: frameOptions.id ?? `${options.sessionId}:frame:${frameIndex}`,
+        id: frameId,
         ...(frameOptions.route !== undefined ? { route: frameOptions.route } : {}),
         createdAt,
         tree,
         layout,
-        actions: collectAgentActions(tree, layout),
+        geometry: createAgentGeometrySnapshot(tree, layout, {
+          id: frameId,
+          ...(frameOptions.route !== undefined ? { route: frameOptions.route } : {}),
+          createdAt,
+        }),
+        actions,
         trace,
       }
       const snapshot = frameSnapshot(frame)

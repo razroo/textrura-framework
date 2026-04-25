@@ -67,6 +67,15 @@ describe('agent gateway', () => {
 
     expect(frame.id).toBe('frame-1')
     expect(frame.route).toBe('/claims')
+    expect(frame.geometry).toMatchObject({
+      id: 'frame-1',
+      route: '/claims',
+      nodes: [
+        expect.objectContaining({ id: 'root' }),
+        expect.objectContaining({ id: 'approve-payout' }),
+        expect.objectContaining({ id: 'export-audit-packet' }),
+      ],
+    })
     expect(gateway.listActions().map(action => action.id)).toEqual([
       'approve-payout',
       'export-audit-packet',
