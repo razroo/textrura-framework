@@ -12,6 +12,7 @@ export const publishablePackages = [
   { name: '@geometra/router', path: 'packages/router' },
   { name: '@geometra/tw', path: 'packages/tw' },
   { name: '@geometra/agent', path: 'packages/agent' },
+  { name: '@geometra/gateway', path: 'packages/gateway' },
   { name: '@geometra/cli', path: 'packages/cli' },
   { name: '@geometra/proxy', path: 'packages/proxy' },
   { name: '@geometra/mcp', path: 'mcp' },
@@ -49,6 +50,7 @@ export function publishTimeDependencyUpdates(version) {
     '@geometra/router',
     '@geometra/tw',
     '@geometra/agent',
+    '@geometra/gateway',
     '@geometra/cli',
   ]) {
     addDependency(packageName, '@geometra/core', `^${version}`)

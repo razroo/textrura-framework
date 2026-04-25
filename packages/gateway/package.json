@@ -1,6 +1,6 @@
 {
   "name": "@geometra/gateway",
-  "version": "1.59.1",
+  "version": "1.61.1",
   "description": "HTTP transport for Geometra agent-safe workflow gateways",
   "license": "MIT",
   "type": "module",
@@ -35,7 +35,7 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
-    "@geometra/core": "^1.59.1"
+    "@geometra/core": "^1.61.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0"

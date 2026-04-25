@@ -147,3 +147,4 @@ bun run benchmark:agent-native:live
 ```
 
 For vertical positioning, see `CLAIMS_COMPLIANCE_WORKSTATIONS.md`.
+For a public/private repo split when hosting a live sandbox, see `HOSTED_SANDBOX_DEPLOYMENT.md`.

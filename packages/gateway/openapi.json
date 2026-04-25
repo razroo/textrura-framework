@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Geometra Agent Gateway",
-    "version": "1.61.0",
+    "version": "1.61.1",
     "description": "HTTP API for inspecting agent-native Geometra frames, requesting policy-gated actions, approving work, and replaying audited UI state."
   },
   "security": [
