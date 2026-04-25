@@ -30,59 +30,51 @@ function label(value: unknown): string {
 
 function card(title: string, lines: string[], accent = colors.border) {
   return box({
-    style: {
-      backgroundColor: colors.card,
-      borderColor: accent,
-      borderWidth: 1,
-      borderRadius: 14,
-      padding: 18,
-      gap: 8,
-    },
+    backgroundColor: colors.card,
+    borderColor: accent,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 18,
+    gap: 8,
   }, [
-    text({ text: title, font: '700 18px Inter, system-ui', lineHeight: 24, style: { color: colors.text } }),
-    ...lines.map(line => text({ text: line, font: '14px Inter, system-ui', lineHeight: 21, style: { color: colors.muted } })),
+    text({ text: title, font: '700 18px Inter, system-ui', lineHeight: 24, color: colors.text }),
+    ...lines.map(line => text({ text: line, font: '14px Inter, system-ui', lineHeight: 21, color: colors.muted })),
   ])
 }
 
 function framePreview(title: string, node: typeof beforeNode | typeof afterNode, status: string) {
   const bounds = node?.bounds
   return box({
-    style: {
-      flex: 1,
-      backgroundColor: '#020617',
+    flex: 1,
+    backgroundColor: '#020617',
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 18,
+    gap: 14,
+  }, [
+    text({ text: title, font: '700 17px Inter, system-ui', lineHeight: 24, color: colors.text }),
+    box({
+      height: 178,
+      backgroundColor: colors.panel,
       borderColor: colors.border,
       borderWidth: 1,
-      borderRadius: 16,
+      borderRadius: 12,
       padding: 18,
-      gap: 14,
-    },
-  }, [
-    text({ text: title, font: '700 17px Inter, system-ui', lineHeight: 24, style: { color: colors.text } }),
-    box({
-      style: {
-        height: 178,
-        backgroundColor: colors.panel,
-        borderColor: colors.border,
-        borderWidth: 1,
-        borderRadius: 12,
-        padding: 18,
-        gap: 12,
-      },
+      gap: 12,
     }, [
-      text({ text: 'Claims review surface', font: '700 15px Inter, system-ui', lineHeight: 20, style: { color: colors.text } }),
-      text({ text: 'CLM-1042 / Northstar Fabrication', font: '14px Inter, system-ui', lineHeight: 20, style: { color: colors.muted } }),
+      text({ text: 'Claims review surface', font: '700 15px Inter, system-ui', lineHeight: 20, color: colors.text }),
+      text({ text: 'CLM-1042 / Northstar Fabrication', font: '14px Inter, system-ui', lineHeight: 20, color: colors.muted }),
       box({
-        style: {
-          width: bounds ? Math.max(132, Math.min(220, bounds.width)) : 160,
-          height: bounds ? Math.max(38, Math.min(54, bounds.height)) : 44,
-          backgroundColor: status === 'completed' ? '#064e3b' : '#1e3a8a',
-          borderColor: status === 'completed' ? colors.success : colors.accent,
-          borderWidth: 2,
-          borderRadius: 10,
-          padding: 10,
-        },
+        width: bounds ? Math.max(132, Math.min(220, bounds.width)) : 160,
+        height: bounds ? Math.max(38, Math.min(54, bounds.height)) : 44,
+        backgroundColor: status === 'completed' ? '#064e3b' : '#1e3a8a',
+        borderColor: status === 'completed' ? colors.success : colors.accent,
+        borderWidth: 2,
+        borderRadius: 10,
+        padding: 10,
       }, [
-        text({ text: target?.title ?? 'Approve payout', font: '700 13px Inter, system-ui', lineHeight: 18, style: { color: colors.text } }),
+        text({ text: target?.title ?? 'Approve payout', font: '700 13px Inter, system-ui', lineHeight: 18, color: colors.text }),
       ]),
     ]),
     text({
@@ -91,7 +83,7 @@ function framePreview(title: string, node: typeof beforeNode | typeof afterNode,
         : 'Target bounds unavailable',
       font: '13px Inter, system-ui',
       lineHeight: 19,
-      style: { color: colors.muted },
+      color: colors.muted,
     }),
   ])
 }
@@ -102,18 +94,16 @@ function timelineItem(index: number, title: string, detail: string) {
     onClick: () => {
       selectedStep.value = index
     },
-    style: {
-      backgroundColor: active ? '#0c4a6e' : colors.card,
-      borderColor: active ? colors.accent : colors.border,
-      borderWidth: 1,
-      borderRadius: 12,
-      padding: 14,
-      gap: 4,
-    },
+    backgroundColor: active ? '#0c4a6e' : colors.card,
+    borderColor: active ? colors.accent : colors.border,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    gap: 4,
     semantic: { id: `replay-step-${index}`, role: 'button', ariaLabel: title },
   }, [
-    text({ text: title, font: '700 14px Inter, system-ui', lineHeight: 19, style: { color: colors.text } }),
-    text({ text: detail, font: '12px Inter, system-ui', lineHeight: 17, style: { color: colors.muted } }),
+    text({ text: title, font: '700 14px Inter, system-ui', lineHeight: 19, color: colors.text }),
+    text({ text: detail, font: '12px Inter, system-ui', lineHeight: 17, color: colors.muted }),
   ])
 }
 
@@ -126,35 +116,33 @@ function root() {
         : 'Replay now contains frame-before, output, approval, and frame-after proof.'
 
   return box({
-    style: {
-      width: '100%',
-      height: '100%',
-      backgroundColor: colors.bg,
-      padding: 28,
-      gap: 22,
-    },
+    width: '100%',
+    height: '100%',
+    backgroundColor: colors.bg,
+    padding: 28,
+    gap: 22,
   }, [
-    box({ style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' } }, [
-      box({ style: { gap: 6 } }, [
-        text({ text: 'Agent-Native Audit Replay Viewer', font: '800 30px Inter, system-ui', lineHeight: 38, style: { color: colors.text } }),
-        text({ text: 'A visual packet of exactly what the agent saw, requested, approved, and completed.', font: '15px Inter, system-ui', lineHeight: 22, style: { color: colors.muted } }),
+    box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, [
+      box({ gap: 6 }, [
+        text({ text: 'Agent-Native Audit Replay Viewer', font: '800 30px Inter, system-ui', lineHeight: 38, color: colors.text }),
+        text({ text: 'A visual packet of exactly what the agent saw, requested, approved, and completed.', font: '15px Inter, system-ui', lineHeight: 22, color: colors.muted }),
       ]),
       card('Replay artifact', [
         `Session ${replay.sessionId}`,
         `${replay.frames.length} frames / ${replay.actions.length} action`,
       ], colors.accent),
     ]),
-    box({ style: { flexDirection: 'row', gap: 16 } }, [
+    box({ flexDirection: 'row', gap: 16 }, [
       timelineItem(0, '1. Inspect', `${before?.geometry.nodes.length ?? 0} geometry nodes`),
       timelineItem(1, '2. Approval', `${action?.approval?.actor ?? 'manager'} approved`),
       timelineItem(2, '3. Completion', `${label(action?.output)}`),
     ]),
     card('Selected replay step', [selected], selectedStep.value === 2 ? colors.success : colors.accent),
-    box({ style: { flexDirection: 'row', gap: 18, flex: 1 } }, [
+    box({ flexDirection: 'row', gap: 18, flex: 1 }, [
       framePreview('Frame before', beforeNode, 'pending'),
       framePreview('Frame after', afterNode, action?.status ?? 'completed'),
     ]),
-    box({ style: { flexDirection: 'row', gap: 18 } }, [
+    box({ flexDirection: 'row', gap: 18 }, [
       card('Action contract', [
         `id: ${action?.actionId ?? 'unknown'}`,
         `risk: ${target?.risk ?? 'unknown'}`,
