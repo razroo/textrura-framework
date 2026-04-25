@@ -47,7 +47,7 @@ Use `semantic.id` for stable UI ids. If omitted, Geometra falls back to `agentAc
 - `createAgentGeometrySnapshot(tree, layout, options)` for auditable frame snapshots.
 - `createAgentRuntime(app, options)` for direct app-level commands: `inspect`, `snapshot`, `click`, `focus`, `type`, `key`, `getActionLog`, and `replay`.
 - `agentAction(contract, semantic)` and `collectAgentActions(tree, layout)` for business-level action contracts.
-- `createAgentGateway()` for policy, approval, execution, trace, and replay around those contracts.
+- `createAgentGateway()` for policy, approval, execution, notification hooks, trace, and replay around those contracts.
 
 ## Runtime Commands
 
@@ -114,6 +114,8 @@ View the replay summary:
 ```bash
 bun run demo:agent-native:replay
 ```
+
+The public demo build also includes `/agent-native-ops/` for the claims workflow and `/replay-viewer/` for a visual audit packet viewer backed by `examples/replays/claims-review.json`.
 
 Scaffold an agent-native gateway starter:
 

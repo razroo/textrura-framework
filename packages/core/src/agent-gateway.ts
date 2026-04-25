@@ -93,6 +93,9 @@ export interface AgentGatewayPendingApproval {
   reason: string
 }
 
+export type AgentGatewayApprovalHook = (approval: AgentGatewayPendingApproval) => unknown | Promise<unknown>
+export type AgentGatewayResultHook = (result: AgentGatewayActionResult) => unknown | Promise<unknown>
+
 export interface AgentGatewayActionResult {
   status: AgentGatewayActionStatus
   actionId: string
@@ -166,6 +169,10 @@ export interface AgentGatewayOptions {
   policy?: AgentGatewayPolicy
   execute?: AgentGatewayExecutor
   redact?: AgentGatewayRedactor
+  /** Optional side-effect hook for approval notifications or webhook dispatch. Hook failures are ignored. */
+  onApprovalRequired?: AgentGatewayApprovalHook
+  /** Optional side-effect hook for audit sinks or workflow notifications. Hook failures are ignored. */
+  onActionResult?: AgentGatewayResultHook
 }
 
 export interface AgentGateway {
@@ -264,6 +271,19 @@ export function createAgentGateway(options: AgentGatewayOptions): AgentGateway {
   const redactValue = (actionId: string, field: AgentGatewayRedactionField, value: unknown): unknown =>
     redact(value, { actionId, field })
 
+  const runHook = <T>(hook: ((value: T) => unknown | Promise<unknown>) | undefined, value: T): void => {
+    try {
+      void Promise.resolve(hook?.(value)).catch(() => undefined)
+    } catch {
+      // Hooks are notification sinks; they must not change gateway execution.
+    }
+  }
+
+  const resultWithHook = (result: AgentGatewayActionResult): AgentGatewayActionResult => {
+    runHook(options.onActionResult, result)
+    return result
+  }
+
   const withTrace = (): void => {
     if (frame) frame = { ...frame, trace }
   }
@@ -347,7 +367,7 @@ export function createAgentGateway(options: AgentGatewayOptions): AgentGateway {
       status,
       error: String(redactValue(request.actionId, 'error', reason)),
     })
-    return {
+    return resultWithHook({
       status,
       actionId: request.actionId,
       replayId: replay.id,
@@ -355,7 +375,7 @@ export function createAgentGateway(options: AgentGatewayOptions): AgentGateway {
       ...(target ? { target } : {}),
       reason,
       trace,
-    }
+    })
   }
 
   const executeApproved = async (
@@ -382,7 +402,7 @@ export function createAgentGateway(options: AgentGatewayOptions): AgentGateway {
         approval: { actor: approvalActor ?? request.approvalActor ?? 'human', approved: false, timestamp: approvalTimestamp },
         error: 'approval denied',
       })
-      return {
+      return resultWithHook({
         status: 'denied',
         actionId: request.actionId,
         frameId: sourceFrame.id,
@@ -390,7 +410,7 @@ export function createAgentGateway(options: AgentGatewayOptions): AgentGateway {
         target,
         reason: 'approval denied',
         trace,
-      }
+      })
     }
 
     try {
@@ -405,7 +425,7 @@ export function createAgentGateway(options: AgentGatewayOptions): AgentGateway {
         approval: { actor: approvalActor ?? request.approvalActor ?? 'human', approved: true, timestamp: approvalTimestamp },
         output: redactedOutput,
       })
-      return {
+      return resultWithHook({
         status: 'completed',
         actionId: request.actionId,
         frameId: sourceFrame.id,
@@ -413,7 +433,7 @@ export function createAgentGateway(options: AgentGatewayOptions): AgentGateway {
         target,
         output: redactedOutput,
         trace,
-      }
+      })
     } catch (error) {
       const message = errorMessage(error)
       append(request.actionId, 'failed', {
@@ -425,7 +445,7 @@ export function createAgentGateway(options: AgentGatewayOptions): AgentGateway {
         approval: { actor: approvalActor ?? request.approvalActor ?? 'human', approved: true, timestamp: approvalTimestamp },
         error: String(redactValue(request.actionId, 'error', message)),
       })
-      return {
+      return resultWithHook({
         status: 'failed',
         actionId: request.actionId,
         frameId: sourceFrame.id,
@@ -433,7 +453,7 @@ export function createAgentGateway(options: AgentGatewayOptions): AgentGateway {
         target,
         reason: message,
         trace,
-      }
+      })
     }
   }
 
@@ -538,7 +558,7 @@ export function createAgentGateway(options: AgentGatewayOptions): AgentGateway {
           status: 'denied',
           error: String(redactValue(request.actionId, 'error', policyDecision.reason)),
         })
-        return {
+        return resultWithHook({
           status: 'denied',
           actionId: request.actionId,
           frameId: sourceFrame.id,
@@ -546,14 +566,14 @@ export function createAgentGateway(options: AgentGatewayOptions): AgentGateway {
           target,
           reason: policyDecision.reason,
           trace,
-        }
+        })
       }
 
       const approvalRequired = policyDecision.requiresApproval === true || target.requiresConfirmation
       if (approvalRequired && request.approved !== true) {
         approvalIndex++
         const approvalId = `${options.sessionId}:approval:${approvalIndex}`
-        pendingApprovals.set(approvalId, {
+        const pendingApproval = {
           id: approvalId,
           actionId: request.actionId,
           frameId: sourceFrame.id,
@@ -564,8 +584,18 @@ export function createAgentGateway(options: AgentGatewayOptions): AgentGateway {
           replayId: replay.id,
           policy: policyDecision,
           frame: sourceFrame,
+        }
+        pendingApprovals.set(approvalId, pendingApproval)
+        runHook(options.onApprovalRequired, {
+          id: pendingApproval.id,
+          actionId: pendingApproval.actionId,
+          frameId: pendingApproval.frameId,
+          requestedAt: pendingApproval.requestedAt,
+          target: pendingApproval.target,
+          request: pendingApproval.request,
+          reason: pendingApproval.reason,
         })
-        return {
+        return resultWithHook({
           status: 'awaiting_approval',
           actionId: request.actionId,
           frameId: sourceFrame.id,
@@ -574,7 +604,7 @@ export function createAgentGateway(options: AgentGatewayOptions): AgentGateway {
           target,
           reason: policyDecision.reason ?? 'approval required',
           trace,
-        }
+        })
       }
 
       return executeApproved(sourceFrame, target, request, replay.id, true, request.approvalActor)
@@ -583,13 +613,13 @@ export function createAgentGateway(options: AgentGatewayOptions): AgentGateway {
     async approveAction(request) {
       const pending = pendingApprovals.get(request.approvalId)
       if (!pending) {
-        return {
+        return resultWithHook({
           status: 'approval_not_found',
           actionId: '',
           approvalId: request.approvalId,
           reason: `approval "${request.approvalId}" is not pending`,
           trace,
-        }
+        })
       }
       pendingApprovals.delete(request.approvalId)
       return executeApproved(

@@ -2,13 +2,18 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Geometra Agent Gateway",
-    "version": "1.60.0",
+    "version": "1.61.0",
     "description": "HTTP API for inspecting agent-native Geometra frames, requesting policy-gated actions, approving work, and replaying audited UI state."
   },
+  "security": [
+    { "ApiKeyAuth": [] },
+    { "BearerAuth": [] }
+  ],
   "paths": {
     "/health": {
       "get": {
         "summary": "Health check",
+        "security": [],
         "responses": {
           "200": {
             "description": "Gateway is healthy"
@@ -25,6 +30,9 @@
             "description": "Current frame inspection",
             "content": {
               "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InspectResponse"
+                },
                 "examples": {
                   "claimsReview": {
                     "value": {
@@ -93,6 +101,9 @@
             "description": "Action result or pending approval",
             "content": {
               "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionRequestResponse"
+                },
                 "examples": {
                   "awaitingApproval": {
                     "value": {
@@ -129,7 +140,14 @@
         },
         "responses": {
           "200": {
-            "description": "Approval result"
+            "description": "Approval result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionRequestResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -163,6 +181,9 @@
             "description": "Replay record",
             "content": {
               "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayResponse"
+                },
                 "examples": {
                   "claimsReplay": {
                     "value": {
@@ -195,7 +216,174 @@
     }
   },
   "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-geometra-api-key"
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
     "schemas": {
+      "Bounds": {
+        "type": "object",
+        "required": ["x", "y", "width", "height"],
+        "properties": {
+          "x": { "type": "number" },
+          "y": { "type": "number" },
+          "width": { "type": "number" },
+          "height": { "type": "number" }
+        }
+      },
+      "GeometryNode": {
+        "type": "object",
+        "required": ["id", "bounds"],
+        "properties": {
+          "id": { "type": "string" },
+          "kind": { "type": "string" },
+          "role": { "type": "string" },
+          "name": { "type": "string" },
+          "text": { "type": "string" },
+          "bounds": { "$ref": "#/components/schemas/Bounds" },
+          "hitTarget": { "$ref": "#/components/schemas/Bounds" },
+          "visible": { "type": "boolean" },
+          "enabled": { "type": "boolean" },
+          "focusable": { "type": "boolean" },
+          "interactive": { "type": "boolean" },
+          "actionId": { "type": "string" }
+        }
+      },
+      "GeometrySnapshot": {
+        "type": "object",
+        "required": ["id", "rootBounds", "nodes", "actions"],
+        "properties": {
+          "id": { "type": "string" },
+          "route": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "rootBounds": { "$ref": "#/components/schemas/Bounds" },
+          "nodes": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/GeometryNode" }
+          },
+          "actions": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ActionTarget" }
+          }
+        }
+      },
+      "ActionTarget": {
+        "type": "object",
+        "required": ["id", "kind", "title", "risk", "bounds"],
+        "properties": {
+          "id": { "type": "string" },
+          "kind": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "risk": { "enum": ["read", "write", "external", "destructive"] },
+          "requiresConfirmation": { "type": "boolean" },
+          "enabled": { "type": "boolean" },
+          "bounds": { "$ref": "#/components/schemas/Bounds" },
+          "inputSchema": { "type": "object", "additionalProperties": true },
+          "outputSchema": { "type": "object", "additionalProperties": true },
+          "preconditions": { "type": "array", "items": { "type": "string" } },
+          "postconditions": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "PendingApproval": {
+        "type": "object",
+        "required": ["id", "actionId", "frameId", "requestedAt", "target", "request", "reason"],
+        "properties": {
+          "id": { "type": "string" },
+          "actionId": { "type": "string" },
+          "frameId": { "type": "string" },
+          "requestedAt": { "type": "string", "format": "date-time" },
+          "target": { "$ref": "#/components/schemas/ActionTarget" },
+          "request": { "$ref": "#/components/schemas/ActionRequest" },
+          "reason": { "type": "string" }
+        }
+      },
+      "FrameSnapshot": {
+        "type": "object",
+        "required": ["id", "createdAt", "layout", "geometry", "actions"],
+        "properties": {
+          "id": { "type": "string" },
+          "route": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "layout": true,
+          "geometry": { "$ref": "#/components/schemas/GeometrySnapshot" },
+          "actions": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ActionTarget" }
+          }
+        }
+      },
+      "InspectResponse": {
+        "type": "object",
+        "required": ["frame", "geometry", "actions", "pendingApprovals"],
+        "properties": {
+          "tenant": { "type": "string" },
+          "frame": { "$ref": "#/components/schemas/FrameSnapshot" },
+          "geometry": { "$ref": "#/components/schemas/GeometrySnapshot" },
+          "actions": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ActionTarget" }
+          },
+          "pendingApprovals": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PendingApproval" }
+          }
+        }
+      },
+      "ActionResult": {
+        "type": "object",
+        "required": ["status", "actionId", "trace"],
+        "properties": {
+          "status": {
+            "enum": ["completed", "awaiting_approval", "denied", "disabled", "failed", "no_frame", "not_found", "stale_frame", "approval_not_found"]
+          },
+          "actionId": { "type": "string" },
+          "frameId": { "type": "string" },
+          "approvalId": { "type": "string" },
+          "replayId": { "type": "string" },
+          "target": { "$ref": "#/components/schemas/ActionTarget" },
+          "reason": { "type": "string" },
+          "output": true,
+          "trace": true
+        }
+      },
+      "ActionRequestResponse": {
+        "type": "object",
+        "required": ["result", "pendingApprovals"],
+        "properties": {
+          "tenant": { "type": "string" },
+          "result": { "$ref": "#/components/schemas/ActionResult" },
+          "pendingApprovals": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PendingApproval" }
+          }
+        }
+      },
+      "ReplayResponse": {
+        "type": "object",
+        "required": ["replay"],
+        "properties": {
+          "tenant": { "type": "string" },
+          "replay": {
+            "type": "object",
+            "required": ["sessionId", "startedAt", "trace", "frames", "actions"],
+            "properties": {
+              "sessionId": { "type": "string" },
+              "startedAt": { "type": "string", "format": "date-time" },
+              "trace": true,
+              "frames": { "type": "array", "items": { "$ref": "#/components/schemas/FrameSnapshot" } },
+              "actions": { "type": "array", "items": true }
+            }
+          }
+        }
+      },
       "ActionRequest": {
         "type": "object",
         "required": ["actionId"],

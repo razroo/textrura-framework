@@ -80,4 +80,21 @@ const gateway = createAgentGateway({
 })
 ```
 
-Approval webhooks can be implemented at the executor boundary: send a notification when `requestAction()` returns `awaiting_approval`, then call `/actions/approve` from your approval service after the human decision.
+Approval webhooks can be wired directly through core gateway hooks:
+
+```ts
+const gateway = createAgentGateway({
+  sessionId: 'claims-review',
+  onApprovalRequired: approval => {
+    void fetch('https://workflow.example/approvals', {
+      method: 'POST',
+      body: JSON.stringify(approval),
+    })
+  },
+  onActionResult: result => {
+    console.log('gateway result', result.status, result.actionId)
+  },
+})
+```
+
+Use `onApprovalRequired` to notify Slack, PagerDuty, a claims supervisor queue, or an internal workflow engine. Use `onActionResult` to mirror completed, denied, or failed outcomes into your audit warehouse.

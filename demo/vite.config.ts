@@ -24,6 +24,7 @@ export default defineConfig({
         main: path.resolve(import.meta.dirname, 'index.html'),
         'agent-native-ops': path.resolve(import.meta.dirname, 'agent-native-ops/index.html'),
         'ai-on-demand': path.resolve(import.meta.dirname, 'ai-on-demand/index.html'),
+        'replay-viewer': path.resolve(import.meta.dirname, 'replay-viewer/index.html'),
         webgpu: path.resolve(import.meta.dirname, 'webgpu.html'),
       },
     },

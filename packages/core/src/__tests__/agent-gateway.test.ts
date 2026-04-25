@@ -209,4 +209,30 @@ describe('agent gateway', () => {
       reason: 'action "approve-payout" is disabled',
     })
   })
+
+  it('notifies approval and result hooks without changing execution', async () => {
+    const approvalIds: string[] = []
+    const statuses: string[] = []
+    const gateway = createAgentGateway({
+      sessionId: 'claims',
+      now: clock(),
+      execute: ({ target }) => ({ action: target.id, ok: true }),
+      onApprovalRequired: approval => {
+        approvalIds.push(approval.id)
+      },
+      onActionResult: result => {
+        statuses.push(result.status)
+      },
+    })
+    const frame = gateway.setFrame(tree(), layout(), { id: 'frame-1' })
+
+    const pending = await gateway.requestAction({ actionId: 'approve-payout', frameId: frame.id })
+    expect(approvalIds).toEqual(['claims:approval:1'])
+    expect(statuses).toEqual(['awaiting_approval'])
+
+    await expect(gateway.approveAction({ approvalId: pending.approvalId!, actor: 'manager' })).resolves.toMatchObject({
+      status: 'completed',
+    })
+    expect(statuses).toEqual(['awaiting_approval', 'completed'])
+  })
 })

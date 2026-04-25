@@ -186,6 +186,7 @@ export type {
   AgentGatewayActionRequest,
   AgentGatewayActionResult,
   AgentGatewayActionStatus,
+  AgentGatewayApprovalHook,
   AgentGatewayApprovalRequest,
   AgentGatewayExecuteContext,
   AgentGatewayExecutor,
@@ -203,6 +204,7 @@ export type {
   AgentGatewayRedactor,
   AgentGatewayReplay,
   AgentGatewayReplayAction,
+  AgentGatewayResultHook,
 } from './agent-gateway.js'
 export { createAgentRuntime } from './agent-runtime.js'
 export type {

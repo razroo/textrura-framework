@@ -220,9 +220,10 @@ const TEMPLATES = {
           'This vertical starter models a claims/compliance review queue with semantic geometry, risk-gated actions, human approval, trace, and replay.',
         commands: ['npm install', 'npm run dev', 'npm run check'],
         notes: [
-          'Start with GET /inspect to read the current claim queue as semantic geometry.',
-          'Request approve-payout, request-evidence, or escalate-claim with POST /actions/request.',
-          'Approve pending work with POST /actions/approve and inspect GET /replay for the audit record.',
+          'Start with GET /inspect to read queue filters, the evidence panel, and action contracts as semantic geometry.',
+          'Request approve-payout, request-evidence, or escalate-claim with POST /actions/request and a claimId input.',
+          'Risk policy only allows approval on low-risk ready claims, evidence requests on missing-evidence claims, and escalation on high-risk claims.',
+          'Approve pending work with POST /actions/approve, inspect GET /replay, or open ./replays/latest-audit-packet.json after a completed action.',
         ],
       }),
     }),

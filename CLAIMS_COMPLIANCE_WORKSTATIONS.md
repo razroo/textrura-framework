@@ -39,6 +39,7 @@ Geometra can package that proof in the UI protocol:
 ## Proof Assets In This Repo
 
 - `demos/agent-native-ops` shows the human workstation and the agent-visible semantic geometry side by side.
+- `demo/replay-viewer` renders the generated replay as a visual audit packet for the public demo build.
 - `bun run demo:agent-native:http` runs the external-agent HTTP flow and writes `examples/replays/claims-review.json`.
 - `packages/gateway/openapi.json` describes the inspect/actions/trace/replay API surface.
 - `bun run benchmark:agent-native:live` compares a live Geometra-native flow with browser-inference-style automation.
@@ -52,6 +53,6 @@ Prioritize features that make this vertical easier to sell:
 - Replay retention, export, and redaction policies.
 - Approval webhooks and integrations with existing workflow systems.
 - Tenant/session auth examples.
-- Audit packet viewer.
-- Starter templates for claims/compliance queues.
+- Audit packet viewer and downloaded replay artifacts.
+- Starter templates for claims/compliance queues with queue filters, evidence panels, and risk-score policies.
 - Live benchmarks against equivalent HTML/Playwright workflows.

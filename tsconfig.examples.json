@@ -13,6 +13,7 @@
       "@geometra/renderer-webgpu": ["packages/renderer-webgpu/src/index.ts"],
       "@geometra/server": ["packages/server/src/index.ts"],
       "@geometra/client": ["packages/client/src/index.ts"],
+      "@geometra/gateway": ["packages/gateway/src/index.ts"],
       "@geometra/ui": ["packages/ui/src/index.ts"],
       "@geometra/router": ["packages/router/src/index.ts"]
     }

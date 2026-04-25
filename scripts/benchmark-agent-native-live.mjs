@@ -12,7 +12,22 @@ const HTML_BASELINE = `<!doctype html>
   <button data-action="approve-payout" aria-label="Approve payout">Approve payout</button>
   <button data-action="request-evidence" aria-label="Request evidence">Request docs</button>
   <button data-action="export-audit-packet" aria-label="Export audit packet">Export audit</button>
-</main>`
+  <section data-testid="approval-panel" hidden>
+    <h2>Human approval required</h2>
+    <button aria-label="Manager approve">Manager approve</button>
+  </section>
+</main>
+<script>
+  window.__trace = []
+  document.querySelector('[data-action="approve-payout"]').addEventListener('click', () => {
+    window.__trace.push({ event: 'clicked', actionId: 'approve-payout' })
+    document.querySelector('[data-testid="approval-panel"]').hidden = false
+  })
+  document.querySelector('[aria-label="Manager approve"]').addEventListener('click', () => {
+    window.__trace.push({ event: 'approved', actor: 'Ops manager' })
+    document.querySelector('[data-route="claims-review"]').setAttribute('data-status', 'approved')
+  })
+</script>`
 
 function layout() {
   return {
@@ -66,22 +81,33 @@ async function browserInferenceBaseline() {
   const page = await browser.newPage({ viewport: { width: 640, height: 360 } })
   try {
     await page.setContent(HTML_BASELINE)
+    const inspected = await page.locator('main').evaluate(node => ({
+      html: node.outerHTML,
+      buttons: [...node.querySelectorAll('button')].map(button => ({
+        label: button.getAttribute('aria-label') ?? button.textContent?.trim() ?? '',
+        actionId: button.getAttribute('data-action'),
+      })),
+    }))
     const button = page.getByRole('button', { name: 'Approve payout' })
     const bounds = await button.boundingBox()
     await button.click()
+    await page.getByRole('button', { name: 'Manager approve' }).click()
     const snapshot = await page.locator('main').evaluate(node => ({
       html: node.outerHTML,
       actionCount: node.querySelectorAll('[data-action]').length,
       approveLabel: node.querySelector('[data-action="approve-payout"]')?.getAttribute('aria-label') ?? null,
+      status: node.getAttribute('data-status'),
+      trace: window.__trace,
     }))
+    const screenshot = await page.screenshot({ fullPage: true })
     return {
       mode: 'browser-inference',
-      contextBytes: bytes(snapshot.html),
-      toolCalls: 7,
+      contextBytes: bytes(inspected) + bytes(snapshot.html) + screenshot.byteLength,
+      toolCalls: 9,
       replayable: false,
       postconditionChecks: 0,
-      success: bounds !== null && snapshot.approveLabel === 'Approve payout',
-      proof: `Playwright role lookup + DOM snapshot; approve bounds ${bounds ? `${Math.round(bounds.x)},${Math.round(bounds.y)},${Math.round(bounds.width)}x${Math.round(bounds.height)}` : 'missing'}; no structured frame-before/frame-after replay.`,
+      success: bounds !== null && snapshot.approveLabel === 'Approve payout' && snapshot.status === 'approved',
+      proof: `Playwright role lookup + DOM/screenshot trace (${snapshot.trace.length} events); approve bounds ${bounds ? `${Math.round(bounds.x)},${Math.round(bounds.y)},${Math.round(bounds.width)}x${Math.round(bounds.height)}` : 'missing'}; no structured frame-before/frame-after replay.`,
     }
   } finally {
     await browser.close()
@@ -121,14 +147,15 @@ async function geometraNativeFlow() {
     })
     gateway.setFrame(tree(), layout(), { id: 'live-agent-native-benchmark:frame:2', route: 'claims-review' })
     const replay = await json(server.url, '/replay')
+    const completedAction = replay.replay.actions.find(action => action.actionId === 'approve-payout')
     return {
       mode: 'geometra-native',
-      contextBytes: bytes(inspected.geometry),
+      contextBytes: bytes(inspected.geometry) + bytes(completedAction),
       toolCalls: 4,
       replayable: true,
       postconditionChecks: approved.result.output.postconditions.length,
-      success: approved.result.status === 'completed',
-      proof: `${replay.replay.frames.length} replay frames, ${inspected.geometry.nodes.length} semantic geometry nodes.`,
+      success: approved.result.status === 'completed' && completedAction?.frameBefore && completedAction?.frameAfter,
+      proof: `${replay.replay.frames.length} replay frames, ${inspected.geometry.nodes.length} semantic geometry nodes, approval/output embedded in replay.`,
     }
   } finally {
     await server.close()
