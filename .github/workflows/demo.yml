@@ -36,7 +36,7 @@ jobs:
       - name: Build Textura demo
         run: |
           cd packages/textura
-          npx vite build --config demo/vite.config.ts --base /geometra/textura/
+          npx vite build --config demo/vite.config.ts --base ./
           cp -r dist-demo ../../dist-demo/textura
 
       - uses: actions/upload-pages-artifact@v3
