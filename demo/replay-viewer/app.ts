@@ -159,5 +159,5 @@ function root() {
 
 const canvas = document.getElementById('app') as HTMLCanvasElement
 const renderer = new CanvasRenderer({ canvas, background: colors.bg })
-const app = await createApp(root, renderer, { width: window.innerWidth, waitForFonts: true })
+const app = await createApp(root, renderer, { width: window.innerWidth, height: window.innerHeight, waitForFonts: true })
 app.update()
