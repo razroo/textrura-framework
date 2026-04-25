@@ -211,6 +211,7 @@ const geometryNodeCount = signal(0)
 const geometryActionLogCount = signal(0)
 const selectedGeometryNode = signal<AgentGeometryNode | null>(null)
 const agentNote = signal('')
+const auditExportMessage = signal('Audit packet not exported yet.')
 
 function syncGatewayFrame() {
   if (!appRef?.tree || !appRef.layout) return null
@@ -295,6 +296,35 @@ function handleAgentNoteKey(event: KeyboardHitEvent): void {
   if (event.key.length === 1 && !event.metaKey && !event.ctrlKey) {
     agentNote.set(`${agentNote.peek()}${event.key}`)
   }
+}
+
+function createAuditPacket(): Record<string, unknown> {
+  const frame = runtimeRef?.snapshot({ route: 'claims-review' })
+  const replay = gateway.getReplay()
+  return {
+    exportedAt: new Date().toISOString(),
+    workflow: 'claims-review',
+    activeClaimId: activeClaimId.peek(),
+    selectedGeometryNode: selectedGeometryNode.peek(),
+    agentNote: agentNote.peek(),
+    frame,
+    trace: gateway.getTrace(),
+    gatewayReplay: replay,
+    runtimeActionLog: runtimeRef?.getActionLog() ?? [],
+  }
+}
+
+function exportAuditPacket(): void {
+  const packet = createAuditPacket()
+  const textValue = JSON.stringify(packet, null, 2)
+  const blob = new Blob([textValue], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `geometra-claims-audit-${activeClaimId.peek()}.json`
+  anchor.click()
+  URL.revokeObjectURL(url)
+  auditExportMessage.set(`Exported ${anchor.download} with ${gateway.getReplay().frames.length} replay frames.`)
 }
 
 async function runAction(actionId: ActionId): Promise<void> {
@@ -758,6 +788,11 @@ function replayPanel(): UIElement {
           ),
         ]
       : [copy('Replay will show frame-before, policy, approval, output, and frame-after once an agent action runs.')]),
+    box({ height: 1, backgroundColor: '#e6dfd2' }, []),
+    box({ flexDirection: 'row', gap: 10, alignItems: 'center', flexWrap: 'wrap' }, [
+      geometryCommandButton('Export audit packet', exportAuditPacket),
+      copy(auditExportMessage.value),
+    ]),
   ])
 }
 
@@ -911,6 +946,10 @@ function compactTraceReplayPanel(): UIElement {
           copy(`Frame-before geometry: ${lastAction.frameBefore?.geometry.nodes.length ?? 0} nodes.`),
         ]
       : [copy('Replay records before/after frames once an agent action runs.')]),
+    box({ flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap' }, [
+      geometryCommandButton('Export audit', exportAuditPacket),
+      copy(auditExportMessage.value),
+    ]),
   ])
 }
 

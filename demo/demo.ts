@@ -1906,6 +1906,7 @@ function heroSection(): UIElement {
           box({ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }, [
             btn('Starter Docs', false, () => window.open('https://github.com/razroo/geometra#start-here', '_blank')),
             btn('Full-Stack Example', false, () => window.open('https://github.com/razroo/geometra/tree/main/demos/full-stack-dashboard', '_blank')),
+            btn('Agent-Native Claims Demo', false, () => { window.location.href = './agent-native-ops/' }),
             btn('WebGPU Demo', false, () => { window.location.href = './webgpu.html' }),
             btn('Export PDF', false, exportPdf),
           ]),

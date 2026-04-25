@@ -170,6 +170,64 @@ const TEMPLATES = {
     }),
     nextSteps: ['npm install', 'npm run dev'],
   },
+  'agent-workstation': {
+    label: 'Agent-native workstation',
+    description: 'Policy-gated agent workflow gateway with /inspect, approvals, trace, and replay.',
+    starterFiles: ['server.ts'],
+    dependencies: ['@geometra/core', '@geometra/gateway'],
+    devDependencies: ['@types/node', 'typescript', 'tsx'],
+    scripts: {
+      dev: 'tsx server.ts',
+      check: 'tsc --noEmit',
+      build: "echo 'No build step required for the agent-workstation starter.'",
+    },
+    extraFiles: (appName) => ({
+      '.gitignore': sharedGitignore,
+      'tsconfig.json': createTsconfig({ nodeTypes: true }),
+      'README.md': createReadme({
+        appName,
+        template: 'agent-workstation',
+        description:
+          'This starter exposes a Geometra agent-native workflow over HTTP: inspect exact semantic geometry, request an action, approve it, then replay what happened.',
+        commands: ['npm install', 'npm run dev', 'npm run check'],
+        notes: [
+          'Open the printed URL and call GET /inspect to see the UI protocol frame.',
+          'POST /actions/request with actionId=approve-payout and the current frameId to create a pending approval.',
+          'POST /actions/approve with the returned approvalId, then GET /replay for the audit record.',
+        ],
+      }),
+    }),
+    nextSteps: ['npm install', 'npm run dev'],
+  },
+  'claims-compliance': {
+    label: 'Claims/compliance workstation',
+    description: 'Vertical agent-native claims queue with evidence, risk, approval, and replay.',
+    starterFiles: ['server.ts'],
+    dependencies: ['@geometra/core', '@geometra/gateway'],
+    devDependencies: ['@types/node', 'typescript', 'tsx'],
+    scripts: {
+      dev: 'tsx server.ts',
+      check: 'tsc --noEmit',
+      build: "echo 'No build step required for the claims-compliance starter.'",
+    },
+    extraFiles: (appName) => ({
+      '.gitignore': sharedGitignore,
+      'tsconfig.json': createTsconfig({ nodeTypes: true }),
+      'README.md': createReadme({
+        appName,
+        template: 'claims-compliance',
+        description:
+          'This vertical starter models a claims/compliance review queue with semantic geometry, risk-gated actions, human approval, trace, and replay.',
+        commands: ['npm install', 'npm run dev', 'npm run check'],
+        notes: [
+          'Start with GET /inspect to read the current claim queue as semantic geometry.',
+          'Request approve-payout, request-evidence, or escalate-claim with POST /actions/request.',
+          'Approve pending work with POST /actions/approve and inspect GET /replay for the audit record.',
+        ],
+      }),
+    }),
+    nextSteps: ['npm install', 'npm run dev'],
+  },
 }
 
 main()

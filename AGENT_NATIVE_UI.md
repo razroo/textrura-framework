@@ -109,6 +109,24 @@ bun run demo:agent-native:http
 
 That script builds the core/gateway packages, starts a local gateway, calls `/inspect`, requests `approve-payout`, approves it, reads `/replay`, and writes `examples/replays/claims-review.json`.
 
+View the replay summary:
+
+```bash
+bun run demo:agent-native:replay
+```
+
+Scaffold an agent-native gateway starter:
+
+```bash
+bun run create:app -- ./claims-workstation --template agent-workstation
+```
+
+For the vertical starter:
+
+```bash
+bun run create:app -- ./claims-compliance --template claims-compliance
+```
+
 ## Benchmark
 
 Run the deterministic value harness:
@@ -119,3 +137,11 @@ bun run benchmark:agent-native:assert
 
 The harness compares Geometra-native operation against MCP/browser/vision-style inference on context bytes, tool calls, latency, success rate, security failures, replayability, and postcondition checks.
 See `benchmarks/agent-native-methodology.md` for assumptions and metric definitions.
+
+Run the live protocol-vs-browser-inference harness:
+
+```bash
+bun run benchmark:agent-native:live
+```
+
+For vertical positioning, see `CLAIMS_COMPLIANCE_WORKSTATIONS.md`.

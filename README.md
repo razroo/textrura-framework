@@ -214,6 +214,12 @@ bun run demo:agent-native:http
 
 It starts a local gateway, calls `/inspect`, requests and approves `approve-payout`, reads `/replay`, and writes `examples/replays/claims-review.json`.
 
+For the vertical wedge, see [`CLAIMS_COMPLIANCE_WORKSTATIONS.md`](CLAIMS_COMPLIANCE_WORKSTATIONS.md). To scaffold the same pattern, run:
+
+```bash
+bun run create:app -- ./claims-workstation --template agent-workstation
+```
+
 ## Agent-native roadmap
 
 The next layer is explicit agent contracts on top of geometry: stable action ids, risk classes, policy gates, traces, and replay. Start with:

@@ -13,6 +13,8 @@ const templateChecks = {
   'server-client': ['package.json', 'server.ts', 'client.ts', 'index.html', 'tsconfig.json', 'README.md'],
   'canvas-local': ['package.json', 'app.ts', 'index.html', 'tsconfig.json', 'README.md'],
   terminal: ['package.json', 'app.ts', 'tsconfig.json', 'README.md'],
+  'agent-workstation': ['package.json', 'server.ts', 'tsconfig.json', 'README.md'],
+  'claims-compliance': ['package.json', 'server.ts', 'tsconfig.json', 'README.md'],
 }
 
 try {

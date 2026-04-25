@@ -1,0 +1,239 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Geometra Agent Gateway",
+    "version": "1.60.0",
+    "description": "HTTP API for inspecting agent-native Geometra frames, requesting policy-gated actions, approving work, and replaying audited UI state."
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Gateway is healthy"
+          }
+        }
+      }
+    },
+    "/inspect": {
+      "get": {
+        "summary": "Inspect the current semantic geometry frame",
+        "description": "Returns the latest frame, semantic geometry nodes, action contracts, and pending approvals.",
+        "responses": {
+          "200": {
+            "description": "Current frame inspection",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "claimsReview": {
+                    "value": {
+                      "frame": { "id": "claims-review:frame:1", "route": "claims-review" },
+                      "geometry": {
+                        "id": "claims-review:frame:1",
+                        "nodes": [
+                          {
+                            "id": "approve-payout",
+                            "role": "button",
+                            "name": "Approve payout",
+                            "bounds": { "x": 24, "y": 144, "width": 160, "height": 48 },
+                            "enabled": true,
+                            "focusable": true
+                          }
+                        ]
+                      },
+                      "actions": [
+                        { "id": "approve-payout", "kind": "approve", "risk": "write", "requiresConfirmation": true }
+                      ],
+                      "pendingApprovals": []
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/frame": {
+      "get": {
+        "summary": "Return the latest frame snapshot",
+        "responses": {
+          "200": {
+            "description": "Latest frame snapshot"
+          }
+        }
+      }
+    },
+    "/actions": {
+      "get": {
+        "summary": "List current frame-bound actions",
+        "responses": {
+          "200": {
+            "description": "Action catalog and pending approvals"
+          }
+        }
+      }
+    },
+    "/actions/request": {
+      "post": {
+        "summary": "Request a gateway action",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Action result or pending approval",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "awaitingApproval": {
+                    "value": {
+                      "result": {
+                        "status": "awaiting_approval",
+                        "actionId": "approve-payout",
+                        "frameId": "claims-review:frame:1",
+                        "approvalId": "claims-review:approval:1"
+                      },
+                      "pendingApprovals": [
+                        { "id": "claims-review:approval:1", "actionId": "approve-payout" }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/actions/approve": {
+      "post": {
+        "summary": "Approve or deny a pending action",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApprovalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Approval result"
+          }
+        }
+      }
+    },
+    "/trace": {
+      "get": {
+        "summary": "Return append-only trace events",
+        "responses": {
+          "200": {
+            "description": "Trace events"
+          }
+        }
+      }
+    },
+    "/replay": {
+      "get": {
+        "summary": "Return replay frames and action outcomes",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional stored replay session id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Replay record",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "claimsReplay": {
+                    "value": {
+                      "replay": {
+                        "sessionId": "claims-review",
+                        "frames": [
+                          { "id": "claims-review:frame:1" },
+                          { "id": "claims-review:frame:2" }
+                        ],
+                        "actions": [
+                          {
+                            "actionId": "approve-payout",
+                            "status": "completed",
+                            "frameBefore": { "id": "claims-review:frame:1" },
+                            "frameAfter": { "id": "claims-review:frame:2" }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Stored replay not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ActionRequest": {
+        "type": "object",
+        "required": ["actionId"],
+        "properties": {
+          "actionId": {
+            "type": "string"
+          },
+          "frameId": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "approvalActor": {
+            "type": "string"
+          },
+          "approved": {
+            "type": "boolean"
+          },
+          "input": true
+        }
+      },
+      "ApprovalRequest": {
+        "type": "object",
+        "required": ["approvalId"],
+        "properties": {
+          "approvalId": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "approved": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    }
+  }
+}
