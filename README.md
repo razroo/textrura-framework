@@ -5,7 +5,7 @@
 > **AI Agents:** See [`llms.txt`](llms.txt) for a structured overview of the entire framework — architecture, props, components, protocols, and APIs.
 > **Agent-native apps:** See [`AGENT_NATIVE_UI.md`](AGENT_NATIVE_UI.md) for exact semantic geometry, stable UI ids, runtime commands, gateway inspect/actions, trace, and replay.
 
-**[Live Demo](https://razroo.github.io/geometra)** | **[npm](https://www.npmjs.com/org/geometra)** | **[GitHub](https://github.com/razroo/geometra)** | **[Auth](https://github.com/razroo/geometra-auth)** | **[Token Registry](https://github.com/razroo/geometra-token-registry)**
+**[Live Demo](https://geometra.razroo.com)** | **[npm](https://www.npmjs.com/org/geometra)** | **[GitHub](https://github.com/razroo/geometra)** | **[Auth](https://github.com/razroo/geometra-auth)** | **[Token Registry](https://github.com/razroo/geometra-token-registry)**
 
 https://github.com/user-attachments/assets/1610d856-3c7d-4fce-be42-1c43306e6520
 
@@ -392,8 +392,8 @@ This is particularly relevant for:
 | Multi-instance | Multiple server/client pairs in one process | One app per page | One app per request |
 | Time to interactive | Instant (geometry is pre-computed) | After hydration + layout | After HTML parse + hydration + layout |
 
-- Dashboard: https://razroo.github.io/geometra-demo/
-- Agent Demo: https://razroo.github.io/geometra-demo/agent-demo.html
+- Dashboard: https://geometra.razroo.com/
+- Agent-native claims demo: https://geometra.razroo.com/agent-native-ops/
 
 ## How It Works
 
