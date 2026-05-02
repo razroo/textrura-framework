@@ -41,6 +41,7 @@ const ACCENT4 = '#f59e0b'
 const CODE_BG = '#131320'
 const GLOW = 'rgba(233,69,96,0.18)'
 const CARD_COLORS = [ACCENT, '#0f3460', '#533483', ACCENT2, ACCENT3, ACCENT4]
+const GITHUB_REPO_URL = 'https://github.com/razroo/geometra'
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const vw = signal(window.innerWidth)
@@ -1904,6 +1905,7 @@ function heroSection(): UIElement {
             }),
           ]),
           box({ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }, [
+            btn('GitHub Repo', false, () => window.open(GITHUB_REPO_URL, '_blank')),
             btn('Starter Docs', false, () => window.open('https://github.com/razroo/geometra#start-here', '_blank')),
             btn('Full-Stack Example', false, () => window.open('https://github.com/razroo/geometra/tree/main/demos/full-stack-dashboard', '_blank')),
             btn('Agent-Native Claims Demo', false, () => { window.location.href = './agent-native-ops/' }),
@@ -2298,8 +2300,8 @@ function footerSection(): UIElement {
   }, [
     center(
       box({ flexDirection: 'row', gap: 24, alignItems: 'center' }, [
-        box({ cursor: 'pointer', onClick: () => window.open('https://github.com/razroo/geometra', '_blank') }, [
-          text({ text: 'GitHub', font: '600 14px Inter', lineHeight: 20, color: ACCENT }),
+        box({ cursor: 'pointer', onClick: () => window.open(GITHUB_REPO_URL, '_blank') }, [
+          text({ text: 'github.com/razroo/geometra', font: '600 14px Inter', lineHeight: 20, color: ACCENT }),
         ]),
         text({ text: '\u00b7', font: '14px Inter', lineHeight: 20, color: BORDER }),
         box({ cursor: 'pointer', onClick: () => window.open('https://www.npmjs.com/org/geometra', '_blank') }, [
