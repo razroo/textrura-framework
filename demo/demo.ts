@@ -1804,6 +1804,15 @@ function heroSection(): UIElement {
       ),
     ]),
     spacer(8),
+    box({ opacity: e1, marginTop: Math.round(s1) }, [
+      center(text({
+        text: 'The browser for the Singularity',
+        font: '700 24px Inter',
+        lineHeight: 32,
+        color: '#ffffff',
+      })),
+    ]),
+    spacer(2),
     // Title lines — per-character mouse proximity (impossible in DOM without per-char <span> wrapping)
     box({ opacity: e1, marginTop: Math.round(s1) }, [
       reactiveHeroText(
